@@ -25,6 +25,8 @@ jobs:
           test -s SPEC.md
           test -s LICENSE
           test -s build/appicon.png
+          test -s build/icons/appicon-16.png
+          test -s build/icons/appicon-256.png
 
       - name: Check project name references
         run: |
@@ -67,7 +69,8 @@ jobs:
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
 
       - name: Build application
-        run: wails build
+        shell: pwsh
+        run: wails build -ldflags "-X main.version=ci"
 
       - name: Check executable
         shell: pwsh

@@ -15,6 +15,12 @@ type App struct {
 	state      appcore.UIState
 }
 
+type AppInfo struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+	GitHub  string `json:"github"`
+}
+
 func NewApp(configPath string, initial appcore.UIState) *App {
 	return &App{
 		configPath: configPath,
@@ -28,6 +34,14 @@ func (a *App) startup(ctx context.Context) {
 
 func (a *App) GetInitialState() appcore.UIState {
 	return a.state
+}
+
+func (a *App) GetAppInfo() AppInfo {
+	return AppInfo{
+		Name:    "ClipForVRChat",
+		Version: version,
+		GitHub:  githubURL,
+	}
 }
 
 func (a *App) LoadConfig() (appcore.Config, error) {

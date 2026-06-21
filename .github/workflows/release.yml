@@ -46,7 +46,8 @@ jobs:
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
 
       - name: Build application
-        run: wails build
+        shell: pwsh
+        run: wails build -ldflags "-X main.version=${{ github.ref_name }}"
 
       - name: Create source archive
         shell: pwsh
@@ -64,12 +65,12 @@ jobs:
           Copy-Item "build/bin/ClipForVRChat.exe" "dist/ClipForVRChat/"
           Copy-Item "README.md" "dist/ClipForVRChat/"
           Copy-Item "LICENSE" "dist/ClipForVRChat/"
-          Compress-Archive -Path "dist/ClipForVRChat/*" -DestinationPath "dist/ClipForVRChat-windows-amd64.zip" -Force
+          Compress-Archive -Path "dist/ClipForVRChat/*" -DestinationPath "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip" -Force
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/ClipForVRChat-source.zip
-            dist/ClipForVRChat-windows-amd64.zip
+            dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip
           generate_release_notes: true
