@@ -55,6 +55,11 @@ func ConfigPath(exePath string) string {
 	return filepath.Join(filepath.Dir(exePath), "config.json")
 }
 
+func ConfigExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
 func LoadConfig(path string) (Config, error) {
 	cfg := DefaultConfig()
 	data, err := os.ReadFile(path)

@@ -21,8 +21,43 @@ createApp({
   },
   async mounted() {
     this.state = await api.GetInitialState()
+    window.runtime?.OnFileDrop?.(async (_x, _y, paths) => {
+      await this.handleDrop(paths || [])
+    }, false)
   },
   methods: {
+    async openSettings() {
+      this.error = ''
+      try {
+        this.state = await api.OpenSettings('')
+      } catch (err) {
+        this.error = String(err)
+      }
+    },
+    async handleDrop(paths) {
+      this.error = ''
+      this.saved = false
+      if (!paths.length) return
+      const jsonPaths = paths.filter((path) => path.toLowerCase().endsWith('.json'))
+      try {
+        if (jsonPaths.length === 1 && paths.length === 1) {
+          this.state = await api.OpenSettings(jsonPaths[0])
+          return
+        }
+        if (jsonPaths.length) {
+          this.state = {
+            ...this.state,
+            mode: 'error',
+            message: '画像ファイルと設定ファイルが混在しています。設定編集と画像処理は別々に実行してください。',
+            results: []
+          }
+          return
+        }
+        this.state = await api.ProcessToState(paths)
+      } catch (err) {
+        this.error = String(err)
+      }
+    },
     async copy(url) {
       if (!url) return
       await api.CopyText(url)
@@ -36,7 +71,11 @@ createApp({
       this.saved = false
       this.error = ''
       try {
-        await api.SaveConfig(this.state.config)
+        if (this.state.processOnSave) {
+          this.state = await api.SaveConfigAndProcess(this.state.config, this.state.pendingPaths || [])
+        } else {
+          await api.SaveConfig(this.state.config)
+        }
         this.saved = true
         setTimeout(() => {
           this.saved = false
@@ -55,10 +94,12 @@ createApp({
           <h1>ClipForVRChat</h1>
           <p>{{ state.configPath }}</p>
         </div>
+        <button class="settings-button" @click="openSettings">設定</button>
       </header>
 
-      <section v-if="state.mode === 'settings'" class="panel">
+      <section v-if="state.mode === 'settings'" class="panel drop-target">
         <h2>設定</h2>
+        <p v-if="state.message" class="message">{{ state.message }}</p>
         <div v-if="state.config" class="settings">
           <label><input type="checkbox" v-model="state.config.output.saveLocal" /> ローカル保存</label>
           <label><input type="checkbox" v-model="state.config.output.uploadDiscord" /> Discord投稿</label>
@@ -99,7 +140,7 @@ createApp({
         </div>
       </section>
 
-      <section v-else class="panel">
+      <section v-else class="panel drop-target">
         <h2>{{ state.mode === 'error' ? '確認が必要です' : '画像URL' }}</h2>
         <p v-if="state.message" class="message">{{ state.message }}</p>
 
@@ -120,4 +161,3 @@ createApp({
     </main>
   `
 }).mount('#app')
-

@@ -10,11 +10,13 @@ const (
 )
 
 type UIState struct {
-	Mode       Mode     `json:"mode"`
-	Message    string   `json:"message"`
-	ConfigPath string   `json:"configPath"`
-	Config     Config   `json:"config"`
-	Results    []Result `json:"results"`
+	Mode          Mode     `json:"mode"`
+	Message       string   `json:"message"`
+	ConfigPath    string   `json:"configPath"`
+	Config        Config   `json:"config"`
+	Results       []Result `json:"results"`
+	PendingPaths  []string `json:"pendingPaths"`
+	ProcessOnSave bool     `json:"processOnSave"`
 }
 
 type Result struct {

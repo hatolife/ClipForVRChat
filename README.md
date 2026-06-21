@@ -35,6 +35,12 @@ ClipForVRChat.exe image1.png image2.jpg
 ClipForVRChat.exe config.json
 ```
 
+初回起動時に `config.json` がない場合は、最初に設定画面が開きます。保存すると、そのまま画像処理を続行します。
+
+起動後のウィンドウには画像ファイルをドラッグ&ドロップできます。複数画像もまとめて処理できます。
+
+`config.json` をウィンドウにドロップすると、その設定ファイルの編集画面を開きます。
+
 ## 設定
 
 設定は exe と同じ場所にある `config.json` に保存されます。
