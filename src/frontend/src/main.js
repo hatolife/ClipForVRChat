@@ -541,6 +541,12 @@ createApp({
               </label>
             </div>
             <div class="setting-row">
+              <div><strong>最大入力サイズ</strong><p>処理する画像ファイルとクリップボード画像の上限です。大きくしすぎると処理が重くなります。</p></div>
+              <label>
+                <input type="number" min="1" max="512" v-model.number="state.config.image.maxInputMb" />
+              </label>
+            </div>
+            <div class="setting-row">
               <div><strong>JPEG品質</strong><p>{{ isJpegOutput ? 'JPG出力時の画質です。数字が大きいほど高画質です。' : 'PNG出力では使用しません。' }}</p></div>
               <label>
                 <input type="number" min="1" max="100" v-model.number="state.config.image.jpegQuality" :disabled="!isJpegOutput" />
