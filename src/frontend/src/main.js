@@ -22,7 +22,10 @@ createApp({
       toast: '',
       saving: false,
       saved: false,
-      error: ''
+      error: '',
+      settingsBaseline: '',
+      pendingSettingsLeave: null,
+      pendingDropPaths: []
     }
   },
   computed: {
@@ -77,6 +80,10 @@ createApp({
     activeView() {
       if (this.isSettings) return 'settings'
       return this.view
+    },
+    hasUnsavedSettings() {
+      if (!this.isSettings || !this.state.config || !this.settingsBaseline) return false
+      return this.serializeSettings(this.state.config) !== this.settingsBaseline
     }
   },
   async mounted() {
@@ -110,31 +117,111 @@ createApp({
         this.dragging = false
       }
     },
-    goHome() {
-      this.view = 'main'
+    serializeSettings(config) {
+      return JSON.stringify(config || {})
+    },
+    rememberSettingsBaseline() {
+      this.settingsBaseline = this.serializeSettings(this.state.config)
+    },
+    resetSettingsBaseline() {
+      this.settingsBaseline = ''
+    },
+    async leaveSettings(action) {
+      if (this.hasUnsavedSettings) {
+        this.pendingSettingsLeave = action
+        return false
+      }
+      await this.performSettingsLeave(action)
+      return true
+    },
+    async performSettingsLeave(action) {
+      this.error = ''
       if (this.isSettings) {
-        this.state = { ...this.state, mode: 'results', message: '', pendingPaths: [], processOnSave: false }
+        this.state = await api.CloseSettings()
+        this.resetSettingsBaseline()
+      }
+      if (action === 'help') {
+        this.view = 'help'
+      } else if (action === 'about') {
+        this.view = 'about'
+      } else if (action === 'history') {
+        this.view = 'history'
+        this.state.history = await api.GetHistory()
+      } else if (action === 'drop') {
+        const paths = [...this.pendingDropPaths]
+        this.pendingDropPaths = []
+        this.view = 'main'
+        await this.handleDrop(paths, true)
+      } else {
+        this.view = 'main'
       }
     },
-    toggleHelp() {
+    async confirmSaveAndLeaveSettings() {
+      const action = this.pendingSettingsLeave || 'home'
+      this.pendingSettingsLeave = null
+      this.saving = true
+      this.saved = false
+      this.error = ''
+      try {
+        this.sanitizeOutputDirectory()
+        this.sanitizePhotoDirectory()
+        if (this.state.processOnSave) {
+          this.state = await api.SaveConfigAndProcess(this.state.config, this.state.pendingPaths || [])
+          this.resetSettingsBaseline()
+          this.view = 'main'
+          return
+        }
+        await api.SaveConfig(this.state.config)
+        this.resetSettingsBaseline()
+        await this.performSettingsLeave(action)
+      } catch (err) {
+        this.error = String(err)
+        this.pendingSettingsLeave = action
+      } finally {
+        this.saving = false
+      }
+    },
+    async discardSettingsAndLeave() {
+      const action = this.pendingSettingsLeave || 'home'
+      this.pendingSettingsLeave = null
+      await this.performSettingsLeave(action)
+    },
+    cancelSettingsLeave() {
+      this.pendingSettingsLeave = null
+      this.pendingDropPaths = []
+    },
+    async goHome() {
+      if (this.isSettings) {
+        await this.leaveSettings('home')
+        return
+      }
+      this.view = 'main'
+    },
+    async toggleHelp() {
       if (this.activeView === 'help') {
-        this.goHome()
+        await this.goHome()
+        return
+      }
+      if (this.isSettings) {
+        await this.leaveSettings('help')
         return
       }
       this.view = 'help'
-      if (this.isSettings) this.state.mode = 'results'
     },
-    toggleAbout() {
+    async toggleAbout() {
       if (this.activeView === 'about' || this.activeView === 'licenses') {
-        this.goHome()
+        await this.goHome()
+        return
+      }
+      if (this.isSettings) {
+        await this.leaveSettings('about')
         return
       }
       this.view = 'about'
-      if (this.isSettings) this.state.mode = 'results'
     },
     async toggleSettings() {
       if (this.activeView === 'settings') {
-        await this.closeSettings()
+        await this.leaveSettings('home')
         return
       }
       await this.openSettings()
@@ -144,14 +231,13 @@ createApp({
       this.view = 'main'
       try {
         this.state = await api.OpenSettings('')
+        this.rememberSettingsBaseline()
       } catch (err) {
         this.error = String(err)
       }
     },
     async closeSettings() {
-      this.error = ''
-      this.state = await api.CloseSettings()
-      this.view = 'main'
+      await this.leaveSettings('home')
     },
     resultPlaceholder(path, index, total) {
       const normalized = path || 'clipboard.png'
@@ -189,15 +275,21 @@ createApp({
         this.toast = ''
       }, 2200)
     },
-    async handleDrop(paths) {
+    async handleDrop(paths, skipSettingsGuard = false) {
       this.error = ''
       this.saved = false
+      if (!skipSettingsGuard && this.isSettings && this.hasUnsavedSettings) {
+        this.pendingDropPaths = [...paths]
+        this.pendingSettingsLeave = 'drop'
+        return
+      }
       this.view = 'main'
       if (!paths.length) return
       const jsonPaths = paths.filter((path) => path.toLowerCase().endsWith('.json'))
       try {
         if (jsonPaths.length === 1 && paths.length === 1) {
           this.state = await api.OpenSettings(jsonPaths[0])
+          this.rememberSettingsBaseline()
           return
         }
         if (jsonPaths.length) {
@@ -225,6 +317,7 @@ createApp({
     },
     async processClipboard() {
       this.error = ''
+      if (this.isSettings && !(await this.leaveSettings('home'))) return
       this.view = 'main'
       try {
         this.processing = true
@@ -274,8 +367,11 @@ createApp({
     },
     async openHistory() {
       this.cancelClearHold()
+      if (this.isSettings) {
+        await this.leaveSettings('history')
+        return
+      }
       this.view = 'history'
-      if (this.isSettings) this.state.mode = 'results'
       this.state.history = await api.GetHistory()
     },
     selectHistory(event, index, item) {
@@ -389,6 +485,7 @@ createApp({
           await api.SaveConfig(this.state.config)
           this.state = await api.CloseSettings()
         }
+        this.resetSettingsBaseline()
         this.saved = true
         setTimeout(() => {
           this.saved = false
@@ -678,6 +775,18 @@ createApp({
         <div>
           <strong>ここにドロップ</strong>
           <span>画像ファイルまたは config.json を処理できます</span>
+        </div>
+      </div>
+      <div v-if="pendingSettingsLeave" class="modal-backdrop" role="dialog" aria-modal="true">
+        <div class="confirm-dialog">
+          <h2>設定が保存されていません</h2>
+          <p>変更した設定を保存してから移動しますか。保存しない場合、変更前の設定が維持されます。</p>
+          <p v-if="error" class="error">{{ error }}</p>
+          <div class="button-row dialog-actions">
+            <button @click="confirmSaveAndLeaveSettings" :disabled="saving">{{ saving ? '保存中' : '保存して移動' }}</button>
+            <button class="secondary" @click="discardSettingsAndLeave" :disabled="saving">保存せずに移動</button>
+            <button class="secondary" @click="cancelSettingsLeave" :disabled="saving">キャンセル</button>
+          </div>
         </div>
       </div>
       <div v-if="toast" class="toast">{{ toast }}</div>
