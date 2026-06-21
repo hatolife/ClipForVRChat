@@ -538,9 +538,15 @@ small {
 }
 
 .history-grid {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 14px;
+  user-select: none;
+}
+
+.history-grid.selecting {
+  cursor: crosshair;
 }
 
 .history-card {
@@ -554,6 +560,7 @@ small {
   background: #ffffff;
   color: #17212b;
   text-align: left;
+  user-select: none;
 }
 
 .history-card.selected {
@@ -593,6 +600,15 @@ small {
   color: #ffffff;
   font-size: 12px;
   font-weight: 400;
+}
+
+.selection-rect {
+  position: absolute;
+  z-index: 4;
+  border: 1px solid #2478a9;
+  border-radius: 4px;
+  background: rgba(36, 120, 169, 0.18);
+  pointer-events: none;
 }
 
 .help-grid {
