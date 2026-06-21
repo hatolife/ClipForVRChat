@@ -31,8 +31,9 @@
 | 023 | [Goテストカバレッジの拡充](023-expand-go-test-coverage.md) | 完了 | `01a8400` | appcore とアプリ主要処理の Go テストを拡充。 |
 | 024 | [Discord Webhook URLエラーの案内改善](024-improve-discord-webhook-error-message.md) | 完了 | `e3146b3` | 空/不正な Webhook URL のエラー文言をユーザー向けに改善。 |
 | 025 | [設定画面の未保存変更確認](025-confirm-unsaved-settings-navigation.md) | 完了 | `f17eea0` / `v0.1.0` | 設定画面を離れる前に保存/破棄/キャンセルを選べる確認ダイアログを追加。 |
-| 026 | [v0.1.1 不具合修正](026-fix-v0.1.1-regressions.md) | 完了 | `21cc973` / `v0.1.1` | クリア長押し、長押し中のボタン幅、Win+Shift+S 画像崩れを修正。 |
+| 026 | [v0.1.1 不具合修正](026-fix-v0.1.1-regressions.md) | 完了 | `21cc973` / `v0.1.1`, 028で導線更新 | 履歴画面への導線、Win+Shift+S 画像崩れを修正。 |
 | 027 | [画像履歴のマウス矩形範囲選択](027-history-drag-selection.md) | 完了 | 未リリース | 履歴画面でマウスドラッグによる矩形範囲選択を追加。 |
+| 028 | [履歴画面への長押し導線をボタンへ変更](028-replace-history-long-press-with-button.md) | 完了 | 未リリース | クリア長押しを廃止し、履歴ボタンと各ボタンの説明 tooltip を追加。 |
 
 ## 状態の意味
 
