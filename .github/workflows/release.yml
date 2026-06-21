@@ -21,7 +21,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.24.x"
+          go-version: "1.25.x"
           cache: true
 
       - name: Setup Node
@@ -35,6 +35,10 @@ jobs:
         working-directory: src/frontend
         run: npm ci
 
+      - name: Audit frontend dependencies
+        working-directory: src/frontend
+        run: npm audit --omit=dev
+
       - name: Build frontend
         working-directory: src/frontend
         run: npm run build
@@ -42,6 +46,10 @@ jobs:
       - name: Test Go packages
         working-directory: src
         run: go test ./...
+
+      - name: Check Go vulnerabilities
+        working-directory: src
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
@@ -63,9 +71,14 @@ jobs:
           Copy-Item "README.md" "dist/ClipForVRChat/"
           Copy-Item "LICENSE" "dist/ClipForVRChat/"
           Compress-Archive -Path "dist/ClipForVRChat/*" -DestinationPath "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip" -Force
+          Get-FileHash "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip" -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip" } |
+            Set-Content "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip.sha256"
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip
+          files: |
+            dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip
+            dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip.sha256
           generate_release_notes: true
