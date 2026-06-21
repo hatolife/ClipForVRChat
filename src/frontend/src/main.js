@@ -14,9 +14,6 @@ createApp({
       view: 'main',
       processing: false,
       dragging: false,
-      clearHoldTimer: null,
-      clearHolding: false,
-      clearHoldTriggered: false,
       selectedHistoryIds: [],
       lastSelectedHistoryIndex: -1,
       toast: '',
@@ -54,9 +51,6 @@ createApp({
     },
     hasAnyHistory() {
       return (this.state.history || []).length > 0
-    },
-    canOpenHistory() {
-      return true
     },
     isSettings() {
       return this.state.mode === 'settings'
@@ -353,10 +347,6 @@ createApp({
       }
     },
     async clearResults() {
-      if (this.clearHoldTriggered) {
-        this.clearHoldTriggered = false
-        return
-      }
       this.error = ''
       if (this.hasResults) {
         this.state = await api.ClearResults()
@@ -366,24 +356,7 @@ createApp({
       }
       this.view = 'main'
     },
-    startClearHold() {
-      this.clearHolding = true
-      this.clearHoldTriggered = false
-      this.clearHoldTimer = setTimeout(() => {
-        this.clearHolding = false
-        this.clearHoldTriggered = true
-        this.openHistory()
-      }, 3000)
-    },
-    cancelClearHold() {
-      if (this.clearHoldTimer) {
-        clearTimeout(this.clearHoldTimer)
-        this.clearHoldTimer = null
-      }
-      this.clearHolding = false
-    },
     async openHistory() {
-      this.cancelClearHold()
       if (this.isSettings) {
         await this.leaveSettings('history')
         return
@@ -670,9 +643,18 @@ createApp({
             <p class="subtle">削除済みを含む履歴です。選択した画像はDiscord上の投稿だけを削除します。</p>
           </div>
           <div class="button-row">
-            <button @click="deleteSelectedFromDiscord" :disabled="!selectedHistoryIds.length">選択をDiscordから削除</button>
-            <button class="secondary" @click="purgeDeletedHistory">削除済みURLの履歴を削除</button>
-            <button class="secondary" @click="goHome">閉じる</button>
+            <span class="tooltip-action">
+              <button @click="deleteSelectedFromDiscord" :disabled="!selectedHistoryIds.length">選択をDiscordから削除</button>
+              <span class="tooltip">選択した画像のDiscord上の投稿を削除します。履歴データ自体は残ります。</span>
+            </span>
+            <span class="tooltip-action">
+              <button class="secondary" @click="purgeDeletedHistory">削除済みURLの履歴を削除</button>
+              <span class="tooltip">URLを確認し、Discord上で削除済みになっている画像だけを履歴から取り除きます。</span>
+            </span>
+            <span class="tooltip-action">
+              <button class="secondary" @click="goHome">閉じる</button>
+              <span class="tooltip">履歴画面を閉じて結果画面へ戻ります。</span>
+            </span>
           </div>
         </div>
         <p v-if="error" class="error">{{ error }}</p>
@@ -814,7 +796,10 @@ createApp({
             <div class="drop-icon">画像</div>
             <h2>画像をここにドラッグ&ドロップ</h2>
             <p>複数画像をまとめて処理できます。config.json をドロップすると設定画面を開きます。</p>
-            <button @click="processClipboard">クリップボード画像を処理</button>
+            <span class="tooltip-action">
+              <button @click="processClipboard">クリップボード画像を処理</button>
+              <span class="tooltip">クリップボードにある画像を縮小し、設定に応じて保存やDiscord投稿を行います。</span>
+            </span>
           </div>
         </div>
 
@@ -824,9 +809,15 @@ createApp({
               <h2>{{ isError ? '確認が必要です' : '結果' }}</h2>
               <p class="subtle">サムネイルをクリックすると画像URLをコピーできます。</p>
             </div>
-            <div class="clear-action">
-              <button class="secondary clear-button" :class="{ holding: clearHolding }" title="3秒長押しすると画像履歴画面を開きます" @mousedown="startClearHold" @mouseup="cancelClearHold" @mouseleave="cancelClearHold" @touchstart.prevent="startClearHold" @touchend.prevent="cancelClearHold" @click="clearResults" :disabled="processing">クリア</button>
-              <span class="tooltip">3秒長押しで画像履歴を開く</span>
+            <div class="result-actions">
+              <span class="tooltip-action">
+                <button class="secondary clear-button" @click="clearResults" :disabled="processing">クリア</button>
+                <span class="tooltip">結果一覧から非表示にします。Discord上の画像や履歴データは削除しません。</span>
+              </span>
+              <span class="tooltip-action">
+                <button class="secondary" @click="openHistory" :disabled="processing">履歴</button>
+                <span class="tooltip">過去に取得した画像URLを表示します。削除済み画像の確認やDiscord上の削除操作ができます。</span>
+              </span>
             </div>
           </div>
           <p v-if="state.message" class="message" :class="{ warning: isError }">{{ state.message }}</p>
