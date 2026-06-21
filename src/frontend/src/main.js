@@ -6,23 +6,14 @@ const api = window.go?.main?.App
 createApp({
   data() {
     return {
-      info: {
-        name: 'ClipForVRChat',
-        version: 'dev',
-        github: 'https://github.com/hatolife/ClipForVRChat'
-      },
-      state: {
-        mode: 'results',
-        message: '',
-        configPath: '',
-        config: null,
-        results: []
-      },
+      info: { name: 'ClipForVRChat', version: 'dev', github: 'https://github.com/hatolife/ClipForVRChat' },
+      state: { mode: 'results', message: '', configPath: '', config: null, results: [] },
+      licenses: [],
+      view: 'main',
       toast: '',
       saving: false,
       saved: false,
-      error: '',
-      showAbout: false
+      error: ''
     }
   },
   computed: {
@@ -34,11 +25,15 @@ createApp({
     },
     isError() {
       return this.state.mode === 'error'
+    },
+    isJpegOutput() {
+      return this.state.config?.image?.outputFormat === 'jpg'
     }
   },
   async mounted() {
     this.info = await api.GetAppInfo()
     this.state = await api.GetInitialState()
+    this.licenses = await api.GetOSSLicenses()
     window.runtime?.OnFileDrop?.(async (_x, _y, paths) => {
       await this.handleDrop(paths || [])
     }, false)
@@ -46,17 +41,21 @@ createApp({
   methods: {
     async openSettings() {
       this.error = ''
-      this.showAbout = false
+      this.view = 'main'
       try {
         this.state = await api.OpenSettings('')
       } catch (err) {
         this.error = String(err)
       }
     },
+    async closeSettings() {
+      this.error = ''
+      this.state = await api.CloseSettings()
+    },
     async handleDrop(paths) {
       this.error = ''
       this.saved = false
-      this.showAbout = false
+      this.view = 'main'
       if (!paths.length) return
       const jsonPaths = paths.filter((path) => path.toLowerCase().endsWith('.json'))
       try {
@@ -80,7 +79,7 @@ createApp({
     },
     async processClipboard() {
       this.error = ''
-      this.showAbout = false
+      this.view = 'main'
       try {
         this.state = await api.ProcessToState([])
       } catch (err) {
@@ -95,6 +94,9 @@ createApp({
         this.toast = ''
       }, 1800)
     },
+    async openURL(url) {
+      await api.OpenURL(url)
+    },
     async saveSettings() {
       this.saving = true
       this.saved = false
@@ -104,6 +106,7 @@ createApp({
           this.state = await api.SaveConfigAndProcess(this.state.config, this.state.pendingPaths || [])
         } else {
           await api.SaveConfig(this.state.config)
+          this.state = await api.CloseSettings()
         }
         this.saved = true
         setTimeout(() => {
@@ -124,61 +127,103 @@ createApp({
           <p>version {{ info.version }}</p>
         </div>
         <nav>
-          <button class="secondary" @click="showAbout = true">情報</button>
+          <button class="secondary" @click="view = 'about'; state.mode = 'results'">情報</button>
           <button @click="openSettings">設定</button>
         </nav>
       </header>
 
-      <section v-if="showAbout" class="panel about">
+      <section v-if="view === 'about'" class="panel about">
         <h2>このアプリについて</h2>
         <dl>
           <div><dt>プログラム名</dt><dd>{{ info.name }}</dd></div>
           <div><dt>バージョン</dt><dd>{{ info.version }}</dd></div>
-          <div><dt>GitHub</dt><dd>{{ info.github }}</dd></div>
+          <div><dt>GitHub</dt><dd><button class="link-button" @click="openURL(info.github)">{{ info.github }}</button></dd></div>
         </dl>
-        <button class="secondary" @click="showAbout = false">閉じる</button>
+        <div class="button-row">
+          <button @click="view = 'licenses'">OSSライセンス</button>
+          <button class="secondary" @click="view = 'main'">閉じる</button>
+        </div>
       </section>
 
-      <section v-else-if="isSettings" class="panel">
-        <h2>設定</h2>
-        <p v-if="state.message" class="message">{{ state.message }}</p>
-        <div v-if="state.config" class="settings">
-          <label><input type="checkbox" v-model="state.config.output.saveLocal" /> ローカル保存</label>
-          <label><input type="checkbox" v-model="state.config.output.uploadDiscord" /> Discord投稿</label>
-          <label><input type="checkbox" v-model="state.config.output.copySingleUrlToClipboard" /> 1枚時にURLを自動コピー</label>
+      <section v-else-if="view === 'licenses'" class="panel licenses">
+        <h2>OSSライセンス</h2>
+        <p class="subtle">このアプリで使用している主なOSSです。</p>
+        <div class="license-list">
+          <article v-for="license in licenses" :key="license.name" class="license-card">
+            <h3>{{ license.name }}</h3>
+            <p>{{ license.license }}</p>
+            <p>{{ license.copyright }}</p>
+            <button class="link-button" @click="openURL(license.url)">{{ license.url }}</button>
+          </article>
+        </div>
+        <button class="secondary" @click="view = 'about'">戻る</button>
+      </section>
 
-          <label>
-            Discord Webhook URL
-            <input type="password" v-model="state.config.discord.webhookUrl" placeholder="https://discord.com/api/webhooks/..." />
-          </label>
+      <section v-else-if="isSettings" class="panel settings-page">
+        <div class="section-title">
+          <h2>設定</h2>
+          <p v-if="state.message" class="message">{{ state.message }}</p>
+        </div>
+        <div v-if="state.config" class="settings-layout">
+          <section class="settings-group">
+            <h3>出力</h3>
+            <div class="toggle-list">
+              <label><input type="checkbox" v-model="state.config.output.saveLocal" /><span>ローカル保存</span></label>
+              <label><input type="checkbox" v-model="state.config.output.uploadDiscord" /><span>Discord投稿</span></label>
+              <label><input type="checkbox" v-model="state.config.output.copySingleUrlToClipboard" /><span>1枚時にURLを自動コピー</span></label>
+            </div>
+            <div class="field-grid">
+              <label>
+                出力形式
+                <select v-model="state.config.image.outputFormat">
+                  <option value="png">PNG</option>
+                  <option value="jpg">JPG</option>
+                </select>
+              </label>
+              <label>
+                JPEG品質
+                <input type="number" min="1" max="100" v-model.number="state.config.image.jpegQuality" :disabled="!isJpegOutput" />
+                <small>{{ isJpegOutput ? 'JPG出力時に使用します。' : 'PNG出力では使用しません。' }}</small>
+              </label>
+              <label>
+                UI表示
+                <select v-model="state.config.output.showUi">
+                  <option value="auto">auto</option>
+                  <option value="always">always</option>
+                  <option value="never">never</option>
+                </select>
+              </label>
+            </div>
+          </section>
 
-          <label>
-            出力先フォルダ
-            <input v-model="state.config.image.outputDirectory" placeholder="未指定なら入力画像と同じ場所" />
-          </label>
+          <section class="settings-group">
+            <h3>保存</h3>
+            <div class="field-grid two">
+              <label>
+                出力先フォルダ
+                <input v-model="state.config.image.outputDirectory" placeholder="未指定なら入力画像と同じ場所" />
+              </label>
+              <label>
+                サフィックス
+                <input v-model="state.config.image.suffix" />
+              </label>
+            </div>
+          </section>
 
-          <div class="grid">
+          <section class="settings-group">
+            <h3>Discord</h3>
             <label>
-              サフィックス
-              <input v-model="state.config.image.suffix" />
+              Webhook URL
+              <input type="password" v-model="state.config.discord.webhookUrl" placeholder="https://discord.com/api/webhooks/..." />
             </label>
-            <label>
-              JPEG品質
-              <input type="number" min="1" max="100" v-model.number="state.config.image.jpegQuality" />
-            </label>
-            <label>
-              UI表示
-              <select v-model="state.config.output.showUi">
-                <option value="auto">auto</option>
-                <option value="always">always</option>
-                <option value="never">never</option>
-              </select>
-            </label>
+          </section>
+
+          <div class="button-row footer-actions">
+            <button @click="saveSettings" :disabled="saving">{{ saving ? '保存中' : '保存' }}</button>
+            <button class="secondary" @click="closeSettings">閉じる</button>
+            <span v-if="saved" class="saved">保存しました</span>
+            <p v-if="error" class="error">{{ error }}</p>
           </div>
-
-          <button @click="saveSettings" :disabled="saving">{{ saving ? '保存中' : '保存' }}</button>
-          <span v-if="saved" class="saved">保存しました</span>
-          <p v-if="error" class="error">{{ error }}</p>
         </div>
       </section>
 
@@ -194,18 +239,15 @@ createApp({
 
         <div class="result-panel">
           <h2>{{ isError ? '確認が必要です' : '結果' }}</h2>
+          <p class="subtle">サムネイルをクリックすると画像URLをコピーできます。</p>
           <p v-if="state.message" class="message">{{ state.message }}</p>
           <p v-if="error" class="error">{{ error }}</p>
 
-          <div v-if="hasResults" class="list">
-            <button v-for="item in state.results" :key="item.name + item.outputPath + item.url + item.error" class="row" @click="copy(item.url)" :disabled="!item.url">
+          <div v-if="hasResults" class="thumb-grid">
+            <button v-for="item in state.results" :key="item.name + item.outputPath + item.url + item.error" class="thumb-card" @click="copy(item.url)" :disabled="!item.url">
               <img v-if="item.thumbnail" :src="item.thumbnail" alt="" />
-              <div>
-                <strong>{{ item.name }}</strong>
-                <span v-if="item.outputPath">{{ item.outputPath }}</span>
-                <span v-if="item.url">{{ item.url }}</span>
-                <span v-if="item.error" class="error">{{ item.error }}</span>
-              </div>
+              <span>{{ item.name }}</span>
+              <small v-if="item.error" class="error">{{ item.error }}</small>
             </button>
           </div>
           <p v-else class="empty">まだ処理結果はありません。</p>
