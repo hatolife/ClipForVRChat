@@ -4,8 +4,14 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
+)
+
+const (
+	MaxAutoPhotoScanFiles      = 5000
+	MaxAutoPhotoProcessPerTick = 5
 )
 
 type AutoPhotoEvent struct {
@@ -18,6 +24,7 @@ type AutoPhotoWatcher struct {
 	Config   Config
 	Interval time.Duration
 	Handler  func(AutoPhotoEvent)
+	Process  func(string) Result
 	seen     map[string]time.Time
 }
 
@@ -40,14 +47,20 @@ func (w *AutoPhotoWatcher) Run(ctx context.Context) {
 
 func (w *AutoPhotoWatcher) tick() {
 	current := scanPhotoFiles(w.Config.AutoPhoto.PhotoDirectory)
-	for path, modTime := range current {
+	processed := 0
+	for _, path := range sortedPhotoPaths(current) {
+		modTime := current[path]
 		if _, ok := w.seen[path]; ok {
 			continue
+		}
+		if processed >= MaxAutoPhotoProcessPerTick {
+			break
 		}
 		if !fileLooksStable(path) {
 			continue
 		}
 		w.seen[path] = modTime
+		processed++
 		result := w.process(path)
 		event := AutoPhotoEvent{Path: path, Result: result}
 		if result.Error != "" {
@@ -65,6 +78,9 @@ func (w *AutoPhotoWatcher) tick() {
 }
 
 func (w *AutoPhotoWatcher) process(path string) Result {
+	if w.Process != nil {
+		return w.Process(path)
+	}
 	cfg := w.Config
 	cfg.Output.UploadDiscord = true
 	if strings.TrimSpace(cfg.AutoPhoto.WebhookURL) != "" {
@@ -81,21 +97,36 @@ func (w *AutoPhotoWatcher) process(path string) Result {
 }
 
 func scanPhotoFiles(dir string) map[string]time.Time {
+	return scanPhotoFilesLimited(dir, MaxAutoPhotoScanFiles)
+}
+
+func scanPhotoFilesLimited(dir string, maxFiles int) map[string]time.Time {
 	files := make(map[string]time.Time)
 	if strings.TrimSpace(dir) == "" {
 		return files
 	}
+	if maxFiles <= 0 {
+		return files
+	}
+	paths := make([]string, 0, maxFiles)
 	_ = filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
 		if err != nil || entry.IsDir() || !isSupportedPhotoPath(path) {
 			return nil
 		}
-		info, err := entry.Info()
-		if err != nil {
-			return nil
+		if len(paths) >= maxFiles {
+			return filepath.SkipAll
 		}
-		files[path] = info.ModTime()
+		paths = append(paths, path)
 		return nil
 	})
+	sort.Strings(paths)
+	for _, path := range paths {
+		info, err := os.Stat(path)
+		if err != nil {
+			continue
+		}
+		files[path] = info.ModTime()
+	}
 	return files
 }
 
@@ -106,6 +137,15 @@ func isSupportedPhotoPath(path string) bool {
 	default:
 		return false
 	}
+}
+
+func sortedPhotoPaths(files map[string]time.Time) []string {
+	paths := make([]string, 0, len(files))
+	for path := range files {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	return paths
 }
 
 func fileLooksStable(path string) bool {
