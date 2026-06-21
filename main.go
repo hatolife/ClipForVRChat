@@ -119,7 +119,7 @@ func hasErrors(results []appcore.Result) bool {
 func runUI(configPath string, state appcore.UIState) {
 	app := NewApp(configPath, state)
 	err := wails.Run(&options.App{
-		Title:  "ClipForVRChat",
+		Title:  fmt.Sprintf("ClipForVRChat %s", version),
 		Width:  900,
 		Height: 640,
 		AssetServer: &assetserver.Options{
