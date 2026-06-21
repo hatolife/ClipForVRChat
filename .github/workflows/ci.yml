@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    name: Documentation checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check required files
+        run: |
+          test -s README.md
+          test -s SPEC.md
+          test -s LICENSE
+
+      - name: Check project name references
+        run: |
+          grep -q "ClipForVRChat" README.md
+          grep -q "ClipForVRChat" SPEC.md
+
