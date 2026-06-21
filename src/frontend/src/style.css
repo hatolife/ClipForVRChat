@@ -257,8 +257,12 @@ button:disabled {
 }
 
 .message {
-  color: #9b4214;
+  color: #5b6875;
   line-height: 1.6;
+}
+
+.message.warning {
+  color: #9b4214;
 }
 
 .settings-page {

@@ -9,9 +9,10 @@ import (
 )
 
 type Config struct {
-	Image   ImageConfig   `json:"image"`
-	Output  OutputConfig  `json:"output"`
-	Discord DiscordConfig `json:"discord"`
+	Image     ImageConfig     `json:"image"`
+	Output    OutputConfig    `json:"output"`
+	Discord   DiscordConfig   `json:"discord"`
+	AutoPhoto AutoPhotoConfig `json:"autoPhoto"`
 }
 
 type ImageConfig struct {
@@ -35,6 +36,12 @@ type DiscordConfig struct {
 	WebhookURL string `json:"webhookUrl"`
 }
 
+type AutoPhotoConfig struct {
+	Enabled        bool   `json:"enabled"`
+	PhotoDirectory string `json:"photoDirectory"`
+	WebhookURL     string `json:"webhookUrl"`
+}
+
 func DefaultConfig() Config {
 	return Config{
 		Image: ImageConfig{
@@ -51,6 +58,10 @@ func DefaultConfig() Config {
 			UploadDiscord:            true,
 			ShowUI:                   "auto",
 			CopySingleURLToClipboard: true,
+		},
+		AutoPhoto: AutoPhotoConfig{
+			Enabled:        false,
+			PhotoDirectory: DefaultVRChatPhotoDirectory(),
 		},
 	}
 }
@@ -119,4 +130,19 @@ func (c *Config) Normalize() {
 	default:
 		c.Output.ShowUI = "auto"
 	}
+	c.AutoPhoto.PhotoDirectory = strings.Trim(strings.TrimSpace(c.AutoPhoto.PhotoDirectory), `"`)
+	if c.AutoPhoto.PhotoDirectory == "" {
+		c.AutoPhoto.PhotoDirectory = DefaultVRChatPhotoDirectory()
+	}
+	c.AutoPhoto.WebhookURL = strings.Trim(strings.TrimSpace(c.AutoPhoto.WebhookURL), `"`)
+}
+
+func DefaultVRChatPhotoDirectory() string {
+	if userProfile := os.Getenv("USERPROFILE"); userProfile != "" {
+		return filepath.Join(userProfile, "Pictures", "VRChat")
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		return filepath.Join(home, "Pictures", "VRChat")
+	}
+	return ""
 }

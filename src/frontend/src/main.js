@@ -86,6 +86,9 @@ createApp({
     window.runtime?.EventsOn?.('process:progress', (event) => {
       this.applyProgress(event)
     })
+    window.runtime?.EventsOn?.('auto-photo:result', (event) => {
+      this.applyAutoPhotoResult(event)
+    })
     window.runtime?.OnFileDrop?.(async (_x, _y, paths) => {
       this.dragging = false
       await this.handleDrop(paths || [])
@@ -176,6 +179,15 @@ createApp({
       const done = results.filter((item) => !item.processing).length
       const message = event.total > 1 ? `画像を処理しています。${done} / ${event.total}` : this.state.message
       this.state = { ...this.state, results, message }
+    },
+    applyAutoPhotoResult(event) {
+      if (!event?.result) return
+      const results = [event.result, ...(this.state.results || [])]
+      this.state = { ...this.state, mode: 'results', results, message: event.error ? 'VRChat写真の自動処理でエラーが発生しました。' : 'VRChat写真を自動投稿しました。' }
+      this.toast = event.error ? '自動投稿に失敗しました' : 'VRChat写真を自動投稿しました'
+      setTimeout(() => {
+        this.toast = ''
+      }, 2200)
     },
     async handleDrop(paths) {
       this.error = ''
@@ -328,6 +340,10 @@ createApp({
       if (!this.state.config?.image) return
       this.state.config.image.outputDirectory = String(this.state.config.image.outputDirectory || '').trim().replace(/^"+|"+$/g, '')
     },
+    sanitizePhotoDirectory() {
+      if (!this.state.config?.autoPhoto) return
+      this.state.config.autoPhoto.photoDirectory = String(this.state.config.autoPhoto.photoDirectory || '').trim().replace(/^"+|"+$/g, '')
+    },
     async chooseOutputDirectory() {
       this.sanitizeOutputDirectory()
       try {
@@ -339,12 +355,24 @@ createApp({
         this.error = String(err)
       }
     },
+    async choosePhotoDirectory() {
+      this.sanitizePhotoDirectory()
+      try {
+        const selected = await api.SelectPhotoDirectory(this.state.config.autoPhoto.photoDirectory)
+        if (selected) {
+          this.state.config.autoPhoto.photoDirectory = selected
+        }
+      } catch (err) {
+        this.error = String(err)
+      }
+    },
     async saveSettings() {
       this.saving = true
       this.saved = false
       this.error = ''
       try {
         this.sanitizeOutputDirectory()
+        this.sanitizePhotoDirectory()
         if (this.state.processOnSave) {
           this.state = await api.SaveConfigAndProcess(this.state.config, this.state.pendingPaths || [])
         } else {
@@ -475,7 +503,7 @@ createApp({
       <section v-else-if="isSettings" class="panel settings-page">
         <div class="section-title">
           <h2>設定</h2>
-          <p v-if="state.message" class="message">{{ state.message }}</p>
+          <p v-if="state.message" class="message" :class="{ warning: isError }">{{ state.message }}</p>
         </div>
         <div v-if="state.config" class="settings-layout">
           <section class="settings-group">
@@ -550,6 +578,27 @@ createApp({
             </div>
           </section>
 
+          <section class="settings-group">
+            <h3>VRChat写真自動投稿</h3>
+            <div class="setting-row">
+              <div><strong>自動投稿</strong><p>VRChatの写真フォルダに新しい画像が保存されたら、自動で縮小してDiscordへ投稿します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="state.config.autoPhoto.enabled" /><span></span></label>
+            </div>
+            <div class="setting-row">
+              <div><strong>写真フォルダ</strong><p>VRChatが写真を保存するフォルダです。通常は「ピクチャ」内のVRChatフォルダです。</p></div>
+              <div class="input-with-button">
+                <input v-model="state.config.autoPhoto.photoDirectory" @blur="sanitizePhotoDirectory" placeholder="C:\\Users\\...\\Pictures\\VRChat" />
+                <button class="secondary" @click="choosePhotoDirectory">選択</button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div><strong>自動投稿用Webhook URL</strong><p>通常のDiscord投稿とは別の投稿先にしたい場合だけ入力します。空の場合は上のDiscord Webhook URLへ投稿します。</p></div>
+              <label>
+                <input type="password" v-model="state.config.autoPhoto.webhookUrl" placeholder="空なら通常のWebhook URLを使用" />
+              </label>
+            </div>
+          </section>
+
           <div class="button-row footer-actions">
             <button @click="saveSettings" :disabled="saving">{{ saving ? '保存中' : '保存' }}</button>
             <button class="secondary" @click="closeSettings">閉じる</button>
@@ -580,7 +629,7 @@ createApp({
               <span class="tooltip">3秒長押しで画像履歴を開く</span>
             </div>
           </div>
-          <p v-if="state.message" class="message">{{ state.message }}</p>
+          <p v-if="state.message" class="message" :class="{ warning: isError }">{{ state.message }}</p>
           <div v-if="processing && totalProcessingCount" class="overall-progress">
             <div><span>全体の進捗</span><strong>{{ processedCount }} / {{ totalProcessingCount }}</strong></div>
             <div class="progress-track"><span :style="{ width: overallProgress + '%' }"></span></div>
