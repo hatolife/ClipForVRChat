@@ -1,6 +1,8 @@
 package appcore
 
 import (
+	"encoding/json"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -33,5 +35,96 @@ func TestAddResultsToHistorySkipsUntrustedURL(t *testing.T) {
 func TestRemoteURLAvailableRejectsUntrustedURLWithoutRequest(t *testing.T) {
 	if RemoteURLAvailable("http://127.0.0.1:1/attachments/1/2/image.png") {
 		t.Fatal("untrusted URL should not be available")
+	}
+}
+
+func TestHistoryPathUsesConfigDirectory(t *testing.T) {
+	got := HistoryPath(filepath.Join("base", "config.json"))
+	if filepath.Base(got) != "history.json" {
+		t.Fatalf("HistoryPath base = %q, want history.json", filepath.Base(got))
+	}
+	if HistoryPath("") != "history.json" {
+		t.Fatalf("HistoryPath empty = %q, want history.json", HistoryPath(""))
+	}
+}
+
+func TestLoadHistoryMissingAndInvalidJSON(t *testing.T) {
+	dir := t.TempDir()
+	missing, err := LoadHistory(filepath.Join(dir, "missing.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if missing != nil {
+		t.Fatalf("missing history = %+v, want nil", missing)
+	}
+
+	invalid := filepath.Join(dir, "invalid.json")
+	if err := os.WriteFile(invalid, []byte("{"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadHistory(invalid); err == nil {
+		t.Fatal("expected invalid JSON error")
+	}
+}
+
+func TestMarkHistoryCleared(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "history.json")
+	initial := []HistoryEntry{
+		{ID: "1", URL: "https://cdn.discordapp.com/attachments/1/2/a.png"},
+		{ID: "2", URL: "https://cdn.discordapp.com/attachments/1/2/b.png"},
+	}
+	if err := SaveHistory(path, initial); err != nil {
+		t.Fatal(err)
+	}
+
+	history, err := MarkHistoryCleared(path, []string{"2", "missing"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if history[0].Cleared {
+		t.Fatal("entry 1 should not be cleared")
+	}
+	if !history[1].Cleared || history[1].ClearedAt == "" {
+		t.Fatalf("entry 2 should be cleared with timestamp: %+v", history[1])
+	}
+}
+
+func TestPurgeUnavailableHistoryRemovesUntrustedURLs(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "history.json")
+	initial := []HistoryEntry{
+		{ID: "untrusted", URL: "https://example.com/attachments/1/2/b.png"},
+		{ID: "empty", URL: ""},
+	}
+	if err := SaveHistory(path, initial); err != nil {
+		t.Fatal(err)
+	}
+
+	history, removed, err := PurgeUnavailableHistory(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if removed != 1 {
+		t.Fatalf("removed = %d, want 1", removed)
+	}
+	if len(history) != 1 || history[0].ID != "empty" {
+		t.Fatalf("history = %+v, want only empty entry", history)
+	}
+}
+
+func TestSaveHistoryWritesJSON(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "history.json")
+	if err := SaveHistory(path, []HistoryEntry{{ID: "1", Name: "image.png"}}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded []HistoryEntry
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if len(decoded) != 1 || decoded[0].ID != "1" {
+		t.Fatalf("decoded = %+v", decoded)
 	}
 }
