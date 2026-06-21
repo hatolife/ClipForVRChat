@@ -11,20 +11,61 @@ permissions:
 
 jobs:
   release:
-    name: Create GitHub release
-    runs-on: ubuntu-latest
+    name: Build exe and create GitHub release
+    runs-on: windows-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.x"
+          cache: true
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Test Go packages
+        run: go test ./...
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
+
+      - name: Build application
+        run: wails build
+
       - name: Create source archive
+        shell: pwsh
         run: |
-          mkdir -p dist
+          New-Item -ItemType Directory -Force dist | Out-Null
           git archive --format=zip --output="dist/ClipForVRChat-source.zip" HEAD
+
+      - name: Package executable
+        shell: pwsh
+        run: |
+          if (!(Test-Path "build/bin/ClipForVRChat.exe")) {
+            throw "build/bin/ClipForVRChat.exe was not created"
+          }
+          Compress-Archive -Path "build/bin/ClipForVRChat.exe" -DestinationPath "dist/ClipForVRChat-windows-amd64.zip" -Force
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/ClipForVRChat-source.zip
+          files: |
+            dist/ClipForVRChat-source.zip
+            dist/ClipForVRChat-windows-amd64.zip
           generate_release_notes: true
