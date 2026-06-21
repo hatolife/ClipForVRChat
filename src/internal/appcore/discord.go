@@ -31,11 +31,11 @@ type DiscordUpload struct {
 func UploadDiscord(webhookURL string, filename string, encoded EncodedImage) (DiscordUpload, error) {
 	var uploaded DiscordUpload
 	if strings.TrimSpace(webhookURL) == "" {
-		return uploaded, errors.New("Discord投稿がONですがWebhook URLが未設定です。設定画面でWebhook URLを設定してください。")
+		return uploaded, errors.New(discordWebhookSetupMessage("Discord Webhook URLが未設定です。"))
 	}
 	webhookID, token, postURL, err := ValidateDiscordWebhookURL(webhookURL)
 	if err != nil {
-		return uploaded, err
+		return uploaded, errors.New(discordWebhookSetupMessage(err.Error()))
 	}
 
 	var body bytes.Buffer
@@ -72,7 +72,7 @@ func UploadDiscord(webhookURL string, filename string, encoded EncodedImage) (Di
 		return uploaded, err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return uploaded, fmt.Errorf("Discord投稿に失敗しました。Webhook URLと投稿権限を確認してください。status=%d body=%s", resp.StatusCode, string(respData))
+		return uploaded, discordUploadStatusError(resp.StatusCode, respData)
 	}
 
 	var parsed webhookResponse
@@ -93,6 +93,32 @@ func UploadDiscord(webhookURL string, filename string, encoded EncodedImage) (Di
 	}
 	uploaded.Token = token
 	return uploaded, nil
+}
+
+func discordUploadStatusError(status int, body []byte) error {
+	bodyText := strings.TrimSpace(string(body))
+	if status == http.StatusUnauthorized || status == http.StatusNotFound || strings.Contains(bodyText, "Invalid Webhook Token") {
+		return fmt.Errorf("%s status=%d", discordWebhookSetupMessage("Discord Webhook URLが無効になっている可能性があります。"), status)
+	}
+	if status == http.StatusForbidden {
+		return fmt.Errorf("Discord投稿に失敗しました。Webhookの投稿権限を確認してください。Webhook URLをDiscordで再取得して設定し直すと改善する場合があります。status=%d", status)
+	}
+	if bodyText != "" {
+		return fmt.Errorf("Discord投稿に失敗しました。時間をおいて再試行してください。改善しない場合はWebhook URLをDiscordで再取得して設定し直してください。status=%d body=%s", status, truncateForUserMessage(bodyText, 160))
+	}
+	return fmt.Errorf("Discord投稿に失敗しました。時間をおいて再試行してください。改善しない場合はWebhook URLをDiscordで再取得して設定し直してください。status=%d", status)
+}
+
+func discordWebhookSetupMessage(reason string) string {
+	return reason + " DiscordでWebhook URLを再度コピーし、設定画面の「Discord Webhook URL」または「自動投稿用Webhook URL」に貼り直してください。"
+}
+
+func truncateForUserMessage(text string, maxRunes int) string {
+	runes := []rune(text)
+	if len(runes) <= maxRunes {
+		return text
+	}
+	return string(runes[:maxRunes]) + "..."
 }
 
 func DeleteDiscordMessage(webhookID, token, messageID string) error {
