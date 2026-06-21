@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"fmt"
 	"image"
+	"image/color"
+	"image/draw"
 	"image/jpeg"
 	"image/png"
 	"os"
@@ -70,6 +72,14 @@ func ResizeToFit(img image.Image, maxWidth, maxHeight int) image.Image {
 	return imaging.Resize(img, newWidth, newHeight, imaging.Lanczos)
 }
 
+func FlattenTransparentImage(img image.Image, bg color.Color) image.Image {
+	b := img.Bounds()
+	out := image.NewNRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
+	draw.Draw(out, out.Bounds(), &image.Uniform{C: bg}, image.Point{}, draw.Src)
+	draw.Draw(out, out.Bounds(), img, b.Min, draw.Over)
+	return out
+}
+
 func EncodeImage(img image.Image, sourceFormat string, quality int) (EncodedImage, error) {
 	var buf bytes.Buffer
 	out := EncodedImage{Image: img}
@@ -110,7 +120,9 @@ func SaveEncodedImage(encoded EncodedImage, sourcePath string, cfg Config, clipb
 	}
 
 	base := strings.TrimSuffix(filepath.Base(sourcePath), filepath.Ext(sourcePath))
-	if base == "" || base == "." {
+	if clipboardInput {
+		base = "clipboard_" + time.Now().Format("20060102_150405")
+	} else if base == "" || base == "." {
 		base = "clipboard_" + time.Now().Format("20060102_150405")
 	}
 	target := filepath.Join(outputDir, base+cfg.Image.Suffix+encoded.Extension)
