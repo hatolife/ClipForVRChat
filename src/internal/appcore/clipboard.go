@@ -23,6 +23,9 @@ func ReadClipboardImage() ([]byte, error) {
 	if err := InitClipboard(); err != nil {
 		return nil, err
 	}
+	if data, err := readNativeClipboardPNG(); err == nil && len(data) > 0 {
+		return data, nil
+	}
 	data := clipboard.Read(clipboard.FmtImage)
 	if len(data) == 0 {
 		return nil, errors.New("クリップボードに画像がありません。画像をコピーしてから再実行するか、画像ファイルを exe にドラッグしてください。")

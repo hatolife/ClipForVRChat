@@ -210,6 +210,10 @@ button:disabled {
   color: #17212b;
 }
 
+.clear-button {
+  min-width: 70px;
+}
+
 .clear-button.holding::before {
   content: "";
   position: absolute;
@@ -218,20 +222,6 @@ button:disabled {
   background: #2478a9;
   transform-origin: left;
   animation: hold-fill 3s linear forwards;
-}
-
-.clear-button.holding {
-  color: #ffffff;
-}
-
-.clear-button.holding::after {
-  content: "履歴を開く";
-  position: relative;
-  z-index: 1;
-}
-
-.clear-button.holding {
-  font-size: 0;
 }
 
 @keyframes hold-fill {
