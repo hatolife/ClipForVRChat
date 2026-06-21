@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/gofrs/flock"
 	"github.com/hatolife/ClipForVRChat/internal/appcore"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -21,6 +22,15 @@ var icon []byte
 
 func main() {
 	configPath := defaultConfigPath()
+	instanceLock, err := acquireInstanceLock(configPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	defer func() {
+		_ = instanceLock.Unlock()
+	}()
+
 	args := os.Args[1:]
 
 	state := appcore.UIState{
@@ -103,6 +113,19 @@ func main() {
 		state.Mode = appcore.ModeResults
 	}
 	runUI(configPath, state)
+}
+
+func acquireInstanceLock(configPath string) (*flock.Flock, error) {
+	lockPath := filepath.Join(filepath.Dir(configPath), "ClipForVRChat.lock")
+	fileLock := flock.New(lockPath)
+	locked, err := fileLock.TryLock()
+	if err != nil {
+		return nil, fmt.Errorf("起動ロックを取得できませんでした: %w", err)
+	}
+	if !locked {
+		return nil, fmt.Errorf("ClipForVRChat はすでに起動しています。既存のウィンドウを確認してください。")
+	}
+	return fileLock, nil
 }
 
 func shouldExitWithoutUI(cfg appcore.Config, results []appcore.Result) bool {
