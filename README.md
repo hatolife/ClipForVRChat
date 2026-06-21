@@ -83,7 +83,7 @@ Discord投稿を使うには、投稿先チャンネルの Webhook URL が必要
 
 Discord公式の説明:
 
-https://support.discord.com/hc/ja/articles/228383668-%E3%82%A6%E3%82%A7%E3%83%96%E3%83%95%E3%83%83%E3%82%AF%E3%81%AE%E3%81%94%E7%B4%B9%E4%BB%8B#:~:text=Webhook%E3%81%AE%E4%BD%9C%E6%88%90
+https://support.discord.com/hc/ja/articles/228383668-%E3%82%A6%E3%82%A7%E3%83%96%E3%83%95%E3%83%83%E3%82%AF%E3%81%AE%E3%81%94%E7%B4%B9%E4%BB%8B
 
 Webhook URL は、投稿できる権限を持つURLです。知らない人に共有しないでください。
 

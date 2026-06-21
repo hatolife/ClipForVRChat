@@ -35,6 +35,7 @@
 | 027 | [画像履歴のマウス矩形範囲選択](027-history-drag-selection.md) | 完了 | 未リリース | 履歴画面でマウスドラッグによる矩形範囲選択を追加。 |
 | 028 | [履歴画面への長押し導線をボタンへ変更](028-replace-history-long-press-with-button.md) | 完了 | 未リリース | クリア長押しを廃止し、履歴ボタンと各ボタンの説明 tooltip を追加。 |
 | 029 | [画像履歴の全選択とピン止め](029-history-select-all-and-pin.md) | 完了 | 未リリース | Ctrl+A/全選択ボタンと、削除対象外にするピン止めを追加。 |
+| 030 | [Discord公式ヘルプリンクが開けない](030-fix-discord-help-link.md) | 完了 | 未リリース | Discord公式ヘルプURLからテキストフラグメントを削除。 |
 
 ## 状態の意味
 
