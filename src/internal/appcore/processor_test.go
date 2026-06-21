@@ -116,6 +116,46 @@ func TestProcessorUploadDiscordRequiresWebhook(t *testing.T) {
 	}
 }
 
+func TestProcessorDetectsQRCodeURLsWhenEnabled(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "qr.png")
+	writeImagePNG(t, source, compositeQRImage(t, []string{"https://example.com/qr"}))
+
+	cfg := DefaultConfig()
+	cfg.Output.SaveLocal = false
+	cfg.Output.UploadDiscord = true
+	cfg.Output.DetectQRCodeURLs = true
+	cfg.Discord.WebhookURL = ""
+
+	results, err := Processor{Config: cfg}.ProcessPaths([]string{source})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 || len(results[0].QRURLs) != 1 || results[0].QRURLs[0] != "https://example.com/qr" {
+		t.Fatalf("QRURLs = %+v", results)
+	}
+}
+
+func TestProcessorSkipsQRCodeDetectionWhenDisabled(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "qr.png")
+	writeImagePNG(t, source, compositeQRImage(t, []string{"https://example.com/qr"}))
+
+	cfg := DefaultConfig()
+	cfg.Output.SaveLocal = false
+	cfg.Output.UploadDiscord = true
+	cfg.Output.DetectQRCodeURLs = false
+	cfg.Discord.WebhookURL = ""
+
+	results, err := Processor{Config: cfg}.ProcessPaths([]string{source})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 || len(results[0].QRURLs) != 0 {
+		t.Fatalf("QRURLs = %+v, want empty", results)
+	}
+}
+
 func TestCopySingleURLIfNeededSkipsNonSingleOrError(t *testing.T) {
 	cfg := DefaultConfig()
 	if err := CopySingleURLIfNeeded(cfg, []Result{{URL: "https://cdn.discordapp.com/attachments/1/2/a.png"}, {URL: "https://cdn.discordapp.com/attachments/1/2/b.png"}}); err != nil {

@@ -21,16 +21,17 @@ type UIState struct {
 }
 
 type Result struct {
-	SourcePath       string `json:"sourcePath"`
-	Name             string `json:"name"`
-	OutputPath       string `json:"outputPath"`
-	URL              string `json:"url"`
-	Thumbnail        string `json:"thumbnail"`
-	Error            string `json:"error"`
-	HistoryID        string `json:"historyId"`
-	DiscordMessageID string `json:"discordMessageId"`
-	DiscordWebhookID string `json:"discordWebhookId"`
-	DiscordToken     string `json:"discordToken"`
+	SourcePath       string   `json:"sourcePath"`
+	Name             string   `json:"name"`
+	OutputPath       string   `json:"outputPath"`
+	URL              string   `json:"url"`
+	QRURLs           []string `json:"qrUrls"`
+	Thumbnail        string   `json:"thumbnail"`
+	Error            string   `json:"error"`
+	HistoryID        string   `json:"historyId"`
+	DiscordMessageID string   `json:"discordMessageId"`
+	DiscordWebhookID string   `json:"discordWebhookId"`
+	DiscordToken     string   `json:"discordToken"`
 }
 
 type ProgressEvent struct {

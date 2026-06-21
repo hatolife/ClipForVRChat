@@ -29,6 +29,10 @@ type DiscordUpload struct {
 }
 
 func UploadDiscord(webhookURL string, filename string, encoded EncodedImage) (DiscordUpload, error) {
+	return UploadDiscordWithContent(webhookURL, filename, encoded, "")
+}
+
+func UploadDiscordWithContent(webhookURL string, filename string, encoded EncodedImage, content string) (DiscordUpload, error) {
 	var uploaded DiscordUpload
 	if strings.TrimSpace(webhookURL) == "" {
 		return uploaded, errors.New(discordWebhookSetupMessage("Discord Webhook URLが未設定です。"))
@@ -47,7 +51,13 @@ func UploadDiscord(webhookURL string, filename string, encoded EncodedImage) (Di
 	if _, err := part.Write(encoded.Data); err != nil {
 		return uploaded, err
 	}
-	if err := writer.WriteField("payload_json", `{"content":""}`); err != nil {
+	payload, err := json.Marshal(struct {
+		Content string `json:"content"`
+	}{Content: truncateDiscordContent(content)})
+	if err != nil {
+		return uploaded, err
+	}
+	if err := writer.WriteField("payload_json", string(payload)); err != nil {
 		return uploaded, err
 	}
 	if err := writer.Close(); err != nil {
@@ -93,6 +103,15 @@ func UploadDiscord(webhookURL string, filename string, encoded EncodedImage) (Di
 	}
 	uploaded.Token = token
 	return uploaded, nil
+}
+
+func truncateDiscordContent(content string) string {
+	const maxDiscordContentLength = 2000
+	runes := []rune(strings.TrimSpace(content))
+	if len(runes) <= maxDiscordContentLength {
+		return string(runes)
+	}
+	return string(runes[:maxDiscordContentLength-3]) + "..."
 }
 
 func discordUploadStatusError(status int, body []byte) error {
