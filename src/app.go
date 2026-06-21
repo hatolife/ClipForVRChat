@@ -58,6 +58,7 @@ func (a *App) OpenURL(url string) {
 
 func (a *App) GetOSSLicenses() []OSSLicense {
 	return []OSSLicense{
+		{Name: "ClipForVRChat", License: "MIT", Copyright: "Copyright (c) 2026 ClipForVRChat contributors", URL: githubURL},
 		{Name: "Wails", License: "MIT", Copyright: "Copyright (c) 2018-Present Lea Anthony", URL: "https://github.com/wailsapp/wails"},
 		{Name: "Vue.js", License: "MIT", Copyright: "Copyright (c) 2018-present, Yuxi (Evan) You", URL: "https://github.com/vuejs/core"},
 		{Name: "Vite", License: "MIT", Copyright: "Copyright (c) 2019-present, VoidZero Inc. and Vite contributors", URL: "https://github.com/vitejs/vite"},
@@ -65,6 +66,15 @@ func (a *App) GetOSSLicenses() []OSSLicense {
 		{Name: "golang.design/x/clipboard", License: "MIT", Copyright: "Copyright (c) 2021 Changkun Ou", URL: "https://github.com/golang-design/clipboard"},
 		{Name: "golang.org/x/image", License: "BSD-3-Clause", Copyright: "Copyright (c) The Go Authors", URL: "https://cs.opensource.google/go/x/image"},
 	}
+}
+
+func (a *App) ClearResults() appcore.UIState {
+	a.state.Mode = appcore.ModeResults
+	a.state.Message = ""
+	a.state.Results = nil
+	a.state.PendingPaths = nil
+	a.state.ProcessOnSave = false
+	return a.state
 }
 
 func (a *App) LoadConfig() (appcore.Config, error) {
@@ -144,7 +154,9 @@ func (a *App) ProcessToState(paths []string) (appcore.UIState, error) {
 	if err != nil {
 		return a.state, err
 	}
-	results, err := appcore.Processor{Config: cfg}.ProcessPaths(paths)
+	results, err := appcore.Processor{Config: cfg}.ProcessPathsWithProgress(paths, func(event appcore.ProgressEvent) {
+		runtime.EventsEmit(a.ctx, "process:progress", event)
+	})
 	if err != nil {
 		a.state.Mode = appcore.ModeError
 		a.state.Message = err.Error()

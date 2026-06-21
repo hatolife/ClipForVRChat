@@ -12,16 +12,33 @@ type Processor struct {
 }
 
 func (p Processor) ProcessPaths(paths []string) ([]Result, error) {
+	return p.ProcessPathsWithProgress(paths, nil)
+}
+
+func (p Processor) ProcessPathsWithProgress(paths []string, progress func(ProgressEvent)) ([]Result, error) {
 	if len(paths) == 0 {
-		return p.ProcessClipboard()
+		if progress != nil {
+			progress(ProgressEvent{Index: 0, Total: 1, Stage: "processing", Result: Result{Name: "clipboard.png", SourcePath: "clipboard.png"}})
+		}
+		results, err := p.ProcessClipboard()
+		if progress != nil && err == nil && len(results) == 1 {
+			progress(ProgressEvent{Index: 0, Total: 1, Stage: "done", Result: results[0]})
+		}
+		return results, err
 	}
 	if !p.Config.Output.SaveLocal && !p.Config.Output.UploadDiscord && len(paths) > 1 {
 		return nil, fmt.Errorf("複数画像はクリップボードへ直接保持できません。ローカル保存またはDiscord投稿をONにするか、1枚ずつ処理してください。")
 	}
 	results := make([]Result, 0, len(paths))
-	for _, path := range paths {
+	for i, path := range paths {
+		if progress != nil {
+			progress(ProgressEvent{Index: i, Total: len(paths), Stage: "processing", Result: Result{SourcePath: path, Name: filepath.Base(path)}})
+		}
 		result := p.processFile(path)
 		results = append(results, result)
+		if progress != nil {
+			progress(ProgressEvent{Index: i, Total: len(paths), Stage: "done", Result: result})
+		}
 	}
 	return results, nil
 }

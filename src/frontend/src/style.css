@@ -90,6 +90,18 @@ button.secondary {
   color: #17212b;
 }
 
+nav button {
+  border-color: #b9c5cf;
+  background: #ffffff;
+  color: #17212b;
+}
+
+nav button.active {
+  border-color: #1f6f9d;
+  background: #2478a9;
+  color: #ffffff;
+}
+
 button:disabled {
   cursor: default;
   opacity: 0.65;
@@ -144,10 +156,21 @@ button:disabled {
 .result-panel {
   min-height: 0;
   display: grid;
-  grid-template-rows: auto auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   gap: 12px;
   padding: 24px 28px;
   overflow: hidden;
+}
+
+.result-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.result-heading h2 {
+  margin-bottom: 4px;
 }
 
 .panel {
@@ -274,14 +297,29 @@ small {
   background: #ffffff;
   color: #17212b;
   text-align: left;
+  position: relative;
 }
 
-.thumb-card img {
+.thumb-media {
+  position: relative;
   width: 100%;
   aspect-ratio: 1;
-  object-fit: cover;
+  overflow: hidden;
   border-radius: 6px;
   background: #e9edf2;
+}
+
+.thumb-card img,
+.thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.thumb-placeholder {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #edf3f7, #dfe9f1);
 }
 
 .thumb-card span {
@@ -290,6 +328,62 @@ small {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 600;
+}
+
+.copy-overlay,
+.processing-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 14px;
+  background: rgba(23, 33, 43, 0.68);
+  color: #ffffff;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.thumb-card:not(:disabled):hover .copy-overlay {
+  opacity: 1;
+}
+
+.processing-overlay {
+  align-content: center;
+  gap: 10px;
+  opacity: 1;
+}
+
+.progress-ring {
+  --progress: 35%;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: conic-gradient(#2f9dbe var(--progress), rgba(255, 255, 255, 0.34) 0);
+  position: relative;
+  animation: ring-pulse 1.2s ease-in-out infinite;
+}
+
+.progress-ring::after {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.processing-overlay .progress-ring::after {
+  background: #17212b;
+}
+
+@keyframes ring-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
 }
 
 .about,
@@ -375,9 +469,41 @@ small {
 }
 
 .wails-drop-target-active {
-  outline: 3px solid #2f9dbe;
-  outline-offset: -10px;
-  background: #eef8fb;
+  outline: 0;
+}
+
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: rgba(23, 33, 43, 0.58);
+  backdrop-filter: blur(3px);
+  pointer-events: none;
+}
+
+.drop-overlay div {
+  width: min(520px, 100%);
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  border: 2px dashed rgba(255, 255, 255, 0.82);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  text-align: center;
+}
+
+.drop-overlay strong {
+  font-size: 26px;
+}
+
+.drop-overlay span {
+  color: rgba(255, 255, 255, 0.88);
 }
 
 .toast {

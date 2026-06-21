@@ -11,6 +11,8 @@ createApp({
       licenses: [],
       webhookGuideUrl: 'https://support.discord.com/hc/ja/articles/228383668-%E3%82%A6%E3%82%A7%E3%83%96%E3%83%95%E3%83%83%E3%82%AF%E3%81%AE%E3%81%94%E7%B4%B9%E4%BB%8B',
       view: 'main',
+      processing: false,
+      dragging: false,
       toast: '',
       saving: false,
       saved: false,
@@ -29,17 +31,69 @@ createApp({
     },
     isJpegOutput() {
       return this.state.config?.image?.outputFormat === 'jpg'
+    },
+    activeView() {
+      if (this.isSettings) return 'settings'
+      return this.view
     }
   },
   async mounted() {
     this.info = await api.GetAppInfo()
     this.state = await api.GetInitialState()
     this.licenses = await api.GetOSSLicenses()
+    window.runtime?.EventsOn?.('process:progress', (event) => {
+      this.applyProgress(event)
+    })
     window.runtime?.OnFileDrop?.(async (_x, _y, paths) => {
+      this.dragging = false
       await this.handleDrop(paths || [])
     }, false)
+    window.addEventListener('dragenter', this.showDropOverlay)
+    window.addEventListener('dragover', this.showDropOverlay)
+    window.addEventListener('dragleave', this.hideDropOverlay)
+    window.addEventListener('drop', () => {
+      this.dragging = false
+    })
   },
   methods: {
+    showDropOverlay(event) {
+      event.preventDefault()
+      this.dragging = true
+    },
+    hideDropOverlay(event) {
+      if (event.clientX <= 0 || event.clientY <= 0 || event.clientX >= window.innerWidth || event.clientY >= window.innerHeight) {
+        this.dragging = false
+      }
+    },
+    goHome() {
+      this.view = 'main'
+      if (this.isSettings) {
+        this.state = { ...this.state, mode: 'results', message: '', pendingPaths: [], processOnSave: false }
+      }
+    },
+    toggleHelp() {
+      if (this.activeView === 'help') {
+        this.goHome()
+        return
+      }
+      this.view = 'help'
+      if (this.isSettings) this.state.mode = 'results'
+    },
+    toggleAbout() {
+      if (this.activeView === 'about' || this.activeView === 'licenses') {
+        this.goHome()
+        return
+      }
+      this.view = 'about'
+      if (this.isSettings) this.state.mode = 'results'
+    },
+    async toggleSettings() {
+      if (this.activeView === 'settings') {
+        await this.closeSettings()
+        return
+      }
+      await this.openSettings()
+    },
     async openSettings() {
       this.error = ''
       this.view = 'main'
@@ -52,6 +106,32 @@ createApp({
     async closeSettings() {
       this.error = ''
       this.state = await api.CloseSettings()
+      this.view = 'main'
+    },
+    resultPlaceholder(path, index, total) {
+      const normalized = path || 'clipboard.png'
+      const parts = normalized.split(/[\\/]/)
+      return {
+        sourcePath: normalized,
+        name: parts[parts.length - 1] || normalized,
+        outputPath: '',
+        url: '',
+        thumbnail: '',
+        error: '',
+        processing: true,
+        progress: total > 0 ? Math.max(5, Math.round((index / total) * 100)) : 20
+      }
+    },
+    applyProgress(event) {
+      if (!event || event.index < 0) return
+      const results = [...(this.state.results || [])]
+      const current = results[event.index] || this.resultPlaceholder(event.result?.sourcePath, event.index, event.total)
+      if (event.stage === 'done') {
+        results[event.index] = { ...event.result, processing: false, progress: 100 }
+      } else {
+        results[event.index] = { ...current, ...event.result, processing: true, progress: 35 }
+      }
+      this.state = { ...this.state, results }
     },
     async handleDrop(paths) {
       this.error = ''
@@ -73,19 +153,42 @@ createApp({
           }
           return
         }
+        this.processing = true
+        this.state = {
+          ...this.state,
+          mode: 'results',
+          message: '画像を処理しています。',
+          results: paths.map((path, index) => this.resultPlaceholder(path, index, paths.length))
+        }
         this.state = await api.ProcessToState(paths)
       } catch (err) {
         this.error = String(err)
+      } finally {
+        this.processing = false
       }
     },
     async processClipboard() {
       this.error = ''
       this.view = 'main'
       try {
+        this.processing = true
+        this.state = {
+          ...this.state,
+          mode: 'results',
+          message: 'クリップボード画像を処理しています。',
+          results: [this.resultPlaceholder('clipboard.png', 0, 1)]
+        }
         this.state = await api.ProcessToState([])
       } catch (err) {
         this.error = String(err)
+      } finally {
+        this.processing = false
       }
+    },
+    async clearResults() {
+      this.error = ''
+      this.state = await api.ClearResults()
+      this.view = 'main'
     },
     async copy(url) {
       if (!url) return
@@ -125,12 +228,11 @@ createApp({
       <header>
         <div>
           <h1>{{ info.name }}</h1>
-          <p>version {{ info.version }}</p>
         </div>
         <nav>
-          <button class="secondary" @click="view = 'help'; state.mode = 'results'">使い方</button>
-          <button class="secondary" @click="view = 'about'; state.mode = 'results'">情報</button>
-          <button @click="openSettings">設定</button>
+          <button :class="{ active: activeView === 'help' }" @click="toggleHelp">使い方</button>
+          <button :class="{ active: activeView === 'about' || activeView === 'licenses' }" @click="toggleAbout">情報</button>
+          <button :class="{ active: activeView === 'settings' }" @click="toggleSettings">設定</button>
         </nav>
       </header>
 
@@ -278,14 +380,29 @@ createApp({
         </div>
 
         <div class="result-panel">
-          <h2>{{ isError ? '確認が必要です' : '結果' }}</h2>
-          <p class="subtle">サムネイルをクリックすると画像URLをコピーできます。</p>
+          <div class="result-heading">
+            <div>
+              <h2>{{ isError ? '確認が必要です' : '結果' }}</h2>
+              <p class="subtle">サムネイルをクリックすると画像URLをコピーできます。</p>
+            </div>
+            <button class="secondary" @click="clearResults" :disabled="processing || !hasResults">クリア</button>
+          </div>
           <p v-if="state.message" class="message">{{ state.message }}</p>
           <p v-if="error" class="error">{{ error }}</p>
 
           <div v-if="hasResults" class="thumb-grid">
-            <button v-for="item in state.results" :key="item.name + item.outputPath + item.url + item.error" class="thumb-card" @click="copy(item.url)" :disabled="!item.url">
-              <img v-if="item.thumbnail" :src="item.thumbnail" alt="" />
+            <button v-for="(item, index) in state.results" :key="item.name + item.outputPath + item.url + item.error + index" class="thumb-card" @click="copy(item.url)" :disabled="!item.url || item.processing">
+              <div class="thumb-media">
+                <img v-if="item.thumbnail" :src="item.thumbnail" alt="" />
+                <div v-else class="thumb-placeholder">
+                  <span class="progress-ring" :style="{ '--progress': (item.progress || 35) + '%' }"></span>
+                </div>
+                <div v-if="item.processing" class="processing-overlay">
+                  <span class="progress-ring" :style="{ '--progress': (item.progress || 35) + '%' }"></span>
+                  <strong>処理中</strong>
+                </div>
+                <div v-else-if="item.url" class="copy-overlay">クリックでURLをコピー</div>
+              </div>
               <span>{{ item.name }}</span>
               <small v-if="item.error" class="error">{{ item.error }}</small>
             </button>
@@ -294,6 +411,12 @@ createApp({
         </div>
       </section>
 
+      <div v-if="dragging" class="drop-overlay">
+        <div>
+          <strong>ここにドロップ</strong>
+          <span>画像ファイルまたは config.json を処理できます</span>
+        </div>
+      </div>
       <div v-if="toast" class="toast">{{ toast }}</div>
     </main>
   `
