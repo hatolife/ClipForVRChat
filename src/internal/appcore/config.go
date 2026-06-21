@@ -32,10 +32,11 @@ type ImageConfig struct {
 }
 
 type OutputConfig struct {
-	SaveLocal                bool   `json:"saveLocal"`
-	UploadDiscord            bool   `json:"uploadDiscord"`
-	ShowUI                   string `json:"showUi"`
-	CopySingleURLToClipboard bool   `json:"copySingleUrlToClipboard"`
+	SaveLocal                  bool   `json:"saveLocal"`
+	UploadDiscord              bool   `json:"uploadDiscord"`
+	ShowUI                     string `json:"showUi"`
+	CopySingleURLToClipboard   bool   `json:"copySingleUrlToClipboard"`
+	DeleteOutputOnHistoryPurge bool   `json:"deleteOutputOnHistoryPurge"`
 }
 
 type DiscordConfig struct {
@@ -61,10 +62,11 @@ func DefaultConfig() Config {
 			OutputDirectory: "./output",
 		},
 		Output: OutputConfig{
-			SaveLocal:                true,
-			UploadDiscord:            true,
-			ShowUI:                   "auto",
-			CopySingleURLToClipboard: true,
+			SaveLocal:                  true,
+			UploadDiscord:              true,
+			ShowUI:                     "auto",
+			CopySingleURLToClipboard:   true,
+			DeleteOutputOnHistoryPurge: true,
 		},
 		AutoPhoto: AutoPhotoConfig{
 			Enabled:        false,

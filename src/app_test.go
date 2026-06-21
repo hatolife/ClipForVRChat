@@ -103,7 +103,7 @@ func TestAppProcessToStateRejectsMixedJSON(t *testing.T) {
 func TestAppHistoryOperations(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	history := []appcore.HistoryEntry{
-		{ID: "1", URL: "https://example.com/attachments/1/2/a.png"},
+		{ID: "1", URL: "https://cdn.discordapp.com/attachments/1/2/a.png", DiscordDeleted: true},
 		{ID: "2", URL: ""},
 	}
 	if err := appcore.SaveHistory(appcore.HistoryPath(configPath), history); err != nil {

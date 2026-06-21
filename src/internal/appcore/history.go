@@ -148,6 +148,37 @@ func PurgeUnavailableHistory(path string) ([]HistoryEntry, int, error) {
 	return kept, removed, SaveHistory(path, kept)
 }
 
+func PurgeDiscordDeletedHistory(path string, deleteOutput bool) ([]HistoryEntry, int, error) {
+	history, err := LoadHistory(path)
+	if err != nil {
+		return history, 0, err
+	}
+	kept := make([]HistoryEntry, 0, len(history))
+	removed := 0
+	for _, entry := range history {
+		if entry.Pinned || !entry.DiscordDeleted {
+			kept = append(kept, entry)
+			continue
+		}
+		if deleteOutput {
+			_ = removeHistoryOutputFile(entry.OutputPath)
+		}
+		removed++
+	}
+	return kept, removed, SaveHistory(path, kept)
+}
+
+func removeHistoryOutputFile(path string) error {
+	path = strings.Trim(strings.TrimSpace(path), `"`)
+	if path == "" || !filepath.IsAbs(path) {
+		return nil
+	}
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
 func RemoteURLAvailable(url string) bool {
 	if !IsTrustedDiscordImageURL(url) {
 		return false

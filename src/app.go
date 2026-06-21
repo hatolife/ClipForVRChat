@@ -188,7 +188,11 @@ func (a *App) DeleteDiscordHistoryEntries(ids []string) ([]appcore.HistoryEntry,
 func (a *App) PurgeDeletedHistoryEntries() ([]appcore.HistoryEntry, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	history, _, err := appcore.PurgeUnavailableHistory(appcore.HistoryPath(a.configPath))
+	cfg, err := appcore.LoadConfig(a.configPath)
+	if err != nil {
+		return a.state.History, err
+	}
+	history, _, err := appcore.PurgeDiscordDeletedHistory(appcore.HistoryPath(a.configPath), cfg.Output.DeleteOutputOnHistoryPurge)
 	if err != nil {
 		return history, err
 	}

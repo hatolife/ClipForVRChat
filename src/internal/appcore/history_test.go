@@ -147,6 +147,67 @@ func TestPurgeUnavailableHistoryKeepsPinnedEntries(t *testing.T) {
 	}
 }
 
+func TestPurgeDiscordDeletedHistoryRemovesOnlyDeletedEntries(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "history.json")
+	initial := []HistoryEntry{
+		{ID: "deleted", URL: "https://cdn.discordapp.com/attachments/1/2/a.png", DiscordDeleted: true},
+		{ID: "available", URL: "https://cdn.discordapp.com/attachments/1/2/b.png"},
+		{ID: "pinned", URL: "https://cdn.discordapp.com/attachments/1/2/c.png", DiscordDeleted: true, Pinned: true},
+	}
+	if err := SaveHistory(path, initial); err != nil {
+		t.Fatal(err)
+	}
+
+	history, removed, err := PurgeDiscordDeletedHistory(path, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if removed != 1 {
+		t.Fatalf("removed = %d, want 1", removed)
+	}
+	if len(history) != 2 || history[0].ID != "available" || history[1].ID != "pinned" {
+		t.Fatalf("history = %+v, want available and pinned", history)
+	}
+}
+
+func TestPurgeDiscordDeletedHistoryDeletesOutputWhenEnabled(t *testing.T) {
+	dir := t.TempDir()
+	output := filepath.Join(dir, "out.png")
+	if err := os.WriteFile(output, []byte("image"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "history.json")
+	if err := SaveHistory(path, []HistoryEntry{{ID: "deleted", DiscordDeleted: true, OutputPath: output}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, err := PurgeDiscordDeletedHistory(path, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(output); !os.IsNotExist(err) {
+		t.Fatalf("output file should be removed, stat err = %v", err)
+	}
+}
+
+func TestPurgeDiscordDeletedHistoryKeepsOutputWhenDisabled(t *testing.T) {
+	dir := t.TempDir()
+	output := filepath.Join(dir, "out.png")
+	if err := os.WriteFile(output, []byte("image"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "history.json")
+	if err := SaveHistory(path, []HistoryEntry{{ID: "deleted", DiscordDeleted: true, OutputPath: output}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, err := PurgeDiscordDeletedHistory(path, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(output); err != nil {
+		t.Fatalf("output file should remain, stat err = %v", err)
+	}
+}
+
 func TestSaveHistoryWritesJSON(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "history.json")
 	if err := SaveHistory(path, []HistoryEntry{{ID: "1", Name: "image.png"}}); err != nil {
