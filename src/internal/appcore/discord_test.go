@@ -54,3 +54,27 @@ func TestIsTrustedDiscordImageURL(t *testing.T) {
 		})
 	}
 }
+
+func TestParseWebhookURL(t *testing.T) {
+	id, token := ParseWebhookURL("https://discord.com/api/webhooks/123/abc")
+	if id != "123" || token != "abc" {
+		t.Fatalf("ParseWebhookURL = %q, %q", id, token)
+	}
+
+	id, token = ParseWebhookURL("https://example.com/api/webhooks/123/abc")
+	if id != "" || token != "" {
+		t.Fatalf("invalid ParseWebhookURL = %q, %q", id, token)
+	}
+}
+
+func TestDeleteDiscordMessageRequiresFields(t *testing.T) {
+	if err := DeleteDiscordMessage("", "token", "message"); err == nil {
+		t.Fatal("expected missing webhook ID error")
+	}
+	if err := DeleteDiscordMessage("id", "", "message"); err == nil {
+		t.Fatal("expected missing token error")
+	}
+	if err := DeleteDiscordMessage("id", "token", ""); err == nil {
+		t.Fatal("expected missing message ID error")
+	}
+}
