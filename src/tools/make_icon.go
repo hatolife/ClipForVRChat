@@ -16,7 +16,7 @@ var sizes = []int{16, 24, 32, 48, 64, 128, 256, 512, 1024}
 
 func main() {
 	src := drawIcon(canvas)
-	if err := os.MkdirAll("build/icons", 0755); err != nil {
+	if err := os.MkdirAll("build/icons", 0700); err != nil {
 		panic(err)
 	}
 	mustWrite("build/appicon.png", src)
@@ -153,10 +153,10 @@ func resize(src image.Image, size int) *image.RGBA {
 				}
 			}
 			dst.SetRGBA(x, y, color.RGBA{
-				R: uint8((r / count) >> 8),
-				G: uint8((g / count) >> 8),
-				B: uint8((b / count) >> 8),
-				A: uint8((a / count) >> 8),
+				R: rgba16To8(r / count),
+				G: rgba16To8(g / count),
+				B: rgba16To8(b / count),
+				A: rgba16To8(a / count),
 			})
 		}
 	}
@@ -164,7 +164,7 @@ func resize(src image.Image, size int) *image.RGBA {
 }
 
 func mustWrite(path string, img image.Image) {
-	file, err := os.Create(path)
+	file, err := os.Create(path) // #nosec G304 -- path is generated from fixed build/icon filenames.
 	if err != nil {
 		panic(err)
 	}
@@ -172,6 +172,14 @@ func mustWrite(path string, img image.Image) {
 	if err := png.Encode(file, img); err != nil {
 		panic(err)
 	}
+}
+
+func rgba16To8(v uint32) uint8 {
+	v >>= 8
+	if v > math.MaxUint8 {
+		return math.MaxUint8
+	}
+	return uint8(v)
 }
 
 func blend(img *image.RGBA, x, y int, c color.RGBA) {

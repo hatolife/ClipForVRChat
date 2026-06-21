@@ -35,7 +35,7 @@ func HistoryPath(configPath string) string {
 }
 
 func LoadHistory(path string) ([]HistoryEntry, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- history path is derived from the active app config path.
 	if os.IsNotExist(err) {
 		return nil, nil
 	}

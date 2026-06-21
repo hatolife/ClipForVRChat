@@ -70,7 +70,7 @@ func DecodeImageFileWithLimit(path string, maxInputMB int) (image.Image, string,
 	if info.Size() > maxBytes {
 		return nil, "", fmt.Errorf("画像ファイルが大きすぎます。%dMB以下の画像を指定してください。", maxBytes/1024/1024)
 	}
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) // #nosec G304 -- path comes from explicit user file drop or configured photo folder.
 	if err != nil {
 		return nil, "", err
 	}
@@ -197,7 +197,7 @@ func SaveEncodedImage(encoded EncodedImage, sourcePath string, cfg Config, clipb
 		}
 		outputDir = filepath.Join(filepath.Dir(exe), outputDir)
 	}
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, privateDirMode); err != nil {
 		return "", err
 	}
 
@@ -211,7 +211,7 @@ func SaveEncodedImage(encoded EncodedImage, sourcePath string, cfg Config, clipb
 	if !cfg.Image.Overwrite {
 		target = nextAvailablePath(target)
 	}
-	return target, os.WriteFile(target, encoded.Data, 0644)
+	return target, WritePrivateFile(target, encoded.Data)
 }
 
 func nextAvailablePath(path string) string {
