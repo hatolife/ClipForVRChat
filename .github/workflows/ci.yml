@@ -22,16 +22,16 @@ jobs:
       - name: Check required files
         run: |
           test -s README.md
-          test -s SPEC.md
+          test -s src/SPEC.md
           test -s LICENSE
-          test -s build/appicon.png
-          test -s build/icons/appicon-16.png
-          test -s build/icons/appicon-256.png
+          test -s src/build/appicon.png
+          test -s src/build/icons/appicon-16.png
+          test -s src/build/icons/appicon-256.png
 
       - name: Check project name references
         run: |
           grep -q "ClipForVRChat" README.md
-          grep -q "ClipForVRChat" SPEC.md
+          grep -q "ClipForVRChat" src/SPEC.md
 
   build:
     name: Build Windows exe
@@ -52,27 +52,30 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: src/frontend/package-lock.json
 
       - name: Install frontend dependencies
-        working-directory: frontend
+        working-directory: src/frontend
         run: npm ci
 
       - name: Build frontend
-        working-directory: frontend
+        working-directory: src/frontend
         run: npm run build
 
       - name: Test Go packages
+        working-directory: src
         run: go test ./...
 
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
 
       - name: Build application
+        working-directory: src
         shell: pwsh
         run: wails build -ldflags "-X main.version=ci"
 
       - name: Check executable
+        working-directory: src
         shell: pwsh
         run: |
           if (!(Test-Path "build/bin/ClipForVRChat.exe")) {
