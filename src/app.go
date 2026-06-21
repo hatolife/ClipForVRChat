@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/hatolife/ClipForVRChat/internal/appcore"
@@ -16,6 +17,7 @@ type App struct {
 	configPath string
 	state      appcore.UIState
 	autoCancel context.CancelFunc
+	mu         sync.Mutex
 }
 
 type AppInfo struct {
@@ -39,11 +41,15 @@ func NewApp(configPath string, initial appcore.UIState) *App {
 }
 
 func (a *App) startup(ctx context.Context) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	a.ctx = ctx
 	a.restartAutoPhotoWatcher(a.state.Config)
 }
 
 func (a *App) GetInitialState() appcore.UIState {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	a.refreshHistory()
 	return a.state
 }
@@ -97,6 +103,8 @@ func (a *App) selectDirectory(title string, current string) (string, error) {
 }
 
 func (a *App) ClearResults() appcore.UIState {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	var ids []string
 	for _, result := range a.state.Results {
 		if result.HistoryID != "" {
@@ -117,6 +125,8 @@ func (a *App) ClearResults() appcore.UIState {
 }
 
 func (a *App) GetHistory() ([]appcore.HistoryEntry, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	history, err := appcore.LoadHistory(appcore.HistoryPath(a.configPath))
 	if err != nil {
 		return nil, err
@@ -126,6 +136,8 @@ func (a *App) GetHistory() ([]appcore.HistoryEntry, error) {
 }
 
 func (a *App) MarkHistoryCleared(ids []string) ([]appcore.HistoryEntry, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	history, err := appcore.MarkHistoryCleared(appcore.HistoryPath(a.configPath), ids)
 	if err != nil {
 		return history, err
@@ -135,6 +147,8 @@ func (a *App) MarkHistoryCleared(ids []string) ([]appcore.HistoryEntry, error) {
 }
 
 func (a *App) DeleteDiscordHistoryEntries(ids []string) ([]appcore.HistoryEntry, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	history, err := appcore.LoadHistory(appcore.HistoryPath(a.configPath))
 	if err != nil {
 		return history, err
@@ -161,6 +175,8 @@ func (a *App) DeleteDiscordHistoryEntries(ids []string) ([]appcore.HistoryEntry,
 }
 
 func (a *App) PurgeDeletedHistoryEntries() ([]appcore.HistoryEntry, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	history, _, err := appcore.PurgeUnavailableHistory(appcore.HistoryPath(a.configPath))
 	if err != nil {
 		return history, err
@@ -170,10 +186,18 @@ func (a *App) PurgeDeletedHistoryEntries() ([]appcore.HistoryEntry, error) {
 }
 
 func (a *App) LoadConfig() (appcore.Config, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	return appcore.LoadConfig(a.configPath)
 }
 
 func (a *App) SaveConfig(cfg appcore.Config) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.saveConfigLocked(cfg)
+}
+
+func (a *App) saveConfigLocked(cfg appcore.Config) error {
 	if err := appcore.SaveConfig(a.configPath, cfg); err != nil {
 		return err
 	}
@@ -186,6 +210,8 @@ func (a *App) SaveConfig(cfg appcore.Config) error {
 }
 
 func (a *App) CloseSettings() appcore.UIState {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	a.state.Mode = appcore.ModeResults
 	a.state.Message = ""
 	a.state.Results = nil
@@ -195,6 +221,8 @@ func (a *App) CloseSettings() appcore.UIState {
 }
 
 func (a *App) OpenSettings(path string) (appcore.UIState, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	if strings.TrimSpace(path) != "" {
 		a.configPath = path
 	}
@@ -213,7 +241,9 @@ func (a *App) OpenSettings(path string) (appcore.UIState, error) {
 }
 
 func (a *App) SaveConfigAndProcess(cfg appcore.Config, paths []string) (appcore.UIState, error) {
-	if err := a.SaveConfig(cfg); err != nil {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err := a.saveConfigLocked(cfg); err != nil {
 		return a.state, err
 	}
 	results, err := appcore.Processor{Config: cfg}.ProcessPaths(paths)
@@ -240,6 +270,8 @@ func (a *App) SaveConfigAndProcess(cfg appcore.Config, paths []string) (appcore.
 }
 
 func (a *App) ProcessToState(paths []string) (appcore.UIState, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	if hasJSONPath(paths) {
 		a.state.Mode = appcore.ModeError
 		a.state.Message = "画像ファイルと設定ファイルが混在しています。設定編集と画像処理は別々に実行してください。"
@@ -276,6 +308,8 @@ func (a *App) ProcessToState(paths []string) (appcore.UIState, error) {
 }
 
 func (a *App) Process(paths []string) ([]appcore.Result, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	cfg, err := appcore.LoadConfig(a.configPath)
 	if err != nil {
 		return nil, err
@@ -359,6 +393,8 @@ func (a *App) restartAutoPhotoWatcher(cfg appcore.Config) {
 	watcher := appcore.AutoPhotoWatcher{
 		Config: cfg,
 		Handler: func(event appcore.AutoPhotoEvent) {
+			a.mu.Lock()
+			defer a.mu.Unlock()
 			if event.Result.URL != "" && event.Result.Error == "" {
 				results := []appcore.Result{event.Result}
 				if history, err := appcore.AddResultsToHistory(appcore.HistoryPath(a.configPath), results); err == nil {
