@@ -51,7 +51,7 @@ createApp({
       return (this.state.history || []).length > 0
     },
     canOpenHistory() {
-      return this.hasResultItems || this.hasAnyHistory
+      return true
     },
     isSettings() {
       return this.state.mode === 'settings'
@@ -349,7 +349,6 @@ createApp({
       this.view = 'main'
     },
     startClearHold() {
-      if (!this.canOpenHistory) return
       this.clearHolding = true
       this.clearHoldTriggered = false
       this.clearHoldTimer = setTimeout(() => {
@@ -739,7 +738,7 @@ createApp({
               <p class="subtle">サムネイルをクリックすると画像URLをコピーできます。</p>
             </div>
             <div class="clear-action">
-              <button class="secondary clear-button" :class="{ holding: clearHolding }" title="3秒長押しすると画像履歴画面を開きます" @mousedown="startClearHold" @mouseup="cancelClearHold" @mouseleave="cancelClearHold" @touchstart.prevent="startClearHold" @touchend.prevent="cancelClearHold" @click="clearResults" :disabled="processing || !canOpenHistory">クリア</button>
+              <button class="secondary clear-button" :class="{ holding: clearHolding }" title="3秒長押しすると画像履歴画面を開きます" @mousedown="startClearHold" @mouseup="cancelClearHold" @mouseleave="cancelClearHold" @touchstart.prevent="startClearHold" @touchend.prevent="cancelClearHold" @click="clearResults" :disabled="processing">クリア</button>
               <span class="tooltip">3秒長押しで画像履歴を開く</span>
             </div>
           </div>
