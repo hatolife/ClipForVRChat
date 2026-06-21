@@ -80,6 +80,20 @@ func FlattenTransparentImage(img image.Image, bg color.Color) image.Image {
 	return out
 }
 
+func TrimClipboardArtifactBorder(img image.Image) image.Image {
+	b := img.Bounds()
+	if b.Dx() <= 4 || b.Dy() <= 4 {
+		return img
+	}
+	return cropImage(img, image.Rect(b.Min.X+1, b.Min.Y+1, b.Max.X-1, b.Max.Y-1))
+}
+
+func cropImage(img image.Image, rect image.Rectangle) image.Image {
+	out := image.NewNRGBA(image.Rect(0, 0, rect.Dx(), rect.Dy()))
+	draw.Draw(out, out.Bounds(), img, rect.Min, draw.Src)
+	return out
+}
+
 func EncodeImage(img image.Image, sourceFormat string, quality int) (EncodedImage, error) {
 	var buf bytes.Buffer
 	out := EncodedImage{Image: img}

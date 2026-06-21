@@ -35,6 +35,7 @@ func (p Processor) ProcessClipboard() ([]Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	img = TrimClipboardArtifactBorder(img)
 	img = FlattenTransparentImage(img, color.White)
 	result := p.processImage(img, format, "clipboard.png", true)
 	return []Result{result}, nil

@@ -29,40 +29,37 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: src/frontend/package-lock.json
 
       - name: Install frontend dependencies
-        working-directory: frontend
+        working-directory: src/frontend
         run: npm ci
 
       - name: Build frontend
-        working-directory: frontend
+        working-directory: src/frontend
         run: npm run build
 
       - name: Test Go packages
+        working-directory: src
         run: go test ./...
 
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
 
       - name: Build application
+        working-directory: src
         shell: pwsh
         run: wails build -ldflags "-X main.version=${{ github.ref_name }}"
-
-      - name: Create source archive
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force dist | Out-Null
-          git archive --format=zip --output="dist/ClipForVRChat-source.zip" HEAD
 
       - name: Package executable
         shell: pwsh
         run: |
-          if (!(Test-Path "build/bin/ClipForVRChat.exe")) {
-            throw "build/bin/ClipForVRChat.exe was not created"
+          if (!(Test-Path "src/build/bin/ClipForVRChat.exe")) {
+            throw "src/build/bin/ClipForVRChat.exe was not created"
           }
+          New-Item -ItemType Directory -Force dist | Out-Null
           New-Item -ItemType Directory -Force "dist/ClipForVRChat" | Out-Null
-          Copy-Item "build/bin/ClipForVRChat.exe" "dist/ClipForVRChat/"
+          Copy-Item "src/build/bin/ClipForVRChat.exe" "dist/ClipForVRChat/"
           Copy-Item "README.md" "dist/ClipForVRChat/"
           Copy-Item "LICENSE" "dist/ClipForVRChat/"
           Compress-Archive -Path "dist/ClipForVRChat/*" -DestinationPath "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip" -Force
@@ -70,7 +67,5 @@ jobs:
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            dist/ClipForVRChat-source.zip
-            dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip
+          files: dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip
           generate_release_notes: true
