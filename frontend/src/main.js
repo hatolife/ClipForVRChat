@@ -6,6 +6,11 @@ const api = window.go?.main?.App
 createApp({
   data() {
     return {
+      info: {
+        name: 'ClipForVRChat',
+        version: 'dev',
+        github: 'https://github.com/hatolife/ClipForVRChat'
+      },
       state: {
         mode: 'results',
         message: '',
@@ -16,10 +21,23 @@ createApp({
       toast: '',
       saving: false,
       saved: false,
-      error: ''
+      error: '',
+      showAbout: false
+    }
+  },
+  computed: {
+    hasResults() {
+      return this.state.results && this.state.results.length > 0
+    },
+    isSettings() {
+      return this.state.mode === 'settings'
+    },
+    isError() {
+      return this.state.mode === 'error'
     }
   },
   async mounted() {
+    this.info = await api.GetAppInfo()
     this.state = await api.GetInitialState()
     window.runtime?.OnFileDrop?.(async (_x, _y, paths) => {
       await this.handleDrop(paths || [])
@@ -28,6 +46,7 @@ createApp({
   methods: {
     async openSettings() {
       this.error = ''
+      this.showAbout = false
       try {
         this.state = await api.OpenSettings('')
       } catch (err) {
@@ -37,6 +56,7 @@ createApp({
     async handleDrop(paths) {
       this.error = ''
       this.saved = false
+      this.showAbout = false
       if (!paths.length) return
       const jsonPaths = paths.filter((path) => path.toLowerCase().endsWith('.json'))
       try {
@@ -54,6 +74,15 @@ createApp({
           return
         }
         this.state = await api.ProcessToState(paths)
+      } catch (err) {
+        this.error = String(err)
+      }
+    },
+    async processClipboard() {
+      this.error = ''
+      this.showAbout = false
+      try {
+        this.state = await api.ProcessToState([])
       } catch (err) {
         this.error = String(err)
       }
@@ -91,13 +120,26 @@ createApp({
     <main class="shell">
       <header>
         <div>
-          <h1>ClipForVRChat</h1>
-          <p>{{ state.configPath }}</p>
+          <h1>{{ info.name }}</h1>
+          <p>version {{ info.version }}</p>
         </div>
-        <button class="settings-button" @click="openSettings">設定</button>
+        <nav>
+          <button class="secondary" @click="showAbout = true">情報</button>
+          <button @click="openSettings">設定</button>
+        </nav>
       </header>
 
-      <section v-if="state.mode === 'settings'" class="panel drop-target">
+      <section v-if="showAbout" class="panel about">
+        <h2>このアプリについて</h2>
+        <dl>
+          <div><dt>プログラム名</dt><dd>{{ info.name }}</dd></div>
+          <div><dt>バージョン</dt><dd>{{ info.version }}</dd></div>
+          <div><dt>GitHub</dt><dd>{{ info.github }}</dd></div>
+        </dl>
+        <button class="secondary" @click="showAbout = false">閉じる</button>
+      </section>
+
+      <section v-else-if="isSettings" class="panel">
         <h2>設定</h2>
         <p v-if="state.message" class="message">{{ state.message }}</p>
         <div v-if="state.config" class="settings">
@@ -140,20 +182,33 @@ createApp({
         </div>
       </section>
 
-      <section v-else class="panel drop-target">
-        <h2>{{ state.mode === 'error' ? '確認が必要です' : '画像URL' }}</h2>
-        <p v-if="state.message" class="message">{{ state.message }}</p>
+      <section v-else class="workspace">
+        <div class="drop-zone">
+          <div class="drop-card">
+            <div class="drop-icon">画像</div>
+            <h2>画像をここにドラッグ&ドロップ</h2>
+            <p>複数画像をまとめて処理できます。config.json をドロップすると設定画面を開きます。</p>
+            <button @click="processClipboard">クリップボード画像を処理</button>
+          </div>
+        </div>
 
-        <div v-if="state.results && state.results.length" class="list">
-          <button v-for="item in state.results" :key="item.name + item.outputPath + item.url" class="row" @click="copy(item.url)" :disabled="!item.url">
-            <img v-if="item.thumbnail" :src="item.thumbnail" alt="" />
-            <div>
-              <strong>{{ item.name }}</strong>
-              <span v-if="item.outputPath">{{ item.outputPath }}</span>
-              <span v-if="item.url">{{ item.url }}</span>
-              <span v-if="item.error" class="error">{{ item.error }}</span>
-            </div>
-          </button>
+        <div class="result-panel">
+          <h2>{{ isError ? '確認が必要です' : '結果' }}</h2>
+          <p v-if="state.message" class="message">{{ state.message }}</p>
+          <p v-if="error" class="error">{{ error }}</p>
+
+          <div v-if="hasResults" class="list">
+            <button v-for="item in state.results" :key="item.name + item.outputPath + item.url + item.error" class="row" @click="copy(item.url)" :disabled="!item.url">
+              <img v-if="item.thumbnail" :src="item.thumbnail" alt="" />
+              <div>
+                <strong>{{ item.name }}</strong>
+                <span v-if="item.outputPath">{{ item.outputPath }}</span>
+                <span v-if="item.url">{{ item.url }}</span>
+                <span v-if="item.error" class="error">{{ item.error }}</span>
+              </div>
+            </button>
+          </div>
+          <p v-else class="empty">まだ処理結果はありません。</p>
         </div>
       </section>
 
