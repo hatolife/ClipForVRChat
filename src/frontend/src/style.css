@@ -717,6 +717,36 @@ small {
   color: rgba(255, 255, 255, 0.88);
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(23, 33, 43, 0.52);
+}
+
+.confirm-dialog {
+  width: min(440px, 100%);
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+  border: 1px solid #d6dee7;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 18px 52px rgba(23, 33, 43, 0.22);
+}
+
+.confirm-dialog p {
+  color: #455361;
+  line-height: 1.65;
+}
+
+.dialog-actions {
+  justify-content: flex-end;
+}
+
 .toast {
   position: fixed;
   right: 24px;
