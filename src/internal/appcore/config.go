@@ -37,6 +37,7 @@ type OutputConfig struct {
 	ShowUI                     string `json:"showUi"`
 	CopySingleURLToClipboard   bool   `json:"copySingleUrlToClipboard"`
 	DeleteOutputOnHistoryPurge bool   `json:"deleteOutputOnHistoryPurge"`
+	DetectQRCodeURLs           bool   `json:"detectQrCodeUrls"`
 }
 
 type DiscordConfig struct {
@@ -67,6 +68,7 @@ func DefaultConfig() Config {
 			ShowUI:                     "auto",
 			CopySingleURLToClipboard:   true,
 			DeleteOutputOnHistoryPurge: true,
+			DetectQRCodeURLs:           false,
 		},
 		AutoPhoto: AutoPhotoConfig{
 			Enabled:        false,

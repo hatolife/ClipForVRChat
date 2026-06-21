@@ -67,9 +67,12 @@ func (p Processor) processFile(path string) Result {
 }
 
 func (p Processor) processImage(img image.Image, format string, sourcePath string, clipboardInput bool) Result {
+	result := Result{SourcePath: sourcePath, Name: filepath.Base(sourcePath)}
+	if p.Config.Output.DetectQRCodeURLs {
+		result.QRURLs = DetectQRCodeURLs(img)
+	}
 	resized := ResizeToFit(img, p.Config.Image.MaxWidth, p.Config.Image.MaxHeight)
 	encoded, err := EncodeImage(resized, p.Config.Image.OutputFormat, p.Config.Image.JPEGQuality)
-	result := Result{SourcePath: sourcePath, Name: filepath.Base(sourcePath)}
 	if err != nil {
 		result.Error = fmt.Sprintf("画像を書き出せませんでした: %v", err)
 		return result
@@ -91,7 +94,7 @@ func (p Processor) processImage(img image.Image, format string, sourcePath strin
 	if p.Config.Output.UploadDiscord {
 		name := filepath.Base(sourcePath)
 		name = name[:len(name)-len(filepath.Ext(name))] + encoded.Extension
-		uploaded, err := UploadDiscord(p.Config.Discord.WebhookURL, name, encoded)
+		uploaded, err := UploadDiscordWithContent(p.Config.Discord.WebhookURL, name, encoded, qrDiscordContent(result.QRURLs))
 		if err != nil {
 			result.Error = err.Error()
 			return result

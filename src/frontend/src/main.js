@@ -524,6 +524,10 @@ createApp({
         this.toast = ''
       }, 1800)
     },
+    async copyQRURL(event, url) {
+      event.stopPropagation()
+      await this.copy(url)
+    },
     async openURL(url) {
       await api.OpenURL(url)
     },
@@ -732,6 +736,10 @@ createApp({
               <label class="switch"><input type="checkbox" v-model="state.config.output.copySingleUrlToClipboard" /><span></span></label>
             </div>
             <div class="setting-row">
+              <div><strong>QRコードURL検出</strong><p>処理した画像内のQRコードを読み取り、URLが含まれていればDiscord本文と結果画面に表示します。複数のQRコードにも対応します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="state.config.output.detectQrCodeUrls" /><span></span></label>
+            </div>
+            <div class="setting-row">
               <div><strong>履歴削除時にoutputも削除</strong><p>画像履歴画面でDiscord削除済みの履歴を削除するとき、PCに保存したoutput画像も一緒に削除します。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.output.deleteOutputOnHistoryPurge" /><span></span></label>
             </div>
@@ -880,6 +888,10 @@ createApp({
                 <div v-else-if="item.url" class="copy-overlay">クリックでURLをコピー</div>
               </div>
               <span>{{ item.name }}</span>
+              <div v-if="item.qrUrls && item.qrUrls.length" class="qr-url-list">
+                <strong>QRコードURL</strong>
+                <button v-for="qrUrl in item.qrUrls" :key="qrUrl" class="qr-url-chip" @click="copyQRURL($event, qrUrl)" :title="qrUrl">{{ qrUrl }}</button>
+              </div>
               <small v-if="item.error" class="error">{{ item.error }}</small>
             </button>
           </div>
