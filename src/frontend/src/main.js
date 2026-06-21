@@ -397,6 +397,9 @@ createApp({
       }
       this.selectedHistoryIds = [item.id]
       this.lastSelectedHistoryIndex = index
+      if (!item.discordDeleted && this.isTrustedDiscordImageURL(item.url)) {
+        this.copy(item.url)
+      }
     },
     startHistoryDragSelect(event) {
       if (event.button !== 0 || event.target.closest('.history-card')) return
@@ -677,7 +680,7 @@ createApp({
             </span>
             <span class="tooltip-action">
               <button class="secondary" @click="purgeDeletedHistory">削除済みURLの履歴を削除</button>
-              <span class="tooltip">URLを確認し、Discord上で削除済みになっている画像だけを履歴から取り除きます。ピン止めした画像は対象外です。</span>
+              <span class="tooltip">Discord削除済みの履歴だけを取り除きます。設定がONならoutput画像も削除します。ピン止めした画像は対象外です。</span>
             </span>
             <span class="tooltip-action">
               <button class="secondary" @click="goHome">閉じる</button>
@@ -727,6 +730,10 @@ createApp({
             <div class="setting-row">
               <div><strong>1枚時にURLを自動コピー</strong><p>1枚だけ処理したとき、取得したURLを自動でクリップボードへコピーします。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.output.copySingleUrlToClipboard" /><span></span></label>
+            </div>
+            <div class="setting-row">
+              <div><strong>履歴削除時にoutputも削除</strong><p>画像履歴画面でDiscord削除済みの履歴を削除するとき、PCに保存したoutput画像も一緒に削除します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="state.config.output.deleteOutputOnHistoryPurge" /><span></span></label>
             </div>
             <div class="setting-row">
               <div><strong>出力形式</strong><p>PNGは画質を保ちやすく、JPGは写真向きです。</p></div>
