@@ -1,6 +1,9 @@
 package appcore
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestValidateDiscordWebhookURL(t *testing.T) {
 	tests := []struct {
@@ -76,5 +79,43 @@ func TestDeleteDiscordMessageRequiresFields(t *testing.T) {
 	}
 	if err := DeleteDiscordMessage("id", "token", ""); err == nil {
 		t.Fatal("expected missing message ID error")
+	}
+}
+
+func TestDiscordUploadStatusErrorGuidesWebhookRefresh(t *testing.T) {
+	err := discordUploadStatusError(401, []byte(`{"message": "Invalid Webhook Token", "code": 50027}`))
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "Webhook URLが無効") {
+		t.Fatalf("message should explain invalid webhook: %q", msg)
+	}
+	if !strings.Contains(msg, "再度コピー") || !strings.Contains(msg, "貼り直") {
+		t.Fatalf("message should guide re-copying URL: %q", msg)
+	}
+	if strings.Contains(msg, "body=") {
+		t.Fatalf("message should not expose raw body for invalid token: %q", msg)
+	}
+}
+
+func TestDiscordUploadStatusErrorTruncatesUnexpectedBody(t *testing.T) {
+	err := discordUploadStatusError(500, []byte(strings.Repeat("x", 200)))
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "body=") {
+		t.Fatalf("message should keep limited body: %q", msg)
+	}
+	if len([]rune(msg)) > 260 {
+		t.Fatalf("message too long: %d runes", len([]rune(msg)))
+	}
+}
+
+func TestDiscordWebhookSetupMessage(t *testing.T) {
+	msg := discordWebhookSetupMessage("Discord Webhook URLが未設定です。")
+	if !strings.Contains(msg, "再度コピー") || !strings.Contains(msg, "自動投稿用Webhook URL") {
+		t.Fatalf("unexpected setup message: %q", msg)
 	}
 }
