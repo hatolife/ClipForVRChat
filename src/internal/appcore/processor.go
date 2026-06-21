@@ -91,12 +91,15 @@ func (p Processor) processImage(img image.Image, format string, sourcePath strin
 	if p.Config.Output.UploadDiscord {
 		name := filepath.Base(sourcePath)
 		name = name[:len(name)-len(filepath.Ext(name))] + encoded.Extension
-		url, err := UploadDiscord(p.Config.Discord.WebhookURL, name, encoded)
+		uploaded, err := UploadDiscord(p.Config.Discord.WebhookURL, name, encoded)
 		if err != nil {
 			result.Error = err.Error()
 			return result
 		}
-		result.URL = url
+		result.URL = uploaded.URL
+		result.DiscordMessageID = uploaded.MessageID
+		result.DiscordWebhookID = uploaded.WebhookID
+		result.DiscordToken = uploaded.Token
 	} else if !p.Config.Output.SaveLocal {
 		if err := WriteClipboardImage(encoded.Data); err != nil {
 			result.Error = fmt.Sprintf("画像をクリップボードへコピーできませんでした: %v", err)

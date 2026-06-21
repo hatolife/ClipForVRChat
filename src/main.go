@@ -27,6 +27,9 @@ func main() {
 		Mode:       appcore.ModeResults,
 		ConfigPath: configPath,
 	}
+	if history, err := appcore.LoadHistory(appcore.HistoryPath(configPath)); err == nil {
+		state.History = history
+	}
 
 	configExists := appcore.ConfigExists(configPath)
 	cfg, err := appcore.LoadConfig(configPath)
@@ -80,6 +83,9 @@ func main() {
 		return
 	}
 	_ = appcore.CopySingleURLIfNeeded(cfg, results)
+	if history, err := appcore.AddResultsToHistory(appcore.HistoryPath(configPath), results); err == nil {
+		state.History = history
+	}
 
 	state.Results = results
 	if shouldExitWithoutUI(cfg, results) {

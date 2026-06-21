@@ -13,6 +13,11 @@ createApp({
       view: 'main',
       processing: false,
       dragging: false,
+      clearHoldTimer: null,
+      clearHolding: false,
+      clearHoldTriggered: false,
+      selectedHistoryIds: [],
+      lastSelectedHistoryIndex: -1,
       toast: '',
       saving: false,
       saved: false,
@@ -22,6 +27,27 @@ createApp({
   computed: {
     hasResults() {
       return this.state.results && this.state.results.length > 0
+    },
+    visibleHistory() {
+      return (this.state.history || []).filter((item) => !item.cleared)
+    },
+    resultItems() {
+      if (this.hasResults) return this.state.results
+      return this.visibleHistory.map((item) => ({
+        ...item,
+        historyId: item.id,
+        processing: false,
+        fromHistory: true
+      }))
+    },
+    hasResultItems() {
+      return this.resultItems.length > 0
+    },
+    hasAnyHistory() {
+      return (this.state.history || []).length > 0
+    },
+    canOpenHistory() {
+      return this.hasResultItems || this.hasAnyHistory
     },
     isSettings() {
       return this.state.mode === 'settings'
@@ -186,9 +212,88 @@ createApp({
       }
     },
     async clearResults() {
+      if (this.clearHoldTriggered) {
+        this.clearHoldTriggered = false
+        return
+      }
       this.error = ''
-      this.state = await api.ClearResults()
+      if (this.hasResults) {
+        this.state = await api.ClearResults()
+      } else {
+        const ids = this.visibleHistory.map((item) => item.id)
+        this.state.history = await api.MarkHistoryCleared(ids)
+      }
       this.view = 'main'
+    },
+    startClearHold() {
+      if (!this.canOpenHistory) return
+      this.clearHolding = true
+      this.clearHoldTriggered = false
+      this.clearHoldTimer = setTimeout(() => {
+        this.clearHolding = false
+        this.clearHoldTriggered = true
+        this.openHistory()
+      }, 5000)
+    },
+    cancelClearHold() {
+      if (this.clearHoldTimer) {
+        clearTimeout(this.clearHoldTimer)
+        this.clearHoldTimer = null
+      }
+      this.clearHolding = false
+    },
+    async openHistory() {
+      this.cancelClearHold()
+      this.view = 'history'
+      if (this.isSettings) this.state.mode = 'results'
+      this.state.history = await api.GetHistory()
+    },
+    selectHistory(event, index, item) {
+      if (!item?.id) return
+      const ids = [...this.selectedHistoryIds]
+      if (event.shiftKey && this.lastSelectedHistoryIndex >= 0) {
+        const start = Math.min(this.lastSelectedHistoryIndex, index)
+        const end = Math.max(this.lastSelectedHistoryIndex, index)
+        const range = (this.state.history || []).slice(start, end + 1).map((entry) => entry.id)
+        this.selectedHistoryIds = Array.from(new Set([...ids, ...range]))
+        return
+      }
+      if (event.ctrlKey || event.metaKey) {
+        this.selectedHistoryIds = ids.includes(item.id) ? ids.filter((id) => id !== item.id) : [...ids, item.id]
+        this.lastSelectedHistoryIndex = index
+        return
+      }
+      this.selectedHistoryIds = [item.id]
+      this.lastSelectedHistoryIndex = index
+    },
+    isHistorySelected(id) {
+      return this.selectedHistoryIds.includes(id)
+    },
+    async deleteSelectedFromDiscord() {
+      if (!this.selectedHistoryIds.length) return
+      this.error = ''
+      try {
+        this.state.history = await api.DeleteDiscordHistoryEntries(this.selectedHistoryIds)
+        this.toast = 'Discordから削除しました'
+        setTimeout(() => {
+          this.toast = ''
+        }, 1800)
+      } catch (err) {
+        this.error = String(err)
+      }
+    },
+    async purgeDeletedHistory() {
+      this.error = ''
+      try {
+        this.state.history = await api.PurgeDeletedHistoryEntries()
+        this.selectedHistoryIds = this.selectedHistoryIds.filter((id) => (this.state.history || []).some((item) => item.id === id))
+        this.toast = '削除済みURLの履歴を整理しました'
+        setTimeout(() => {
+          this.toast = ''
+        }, 1800)
+      } catch (err) {
+        this.error = String(err)
+      }
     },
     async copy(url) {
       if (!url) return
@@ -301,6 +406,35 @@ createApp({
         <button class="secondary" @click="view = 'about'">戻る</button>
       </section>
 
+      <section v-else-if="view === 'history'" class="panel history-page">
+        <div class="history-toolbar">
+          <div>
+            <h2>画像履歴</h2>
+            <p class="subtle">削除済みを含む履歴です。選択した画像はDiscord上の投稿だけを削除します。</p>
+          </div>
+          <div class="button-row">
+            <button @click="deleteSelectedFromDiscord" :disabled="!selectedHistoryIds.length">選択をDiscordから削除</button>
+            <button class="secondary" @click="purgeDeletedHistory">削除済みURLの履歴を削除</button>
+            <button class="secondary" @click="goHome">閉じる</button>
+          </div>
+        </div>
+        <p v-if="error" class="error">{{ error }}</p>
+        <div v-if="state.history && state.history.length" class="history-grid">
+          <button v-for="(item, index) in state.history" :key="item.id" class="history-card" :class="{ selected: isHistorySelected(item.id), cleared: item.cleared, deleted: item.discordDeleted }" @click="selectHistory($event, index, item)">
+            <div class="thumb-media">
+              <img :src="item.thumbnail || item.url" alt="" />
+              <div class="history-badges">
+                <span v-if="item.cleared">クリア済み</span>
+                <span v-if="item.discordDeleted">Discord削除済み</span>
+              </div>
+            </div>
+            <span>{{ item.name }}</span>
+            <small>{{ item.createdAt }}</small>
+          </button>
+        </div>
+        <p v-else class="empty">履歴はありません。</p>
+      </section>
+
       <section v-else-if="isSettings" class="panel settings-page">
         <div class="section-title">
           <h2>設定</h2>
@@ -385,13 +519,13 @@ createApp({
               <h2>{{ isError ? '確認が必要です' : '結果' }}</h2>
               <p class="subtle">サムネイルをクリックすると画像URLをコピーできます。</p>
             </div>
-            <button class="secondary" @click="clearResults" :disabled="processing || !hasResults">クリア</button>
+            <button class="secondary clear-button" :class="{ holding: clearHolding }" @mousedown="startClearHold" @mouseup="cancelClearHold" @mouseleave="cancelClearHold" @touchstart.prevent="startClearHold" @touchend.prevent="cancelClearHold" @click="clearResults" :disabled="processing || !canOpenHistory">クリア</button>
           </div>
           <p v-if="state.message" class="message">{{ state.message }}</p>
           <p v-if="error" class="error">{{ error }}</p>
 
-          <div v-if="hasResults" class="thumb-grid">
-            <button v-for="(item, index) in state.results" :key="item.name + item.outputPath + item.url + item.error + index" class="thumb-card" @click="copy(item.url)" :disabled="!item.url || item.processing">
+          <div v-if="hasResultItems" class="thumb-grid">
+            <button v-for="(item, index) in resultItems" :key="item.name + item.outputPath + item.url + item.error + index" class="thumb-card" @click="copy(item.url)" :disabled="!item.url || item.processing">
               <div class="thumb-media">
                 <img v-if="item.thumbnail" :src="item.thumbnail" alt="" />
                 <div v-else class="thumb-placeholder">
