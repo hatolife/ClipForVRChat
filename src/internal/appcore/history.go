@@ -54,10 +54,10 @@ func SaveHistory(path string, history []HistoryEntry) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), privateDirMode); err != nil {
 		return err
 	}
-	return os.WriteFile(path, append(data, '\n'), 0644)
+	return WritePrivateFile(path, append(data, '\n'))
 }
 
 func AddResultsToHistory(path string, results []Result) ([]HistoryEntry, error) {

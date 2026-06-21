@@ -8,6 +8,11 @@ import (
 	"strings"
 )
 
+const (
+	privateDirMode  os.FileMode = 0700
+	privateFileMode os.FileMode = 0600
+)
+
 type Config struct {
 	Image     ImageConfig     `json:"image"`
 	Output    OutputConfig    `json:"output"`
@@ -97,10 +102,17 @@ func SaveConfig(path string, cfg Config) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), privateDirMode); err != nil {
 		return err
 	}
-	return os.WriteFile(path, append(data, '\n'), 0644)
+	return WritePrivateFile(path, append(data, '\n'))
+}
+
+func WritePrivateFile(path string, data []byte) error {
+	if err := os.WriteFile(path, data, privateFileMode); err != nil {
+		return err
+	}
+	return os.Chmod(path, privateFileMode)
 }
 
 func (c *Config) Normalize() {
