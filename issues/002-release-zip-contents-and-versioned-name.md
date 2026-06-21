@@ -1,19 +1,21 @@
-# Release zip contents and versioned filename
+# Release zipの内容とバージョン付きファイル名
 
-## Problem
+## 問題
 
-The Windows release zip should include user-facing files and its filename should include the version.
+Windows向けRelease zipにはユーザー向けファイルを含める必要があり、zip名にもバージョン情報が必要。
 
-## Desired behavior
+## 期待する挙動
 
-- Windows release zip contains:
-  - `ClipForVRChat.exe`
-  - `README.md`
-  - `LICENSE`
-- Release zip filename includes the version tag.
+Windows向けRelease zipには以下を含める。
 
-## Acceptance criteria
+- `ClipForVRChat.exe`
+- `README.md`
+- `LICENSE`
 
-- A release for tag `vX.Y.Z` uploads `ClipForVRChat-vX.Y.Z-windows-amd64.zip`.
-- The zip includes the executable, README, and license.
+zipファイル名にはタグのバージョンを含める。
 
+## 受け入れ条件
+
+- `vX.Y.Z` のReleaseで `ClipForVRChat-vX.Y.Z-windows-amd64.zip` がアップロードされる。
+- zipにexe、README、LICENSEが含まれる。
+- 不要な `ClipForVRChat-source.zip` はReleaseに添付しない。

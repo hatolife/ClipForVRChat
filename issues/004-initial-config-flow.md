@@ -1,16 +1,15 @@
-# Initial config flow
+# 初回設定フロー
 
-## Problem
+## 問題
 
-When no settings file exists, the app should not silently continue with defaults.
+設定ファイルが存在しない状態で起動したときに、デフォルト設定で黙って処理を続けるべきではない。
 
-## Desired behavior
+## 期待する挙動
 
-- If `config.json` is missing on normal launch, show the settings UI first.
-- After the user saves settings, continue the original processing flow.
+- `config.json` がない通常起動では、最初に設定画面を表示する。
+- ユーザーが設定を保存したあと、元の入力で通常処理を続行する。
 
-## Acceptance criteria
+## 受け入れ条件
 
-- First launch without args opens settings, then processes clipboard after save.
-- First launch with image args opens settings, then processes those images after save.
-
+- 初回の引数なし起動では、設定保存後にクリップボード画像を処理する。
+- 初回の画像引数付き起動では、設定保存後にその画像を処理する。

@@ -1,14 +1,13 @@
-# Clipboard output filename includes timestamp
+# クリップボード画像の保存ファイル名に時刻を含める
 
-## Problem
+## 問題
 
-Clipboard image output currently uses names like `clipboard_2048.png`, which are not descriptive enough.
+クリップボード画像の保存名が `clipboard_2048.png` のようになり、いつ処理したものか分かりにくい。
 
-## Desired behavior
+## 期待する挙動
 
-- Clipboard input local save filenames include the processing timestamp.
+クリップボード入力をローカル保存する場合、ファイル名に処理時刻を含める。
 
-## Acceptance criteria
+## 受け入れ条件
 
-- Clipboard output names are like `clipboard_20260621_133132_2048.png`.
-
+- `clipboard_20260621_133132_2048.png` のような名前で保存される。

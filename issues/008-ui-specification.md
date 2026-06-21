@@ -1,17 +1,22 @@
-# UI specification
+# UI仕様の明文化
 
-## Problem
+## 問題
 
-The UI behavior needs to be explicitly designed in the specification.
+UIの画面遷移やレイアウトが仕様書に十分書かれていない。
 
-## Desired behavior
+## 期待する挙動
 
-- Document screen transitions.
-- Document the main layout.
-- Document result, settings, about, and error states.
-- Document drag and drop behavior.
+`src/SPEC.md` に以下を明記する。
 
-## Acceptance criteria
+- 画面遷移
+- メイン画面のレイアウト
+- 結果画面
+- 設定画面
+- 情報画面
+- エラー表示
+- ドラッグ&ドロップ挙動
 
-- `SPEC.md` includes a dedicated UI design section covering layout and transitions.
+## 受け入れ条件
 
+- `src/SPEC.md` にUI設計セクションがある。
+- レイアウトと画面遷移が実装時に参照できる粒度で書かれている。
