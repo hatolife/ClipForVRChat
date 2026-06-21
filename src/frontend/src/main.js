@@ -9,6 +9,7 @@ createApp({
       info: { name: 'ClipForVRChat', version: 'dev', github: 'https://github.com/hatolife/ClipForVRChat' },
       state: { mode: 'results', message: '', configPath: '', config: null, results: [] },
       licenses: [],
+      webhookGuideUrl: 'https://support.discord.com/hc/ja/articles/228383668-%E3%82%A6%E3%82%A7%E3%83%96%E3%83%95%E3%83%83%E3%82%AF%E3%81%AE%E3%81%94%E7%B4%B9%E4%BB%8B',
       view: 'main',
       toast: '',
       saving: false,
@@ -127,12 +128,51 @@ createApp({
           <p>version {{ info.version }}</p>
         </div>
         <nav>
+          <button class="secondary" @click="view = 'help'; state.mode = 'results'">使い方</button>
           <button class="secondary" @click="view = 'about'; state.mode = 'results'">情報</button>
           <button @click="openSettings">設定</button>
         </nav>
       </header>
 
-      <section v-if="view === 'about'" class="panel about">
+      <section v-if="view === 'help'" class="panel help">
+        <div class="section-title">
+          <h2>使い方</h2>
+          <p class="subtle">VRChatで使う画像URLを作るための基本操作です。</p>
+        </div>
+
+        <div class="help-grid">
+          <article class="help-card">
+            <h3>1. 画像を用意する</h3>
+            <p>画像ファイルをウィンドウへドラッグ&ドロップします。複数画像もまとめて処理できます。</p>
+            <p>スクリーンショットなど、クリップボードに入っている画像は「クリップボード画像を処理」ボタンで処理できます。</p>
+          </article>
+
+          <article class="help-card">
+            <h3>2. 必要なら設定する</h3>
+            <p>設定画面では、ローカル保存、Discord投稿、出力形式、出力先フォルダ、ファイル名サフィックスを変更できます。</p>
+            <p>出力形式はPNGまたはJPGを選べます。JPEG品質はJPG出力のときだけ使用します。</p>
+          </article>
+
+          <article class="help-card">
+            <h3>3. Discordへ投稿する</h3>
+            <p>Discord投稿を使う場合は、投稿先チャンネルのWebhook URLを設定します。</p>
+            <p>Webhook URLの発行方法はDiscord公式ヘルプで確認できます。</p>
+            <button class="link-button" @click="openURL(webhookGuideUrl)">Discord公式: ウェブフックのご紹介</button>
+          </article>
+
+          <article class="help-card">
+            <h3>4. URLを使う</h3>
+            <p>1枚だけ処理した場合は、設定がONなら画像URLを自動でクリップボードへコピーします。</p>
+            <p>結果画面では、サムネイルをクリックするとその画像URLを再度コピーできます。</p>
+          </article>
+        </div>
+
+        <div class="button-row">
+          <button class="secondary" @click="view = 'main'">閉じる</button>
+        </div>
+      </section>
+
+      <section v-else-if="view === 'about'" class="panel about">
         <h2>このアプリについて</h2>
         <dl>
           <div><dt>プログラム名</dt><dd>{{ info.name }}</dd></div>
