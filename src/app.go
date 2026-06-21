@@ -15,6 +15,7 @@ type App struct {
 	ctx        context.Context
 	configPath string
 	state      appcore.UIState
+	autoCancel context.CancelFunc
 }
 
 type AppInfo struct {
@@ -39,6 +40,7 @@ func NewApp(configPath string, initial appcore.UIState) *App {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	a.restartAutoPhotoWatcher(a.state.Config)
 }
 
 func (a *App) GetInitialState() appcore.UIState {
@@ -70,6 +72,14 @@ func (a *App) GetOSSLicenses() []OSSLicense {
 }
 
 func (a *App) SelectOutputDirectory(current string) (string, error) {
+	return a.selectDirectory("出力先フォルダを選択", current)
+}
+
+func (a *App) SelectPhotoDirectory(current string) (string, error) {
+	return a.selectDirectory("VRChat写真フォルダを選択", current)
+}
+
+func (a *App) selectDirectory(title string, current string) (string, error) {
 	dir := strings.Trim(strings.TrimSpace(current), `"`)
 	if dir != "" && !filepath.IsAbs(dir) {
 		exe, err := os.Executable()
@@ -81,7 +91,7 @@ func (a *App) SelectOutputDirectory(current string) (string, error) {
 		dir = ""
 	}
 	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
-		Title:            "出力先フォルダを選択",
+		Title:            title,
 		DefaultDirectory: dir,
 	})
 }
@@ -171,6 +181,7 @@ func (a *App) SaveConfig(cfg appcore.Config) error {
 	a.state.Mode = appcore.ModeResults
 	a.state.Message = ""
 	a.state.Results = nil
+	a.restartAutoPhotoWatcher(cfg)
 	return nil
 }
 
@@ -333,4 +344,32 @@ func (a *App) refreshHistory() {
 
 func nowRFC3339() string {
 	return time.Now().Format(time.RFC3339)
+}
+
+func (a *App) restartAutoPhotoWatcher(cfg appcore.Config) {
+	if a.autoCancel != nil {
+		a.autoCancel()
+		a.autoCancel = nil
+	}
+	if a.ctx == nil || !cfg.AutoPhoto.Enabled {
+		return
+	}
+	ctx, cancel := context.WithCancel(a.ctx)
+	a.autoCancel = cancel
+	watcher := appcore.AutoPhotoWatcher{
+		Config: cfg,
+		Handler: func(event appcore.AutoPhotoEvent) {
+			if event.Result.URL != "" && event.Result.Error == "" {
+				results := []appcore.Result{event.Result}
+				if history, err := appcore.AddResultsToHistory(appcore.HistoryPath(a.configPath), results); err == nil {
+					a.state.History = history
+					event.Result = results[0]
+				}
+			}
+			a.state.Results = append([]appcore.Result{event.Result}, a.state.Results...)
+			a.state.Mode = appcore.ModeResults
+			runtime.EventsEmit(a.ctx, "auto-photo:result", event)
+		},
+	}
+	go watcher.Run(ctx)
 }
