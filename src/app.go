@@ -146,6 +146,17 @@ func (a *App) MarkHistoryCleared(ids []string) ([]appcore.HistoryEntry, error) {
 	return history, nil
 }
 
+func (a *App) SetHistoryPinned(id string, pinned bool) ([]appcore.HistoryEntry, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	history, err := appcore.SetHistoryPinned(appcore.HistoryPath(a.configPath), id, pinned)
+	if err != nil {
+		return history, err
+	}
+	a.state.History = history
+	return history, nil
+}
+
 func (a *App) DeleteDiscordHistoryEntries(ids []string) ([]appcore.HistoryEntry, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -158,7 +169,7 @@ func (a *App) DeleteDiscordHistoryEntries(ids []string) ([]appcore.HistoryEntry,
 		idSet[id] = true
 	}
 	for i := range history {
-		if !idSet[history[i].ID] {
+		if !idSet[history[i].ID] || history[i].Pinned {
 			continue
 		}
 		if err := appcore.DeleteDiscordMessage(history[i].DiscordWebhookID, history[i].DiscordToken, history[i].DiscordMessageID); err != nil {

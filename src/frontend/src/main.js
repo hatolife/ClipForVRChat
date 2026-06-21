@@ -118,8 +118,19 @@ createApp({
     window.addEventListener('drop', () => {
       this.dragging = false
     })
+    window.addEventListener('keydown', this.handleKeyDown)
+  },
+  unmounted() {
+    window.removeEventListener('keydown', this.handleKeyDown)
+    window.removeEventListener('mousemove', this.updateHistoryDragSelect)
+    window.removeEventListener('mouseup', this.finishHistoryDragSelect)
   },
   methods: {
+    handleKeyDown(event) {
+      if (this.view !== 'history' || !(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'a') return
+      event.preventDefault()
+      this.selectAllHistory()
+    },
     showDropOverlay(event) {
       event.preventDefault()
       this.dragging = true
@@ -364,6 +375,10 @@ createApp({
       this.view = 'history'
       this.state.history = await api.GetHistory()
     },
+    selectAllHistory() {
+      this.selectedHistoryIds = (this.state.history || []).map((item) => item.id).filter(Boolean)
+      this.lastSelectedHistoryIndex = this.selectedHistoryIds.length ? 0 : -1
+    },
     selectHistory(event, index, item) {
       if (this.historyDragSelecting) return
       if (!item?.id) return
@@ -452,6 +467,15 @@ createApp({
     },
     isHistorySelected(id) {
       return this.selectedHistoryIds.includes(id)
+    },
+    async toggleHistoryPinned(item) {
+      if (!item?.id) return
+      this.error = ''
+      try {
+        this.state.history = await api.SetHistoryPinned(item.id, !item.pinned)
+      } catch (err) {
+        this.error = String(err)
+      }
     },
     isTrustedDiscordImageURL(url) {
       try {
@@ -644,12 +668,16 @@ createApp({
           </div>
           <div class="button-row">
             <span class="tooltip-action">
+              <button class="secondary" @click="selectAllHistory" :disabled="!(state.history && state.history.length)">全選択</button>
+              <span class="tooltip">履歴に表示されている画像をすべて選択します。Ctrl+Aでも同じ操作ができます。</span>
+            </span>
+            <span class="tooltip-action">
               <button @click="deleteSelectedFromDiscord" :disabled="!selectedHistoryIds.length">選択をDiscordから削除</button>
-              <span class="tooltip">選択した画像のDiscord上の投稿を削除します。履歴データ自体は残ります。</span>
+              <span class="tooltip">選択した画像のDiscord上の投稿を削除します。ピン止めした画像と履歴データ自体は削除しません。</span>
             </span>
             <span class="tooltip-action">
               <button class="secondary" @click="purgeDeletedHistory">削除済みURLの履歴を削除</button>
-              <span class="tooltip">URLを確認し、Discord上で削除済みになっている画像だけを履歴から取り除きます。</span>
+              <span class="tooltip">URLを確認し、Discord上で削除済みになっている画像だけを履歴から取り除きます。ピン止めした画像は対象外です。</span>
             </span>
             <span class="tooltip-action">
               <button class="secondary" @click="goHome">閉じる</button>
@@ -659,11 +687,15 @@ createApp({
         </div>
         <p v-if="error" class="error">{{ error }}</p>
         <div v-if="state.history && state.history.length" ref="historyGrid" class="history-grid" :class="{ selecting: historyDragSelecting }" @mousedown="startHistoryDragSelect">
-          <button v-for="(item, index) in state.history" :key="item.id" class="history-card" :data-history-id="item.id" :class="{ selected: isHistorySelected(item.id), cleared: item.cleared, deleted: item.discordDeleted }" @click="selectHistory($event, index, item)">
+          <button v-for="(item, index) in state.history" :key="item.id" class="history-card" :data-history-id="item.id" :class="{ selected: isHistorySelected(item.id), cleared: item.cleared, deleted: item.discordDeleted, pinned: item.pinned }" @click="selectHistory($event, index, item)">
+            <span class="pin-action">
+              <span class="pin-button" :class="{ active: item.pinned }" @click.stop="toggleHistoryPinned(item)" title="ピン止め" aria-label="ピン止め"></span>
+            </span>
             <div class="thumb-media">
               <img v-if="item.thumbnail || isTrustedDiscordImageURL(item.url)" :src="item.thumbnail || item.url" alt="" />
               <div v-else class="thumb-placeholder"></div>
               <div class="history-badges">
+                <span v-if="item.pinned">ピン止め</span>
                 <span v-if="item.cleared">クリア済み</span>
                 <span v-if="item.discordDeleted">Discord削除済み</span>
               </div>

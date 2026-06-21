@@ -89,6 +89,24 @@ func TestMarkHistoryCleared(t *testing.T) {
 	}
 }
 
+func TestSetHistoryPinned(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "history.json")
+	initial := []HistoryEntry{
+		{ID: "1", URL: "https://cdn.discordapp.com/attachments/1/2/a.png"},
+	}
+	if err := SaveHistory(path, initial); err != nil {
+		t.Fatal(err)
+	}
+
+	history, err := SetHistoryPinned(path, "1", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(history) != 1 || !history[0].Pinned {
+		t.Fatalf("history = %+v, want pinned entry", history)
+	}
+}
+
 func TestPurgeUnavailableHistoryRemovesUntrustedURLs(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "history.json")
 	initial := []HistoryEntry{
@@ -108,6 +126,24 @@ func TestPurgeUnavailableHistoryRemovesUntrustedURLs(t *testing.T) {
 	}
 	if len(history) != 1 || history[0].ID != "empty" {
 		t.Fatalf("history = %+v, want only empty entry", history)
+	}
+}
+
+func TestPurgeUnavailableHistoryKeepsPinnedEntries(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "history.json")
+	initial := []HistoryEntry{
+		{ID: "pinned", URL: "https://example.com/attachments/1/2/b.png", Pinned: true},
+	}
+	if err := SaveHistory(path, initial); err != nil {
+		t.Fatal(err)
+	}
+
+	history, removed, err := PurgeUnavailableHistory(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if removed != 0 || len(history) != 1 || history[0].ID != "pinned" {
+		t.Fatalf("history = %+v removed = %d, want pinned entry kept", history, removed)
 	}
 }
 

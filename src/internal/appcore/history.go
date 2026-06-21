@@ -21,6 +21,7 @@ type HistoryEntry struct {
 	DiscordWebhookID string `json:"discordWebhookId"`
 	DiscordToken     string `json:"discordToken"`
 	Cleared          bool   `json:"cleared"`
+	Pinned           bool   `json:"pinned,omitempty"`
 	DiscordDeleted   bool   `json:"discordDeleted"`
 	CreatedAt        string `json:"createdAt"`
 	ClearedAt        string `json:"clearedAt,omitempty"`
@@ -112,6 +113,20 @@ func MarkHistoryCleared(path string, ids []string) ([]HistoryEntry, error) {
 	return history, SaveHistory(path, history)
 }
 
+func SetHistoryPinned(path string, id string, pinned bool) ([]HistoryEntry, error) {
+	history, err := LoadHistory(path)
+	if err != nil {
+		return history, err
+	}
+	for i := range history {
+		if history[i].ID == id {
+			history[i].Pinned = pinned
+			break
+		}
+	}
+	return history, SaveHistory(path, history)
+}
+
 func PurgeUnavailableHistory(path string) ([]HistoryEntry, int, error) {
 	history, err := LoadHistory(path)
 	if err != nil {
@@ -120,6 +135,10 @@ func PurgeUnavailableHistory(path string) ([]HistoryEntry, int, error) {
 	kept := make([]HistoryEntry, 0, len(history))
 	removed := 0
 	for _, entry := range history {
+		if entry.Pinned {
+			kept = append(kept, entry)
+			continue
+		}
 		if entry.URL != "" && !RemoteURLAvailable(entry.URL) {
 			removed++
 			continue
