@@ -56,6 +56,10 @@ ClipForVRChat.exe config.json
 - JPEG品質
 - UI表示モード
 
+## 配布zip
+
+Release の `ClipForVRChat-vX.Y.Z-windows-amd64.zip` には、exe、README、LICENSE が含まれます。
+
 ## Discord設定
 
 投稿先チャンネルで Discord Webhook を作成し、設定画面で Webhook URL を指定してください。

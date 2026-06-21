@@ -1,6 +1,6 @@
 :root {
   color: #1b1f23;
-  background: #f4f6f8;
+  background: #eef3f7;
   font-family: "Segoe UI", system-ui, sans-serif;
   font-size: 14px;
 }
@@ -28,39 +28,121 @@ header {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 24px 28px 16px;
+  padding: 18px 24px;
   background: #ffffff;
   border-bottom: 1px solid #d9dee5;
 }
 
 h1,
 h2,
-p {
+p,
+dl,
+dd {
   margin: 0;
 }
 
 h1 {
-  font-size: 24px;
+  font-size: 22px;
+}
+
+h2 {
+  font-size: 18px;
 }
 
 header p {
-  margin-top: 6px;
+  margin-top: 4px;
   color: #64707d;
-  word-break: break-all;
 }
 
+nav {
+  display: flex;
+  gap: 8px;
+}
+
+button {
+  width: fit-content;
+  padding: 9px 14px;
+  border: 1px solid #1f6f9d;
+  border-radius: 6px;
+  background: #2478a9;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+button.secondary {
+  border-color: #b9c5cf;
+  background: #ffffff;
+  color: #1b1f23;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+.workspace {
+  min-height: calc(100vh - 78px);
+  display: grid;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(360px, 1.1fr);
+  gap: 0;
+  --wails-drop-target: drop;
+}
+
+.drop-zone {
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: linear-gradient(135deg, #e6f3f8, #f5f9fb);
+  border-right: 1px solid #d9dee5;
+}
+
+.drop-card {
+  width: min(460px, 100%);
+  display: grid;
+  justify-items: start;
+  gap: 14px;
+  padding: 28px;
+  border: 2px dashed #8eb8cc;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.drop-icon {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 8px;
+  background: #d7eafa;
+  color: #2478a9;
+  font-weight: 700;
+}
+
+.drop-card p,
+.empty {
+  color: #64707d;
+  line-height: 1.6;
+}
+
+.result-panel,
 .panel {
   padding: 24px 28px;
 }
 
-.panel h2 {
+.panel {
+  min-height: calc(100vh - 78px);
+  --wails-drop-target: drop;
+}
+
+.panel h2,
+.result-panel h2 {
   margin-bottom: 16px;
-  font-size: 18px;
 }
 
 .message {
   margin-bottom: 16px;
   color: #9b4214;
+  line-height: 1.6;
 }
 
 .settings {
@@ -93,36 +175,6 @@ select {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
-}
-
-button {
-  width: fit-content;
-  padding: 9px 14px;
-  border: 1px solid #1c6b9f;
-  border-radius: 6px;
-  background: #2478b4;
-  color: #ffffff;
-  cursor: pointer;
-}
-
-button:disabled {
-  cursor: default;
-  opacity: 0.65;
-}
-
-.settings-button {
-  flex: 0 0 auto;
-}
-
-.drop-target {
-  min-height: calc(100vh - 91px);
-  --wails-drop-target: drop;
-}
-
-.wails-drop-target-active {
-  outline: 3px solid #2f9dbe;
-  outline-offset: -10px;
-  background: #eef8fb;
 }
 
 .list {
@@ -162,12 +214,38 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.about dl {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.about dl div {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 12px;
+}
+
+.about dt {
+  color: #64707d;
+}
+
+.about dd {
+  overflow-wrap: anywhere;
+}
+
 .error {
   color: #b42318;
 }
 
 .saved {
   color: #217a3b;
+}
+
+.wails-drop-target-active {
+  outline: 3px solid #2f9dbe;
+  outline-offset: -10px;
+  background: #eef8fb;
 }
 
 .toast {
@@ -180,7 +258,16 @@ button:disabled {
   color: #ffffff;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 800px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .drop-zone {
+    border-right: 0;
+    border-bottom: 1px solid #d9dee5;
+  }
+
   .grid {
     grid-template-columns: 1fr;
   }
