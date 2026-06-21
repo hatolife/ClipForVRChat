@@ -1,19 +1,18 @@
-# Icon quality and multi-size generation
+# アイコン品質と複数サイズ生成
 
-## Problem
+## 問題
 
-The current app icon looks poor and does not match the desired soft image-plus-clipboard direction.
+現在のアプリアイコンの品質が低く、指定された「淡い画像アイコン + クリップボード」の方向性に合っていない。
 
-## Desired behavior
+## 期待する挙動
 
-- Use a cleaner icon inspired by the provided reference image.
-- Keep an original high-resolution icon source in the repository.
-- Generate the Wails `build/appicon.png` from the source.
-- Prepare generation logic so multiple icon sizes can be produced from the original when needed.
+- 参考画像に近い、柔らかい印象のアイコンにする。
+- 高解像度の元画像または生成元をリポジトリで管理する。
+- Wailsが使う `src/build/appicon.png` を生成できるようにする。
+- 必要な複数サイズのアイコン画像も同じ生成元から作る。
 
-## Acceptance criteria
+## 受け入れ条件
 
-- The app no longer uses the Wails default icon.
-- `build/appicon.png` is generated from a maintained source asset.
-- The icon generation command can emit multiple standard sizes.
-
+- Wailsのデフォルトアイコンを使っていない。
+- `src/build/appicon.png` が管理された生成元から作られている。
+- 標準的な複数サイズのPNGを生成できる。

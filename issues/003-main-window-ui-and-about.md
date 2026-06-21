@@ -1,24 +1,24 @@
-# Main window UI and about information
+# メインウィンドウUIと情報表示
 
-## Problem
+## 問題
 
-When the app window is opened normally, the UI does not clearly explain what to do. The settings button may not be visible depending on the flow.
+通常起動時の画面が空白に見える、または何をすればよいか分かりにくい。設定ボタンも常に見える必要がある。
 
-## Desired behavior
+## 期待する挙動
 
-- Design the main window from scratch as a useful first screen.
-- Make it obvious that images can be dragged and dropped.
-- Always provide a visible settings button.
-- Add an about/info button.
-- About view shows:
-  - Program name
-  - Version
+- 通常起動時のメイン画面を、使い方が分かる画面として設計し直す。
+- 画像をドラッグ&ドロップできることを明示する。
+- 設定ボタンを常に表示する。
+- 情報ボタンを追加する。
+- 情報画面には以下を表示する。
+  - プログラム名
+  - バージョン
   - GitHub URL
-- Show version information in the title bar.
+- タイトルバーにバージョン情報を表示する。
 
-## Acceptance criteria
+## 受け入れ条件
 
-- Empty or normal window state presents a clear drop area and concise usage hints.
-- Settings and about buttons are visible.
-- Title bar includes app version.
-
+- 通常起動時に空白画面にならない。
+- ドロップ領域と使い方が表示される。
+- 設定ボタンと情報ボタンが表示される。
+- タイトルバーにバージョンが表示される。

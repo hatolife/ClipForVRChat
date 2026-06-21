@@ -1,18 +1,17 @@
-# Window drag and drop
+# ウィンドウへのドラッグ&ドロップ
 
-## Problem
+## 問題
 
-The launched app window should support file drag and drop.
+起動済みウィンドウへファイルをドラッグ&ドロップして処理できる必要がある。
 
-## Desired behavior
+## 期待する挙動
 
-- Dropping one `.json` settings file opens the settings UI for that file.
-- Dropping one or more images treats them as input files and runs normal processing.
-- Dropping mixed settings and images shows an actionable error.
+- `.json` 設定ファイルを1つだけドロップした場合、その設定ファイルの編集画面を開く。
+- 画像ファイルを1枚以上ドロップした場合、入力画像として通常処理を実行する。
+- 設定ファイルと画像が混在している場合は、処理せず分けて実行するよう案内する。
 
-## Acceptance criteria
+## 受け入れ条件
 
-- Multi-image D&D works.
-- Settings JSON D&D works.
-- Mixed D&D does not process and explains what to do.
-
+- 複数画像のD&Dが動作する。
+- 設定JSONのD&Dが動作する。
+- 混在D&Dでは処理せず、ユーザーが次に何をすべきか分かるエラーを表示する。

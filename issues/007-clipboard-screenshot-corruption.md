@@ -1,30 +1,28 @@
-# Clipboard screenshot corruption investigation
+# クリップボードのスクリーンショット画像が崩れる
 
-## Problem
+## 問題
 
-Images captured with a small Win+Shift+S selection can become visually corrupted after processing from the clipboard.
+Win+Shift+Sで小さい範囲を選択してクリップボードから処理すると、出力画像の端に不自然な色線や乱れが出ることがある。
 
-Observed examples:
+確認されている例:
 
-- Thin colored artifacts near the left edge.
-- Incorrect-looking output for small screenshot clipboard input.
+- 左端に細い色線が出る。
+- 下端に不要な色が出る。
+- D&D入力や、ペイントからコピーした画像では再現しにくい。
 
-Cases that do not reproduce:
+## 調査メモ
 
-- D&D with an image that does not need shrinking.
-- Copying an image from Paint and processing from clipboard.
+Windowsのスクリーンショット系クリップボード画像は、PNGとして見えていてもDIB/BGRA由来の変換や透明ピクセルを含む可能性がある。
 
-## Investigation notes
+現在は `golang.design/x/clipboard` から取得した画像をPNGとして処理しているが、Win+Shift+S由来の外周ピクセルが期待通りでない可能性がある。
 
-The current code reads clipboard image bytes via `golang.design/x/clipboard` and decodes them as an encoded image. On Windows, clipboard image data may be DIB/BGRA rather than PNG, especially for screenshot tools. If DIB bytes are treated as regular encoded image data, decoding or pixel layout may break.
+## 期待する挙動
 
-## Desired behavior
+- クリップボード画像入力でも、スクリーンショットの見た目を壊さない。
+- 小さいスクリーンショットで縮小が不要な場合、PNG再エンコード以外の見た目変化を起こさない。
 
-- Clipboard image input should preserve the actual screenshot pixels.
-- Small screenshots that do not need resizing should not change visually except for PNG encoding.
+## 受け入れ条件
 
-## Acceptance criteria
-
-- Windows clipboard image reading handles screenshot clipboard data correctly.
-- Add focused tests or a small fixture-based regression test if practical.
-
+- Win+Shift+Sの小さい範囲スクリーンショットで、端の不自然な色線が出ない。
+- 必要ならクリップボード入力専用の外周補正や透明ピクセル処理を行う。
+- 可能なら再現用のfixtureまたは回帰確認手順を追加する。
