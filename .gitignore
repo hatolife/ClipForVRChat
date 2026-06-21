@@ -1,5 +1,7 @@
 build/*
 !build/appicon.png
+!build/icons/
+!build/icons/*.png
 dist/
 frontend/dist/
 frontend/node_modules/
