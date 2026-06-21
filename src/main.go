@@ -61,7 +61,7 @@ func main() {
 		state.Mode = appcore.ModeSettings
 		state.Message = "初回起動です。設定を確認して保存すると、続けて通常処理を実行します。"
 		state.PendingPaths = args
-		state.ProcessOnSave = true
+		state.ProcessOnSave = len(args) > 0
 		runUI(configPath, state)
 		return
 	}
@@ -73,6 +73,11 @@ func main() {
 			runUI(configPath, state)
 			return
 		}
+	}
+
+	if len(args) == 0 {
+		runUI(configPath, state)
+		return
 	}
 
 	results, err := appcore.Processor{Config: cfg}.ProcessPaths(args)

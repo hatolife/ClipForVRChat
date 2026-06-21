@@ -9,7 +9,8 @@ createApp({
       info: { name: 'ClipForVRChat', version: 'dev', github: 'https://github.com/hatolife/ClipForVRChat' },
       state: { mode: 'results', message: '', configPath: '', config: null, results: [] },
       licenses: [],
-      webhookGuideUrl: 'https://support.discord.com/hc/ja/articles/228383668-%E3%82%A6%E3%82%A7%E3%83%96%E3%83%95%E3%83%83%E3%82%AF%E3%81%AE%E3%81%94%E7%B4%B9%E4%BB%8B',
+      webhookGuideUrl: 'https://support.discord.com/hc/ja/articles/228383668-%E3%82%A6%E3%82%A7%E3%83%96%E3%83%95%E3%83%83%E3%82%AF%E3%81%AE%E3%81%94%E7%B4%B9%E4%BB%8B#:~:text=Webhook%E3%81%AE%E4%BD%9C%E6%88%90',
+      issuesUrl: 'https://github.com/hatolife/ClipForVRChat/issues',
       view: 'main',
       processing: false,
       dragging: false,
@@ -57,6 +58,21 @@ createApp({
     },
     isJpegOutput() {
       return this.state.config?.image?.outputFormat === 'jpg'
+    },
+    processedCount() {
+      return (this.state.results || []).filter((item) => !item.processing).length
+    },
+    totalProcessingCount() {
+      return (this.state.results || []).length
+    },
+    overallProgress() {
+      if (!this.processing || !this.totalProcessingCount) return 0
+      return Math.round((this.processedCount / this.totalProcessingCount) * 100)
+    },
+    outputExample() {
+      const suffix = this.state.config?.image?.suffix || '_2048'
+      const ext = this.state.config?.image?.outputFormat === 'jpg' ? 'jpg' : 'png'
+      return `例: image.png -> image${suffix}.${ext}`
     },
     activeView() {
       if (this.isSettings) return 'settings'
@@ -157,7 +173,9 @@ createApp({
       } else {
         results[event.index] = { ...current, ...event.result, processing: true, progress: 35 }
       }
-      this.state = { ...this.state, results }
+      const done = results.filter((item) => !item.processing).length
+      const message = event.total > 1 ? `画像を処理しています。${done} / ${event.total}` : this.state.message
+      this.state = { ...this.state, results, message }
     },
     async handleDrop(paths) {
       this.error = ''
@@ -183,7 +201,7 @@ createApp({
         this.state = {
           ...this.state,
           mode: 'results',
-          message: '画像を処理しています。',
+          message: `画像を処理しています。0 / ${paths.length}`,
           results: paths.map((path, index) => this.resultPlaceholder(path, index, paths.length))
         }
         this.state = await api.ProcessToState(paths)
@@ -233,7 +251,7 @@ createApp({
         this.clearHolding = false
         this.clearHoldTriggered = true
         this.openHistory()
-      }, 5000)
+      }, 3000)
     },
     cancelClearHold() {
       if (this.clearHoldTimer) {
@@ -306,11 +324,27 @@ createApp({
     async openURL(url) {
       await api.OpenURL(url)
     },
+    sanitizeOutputDirectory() {
+      if (!this.state.config?.image) return
+      this.state.config.image.outputDirectory = String(this.state.config.image.outputDirectory || '').trim().replace(/^"+|"+$/g, '')
+    },
+    async chooseOutputDirectory() {
+      this.sanitizeOutputDirectory()
+      try {
+        const selected = await api.SelectOutputDirectory(this.state.config.image.outputDirectory)
+        if (selected) {
+          this.state.config.image.outputDirectory = selected
+        }
+      } catch (err) {
+        this.error = String(err)
+      }
+    },
     async saveSettings() {
       this.saving = true
       this.saved = false
       this.error = ''
       try {
+        this.sanitizeOutputDirectory()
         if (this.state.processOnSave) {
           this.state = await api.SaveConfigAndProcess(this.state.config, this.state.pendingPaths || [])
         } else {
@@ -384,8 +418,11 @@ createApp({
         <dl>
           <div><dt>プログラム名</dt><dd>{{ info.name }}</dd></div>
           <div><dt>バージョン</dt><dd>{{ info.version }}</dd></div>
+          <div><dt>ライセンス</dt><dd>MIT License / Copyright (c) 2026 hatolife</dd></div>
           <div><dt>GitHub</dt><dd><button class="link-button" @click="openURL(info.github)">{{ info.github }}</button></dd></div>
+          <div><dt>バグ報告</dt><dd><button class="link-button" @click="openURL(issuesUrl)">{{ issuesUrl }}</button></dd></div>
         </dl>
+        <p class="subtle">不具合や使いにくい点があれば、バグ報告ページから連絡できます。</p>
         <div class="button-row">
           <button @click="view = 'licenses'">OSSライセンス</button>
           <button class="secondary" @click="view = 'main'">閉じる</button>
@@ -443,26 +480,36 @@ createApp({
         <div v-if="state.config" class="settings-layout">
           <section class="settings-group">
             <h3>出力</h3>
-            <div class="toggle-list">
-              <label><input type="checkbox" v-model="state.config.output.saveLocal" /><span>ローカル保存</span></label>
-              <label><input type="checkbox" v-model="state.config.output.uploadDiscord" /><span>Discord投稿</span></label>
-              <label><input type="checkbox" v-model="state.config.output.copySingleUrlToClipboard" /><span>1枚時にURLを自動コピー</span></label>
+            <div class="setting-row">
+              <div><strong>ローカル保存</strong><p>縮小した画像ファイルをPCにも保存します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="state.config.output.saveLocal" /><span></span></label>
             </div>
-            <div class="field-grid">
+            <div class="setting-row">
+              <div><strong>Discord投稿</strong><p>縮小した画像をDiscord Webhookへ投稿し、VRChatで使うURLを取得します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="state.config.output.uploadDiscord" /><span></span></label>
+            </div>
+            <div class="setting-row">
+              <div><strong>1枚時にURLを自動コピー</strong><p>1枚だけ処理したとき、取得したURLを自動でクリップボードへコピーします。</p></div>
+              <label class="switch"><input type="checkbox" v-model="state.config.output.copySingleUrlToClipboard" /><span></span></label>
+            </div>
+            <div class="setting-row">
+              <div><strong>出力形式</strong><p>PNGは画質を保ちやすく、JPGは写真向きです。</p></div>
               <label>
-                出力形式
                 <select v-model="state.config.image.outputFormat">
                   <option value="png">PNG</option>
                   <option value="jpg">JPG</option>
                 </select>
               </label>
+            </div>
+            <div class="setting-row">
+              <div><strong>JPEG品質</strong><p>{{ isJpegOutput ? 'JPG出力時の画質です。数字が大きいほど高画質です。' : 'PNG出力では使用しません。' }}</p></div>
               <label>
-                JPEG品質
                 <input type="number" min="1" max="100" v-model.number="state.config.image.jpegQuality" :disabled="!isJpegOutput" />
-                <small>{{ isJpegOutput ? 'JPG出力時に使用します。' : 'PNG出力では使用しません。' }}</small>
               </label>
+            </div>
+            <div class="setting-row">
+              <div><strong>UI表示</strong><p>処理後に画面を表示する条件を選びます。通常はautoのままで問題ありません。</p></div>
               <label>
-                UI表示
                 <select v-model="state.config.output.showUi">
                   <option value="auto">auto</option>
                   <option value="always">always</option>
@@ -474,13 +521,16 @@ createApp({
 
           <section class="settings-group">
             <h3>保存</h3>
-            <div class="field-grid two">
+            <div class="setting-row">
+              <div><strong>出力先フォルダ</strong><p>保存先です。初期値はアプリと同じ場所にある output フォルダです。</p></div>
+              <div class="input-with-button">
+                <input v-model="state.config.image.outputDirectory" @blur="sanitizeOutputDirectory" placeholder="./output" />
+                <button class="secondary" @click="chooseOutputDirectory">選択</button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div><strong>サフィックス</strong><p>保存するファイル名の末尾に付ける文字です。{{ outputExample }}</p></div>
               <label>
-                出力先フォルダ
-                <input v-model="state.config.image.outputDirectory" placeholder="未指定なら入力画像と同じ場所" />
-              </label>
-              <label>
-                サフィックス
                 <input v-model="state.config.image.suffix" />
               </label>
             </div>
@@ -488,10 +538,16 @@ createApp({
 
           <section class="settings-group">
             <h3>Discord</h3>
-            <label>
-              Webhook URL
+            <div class="setting-row">
+              <div>
+                <strong>Webhook URL</strong>
+                <p>Discordの投稿先チャンネルでWebhookを作成し、そのURLを貼り付けます。</p>
+                <button class="link-button" @click="openURL(webhookGuideUrl)">Discord公式: Webhookの作成方法</button>
+              </div>
+              <label>
               <input type="password" v-model="state.config.discord.webhookUrl" placeholder="https://discord.com/api/webhooks/..." />
-            </label>
+              </label>
+            </div>
           </section>
 
           <div class="button-row footer-actions">
@@ -519,9 +575,16 @@ createApp({
               <h2>{{ isError ? '確認が必要です' : '結果' }}</h2>
               <p class="subtle">サムネイルをクリックすると画像URLをコピーできます。</p>
             </div>
-            <button class="secondary clear-button" :class="{ holding: clearHolding }" @mousedown="startClearHold" @mouseup="cancelClearHold" @mouseleave="cancelClearHold" @touchstart.prevent="startClearHold" @touchend.prevent="cancelClearHold" @click="clearResults" :disabled="processing || !canOpenHistory">クリア</button>
+            <div class="clear-action">
+              <button class="secondary clear-button" :class="{ holding: clearHolding }" title="3秒長押しすると画像履歴画面を開きます" @mousedown="startClearHold" @mouseup="cancelClearHold" @mouseleave="cancelClearHold" @touchstart.prevent="startClearHold" @touchend.prevent="cancelClearHold" @click="clearResults" :disabled="processing || !canOpenHistory">クリア</button>
+              <span class="tooltip">3秒長押しで画像履歴を開く</span>
+            </div>
           </div>
           <p v-if="state.message" class="message">{{ state.message }}</p>
+          <div v-if="processing && totalProcessingCount" class="overall-progress">
+            <div><span>全体の進捗</span><strong>{{ processedCount }} / {{ totalProcessingCount }}</strong></div>
+            <div class="progress-track"><span :style="{ width: overallProgress + '%' }"></span></div>
+          </div>
           <p v-if="error" class="error">{{ error }}</p>
 
           <div v-if="hasResultItems" class="thumb-grid">

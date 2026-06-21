@@ -117,17 +117,16 @@ func EncodeImage(img image.Image, outputFormat string, quality int) (EncodedImag
 }
 
 func SaveEncodedImage(encoded EncodedImage, sourcePath string, cfg Config, clipboardInput bool) (string, error) {
-	outputDir := cfg.Image.OutputDirectory
+	outputDir := strings.Trim(strings.TrimSpace(cfg.Image.OutputDirectory), `"`)
 	if outputDir == "" {
-		if clipboardInput {
-			exe, err := os.Executable()
-			if err != nil {
-				return "", err
-			}
-			outputDir = filepath.Join(filepath.Dir(exe), "output")
-		} else {
-			outputDir = filepath.Dir(sourcePath)
+		outputDir = "./output"
+	}
+	if !filepath.IsAbs(outputDir) {
+		exe, err := os.Executable()
+		if err != nil {
+			return "", err
 		}
+		outputDir = filepath.Join(filepath.Dir(exe), outputDir)
 	}
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		return "", err

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type Config struct {
@@ -37,12 +38,13 @@ type DiscordConfig struct {
 func DefaultConfig() Config {
 	return Config{
 		Image: ImageConfig{
-			MaxWidth:     2048,
-			MaxHeight:    2048,
-			Suffix:       "_2048",
-			OutputFormat: "png",
-			Overwrite:    false,
-			JPEGQuality:  92,
+			MaxWidth:        2048,
+			MaxHeight:       2048,
+			Suffix:          "_2048",
+			OutputFormat:    "png",
+			Overwrite:       false,
+			JPEGQuality:     92,
+			OutputDirectory: "./output",
 		},
 		Output: OutputConfig{
 			SaveLocal:                true,
@@ -99,6 +101,10 @@ func (c *Config) Normalize() {
 	}
 	if c.Image.Suffix == "" {
 		c.Image.Suffix = "_2048"
+	}
+	c.Image.OutputDirectory = strings.Trim(strings.TrimSpace(c.Image.OutputDirectory), `"`)
+	if c.Image.OutputDirectory == "" {
+		c.Image.OutputDirectory = "./output"
 	}
 	switch c.Image.OutputFormat {
 	case "png", "jpg":
