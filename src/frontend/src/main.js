@@ -299,6 +299,16 @@ createApp({
     isHistorySelected(id) {
       return this.selectedHistoryIds.includes(id)
     },
+    isTrustedDiscordImageURL(url) {
+      try {
+        const parsed = new URL(String(url || ''))
+        return parsed.protocol === 'https:' &&
+          ['cdn.discordapp.com', 'media.discordapp.net'].includes(parsed.hostname.toLowerCase()) &&
+          parsed.pathname.startsWith('/attachments/')
+      } catch {
+        return false
+      }
+    },
     async deleteSelectedFromDiscord() {
       if (!this.selectedHistoryIds.length) return
       this.error = ''
@@ -487,7 +497,8 @@ createApp({
         <div v-if="state.history && state.history.length" class="history-grid">
           <button v-for="(item, index) in state.history" :key="item.id" class="history-card" :class="{ selected: isHistorySelected(item.id), cleared: item.cleared, deleted: item.discordDeleted }" @click="selectHistory($event, index, item)">
             <div class="thumb-media">
-              <img :src="item.thumbnail || item.url" alt="" />
+              <img v-if="item.thumbnail || isTrustedDiscordImageURL(item.url)" :src="item.thumbnail || item.url" alt="" />
+              <div v-else class="thumb-placeholder"></div>
               <div class="history-badges">
                 <span v-if="item.cleared">クリア済み</span>
                 <span v-if="item.discordDeleted">Discord削除済み</span>

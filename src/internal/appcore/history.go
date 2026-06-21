@@ -67,7 +67,7 @@ func AddResultsToHistory(path string, results []Result) ([]HistoryEntry, error) 
 	}
 	now := time.Now().Format(time.RFC3339)
 	for i := range results {
-		if strings.TrimSpace(results[i].URL) == "" || results[i].Error != "" {
+		if strings.TrimSpace(results[i].URL) == "" || results[i].Error != "" || !IsTrustedDiscordImageURL(results[i].URL) {
 			continue
 		}
 		entry := HistoryEntry{
@@ -130,6 +130,9 @@ func PurgeUnavailableHistory(path string) ([]HistoryEntry, int, error) {
 }
 
 func RemoteURLAvailable(url string) bool {
+	if !IsTrustedDiscordImageURL(url) {
+		return false
+	}
 	status, err := remoteURLStatus(http.MethodHead, url)
 	if err != nil {
 		return false
