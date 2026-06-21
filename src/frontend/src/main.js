@@ -25,7 +25,12 @@ createApp({
       error: '',
       settingsBaseline: '',
       pendingSettingsLeave: null,
-      pendingDropPaths: []
+      pendingDropPaths: [],
+      historyDragSelecting: false,
+      historySelectionAdditive: false,
+      historyDragStart: { x: 0, y: 0 },
+      historyDragCurrent: { x: 0, y: 0 },
+      historyDragBaseIds: []
     }
   },
   computed: {
@@ -84,6 +89,19 @@ createApp({
     hasUnsavedSettings() {
       if (!this.isSettings || !this.state.config || !this.settingsBaseline) return false
       return this.serializeSettings(this.state.config) !== this.settingsBaseline
+    },
+    historySelectionRectStyle() {
+      if (!this.historyDragSelecting) return {}
+      const left = Math.min(this.historyDragStart.x, this.historyDragCurrent.x)
+      const top = Math.min(this.historyDragStart.y, this.historyDragCurrent.y)
+      const width = Math.abs(this.historyDragCurrent.x - this.historyDragStart.x)
+      const height = Math.abs(this.historyDragCurrent.y - this.historyDragStart.y)
+      return {
+        left: `${left}px`,
+        top: `${top}px`,
+        width: `${width}px`,
+        height: `${height}px`
+      }
     }
   },
   async mounted() {
@@ -374,6 +392,7 @@ createApp({
       this.state.history = await api.GetHistory()
     },
     selectHistory(event, index, item) {
+      if (this.historyDragSelecting) return
       if (!item?.id) return
       const ids = [...this.selectedHistoryIds]
       if (event.shiftKey && this.lastSelectedHistoryIndex >= 0) {
@@ -390,6 +409,73 @@ createApp({
       }
       this.selectedHistoryIds = [item.id]
       this.lastSelectedHistoryIndex = index
+    },
+    startHistoryDragSelect(event) {
+      if (event.button !== 0 || event.target.closest('.history-card')) return
+      const grid = event.currentTarget
+      const rect = grid.getBoundingClientRect()
+      const point = {
+        x: event.clientX - rect.left + grid.scrollLeft,
+        y: event.clientY - rect.top + grid.scrollTop
+      }
+      this.historyDragSelecting = true
+      this.historySelectionAdditive = event.ctrlKey || event.metaKey
+      this.historyDragStart = point
+      this.historyDragCurrent = point
+      this.historyDragBaseIds = this.historySelectionAdditive ? [...this.selectedHistoryIds] : []
+      if (!this.historySelectionAdditive) {
+        this.selectedHistoryIds = []
+      }
+      window.addEventListener('mousemove', this.updateHistoryDragSelect)
+      window.addEventListener('mouseup', this.finishHistoryDragSelect)
+      event.preventDefault()
+    },
+    updateHistoryDragSelect(event) {
+      if (!this.historyDragSelecting) return
+      const grid = this.$refs.historyGrid
+      if (!grid) return
+      const rect = grid.getBoundingClientRect()
+      this.historyDragCurrent = {
+        x: event.clientX - rect.left + grid.scrollLeft,
+        y: event.clientY - rect.top + grid.scrollTop
+      }
+      const selectionRect = this.normalizedHistorySelectionRect()
+      const selected = this.historySelectionAdditive ? new Set(this.historyDragBaseIds) : new Set()
+      grid.querySelectorAll('.history-card').forEach((card) => {
+        const id = card.dataset.historyId
+        if (!id) return
+        if (this.rectsIntersect(selectionRect, this.elementRectInGrid(card, grid))) {
+          selected.add(id)
+        }
+      })
+      this.selectedHistoryIds = Array.from(selected)
+    },
+    finishHistoryDragSelect() {
+      if (!this.historyDragSelecting) return
+      window.removeEventListener('mousemove', this.updateHistoryDragSelect)
+      window.removeEventListener('mouseup', this.finishHistoryDragSelect)
+      this.historyDragSelecting = false
+      this.historyDragBaseIds = []
+    },
+    normalizedHistorySelectionRect() {
+      const left = Math.min(this.historyDragStart.x, this.historyDragCurrent.x)
+      const top = Math.min(this.historyDragStart.y, this.historyDragCurrent.y)
+      const right = Math.max(this.historyDragStart.x, this.historyDragCurrent.x)
+      const bottom = Math.max(this.historyDragStart.y, this.historyDragCurrent.y)
+      return { left, top, right, bottom }
+    },
+    elementRectInGrid(element, grid) {
+      const elementRect = element.getBoundingClientRect()
+      const gridRect = grid.getBoundingClientRect()
+      return {
+        left: elementRect.left - gridRect.left + grid.scrollLeft,
+        top: elementRect.top - gridRect.top + grid.scrollTop,
+        right: elementRect.right - gridRect.left + grid.scrollLeft,
+        bottom: elementRect.bottom - gridRect.top + grid.scrollTop
+      }
+    },
+    rectsIntersect(a, b) {
+      return a.left <= b.right && a.right >= b.left && a.top <= b.bottom && a.bottom >= b.top
     },
     isHistorySelected(id) {
       return this.selectedHistoryIds.includes(id)
@@ -590,8 +676,8 @@ createApp({
           </div>
         </div>
         <p v-if="error" class="error">{{ error }}</p>
-        <div v-if="state.history && state.history.length" class="history-grid">
-          <button v-for="(item, index) in state.history" :key="item.id" class="history-card" :class="{ selected: isHistorySelected(item.id), cleared: item.cleared, deleted: item.discordDeleted }" @click="selectHistory($event, index, item)">
+        <div v-if="state.history && state.history.length" ref="historyGrid" class="history-grid" :class="{ selecting: historyDragSelecting }" @mousedown="startHistoryDragSelect">
+          <button v-for="(item, index) in state.history" :key="item.id" class="history-card" :data-history-id="item.id" :class="{ selected: isHistorySelected(item.id), cleared: item.cleared, deleted: item.discordDeleted }" @click="selectHistory($event, index, item)">
             <div class="thumb-media">
               <img v-if="item.thumbnail || isTrustedDiscordImageURL(item.url)" :src="item.thumbnail || item.url" alt="" />
               <div v-else class="thumb-placeholder"></div>
@@ -603,6 +689,7 @@ createApp({
             <span>{{ item.name }}</span>
             <small>{{ item.createdAt }}</small>
           </button>
+          <div v-if="historyDragSelecting" class="selection-rect" :style="historySelectionRectStyle"></div>
         </div>
         <p v-else class="empty">履歴はありません。</p>
       </section>
