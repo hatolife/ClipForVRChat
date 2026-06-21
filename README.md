@@ -1,57 +1,57 @@
 # ClipForVRChat
 
-ClipForVRChat is a Windows app for preparing images for VRChat.
+ClipForVRChat は、VRChat で外部画像URLを使いやすくするための Windows アプリです。
 
-It resizes images so they fit within VRChat's 2048x2048 limit, can upload them to a configured Discord webhook, and copies the resulting image URL to the clipboard.
+画像を VRChat の 2048x2048 制限に収まるように縮小し、必要に応じて Discord に投稿して、画像URLをクリップボードへコピーします。
 
-## What It Does
+## できること
 
-- Resizes images to fit within 2048x2048 without changing the aspect ratio
-- Keeps JPEG images as JPEG, and saves other image types as PNG
-- Saves resized images locally when enabled
-- Uploads resized images to Discord when enabled
-- Copies the Discord image URL to the clipboard for single-image uploads
-- Shows a URL list with thumbnails for multiple images
+- 画像を縦横 2048px 以内に縮小
+- 縦横比を維持
+- JPEG は JPEG、それ以外は PNG として出力
+- 縮小画像をローカル保存
+- Discord Webhook に画像を投稿
+- 1枚だけなら投稿後の画像URLを自動でクリップボードへコピー
+- 複数枚ならサムネイル付きのURL一覧を表示
 
-## Basic Usage
+## 使い方
 
-Run without arguments to process the image currently in the clipboard:
+クリップボード内の画像を処理:
 
 ```txt
 ClipForVRChat.exe
 ```
 
-Run with one or more image files:
+画像ファイルを処理:
 
 ```txt
 ClipForVRChat.exe image.png
 ClipForVRChat.exe image1.png image2.jpg
 ```
 
-Open the settings UI by passing the config file:
+設定画面を開く:
 
 ```txt
 ClipForVRChat.exe config.json
 ```
 
-## Settings
+## 設定
 
-Settings are stored in `config.json` next to the exe.
+設定は exe と同じ場所にある `config.json` に保存されます。
 
-The app is designed so normal users can edit settings from the UI instead of editing JSON by hand.
+通常はJSONを手で編集せず、設定画面から変更する想定です。
 
-Important settings:
+主な設定:
 
-- Local save on/off
-- Discord upload on/off
-- Discord webhook URL
-- Output directory
-- JPEG quality
-- UI display mode
+- ローカル保存のON/OFF
+- Discord投稿のON/OFF
+- Discord Webhook URL
+- 出力先フォルダ
+- JPEG品質
+- UI表示モード
 
-## Discord Setup
+## Discord設定
 
-Create a Discord webhook for the channel you want to use, then set that webhook URL in the settings UI.
+投稿先チャンネルで Discord Webhook を作成し、設定画面で Webhook URL を指定してください。
 
-Uploaded image URLs are Discord attachment direct links.
-
+コピーされるURLは Discord 添付画像の直リンクです。

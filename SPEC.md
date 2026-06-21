@@ -1,139 +1,143 @@
-# ClipForVRChat Specification
+# ClipForVRChat 仕様
 
-## Overview
+## 概要
 
-ClipForVRChat is a Windows desktop application for VRChat users who need to resize external images to fit VRChat's image resolution limits, optionally upload them to Discord, and quickly copy usable image URLs.
+ClipForVRChat は、VRChat ユーザー向けの Windows デスクトップアプリです。
 
-The application is implemented in Go with Wails for the desktop UI.
+VRChat の外部画像読み込みで扱いやすいように、画像を 2048x2048 以内へ縮小し、必要に応じて Discord に投稿し、投稿された画像URLをすばやくクリップボードへコピーします。
 
-## Goals
+アプリ本体は Go と Wails で実装します。
 
-- Resize input images to fit within 2048x2048.
-- Preserve aspect ratio.
-- Avoid upscaling images that are already within the limit.
-- Save resized images locally when configured.
-- Upload resized images to a configured Discord webhook when configured.
-- Copy a usable image URL or image data to the clipboard when possible.
-- Provide a simple URL list UI for multi-image workflows.
-- Keep settings in JSON next to the executable.
+## 目的
 
-## Non-Goals
+- 入力画像を 2048x2048 以内に収める。
+- 縦横比を維持する。
+- 元画像が制限内なら拡大しない。
+- 設定に応じて縮小画像をローカル保存する。
+- 設定に応じて縮小画像を Discord Webhook に投稿する。
+- 可能な場合、画像URLまたは画像データをクリップボードへ保持する。
+- 複数画像のときはURL一覧UIを表示する。
+- 設定は exe と同じ場所の JSON に保存する。
 
-- Persistent upload history across app launches.
-- Manual JSON editing as the primary settings workflow.
-- Supporting arbitrary upload providers in the initial version.
-- Long-term hosting guarantees beyond Discord attachment behavior.
+## やらないこと
 
-## Application Name
+- 起動をまたいだ投稿履歴の保存。
+- ユーザーがJSONを直接編集する前提の設定運用。
+- 初期版でのDiscord以外のアップロード先対応。
+- Discord添付URLの長期永続性保証。
 
-`ClipForVRChat`
+## アプリ名
 
-Executable name:
+```txt
+ClipForVRChat
+```
+
+実行ファイル名:
 
 ```txt
 ClipForVRChat.exe
 ```
 
-## Platform
+## 対象環境
 
-Initial target:
+初期対象:
 
 - Windows
 
-Technology:
+使用技術:
 
 - Go
 - Wails
 
-## Input
+## 入力
 
-### No Arguments
+### 引数なし
 
-When launched without arguments, the app reads the current clipboard image and processes it.
+引数なしで起動された場合、現在のクリップボード画像を処理します。
 
-If the clipboard does not contain an image, the app shows an actionable error explaining that the user should copy an image to the clipboard or pass image files as arguments.
+クリップボードに画像がない場合は、画像をコピーしてから再実行するか、画像ファイルを引数に指定するよう案内するエラーを表示します。
 
-### Image File Arguments
+### 画像ファイル引数
 
-When launched with one or more image file paths, each image is processed.
+1枚以上の画像ファイルが引数に指定された場合、それらを順番に処理します。
 
-Supported initial input formats should include:
+初期対応形式:
 
 - JPEG
 - PNG
-- WebP if the selected Go image stack supports it cleanly
+- WebP
 
-Unsupported files should produce actionable errors.
+対応していないファイルは、ユーザーが次に何をすべきかわかるエラーとして表示します。
 
-### Config File Argument
+### 設定ファイル引数
 
-When launched with exactly one `.json` config file path, the app opens the settings UI for that config.
+`.json` 設定ファイルが1つだけ指定された場合、設定画面を開きます。
 
-If image files and config files are mixed, the app should show an error explaining that settings editing and image processing should be launched separately.
+画像ファイルと設定ファイルが混在している場合は、設定編集と画像処理は別々に起動するよう案内するエラーを表示します。
 
-## Image Processing
+## 画像処理
 
-### Resize Rule
+### 縮小ルール
 
-Images are resized so both width and height fit within:
+画像の横幅と高さがどちらも以下に収まるように縮小します。
 
 ```txt
 2048x2048
 ```
 
-The aspect ratio is preserved.
+縦横比は維持します。
 
-Images already within the limit are not enlarged.
+すでに制限内の画像は拡大しません。
 
-### Output Format
+### 出力形式
 
-- JPEG input is output as JPEG.
-- Any non-JPEG input is output as PNG.
-- Clipboard image input is output as PNG unless reliable source format detection is available.
+- JPEG入力はJPEGで出力する。
+- JPEG以外の入力はPNGで出力する。
+- クリップボード画像は、元形式を確実に判定できない場合はPNGで出力する。
 
-### JPEG Quality
+### JPEG品質
 
-JPEG quality is configurable.
+JPEG品質は設定可能です。
 
-Default:
+初期値:
 
 ```txt
 92
 ```
 
-## Local Output
+## ローカル出力
 
-Local file output can be enabled or disabled.
+ローカル保存は設定でON/OFFできます。
 
-When enabled, resized images are written to disk.
+ONの場合、縮小画像をファイルとして保存します。
 
-### Output Directory
+### 出力先
 
-The output directory is configurable.
+出力先フォルダは設定可能です。
 
-If no output directory is configured:
+未指定の場合:
 
-- File input: output next to the input image.
-- Clipboard input: output to an `output` directory next to the executable.
+- ファイル入力: 入力画像と同じフォルダ。
+- クリップボード入力: exe と同じ場所の `output` フォルダ。
 
-### Output Name
+### 出力名
 
-Default suffix:
+初期サフィックス:
 
 ```txt
 _2048
 ```
 
-Examples:
+例:
 
 ```txt
 image.png -> image_2048.png
 image.jpg -> image_2048.jpg
 ```
 
-By default, existing files are not overwritten.
+初期設定では既存ファイルを上書きしません。
 
-If the target path exists, the app should generate a numbered filename:
+出力先がすでに存在する場合は連番を付与します。
 
 ```txt
 image_2048.png
@@ -141,91 +145,91 @@ image_2048_2.png
 image_2048_3.png
 ```
 
-## Discord Upload
+## Discord投稿
 
-Discord upload uses a Discord webhook.
+Discord投稿には Discord Webhook を使います。
 
-The app uploads the resized image file or in-memory resized image data to the configured webhook.
+縮小済み画像を、設定されたWebhookへ投稿します。
 
-After upload, the app extracts the Discord attachment direct URL from the webhook response.
+投稿後、Webhookレスポンスから添付画像の直リンクURLを取得します。
 
-If Discord upload is enabled but the webhook URL is missing or invalid, the app shows an actionable error telling the user to open settings and configure the Discord webhook URL.
+Discord投稿がONでWebhook URLが未設定または不正な場合は、設定画面でWebhook URLを設定するよう案内するエラーを表示します。
 
-## Clipboard Output
+## クリップボード出力
 
-### Single Image
+### 1枚の場合
 
-If exactly one image is processed and Discord upload succeeds, the uploaded image URL is copied to the clipboard automatically when enabled.
+画像が1枚だけでDiscord投稿に成功した場合、設定がONなら投稿された画像URLを自動でクリップボードへコピーします。
 
-If local save and Discord upload are both disabled, a single processed image is copied to the clipboard as image data.
+ローカル保存とDiscord投稿が両方OFFの場合は、縮小後の画像データをクリップボードへ保持します。
 
-### Multiple Images
+### 複数枚の場合
 
-If multiple images are processed and Discord upload succeeds, the URL list UI is shown.
+複数画像を処理し、Discord投稿に成功した場合はURL一覧UIを表示します。
 
-Clicking a list item copies that item's URL to the clipboard.
+一覧要素をクリックすると、そのURLをクリップボードへコピーします。
 
-If local save and Discord upload are both disabled and multiple images are provided, the app shows an error explaining that it can only copy one processed image to the clipboard, and the user should enable local save, enable Discord upload, or process one image at a time.
+ローカル保存とDiscord投稿が両方OFFで複数画像が指定された場合は、複数画像を直接クリップボードへ保持できないため、ローカル保存またはDiscord投稿をONにするか、1枚ずつ処理するよう案内するエラーを表示します。
 
 ## UI
 
-The UI is built with Wails.
+UIは Wails で実装します。
 
-### URL List
+### URL一覧
 
-The URL list is shown when:
+URL一覧は以下の場合に表示します。
 
-- Multiple uploaded image URLs are available.
-- The UI mode is set to `always`.
-- An error needs to be shown in an actionable way.
+- 複数の投稿画像URLがある。
+- UI表示モードが `always`。
+- エラーをユーザーに案内する必要がある。
 
-Each URL list item includes:
+各要素に表示する内容:
 
-- Thumbnail
-- Source file name or clipboard label
+- サムネイル
+- 元ファイル名、またはクリップボード画像であることがわかる名前
 - URL
-- Click-to-copy behavior
+- クリックでコピー
 
-After copying, the UI shows a short toast-like message:
+コピー後、UI内に短いトーストを表示します。
 
 ```txt
 コピーしました
 ```
 
-### Settings UI
+### 設定画面
 
-The settings UI is opened by passing the config file path:
+設定画面は設定ファイルを引数に渡すと開きます。
 
 ```txt
 ClipForVRChat.exe config.json
 ```
 
-The settings UI should allow editing:
+設定画面で編集できる項目:
 
-- Local save enabled
-- Discord upload enabled
-- Discord webhook URL
-- Output directory
-- Output suffix
-- JPEG quality
-- UI display mode
-- Single-image automatic URL copy
+- ローカル保存ON/OFF
+- Discord投稿ON/OFF
+- Discord Webhook URL
+- 出力先フォルダ
+- 出力サフィックス
+- JPEG品質
+- UI表示モード
+- 1枚時のURL自動コピー
 
-## Settings
+## 設定
 
-Settings are stored in JSON.
+設定はJSONで保存します。
 
-Default location:
+初期配置:
 
 ```txt
 config.json
 ```
 
-The file is stored next to the executable.
+ファイルは exe と同じ場所に置きます。
 
-Users are expected to use the settings UI. The JSON should still be readable and stable for debugging.
+通常ユーザーは設定UIから編集します。JSONはデバッグしやすいよう、読みやすく安定した構造にします。
 
-### Draft Schema
+### 設定例
 
 ```json
 {
@@ -249,34 +253,32 @@ Users are expected to use the settings UI. The JSON should still be readable and
 }
 ```
 
-### UI Display Mode
+### UI表示モード
 
-Allowed values:
+設定値:
 
 - `auto`
 - `always`
 - `never`
 
-`auto` behavior:
+`auto` の挙動:
 
-- Single successful URL upload: do not show UI unless needed.
-- Multiple successful URL uploads: show URL list UI.
-- Error: show UI or a dialog with actionable guidance.
+- 1枚の投稿URLコピー成功時: UIを表示しない。
+- 複数の投稿URLがある場合: URL一覧UIを表示する。
+- エラー時: UIまたはダイアログで案内する。
 
-## Error Messages
+## エラーメッセージ方針
 
-Errors should explain what happened and what the user should do next.
+エラーは、何が起きたかだけでなく、ユーザーが次に何をすべきかも含めます。
 
-Examples:
+例:
 
-- Clipboard has no image: "クリップボードに画像がありません。画像をコピーしてから再実行するか、画像ファイルを exe にドラッグしてください。"
-- Multiple image clipboard-only output is impossible: "複数画像はクリップボードへ直接保持できません。ローカル保存またはDiscord投稿をONにするか、1枚ずつ処理してください。"
-- Missing webhook URL: "Discord投稿がONですがWebhook URLが未設定です。設定画面でWebhook URLを設定してください。"
+- クリップボードに画像がない: `クリップボードに画像がありません。画像をコピーしてから再実行するか、画像ファイルを exe にドラッグしてください。`
+- 複数画像をクリップボードへ直接出力できない: `複数画像はクリップボードへ直接保持できません。ローカル保存またはDiscord投稿をONにするか、1枚ずつ処理してください。`
+- Webhook URL未設定: `Discord投稿がONですがWebhook URLが未設定です。設定画面でWebhook URLを設定してください。`
 
-## Open Questions
+## 未決定事項
 
-- Whether WebP input should be supported in the first implementation.
-- Whether animated image inputs should be rejected or flattened to the first frame.
-- Whether clipboard image output should preserve alpha when copied back to the clipboard.
-- Whether the first release should include drag-and-drop onto the running UI in addition to file arguments.
-
+- アニメーション画像を拒否するか、先頭フレームだけ扱うか。
+- クリップボードへ画像データを戻すときにアルファをどこまで保持できるか。
+- 初期版で、起動済みUIへのドラッグ&ドロップを対応するか。
