@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/hatolife/ClipForVRChat/internal/appcore"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 type App struct {
@@ -19,6 +20,13 @@ type AppInfo struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
 	GitHub  string `json:"github"`
+}
+
+type OSSLicense struct {
+	Name      string `json:"name"`
+	License   string `json:"license"`
+	Copyright string `json:"copyright"`
+	URL       string `json:"url"`
 }
 
 func NewApp(configPath string, initial appcore.UIState) *App {
@@ -44,6 +52,21 @@ func (a *App) GetAppInfo() AppInfo {
 	}
 }
 
+func (a *App) OpenURL(url string) {
+	runtime.BrowserOpenURL(a.ctx, url)
+}
+
+func (a *App) GetOSSLicenses() []OSSLicense {
+	return []OSSLicense{
+		{Name: "Wails", License: "MIT", Copyright: "Copyright (c) 2018-Present Lea Anthony", URL: "https://github.com/wailsapp/wails"},
+		{Name: "Vue.js", License: "MIT", Copyright: "Copyright (c) 2018-present, Yuxi (Evan) You", URL: "https://github.com/vuejs/core"},
+		{Name: "Vite", License: "MIT", Copyright: "Copyright (c) 2019-present, VoidZero Inc. and Vite contributors", URL: "https://github.com/vitejs/vite"},
+		{Name: "imaging", License: "MIT", Copyright: "Copyright (c) 2012 Grigory Dryapak", URL: "https://github.com/disintegration/imaging"},
+		{Name: "golang.design/x/clipboard", License: "MIT", Copyright: "Copyright (c) 2021 Changkun Ou", URL: "https://github.com/golang-design/clipboard"},
+		{Name: "golang.org/x/image", License: "BSD-3-Clause", Copyright: "Copyright (c) The Go Authors", URL: "https://cs.opensource.google/go/x/image"},
+	}
+}
+
 func (a *App) LoadConfig() (appcore.Config, error) {
 	return appcore.LoadConfig(a.configPath)
 }
@@ -53,7 +76,19 @@ func (a *App) SaveConfig(cfg appcore.Config) error {
 		return err
 	}
 	a.state.Config = cfg
+	a.state.Mode = appcore.ModeResults
+	a.state.Message = ""
+	a.state.Results = nil
 	return nil
+}
+
+func (a *App) CloseSettings() appcore.UIState {
+	a.state.Mode = appcore.ModeResults
+	a.state.Message = ""
+	a.state.Results = nil
+	a.state.PendingPaths = nil
+	a.state.ProcessOnSave = false
+	return a.state
 }
 
 func (a *App) OpenSettings(path string) (appcore.UIState, error) {

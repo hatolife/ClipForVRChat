@@ -17,6 +17,7 @@ type ImageConfig struct {
 	MaxWidth        int    `json:"maxWidth"`
 	MaxHeight       int    `json:"maxHeight"`
 	Suffix          string `json:"suffix"`
+	OutputFormat    string `json:"outputFormat"`
 	Overwrite       bool   `json:"overwrite"`
 	JPEGQuality     int    `json:"jpegQuality"`
 	OutputDirectory string `json:"outputDirectory"`
@@ -36,11 +37,12 @@ type DiscordConfig struct {
 func DefaultConfig() Config {
 	return Config{
 		Image: ImageConfig{
-			MaxWidth:    2048,
-			MaxHeight:   2048,
-			Suffix:      "_2048",
-			Overwrite:   false,
-			JPEGQuality: 92,
+			MaxWidth:     2048,
+			MaxHeight:    2048,
+			Suffix:       "_2048",
+			OutputFormat: "png",
+			Overwrite:    false,
+			JPEGQuality:  92,
 		},
 		Output: OutputConfig{
 			SaveLocal:                true,
@@ -97,6 +99,11 @@ func (c *Config) Normalize() {
 	}
 	if c.Image.Suffix == "" {
 		c.Image.Suffix = "_2048"
+	}
+	switch c.Image.OutputFormat {
+	case "png", "jpg":
+	default:
+		c.Image.OutputFormat = "png"
 	}
 	if c.Image.JPEGQuality <= 0 || c.Image.JPEGQuality > 100 {
 		c.Image.JPEGQuality = 92

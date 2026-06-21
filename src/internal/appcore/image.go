@@ -94,14 +94,14 @@ func cropImage(img image.Image, rect image.Rectangle) image.Image {
 	return out
 }
 
-func EncodeImage(img image.Image, sourceFormat string, quality int) (EncodedImage, error) {
+func EncodeImage(img image.Image, outputFormat string, quality int) (EncodedImage, error) {
 	var buf bytes.Buffer
 	out := EncodedImage{Image: img}
-	if sourceFormat == "jpeg" || sourceFormat == "jpg" {
+	if outputFormat == "jpg" || outputFormat == "jpeg" {
 		out.Format = "jpeg"
 		out.Extension = ".jpg"
 		out.Mime = "image/jpeg"
-		if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: quality}); err != nil {
+		if err := jpeg.Encode(&buf, FlattenTransparentImage(img, color.White), &jpeg.Options{Quality: quality}); err != nil {
 			return out, err
 		}
 	} else {

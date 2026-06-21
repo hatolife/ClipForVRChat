@@ -51,7 +51,7 @@ func (p Processor) processFile(path string) Result {
 
 func (p Processor) processImage(img image.Image, format string, sourcePath string, clipboardInput bool) Result {
 	resized := ResizeToFit(img, p.Config.Image.MaxWidth, p.Config.Image.MaxHeight)
-	encoded, err := EncodeImage(resized, format, p.Config.Image.JPEGQuality)
+	encoded, err := EncodeImage(resized, p.Config.Image.OutputFormat, p.Config.Image.JPEGQuality)
 	result := Result{SourcePath: sourcePath, Name: filepath.Base(sourcePath)}
 	if err != nil {
 		result.Error = fmt.Sprintf("画像を書き出せませんでした: %v", err)
