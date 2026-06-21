@@ -60,7 +60,11 @@ jobs:
           if (!(Test-Path "build/bin/ClipForVRChat.exe")) {
             throw "build/bin/ClipForVRChat.exe was not created"
           }
-          Compress-Archive -Path "build/bin/ClipForVRChat.exe" -DestinationPath "dist/ClipForVRChat-windows-amd64.zip" -Force
+          New-Item -ItemType Directory -Force "dist/ClipForVRChat" | Out-Null
+          Copy-Item "build/bin/ClipForVRChat.exe" "dist/ClipForVRChat/"
+          Copy-Item "README.md" "dist/ClipForVRChat/"
+          Copy-Item "LICENSE" "dist/ClipForVRChat/"
+          Compress-Archive -Path "dist/ClipForVRChat/*" -DestinationPath "dist/ClipForVRChat-windows-amd64.zip" -Force
 
       - name: Create release
         uses: softprops/action-gh-release@v2

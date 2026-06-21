@@ -24,6 +24,7 @@ jobs:
           test -s README.md
           test -s SPEC.md
           test -s LICENSE
+          test -s build/appicon.png
 
       - name: Check project name references
         run: |

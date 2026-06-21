@@ -16,6 +16,9 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+//go:embed build/appicon.png
+var icon []byte
+
 func main() {
 	configPath := defaultConfigPath()
 	args := os.Args[1:]
@@ -25,6 +28,7 @@ func main() {
 		ConfigPath: configPath,
 	}
 
+	configExists := appcore.ConfigExists(configPath)
 	cfg, err := appcore.LoadConfig(configPath)
 	if err != nil {
 		state.Mode = appcore.ModeError
@@ -46,6 +50,15 @@ func main() {
 			state.Config = cfg
 			state.ConfigPath = configPath
 		}
+		runUI(configPath, state)
+		return
+	}
+
+	if !configExists {
+		state.Mode = appcore.ModeSettings
+		state.Message = "初回起動です。設定を確認して保存すると、続けて通常処理を実行します。"
+		state.PendingPaths = args
+		state.ProcessOnSave = true
 		runUI(configPath, state)
 		return
 	}
@@ -113,6 +126,10 @@ func runUI(configPath string, state appcore.UIState) {
 			Assets: assets,
 		},
 		OnStartup: app.startup,
+		DragAndDrop: &options.DragAndDrop{
+			EnableFileDrop:     true,
+			DisableWebViewDrop: true,
+		},
 		Bind: []interface{}{
 			app,
 		},

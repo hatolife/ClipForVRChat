@@ -24,6 +24,10 @@ select {
 }
 
 header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   padding: 24px 28px 16px;
   background: #ffffff;
   border-bottom: 1px solid #d9dee5;
@@ -104,6 +108,21 @@ button {
 button:disabled {
   cursor: default;
   opacity: 0.65;
+}
+
+.settings-button {
+  flex: 0 0 auto;
+}
+
+.drop-target {
+  min-height: calc(100vh - 91px);
+  --wails-drop-target: drop;
+}
+
+.wails-drop-target-active {
+  outline: 3px solid #2f9dbe;
+  outline-offset: -10px;
+  background: #eef8fb;
 }
 
 .list {
