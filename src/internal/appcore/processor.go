@@ -48,7 +48,7 @@ func (p Processor) ProcessClipboard() ([]Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	img, format, err := DecodeImage(data, "clipboard.png")
+	img, format, err := DecodeImageWithLimit(data, "clipboard.png", p.Config.Image.MaxInputMB)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (p Processor) ProcessClipboard() ([]Result, error) {
 }
 
 func (p Processor) processFile(path string) Result {
-	img, format, err := DecodeImageFile(path)
+	img, format, err := DecodeImageFileWithLimit(path, p.Config.Image.MaxInputMB)
 	if err != nil {
 		return Result{SourcePath: path, Name: filepath.Base(path), Error: fmt.Sprintf("画像を読み込めませんでした: %v", err)}
 	}

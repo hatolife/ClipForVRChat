@@ -23,6 +23,7 @@ type Config struct {
 type ImageConfig struct {
 	MaxWidth        int    `json:"maxWidth"`
 	MaxHeight       int    `json:"maxHeight"`
+	MaxInputMB      int    `json:"maxInputMb"`
 	Suffix          string `json:"suffix"`
 	OutputFormat    string `json:"outputFormat"`
 	Overwrite       bool   `json:"overwrite"`
@@ -52,6 +53,7 @@ func DefaultConfig() Config {
 		Image: ImageConfig{
 			MaxWidth:        2048,
 			MaxHeight:       2048,
+			MaxInputMB:      32,
 			Suffix:          "_2048",
 			OutputFormat:    "png",
 			Overwrite:       false,
@@ -121,6 +123,9 @@ func (c *Config) Normalize() {
 	}
 	if c.Image.MaxHeight <= 0 {
 		c.Image.MaxHeight = 2048
+	}
+	if c.Image.MaxInputMB <= 0 {
+		c.Image.MaxInputMB = 32
 	}
 	if c.Image.Suffix == "" {
 		c.Image.Suffix = "_2048"

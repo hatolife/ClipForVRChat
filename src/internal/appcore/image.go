@@ -3,6 +3,7 @@ package appcore
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -18,6 +19,11 @@ import (
 	"golang.org/x/image/webp"
 )
 
+const (
+	DefaultMaxImageInputMB = 32
+	MaxImagePixels         = 64_000_000
+)
+
 type EncodedImage struct {
 	Image     image.Image
 	Format    string
@@ -27,6 +33,17 @@ type EncodedImage struct {
 }
 
 func DecodeImage(data []byte, sourceName string) (image.Image, string, error) {
+	return DecodeImageWithLimit(data, sourceName, DefaultMaxImageInputMB)
+}
+
+func DecodeImageWithLimit(data []byte, sourceName string, maxInputMB int) (image.Image, string, error) {
+	if err := ValidateImageBytes(data, maxInputMB); err != nil {
+		return nil, "", err
+	}
+	format, err := ValidateImageDimensions(data, sourceName)
+	if err != nil {
+		return nil, "", err
+	}
 	img, format, err := image.Decode(bytes.NewReader(data))
 	if err == nil {
 		return img, strings.ToLower(format), nil
@@ -41,11 +58,63 @@ func DecodeImage(data []byte, sourceName string) (image.Image, string, error) {
 }
 
 func DecodeImageFile(path string) (image.Image, string, error) {
+	return DecodeImageFileWithLimit(path, DefaultMaxImageInputMB)
+}
+
+func DecodeImageFileWithLimit(path string, maxInputMB int) (image.Image, string, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, "", err
+	}
+	maxBytes := maxImageInputBytes(maxInputMB)
+	if info.Size() > maxBytes {
+		return nil, "", fmt.Errorf("画像ファイルが大きすぎます。%dMB以下の画像を指定してください。", maxBytes/1024/1024)
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, "", err
 	}
-	return DecodeImage(data, path)
+	return DecodeImageWithLimit(data, path, maxInputMB)
+}
+
+func ValidateImageBytes(data []byte, maxInputMB int) error {
+	if len(data) == 0 {
+		return errors.New("画像データが空です。")
+	}
+	maxBytes := maxImageInputBytes(maxInputMB)
+	if int64(len(data)) > maxBytes {
+		return fmt.Errorf("画像データが大きすぎます。%dMB以下の画像を指定してください。", maxBytes/1024/1024)
+	}
+	return nil
+}
+
+func maxImageInputBytes(maxInputMB int) int64 {
+	if maxInputMB <= 0 {
+		maxInputMB = DefaultMaxImageInputMB
+	}
+	return int64(maxInputMB) * 1024 * 1024
+}
+
+func ValidateImageDimensions(data []byte, sourceName string) (string, error) {
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil && strings.EqualFold(filepath.Ext(sourceName), ".webp") {
+		var webpErr error
+		cfg, webpErr = webp.DecodeConfig(bytes.NewReader(data))
+		if webpErr == nil {
+			format = "webp"
+			err = nil
+		}
+	}
+	if err != nil {
+		return "", err
+	}
+	if cfg.Width <= 0 || cfg.Height <= 0 {
+		return "", errors.New("画像サイズを確認できませんでした。")
+	}
+	if cfg.Height > MaxImagePixels/cfg.Width {
+		return "", fmt.Errorf("画像のピクセル数が大きすぎます。%dメガピクセル以下の画像を指定してください。", MaxImagePixels/1_000_000)
+	}
+	return strings.ToLower(format), nil
 }
 
 func ResizeToFit(img image.Image, maxWidth, maxHeight int) image.Image {
