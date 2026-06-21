@@ -28,6 +28,13 @@ type Result struct {
 	Error      string `json:"error"`
 }
 
+type ProgressEvent struct {
+	Index  int    `json:"index"`
+	Total  int    `json:"total"`
+	Stage  string `json:"stage"`
+	Result Result `json:"result"`
+}
+
 type ProcessRequest struct {
 	Paths []string `json:"paths"`
 }
