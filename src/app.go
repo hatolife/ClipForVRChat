@@ -60,7 +60,6 @@ func (a *App) OpenURL(url string) {
 
 func (a *App) GetOSSLicenses() []OSSLicense {
 	return []OSSLicense{
-		{Name: "ClipForVRChat", License: "MIT", Copyright: "Copyright (c) 2026 ClipForVRChat contributors", URL: githubURL},
 		{Name: "Wails", License: "MIT", Copyright: "Copyright (c) 2018-Present Lea Anthony", URL: "https://github.com/wailsapp/wails"},
 		{Name: "Vue.js", License: "MIT", Copyright: "Copyright (c) 2018-present, Yuxi (Evan) You", URL: "https://github.com/vuejs/core"},
 		{Name: "Vite", License: "MIT", Copyright: "Copyright (c) 2019-present, VoidZero Inc. and Vite contributors", URL: "https://github.com/vitejs/vite"},
@@ -68,6 +67,23 @@ func (a *App) GetOSSLicenses() []OSSLicense {
 		{Name: "golang.design/x/clipboard", License: "MIT", Copyright: "Copyright (c) 2021 Changkun Ou", URL: "https://github.com/golang-design/clipboard"},
 		{Name: "golang.org/x/image", License: "BSD-3-Clause", Copyright: "Copyright (c) The Go Authors", URL: "https://cs.opensource.google/go/x/image"},
 	}
+}
+
+func (a *App) SelectOutputDirectory(current string) (string, error) {
+	dir := strings.Trim(strings.TrimSpace(current), `"`)
+	if dir != "" && !filepath.IsAbs(dir) {
+		exe, err := os.Executable()
+		if err == nil {
+			dir = filepath.Join(filepath.Dir(exe), dir)
+		}
+	}
+	if stat, err := os.Stat(dir); err != nil || !stat.IsDir() {
+		dir = ""
+	}
+	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title:            "出力先フォルダを選択",
+		DefaultDirectory: dir,
+	})
 }
 
 func (a *App) ClearResults() appcore.UIState {

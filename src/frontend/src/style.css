@@ -173,9 +173,74 @@ button:disabled {
   margin-bottom: 4px;
 }
 
-.clear-button.holding {
-  background: linear-gradient(90deg, #2478a9 0%, #2478a9 55%, #ffffff 55%);
+.clear-action {
+  position: relative;
+  display: grid;
+  justify-items: end;
+}
+
+.tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 5;
+  width: max-content;
+  max-width: 220px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  background: #17212b;
   color: #ffffff;
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-3px);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.clear-action:hover .tooltip,
+.clear-action:focus-within .tooltip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.clear-button.holding {
+  position: relative;
+  overflow: hidden;
+  color: #17212b;
+}
+
+.clear-button.holding::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: #2478a9;
+  transform-origin: left;
+  animation: hold-fill 3s linear forwards;
+}
+
+.clear-button.holding {
+  color: #ffffff;
+}
+
+.clear-button.holding::after {
+  content: "履歴を開く";
+  position: relative;
+  z-index: 1;
+}
+
+.clear-button.holding {
+  font-size: 0;
+}
+
+@keyframes hold-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
 }
 
 .panel {
@@ -215,28 +280,6 @@ button:disabled {
   background: #ffffff;
 }
 
-.toggle-list {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.toggle-list label {
-  min-height: 62px;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid #d6dee7;
-  border-radius: 8px;
-  background: #f8fbfd;
-}
-
-.toggle-list input {
-  width: auto;
-  margin-top: 2px;
-}
-
 label {
   display: grid;
   gap: 7px;
@@ -264,14 +307,76 @@ small {
   line-height: 1.45;
 }
 
-.field-grid {
+.setting-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: minmax(220px, 0.46fr) minmax(260px, 0.54fr);
+  align-items: center;
+  gap: 18px;
+  padding: 12px 0;
+  border-top: 1px solid #e6ecf2;
 }
 
-.field-grid.two {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.setting-row:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.setting-row strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.setting-row p {
+  color: #5b6875;
+  line-height: 1.55;
+}
+
+.switch {
+  justify-self: end;
+  width: 52px;
+  height: 30px;
+  position: relative;
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.switch span {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: #c8d2dc;
+  transition: background 160ms ease;
+}
+
+.switch span::before {
+  content: "";
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  top: 3px;
+  left: 3px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(23, 33, 43, 0.22);
+  transition: transform 160ms ease;
+}
+
+.switch input:checked + span {
+  background: #2478a9;
+}
+
+.switch input:checked + span::before {
+  transform: translateX(22px);
+}
+
+.input-with-button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
 }
 
 .footer-actions {
@@ -289,6 +394,37 @@ small {
   gap: 14px;
   overflow: auto;
   padding: 2px 4px 4px 0;
+}
+
+.overall-progress {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  border: 1px solid #d6dee7;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.overall-progress div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.progress-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dde7ef;
+}
+
+.progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2478a9;
+  transition: width 180ms ease;
 }
 
 .thumb-card {
@@ -622,13 +758,15 @@ small {
     overflow: visible;
   }
 
-  .toggle-list,
-  .field-grid,
-  .field-grid.two,
+  .setting-row,
   .license-list,
   .help-grid,
   .history-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .switch {
+    justify-self: start;
   }
 
   .history-toolbar {
