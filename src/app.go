@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/hatolife/ClipForVRChat/internal/appcore"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -41,6 +42,7 @@ func (a *App) startup(ctx context.Context) {
 }
 
 func (a *App) GetInitialState() appcore.UIState {
+	a.refreshHistory()
 	return a.state
 }
 
@@ -69,12 +71,76 @@ func (a *App) GetOSSLicenses() []OSSLicense {
 }
 
 func (a *App) ClearResults() appcore.UIState {
+	var ids []string
+	for _, result := range a.state.Results {
+		if result.HistoryID != "" {
+			ids = append(ids, result.HistoryID)
+		}
+	}
+	if len(ids) > 0 {
+		if history, err := appcore.MarkHistoryCleared(appcore.HistoryPath(a.configPath), ids); err == nil {
+			a.state.History = history
+		}
+	}
 	a.state.Mode = appcore.ModeResults
 	a.state.Message = ""
 	a.state.Results = nil
 	a.state.PendingPaths = nil
 	a.state.ProcessOnSave = false
 	return a.state
+}
+
+func (a *App) GetHistory() ([]appcore.HistoryEntry, error) {
+	history, err := appcore.LoadHistory(appcore.HistoryPath(a.configPath))
+	if err != nil {
+		return nil, err
+	}
+	a.state.History = history
+	return history, nil
+}
+
+func (a *App) MarkHistoryCleared(ids []string) ([]appcore.HistoryEntry, error) {
+	history, err := appcore.MarkHistoryCleared(appcore.HistoryPath(a.configPath), ids)
+	if err != nil {
+		return history, err
+	}
+	a.state.History = history
+	return history, nil
+}
+
+func (a *App) DeleteDiscordHistoryEntries(ids []string) ([]appcore.HistoryEntry, error) {
+	history, err := appcore.LoadHistory(appcore.HistoryPath(a.configPath))
+	if err != nil {
+		return history, err
+	}
+	idSet := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		idSet[id] = true
+	}
+	for i := range history {
+		if !idSet[history[i].ID] {
+			continue
+		}
+		if err := appcore.DeleteDiscordMessage(history[i].DiscordWebhookID, history[i].DiscordToken, history[i].DiscordMessageID); err != nil {
+			return history, err
+		}
+		history[i].DiscordDeleted = true
+		history[i].DeletedAt = nowRFC3339()
+	}
+	if err := appcore.SaveHistory(appcore.HistoryPath(a.configPath), history); err != nil {
+		return history, err
+	}
+	a.state.History = history
+	return history, nil
+}
+
+func (a *App) PurgeDeletedHistoryEntries() ([]appcore.HistoryEntry, error) {
+	history, _, err := appcore.PurgeUnavailableHistory(appcore.HistoryPath(a.configPath))
+	if err != nil {
+		return history, err
+	}
+	a.state.History = history
+	return history, nil
 }
 
 func (a *App) LoadConfig() (appcore.Config, error) {
@@ -130,6 +196,9 @@ func (a *App) SaveConfigAndProcess(cfg appcore.Config, paths []string) (appcore.
 		return a.state, nil
 	}
 	_ = appcore.CopySingleURLIfNeeded(cfg, results)
+	if history, historyErr := appcore.AddResultsToHistory(appcore.HistoryPath(a.configPath), results); historyErr == nil {
+		a.state.History = history
+	}
 	a.state.Results = results
 	a.state.PendingPaths = nil
 	a.state.ProcessOnSave = false
@@ -164,6 +233,9 @@ func (a *App) ProcessToState(paths []string) (appcore.UIState, error) {
 		return a.state, nil
 	}
 	_ = appcore.CopySingleURLIfNeeded(cfg, results)
+	if history, historyErr := appcore.AddResultsToHistory(appcore.HistoryPath(a.configPath), results); historyErr == nil {
+		a.state.History = history
+	}
 	a.state.Config = cfg
 	a.state.Results = results
 	if hasResultErrors(results) {
@@ -186,6 +258,7 @@ func (a *App) Process(paths []string) ([]appcore.Result, error) {
 		return nil, err
 	}
 	_ = appcore.CopySingleURLIfNeeded(cfg, results)
+	_, _ = appcore.AddResultsToHistory(appcore.HistoryPath(a.configPath), results)
 	return results, nil
 }
 
@@ -234,4 +307,14 @@ func hasJSONPath(paths []string) bool {
 		}
 	}
 	return false
+}
+
+func (a *App) refreshHistory() {
+	if history, err := appcore.LoadHistory(appcore.HistoryPath(a.configPath)); err == nil {
+		a.state.History = history
+	}
+}
+
+func nowRFC3339() string {
+	return time.Now().Format(time.RFC3339)
 }

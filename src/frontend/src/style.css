@@ -173,6 +173,11 @@ button:disabled {
   margin-bottom: 4px;
 }
 
+.clear-button.holding {
+  background: linear-gradient(90deg, #2478a9 0%, #2478a9 55%, #ffffff 55%);
+  color: #ffffff;
+}
+
 .panel {
   min-height: 0;
   padding: 24px 28px;
@@ -388,10 +393,76 @@ small {
 
 .about,
 .licenses,
-.help {
+.help,
+.history-page {
   display: grid;
   align-content: start;
   gap: 18px;
+}
+
+.history-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.history-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+}
+
+.history-card {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #d4dbe4;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #17212b;
+  text-align: left;
+}
+
+.history-card.selected {
+  border-color: #2478a9;
+  box-shadow: 0 0 0 3px rgba(36, 120, 169, 0.2);
+}
+
+.history-card.cleared {
+  background: #f5f7f9;
+}
+
+.history-card.deleted img {
+  filter: grayscale(1);
+  opacity: 0.58;
+}
+
+.history-card span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.history-badges {
+  position: absolute;
+  inset: auto 8px 8px 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.history-badges span {
+  width: fit-content;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: rgba(23, 33, 43, 0.76);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 400;
 }
 
 .help-grid {
@@ -555,7 +626,12 @@ small {
   .field-grid,
   .field-grid.two,
   .license-list,
-  .help-grid {
+  .help-grid,
+  .history-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .history-toolbar {
+    display: grid;
   }
 }
