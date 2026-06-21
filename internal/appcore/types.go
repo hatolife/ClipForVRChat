@@ -1,0 +1,31 @@
+package appcore
+
+type Mode string
+
+const (
+	ModeProcess  Mode = "process"
+	ModeSettings Mode = "settings"
+	ModeResults  Mode = "results"
+	ModeError    Mode = "error"
+)
+
+type UIState struct {
+	Mode       Mode     `json:"mode"`
+	Message    string   `json:"message"`
+	ConfigPath string   `json:"configPath"`
+	Config     Config   `json:"config"`
+	Results    []Result `json:"results"`
+}
+
+type Result struct {
+	SourcePath string `json:"sourcePath"`
+	Name       string `json:"name"`
+	OutputPath string `json:"outputPath"`
+	URL        string `json:"url"`
+	Thumbnail  string `json:"thumbnail"`
+	Error      string `json:"error"`
+}
+
+type ProcessRequest struct {
+	Paths []string `json:"paths"`
+}
