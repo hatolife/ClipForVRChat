@@ -1,9 +1,10 @@
 module github.com/hatolife/ClipForVRChat
 
-go 1.25.0
+go 1.26.4
 
 require (
 	github.com/disintegration/imaging v1.6.2
+	github.com/gofrs/flock v0.13.0
 	github.com/wailsapp/wails/v2 v2.12.0
 	golang.design/x/clipboard v0.8.0
 	golang.org/x/image v0.43.0
@@ -15,7 +16,6 @@ require (
 	github.com/ebitengine/purego v0.10.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
-	github.com/gofrs/flock v0.13.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/jchv/go-winloader v0.0.0-20210711035445-715c2860da7e // indirect
