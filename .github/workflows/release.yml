@@ -60,11 +60,13 @@ jobs:
         run: |
           $shortSha = "${{ github.sha }}".Substring(0, 7)
           "app_version=${{ github.ref_name }}.$shortSha" >> $env:GITHUB_OUTPUT
+          "version=${{ github.ref_name }}" >> $env:GITHUB_OUTPUT
+          "revision=$shortSha" >> $env:GITHUB_OUTPUT
 
       - name: Build application
         working-directory: src
         shell: pwsh
-        run: wails build -ldflags "-X main.version=${{ steps.version.outputs.app_version }}"
+        run: wails build -ldflags "-X main.version=${{ steps.version.outputs.version }} -X main.revision=${{ steps.version.outputs.revision }}"
 
       - name: Package executable
         shell: pwsh

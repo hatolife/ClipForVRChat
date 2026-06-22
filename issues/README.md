@@ -43,6 +43,7 @@
 | 035 | [処理診断ログの追加](035-add-processing-diagnostic-log.md) | 完了 | 未リリース | QR検出などの原因調査用に処理時の診断ログを出力する。 |
 | 037 | [Release exe の外部署名ファイル](037-release-detached-gpg-signature.md) | 完了 | 未リリース | ReleaseでexeのPGP外部署名ファイルを生成して添付する。 |
 | 038 | [情報画面に公式配布元とPGP確認方法を追加](038-about-official-distribution-and-pgp.md) | 完了 | 未リリース | 公式配布元とexe署名による改竄確認方法を情報画面に記載する。 |
+| 039 | [バージョンとリビジョンを分けてビルドに埋め込む](039-separate-version-and-revision-build-info.md) | 完了 | 未リリース | ビルド時にバージョンとリビジョンを別々に埋め込む。 |
 
 ## 状態の意味
 
