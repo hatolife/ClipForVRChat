@@ -80,7 +80,9 @@ jobs:
       - name: Build application
         working-directory: src
         shell: pwsh
-        run: wails build -ldflags "-X main.version=ci"
+        run: |
+          $shortSha = "${{ github.sha }}".Substring(0, 7)
+          wails build -ldflags "-X main.version=ci -X main.revision=$shortSha"
 
       - name: Check executable
         working-directory: src

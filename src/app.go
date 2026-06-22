@@ -57,7 +57,7 @@ func (a *App) GetInitialState() appcore.UIState {
 func (a *App) GetAppInfo() AppInfo {
 	return AppInfo{
 		Name:    "ClipForVRChat",
-		Version: version,
+		Version: appVersion(),
 		GitHub:  githubURL,
 	}
 }

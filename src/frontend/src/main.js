@@ -79,7 +79,7 @@ createApp({
     outputExample() {
       const suffix = this.state.config?.image?.suffix || '_2048'
       const ext = this.state.config?.image?.outputFormat === 'jpg' ? 'jpg' : 'png'
-      return `例: image.png -> image${suffix}.${ext}`
+      return `image.png -> image${suffix}.${ext}`
     },
     activeView() {
       if (this.isSettings) return 'settings'
@@ -656,14 +656,17 @@ createApp({
           <h3>公式の配布場所</h3>
           <p>公式の配布場所は下記のみです。他で取得したファイルについては、内容や安全性に責任を取れません。</p>
           <ul>
-            <li><button class="link-button inline" @click="openURL(latestReleaseUrl)">GitHub</button></li>
-            <li><button class="link-button inline" @click="openURL(boothUrl)">BOOTH</button></li>
+            <li><button class="link-button inline" @click="openURL(latestReleaseUrl)">GitHub - https://github.com/hatolife/ClipForVRChat/releases/latest</button></li>
+            <li><button class="link-button inline" @click="openURL(boothUrl)">BOOTH - https://hatolife.booth.pm/items/8531663</button></li>
           </ul>
         </section>
         <section class="about-note">
           <h3>PGPで改竄確認できます</h3>
           <p>
-            GitHub Releasesでは、zipとは別に <code>ClipForVRChat.exe.asc</code> 署名ファイルも配布しています。PGP/GPGを使うと、展開した <code>ClipForVRChat.exe</code> が公式の配布用鍵で署名され、途中で書き換えられていないことを確認できます。
+            GitHub Releasesでは、zipとは別に <code>ClipForVRChat.exe.asc</code> 署名ファイルも配布しています。
+          </p>
+          <p>
+            展開した <code>ClipForVRChat.exe</code> が改竄されていないことを確認できます。
           </p>
           <ol>
             <li><button class="link-button inline" @click="openURL(releasesUrl)">GitHub Releases</button> で使いたいバージョンを開きます。</li>
@@ -675,22 +678,28 @@ createApp({
           </ol>
           <p>PGPがよく分からない場合は、公式の配布場所から直接ダウンロードしてください。</p>
           <ul>
-            <li><button class="link-button inline" @click="openURL(latestReleaseUrl)">GitHub</button></li>
-            <li><button class="link-button inline" @click="openURL(boothUrl)">BOOTH</button></li>
+            <li><button class="link-button inline" @click="openURL(latestReleaseUrl)">GitHub - https://github.com/hatolife/ClipForVRChat/releases/latest</button></li>
+            <li><button class="link-button inline" @click="openURL(boothUrl)">BOOTH - https://hatolife.booth.pm/items/8531663</button></li>
           </ul>
         </section>
         <section class="about-note">
           <h3>連絡・要望</h3>
           <p>
-            不具合や使いにくいところがあれば、Twitterの <button class="link-button inline" @click="openURL(authorTwitterUrl)">@hato_poppo_life</button> に連絡してもらって大丈夫です。
+            不具合や使いにくいところがあれば、Twitterの <button class="link-button inline" @click="openURL(authorTwitterUrl)">@hato_poppo_life</button> にご連絡ください。
           </p>
           <p>
-            「こういう機能が欲しい」みたいな話でも大丈夫です。できれば
+            「こういう機能が欲しい」みたいな話でも大丈夫です。全て対応は難しいですがある程度対応させていただきます。
+          </p>
+          <p>
+            できれば
             <button class="link-button inline" @click="openURL(feedbackTweetUrl)">このツイートへの返信</button>
             で書いてもらえると、見やすくて助かります。
           </p>
           <p>
-            もしくはGitHubのIssueに気軽に日本語で書いてください。恐らく反応はTwitterのほうが早いです。GitHubは反応が遅いと思われますが許してください。
+            GitHubのIssueでも問題ありません。気軽に日本語で書いてください。
+          </p>
+          <p>
+            恐らく反応はTwitterのほうが早いです。GitHubは反応が遅いと思われますが許してください。
           </p>
         </section>
         <div class="button-row">
@@ -701,7 +710,7 @@ createApp({
 
       <section v-else-if="view === 'licenses'" class="panel licenses">
         <h2>OSSライセンス</h2>
-        <p class="subtle">このアプリで使用している主なOSSです。</p>
+        <p class="subtle">このアプリで使用しているOSSです。</p>
         <div class="license-list">
           <article v-for="license in licenses" :key="license.name" class="license-card">
             <h3>{{ license.name }}</h3>
@@ -832,7 +841,11 @@ createApp({
               </div>
             </div>
             <div class="setting-row">
-              <div><strong>サフィックス</strong><p>保存するファイル名の末尾に付ける文字です。{{ outputExample }}</p></div>
+              <div>
+                <strong>サフィックス</strong>
+                <p>保存するファイル名の末尾に付ける文字です。</p>
+                <p>例: {{ outputExample }}</p>
+              </div>
               <label>
                 <input v-model="state.config.image.suffix" />
               </label>

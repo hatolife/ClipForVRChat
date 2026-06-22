@@ -19,3 +19,4 @@
 - PGP確認手順はzipではなく `ClipForVRChat.exe` と `ClipForVRChat.exe.asc` を対象にする。
 - 情報画面上にはRelease署名用公開鍵のfingerprintを表示しない。
 - 連絡・要望はPGPとは別項目として表示する。
+- PGP説明と連絡・要望の文章は、長文を避けて段落分けする。

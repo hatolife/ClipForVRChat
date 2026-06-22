@@ -16,16 +16,22 @@ if ! command -v wails >/dev/null 2>&1; then
   exit 1
 fi
 
-VERSION="$(git -C "${ROOT_DIR}" rev-parse --short=12 HEAD)"
+VERSION="$(git -C "${ROOT_DIR}" tag -l 'v*' | sort -rV | head -n1)"
+if [[ -z "${VERSION}" ]]; then
+  VERSION="develop"
+fi
+REVISION="$(git -C "${ROOT_DIR}" rev-parse --short=7 HEAD)"
+APP_VERSION="${VERSION}.${REVISION}"
 EXE_PATH="${SRC_DIR}/build/bin/${APP_NAME}.exe"
-ZIP_PATH="${DIST_DIR}/${APP_NAME}-${VERSION}-windows-amd64.zip"
+ZIP_PATH="${DIST_DIR}/${APP_NAME}-${APP_VERSION}-windows-amd64.zip"
 
 echo "Building ${APP_NAME} for windows/amd64"
 echo "Version: ${VERSION}"
+echo "Revision: ${REVISION}"
 
 (
   cd "${SRC_DIR}"
-  wails build -platform windows/amd64 -ldflags "-X main.version=${VERSION}"
+  wails build -platform windows/amd64 -ldflags "-X main.version=${VERSION} -X main.revision=${REVISION}"
 )
 
 if [[ ! -f "${EXE_PATH}" ]]; then
