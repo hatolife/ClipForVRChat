@@ -26,11 +26,15 @@ https://github.com/hatolife/ClipForVRChat/releases/tag/latest
 
 zipファイルを展開し、中にある `ClipForVRChat.exe` を起動してください。
 
+同じリリースには、zip本体とは別に `.sha256` と `ClipForVRChat.exe.asc` も添付されています。`.sha256` はzipのファイル破損確認用、`ClipForVRChat.exe.asc` はexeのPGP署名検証用です。通常はzipだけダウンロードすれば使用できます。
+
+PGP署名を確認する場合は、zipを展開して `ClipForVRChat.exe` を取り出し、GitHub Releasesから同じリリースの `ClipForVRChat.exe.asc` を同じフォルダに保存してください。そのうえで、同じリリースの `ClipForVRChat-release-signing-public-key.asc` を取り込んでから、exeと `.asc` を検証してください。
+
 ### 2. 初回設定
 
 初めて起動したときは設定画面が開きます。
 
-まずはそのまま保存しても使えます。Discordへ投稿したい場合は、Discord Webhook URL を設定してください。
+まずはそのまま保存しても使用できます。Discordへ投稿したい場合は、Discord Webhook URL を設定してください。
 
 設定は `ClipForVRChat.exe` と同じ場所の `config.json` に保存されます。通常はこのファイルを直接編集する必要はありません。
 

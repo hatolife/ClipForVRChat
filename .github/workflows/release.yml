@@ -82,10 +82,36 @@ jobs:
             ForEach-Object { "$($_.Hash.ToLower())  ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip" } |
             Set-Content "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip.sha256"
 
+      - name: Sign executable
+        shell: bash
+        env:
+          RELEASE_GPG_PRIVATE_KEY: ${{ secrets.CI_RELEASE_GPG_PRIVATE_KEY }}
+          RELEASE_GPG_PASSPHRASE: ${{ secrets.CI_RELEASE_GPG_PASSPHRASE }}
+          RELEASE_GPG_FINGERPRINT: ${{ secrets.CI_RELEASE_GPG_FINGERPRINT }}
+        run: |
+          test -n "$RELEASE_GPG_PRIVATE_KEY"
+          test -n "$RELEASE_GPG_PASSPHRASE"
+          test -n "$RELEASE_GPG_FINGERPRINT"
+          export GNUPGHOME="$RUNNER_TEMP/release-gnupg"
+          mkdir -p "$GNUPGHOME"
+          chmod 700 "$GNUPGHOME"
+          printf '%s' "$RELEASE_GPG_PRIVATE_KEY" | gpg --batch --import
+          printf '%s' "$RELEASE_GPG_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --local-user "$RELEASE_GPG_FINGERPRINT" \
+            --armor --detach-sign \
+            --output "dist/ClipForVRChat.exe.asc" \
+            "dist/ClipForVRChat/ClipForVRChat.exe"
+          gpg --batch --verify \
+            "dist/ClipForVRChat.exe.asc" \
+            "dist/ClipForVRChat/ClipForVRChat.exe"
+          gpg --batch --armor --export "$RELEASE_GPG_FINGERPRINT" > "dist/ClipForVRChat-release-signing-public-key.asc"
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip
             dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip.sha256
+            dist/ClipForVRChat.exe.asc
+            dist/ClipForVRChat-release-signing-public-key.asc
           generate_release_notes: true
