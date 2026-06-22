@@ -94,8 +94,7 @@ jobs:
           test -n "$RELEASE_GPG_PRIVATE_KEY"
           test -n "$RELEASE_GPG_PASSPHRASE"
           test -n "$RELEASE_GPG_FINGERPRINT"
-          export GNUPGHOME="$RUNNER_TEMP/release-gnupg"
-          mkdir -p "$GNUPGHOME"
+          export GNUPGHOME="$(mktemp -d)"
           chmod 700 "$GNUPGHOME"
           printf '%s' "$RELEASE_GPG_PRIVATE_KEY" | gpg --batch --import
           printf '%s' "$RELEASE_GPG_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
