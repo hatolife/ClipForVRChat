@@ -5,7 +5,7 @@ go 1.26.4
 require (
 	github.com/disintegration/imaging v1.6.2
 	github.com/gofrs/flock v0.13.0
-	github.com/liyue201/goqr v0.0.0-20200803022322-df443203d4ea
+	github.com/makiuchi-d/gozxing v0.1.1
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	github.com/wailsapp/wails/v2 v2.12.0
 	golang.design/x/clipboard v0.8.0
@@ -45,4 +45,5 @@ require (
 	golang.org/x/net v0.35.0 // indirect
 	golang.org/x/sys v0.37.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 )
