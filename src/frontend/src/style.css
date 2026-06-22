@@ -726,6 +726,30 @@ small {
   overflow-wrap: anywhere;
 }
 
+.about-note {
+  display: grid;
+  gap: 8px;
+  padding: 14px 0;
+  border-top: 1px solid #d6dee7;
+}
+
+.about-note h3 {
+  font-size: 16px;
+}
+
+.about-note p,
+.about-note li {
+  color: #455361;
+  line-height: 1.65;
+}
+
+.about-note ol,
+.about-note ul {
+  display: grid;
+  gap: 6px;
+  padding-left: 24px;
+}
+
 .license-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -750,6 +774,11 @@ small {
   text-align: left;
   text-decoration: underline;
   overflow-wrap: anywhere;
+}
+
+.link-button.inline {
+  display: inline;
+  vertical-align: baseline;
 }
 
 .error {

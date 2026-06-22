@@ -11,6 +11,11 @@ createApp({
       licenses: [],
       webhookGuideUrl: 'https://support.discord.com/hc/ja/articles/228383668-%E3%82%A6%E3%82%A7%E3%83%96%E3%83%95%E3%83%83%E3%82%AF%E3%81%AE%E3%81%94%E7%B4%B9%E4%BB%8B',
       issuesUrl: 'https://github.com/hatolife/ClipForVRChat/issues',
+      authorTwitterUrl: 'https://x.com/hato_poppo_life',
+      feedbackTweetUrl: 'https://x.com/hato_poppo_life/status/2068611307830710667',
+      releasesUrl: 'https://github.com/hatolife/ClipForVRChat/releases',
+      latestReleaseUrl: 'https://github.com/hatolife/ClipForVRChat/releases/latest',
+      boothUrl: 'https://hatolife.booth.pm/items/8531663',
       view: 'main',
       processing: false,
       dragging: false,
@@ -644,9 +649,50 @@ createApp({
           <div><dt>バージョン</dt><dd>{{ info.version }}</dd></div>
           <div><dt>ライセンス</dt><dd>MIT License / Copyright (c) 2026 hatolife</dd></div>
           <div><dt>GitHub</dt><dd><button class="link-button" @click="openURL(info.github)">{{ info.github }}</button></dd></div>
+          <div><dt>作者</dt><dd><button class="link-button" @click="openURL(authorTwitterUrl)">@hato_poppo_life</button></dd></div>
           <div><dt>バグ報告</dt><dd><button class="link-button" @click="openURL(issuesUrl)">{{ issuesUrl }}</button></dd></div>
         </dl>
-        <p class="subtle">不具合や使いにくい点があれば、バグ報告ページから連絡できます。</p>
+        <section class="about-note">
+          <h3>公式の配布場所</h3>
+          <p>公式の配布場所は下記のみです。他で取得したファイルについては、内容や安全性に責任を取れません。</p>
+          <ul>
+            <li><button class="link-button inline" @click="openURL(latestReleaseUrl)">GitHub</button></li>
+            <li><button class="link-button inline" @click="openURL(boothUrl)">BOOTH</button></li>
+          </ul>
+        </section>
+        <section class="about-note">
+          <h3>PGPで改竄確認できます</h3>
+          <p>
+            GitHub Releasesでは、zipとは別に <code>ClipForVRChat.exe.asc</code> 署名ファイルも配布しています。PGP/GPGを使うと、展開した <code>ClipForVRChat.exe</code> が公式の配布用鍵で署名され、途中で書き換えられていないことを確認できます。
+          </p>
+          <ol>
+            <li><button class="link-button inline" @click="openURL(releasesUrl)">GitHub Releases</button> で使いたいバージョンを開きます。</li>
+            <li>zipを展開し、確認したい <code>ClipForVRChat.exe</code> を用意します。</li>
+            <li>同じReleaseにある <code>ClipForVRChat.exe.asc</code> を、exeと同じフォルダに保存します。</li>
+            <li>公式の公開鍵を取り込みます。公開鍵は同じReleaseにある公開鍵ファイル、またはREADMEに記載されているものを使用してください。</li>
+            <li>コマンドプロンプトやPowerShellで <code>gpg --verify ClipForVRChat.exe.asc ClipForVRChat.exe</code> を実行します。</li>
+            <li><code>Good signature</code> と表示されれば、公式配布のexeとして確認できています。</li>
+          </ol>
+          <p>PGPがよく分からない場合は、公式の配布場所から直接ダウンロードしてください。</p>
+          <ul>
+            <li><button class="link-button inline" @click="openURL(latestReleaseUrl)">GitHub</button></li>
+            <li><button class="link-button inline" @click="openURL(boothUrl)">BOOTH</button></li>
+          </ul>
+        </section>
+        <section class="about-note">
+          <h3>連絡・要望</h3>
+          <p>
+            不具合や使いにくいところがあれば、Twitterの <button class="link-button inline" @click="openURL(authorTwitterUrl)">@hato_poppo_life</button> に連絡してもらって大丈夫です。
+          </p>
+          <p>
+            「こういう機能が欲しい」みたいな話でも大丈夫です。できれば
+            <button class="link-button inline" @click="openURL(feedbackTweetUrl)">このツイートへの返信</button>
+            で書いてもらえると、見やすくて助かります。
+          </p>
+          <p>
+            もしくはGitHubのIssueに気軽に日本語で書いてください。恐らく反応はTwitterのほうが早いです。GitHubは反応が遅いと思われますが許してください。
+          </p>
+        </section>
         <div class="button-row">
           <button @click="view = 'licenses'">OSSライセンス</button>
           <button class="secondary" @click="view = 'main'">閉じる</button>
