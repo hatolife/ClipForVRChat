@@ -68,7 +68,7 @@ jobs:
         shell: pwsh
         run: wails build -ldflags "-X main.version=${{ steps.version.outputs.version }} -X main.revision=${{ steps.version.outputs.revision }}"
 
-      - name: Package executable
+      - name: Prepare package directory
         shell: pwsh
         run: |
           if (!(Test-Path "src/build/bin/ClipForVRChat.exe")) {
@@ -79,10 +79,6 @@ jobs:
           Copy-Item "src/build/bin/ClipForVRChat.exe" "dist/ClipForVRChat/"
           Copy-Item "README.md" "dist/ClipForVRChat/"
           Copy-Item "LICENSE" "dist/ClipForVRChat/"
-          Compress-Archive -Path "dist/ClipForVRChat/*" -DestinationPath "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip" -Force
-          Get-FileHash "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip" -Algorithm SHA256 |
-            ForEach-Object { "$($_.Hash.ToLower())  ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip" } |
-            Set-Content "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip.sha256"
 
       - name: Sign executable
         shell: bash
@@ -100,12 +96,22 @@ jobs:
           printf '%s' "$RELEASE_GPG_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
             --local-user "$RELEASE_GPG_FINGERPRINT" \
             --armor --detach-sign \
-            --output "dist/ClipForVRChat.exe.asc" \
+            --output "dist/ClipForVRChat/ClipForVRChat.exe.asc" \
             "dist/ClipForVRChat/ClipForVRChat.exe"
           gpg --batch --verify \
-            "dist/ClipForVRChat.exe.asc" \
+            "dist/ClipForVRChat/ClipForVRChat.exe.asc" \
             "dist/ClipForVRChat/ClipForVRChat.exe"
-          gpg --batch --armor --export "$RELEASE_GPG_FINGERPRINT" > "dist/ClipForVRChat-release-signing-public-key.asc"
+          cp "dist/ClipForVRChat/ClipForVRChat.exe.asc" "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.exe.asc"
+          gpg --batch --armor --export "$RELEASE_GPG_FINGERPRINT" > "dist/ClipForVRChat/ClipForVRChat-release-signing-public-key.asc"
+          cp "dist/ClipForVRChat/ClipForVRChat-release-signing-public-key.asc" "dist/ClipForVRChat-${{ github.ref_name }}-release-signing-public-key.asc"
+
+      - name: Package executable
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "dist/ClipForVRChat/*" -DestinationPath "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip" -Force
+          Get-FileHash "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip" -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip" } |
+            Set-Content "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip.sha256"
 
       - name: Create release
         uses: softprops/action-gh-release@v2
@@ -113,6 +119,6 @@ jobs:
           files: |
             dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip
             dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip.sha256
-            dist/ClipForVRChat.exe.asc
-            dist/ClipForVRChat-release-signing-public-key.asc
+            dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.exe.asc
+            dist/ClipForVRChat-${{ github.ref_name }}-release-signing-public-key.asc
           generate_release_notes: true
