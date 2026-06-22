@@ -613,8 +613,16 @@ config.json
 GitHub Release のWindows配布zipには以下を含めます。
 
 - `ClipForVRChat.exe`
+- `ClipForVRChat.exe.asc`
+- `ClipForVRChat-release-signing-public-key.asc`
 - `README.md`
 - `LICENSE`
+
+Release asset には配布zipに加えて以下を添付します。
+
+- `ClipForVRChat-vX.Y.Z-windows-amd64.zip.sha256`
+- `ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc`
+- `ClipForVRChat-vX.Y.Z-release-signing-public-key.asc`
 
 zipファイル名にはバージョンを含めます。
 
