@@ -54,10 +54,17 @@ jobs:
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
 
+      - name: Prepare version
+        id: version
+        shell: pwsh
+        run: |
+          $shortSha = "${{ github.sha }}".Substring(0, 7)
+          "app_version=${{ github.ref_name }}.$shortSha" >> $env:GITHUB_OUTPUT
+
       - name: Build application
         working-directory: src
         shell: pwsh
-        run: wails build -ldflags "-X main.version=${{ github.ref_name }}"
+        run: wails build -ldflags "-X main.version=${{ steps.version.outputs.app_version }}"
 
       - name: Package executable
         shell: pwsh

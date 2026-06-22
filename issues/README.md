@@ -38,6 +38,8 @@
 | 030 | [Discord公式ヘルプリンクが開けない](030-fix-discord-help-link.md) | 完了 | 未リリース | Discord公式ヘルプURLからテキストフラグメントを削除。 |
 | 031 | [Discord削除済み履歴の削除条件とoutput削除](031-purge-discord-deleted-history.md) | 完了 | 未リリース | Discord削除済みフラグで履歴を削除し、設定に応じてoutputも削除。 |
 | 032 | [QRコードURLの検出とDiscord投稿](032-detect-qr-url-and-post.md) | 完了 | 未リリース | 画像内QRコードのURLを検出し、Discord投稿本文と結果画面に表示する。 |
+| 033 | [WSLからのWindowsビルドスクリプト](033-wsl-windows-build-script.md) | 完了 | 未リリース | WSLからWindows向けexeをコミットハッシュ版としてローカルビルドするスクリプトを追加。 |
+| 034 | [GitHub ActionsビルドのバージョンにコミットIDを含める](034-release-version-includes-commit.md) | 完了 | 未リリース | Release workflow で表示バージョンをリリース番号.コミットIDにする。 |
 
 ## 状態の意味
 
