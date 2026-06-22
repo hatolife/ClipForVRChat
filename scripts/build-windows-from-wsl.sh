@@ -21,6 +21,7 @@ if [[ -z "${VERSION}" ]]; then
   VERSION="develop"
 fi
 REVISION="$(git -C "${ROOT_DIR}" rev-parse --short=7 HEAD)"
+RELEASE_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 APP_VERSION="${VERSION}.${REVISION}"
 EXE_PATH="${SRC_DIR}/build/bin/${APP_NAME}.exe"
 ZIP_PATH="${DIST_DIR}/${APP_NAME}-${APP_VERSION}-windows-amd64.zip"
@@ -28,10 +29,11 @@ ZIP_PATH="${DIST_DIR}/${APP_NAME}-${APP_VERSION}-windows-amd64.zip"
 echo "Building ${APP_NAME} for windows/amd64"
 echo "Version: ${VERSION}"
 echo "Revision: ${REVISION}"
+echo "Release time: ${RELEASE_TIME}"
 
 (
   cd "${SRC_DIR}"
-  wails build -platform windows/amd64 -ldflags "-X main.version=${VERSION} -X main.revision=${REVISION}"
+  wails build -platform windows/amd64 -ldflags "-X main.version=${VERSION} -X main.revision=${REVISION} -X main.releaseTime=${RELEASE_TIME}"
 )
 
 if [[ ! -f "${EXE_PATH}" ]]; then

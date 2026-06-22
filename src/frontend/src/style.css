@@ -23,11 +23,12 @@ select {
 .shell {
   height: 100vh;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   overflow: hidden;
 }
 
 header {
+  grid-row: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -102,12 +103,30 @@ nav button.active {
   color: #ffffff;
 }
 
+.update-banner {
+  grid-row: 2;
+  width: 100%;
+  padding: 10px 24px;
+  border: 0;
+  border-bottom: 1px solid #d1bd7a;
+  border-radius: 0;
+  background: #fff4c8;
+  color: #5c4300;
+  text-align: left;
+  font-weight: 700;
+}
+
+.update-banner:hover {
+  background: #ffeaa1;
+}
+
 button:disabled {
   cursor: default;
   opacity: 0.65;
 }
 
 .workspace {
+  grid-row: 3;
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(320px, 0.86fr) minmax(380px, 1.14fr);
@@ -216,6 +235,7 @@ button:disabled {
 }
 
 .panel {
+  grid-row: 3;
   min-height: 0;
   padding: 24px 28px;
   overflow: auto;

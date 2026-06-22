@@ -6,8 +6,9 @@ import (
 )
 
 var (
-	version  = "develop"
-	revision = "unknown"
+	version     = "develop"
+	revision    = "unknown"
+	releaseTime = ""
 )
 
 const githubURL = "https://github.com/hatolife/ClipForVRChat"
@@ -23,6 +24,10 @@ func appVersion() string {
 		return version
 	}
 	return version + "." + revision
+}
+
+func appReleaseTime() string {
+	return strings.TrimSpace(releaseTime)
 }
 
 func buildInfoRevision() string {
