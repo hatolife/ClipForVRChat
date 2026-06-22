@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/color"
 	"path/filepath"
+	"strings"
 )
 
 type Processor struct {
@@ -68,13 +69,20 @@ func (p Processor) processFile(path string) Result {
 
 func (p Processor) processImage(img image.Image, format string, sourcePath string, clipboardInput bool) Result {
 	result := Result{SourcePath: sourcePath, Name: filepath.Base(sourcePath)}
+	inputBounds := img.Bounds()
+	p.logf("process start source=%q format=%s clipboard=%t input=%dx%d qr_enabled=%t", sourcePath, format, clipboardInput, inputBounds.Dx(), inputBounds.Dy(), p.Config.Output.DetectQRCodeURLs)
 	if p.Config.Output.DetectQRCodeURLs {
-		result.QRURLs = DetectQRCodeURLs(img)
+		qrResult := DetectQRCodeURLsWithDiagnostics(img)
+		result.QRURLs = qrResult.URLs
+		p.logf("qr result source=%q urls=%d details=%s", sourcePath, len(qrResult.URLs), strings.Join(qrResult.Diagnostics, " | "))
 	}
 	resized := ResizeToFit(img, p.Config.Image.MaxWidth, p.Config.Image.MaxHeight)
+	resizedBounds := resized.Bounds()
+	p.logf("resize result source=%q output=%dx%d", sourcePath, resizedBounds.Dx(), resizedBounds.Dy())
 	encoded, err := EncodeImage(resized, p.Config.Image.OutputFormat, p.Config.Image.JPEGQuality)
 	if err != nil {
 		result.Error = fmt.Sprintf("画像を書き出せませんでした: %v", err)
+		p.logf("encode error source=%q error=%q", sourcePath, result.Error)
 		return result
 	}
 
@@ -86,9 +94,11 @@ func (p Processor) processImage(img image.Image, format string, sourcePath strin
 		outputPath, err := SaveEncodedImage(encoded, sourcePath, p.Config, clipboardInput)
 		if err != nil {
 			result.Error = fmt.Sprintf("縮小画像を保存できませんでした: %v", err)
+			p.logf("save error source=%q error=%q", sourcePath, result.Error)
 			return result
 		}
 		result.OutputPath = outputPath
+		p.logf("save result source=%q output_path=%q bytes=%d", sourcePath, outputPath, len(encoded.Data))
 	}
 
 	if p.Config.Output.UploadDiscord {
@@ -97,20 +107,28 @@ func (p Processor) processImage(img image.Image, format string, sourcePath strin
 		uploaded, err := UploadDiscordWithContent(p.Config.Discord.WebhookURL, name, encoded, qrDiscordContent(result.QRURLs))
 		if err != nil {
 			result.Error = err.Error()
+			p.logf("discord error source=%q error=%q", sourcePath, result.Error)
 			return result
 		}
 		result.URL = uploaded.URL
 		result.DiscordMessageID = uploaded.MessageID
 		result.DiscordWebhookID = uploaded.WebhookID
 		result.DiscordToken = uploaded.Token
+		p.logf("discord result source=%q url=%q message_id=%q", sourcePath, result.URL, result.DiscordMessageID)
 	} else if !p.Config.Output.SaveLocal {
 		if err := WriteClipboardImage(encoded.Data); err != nil {
 			result.Error = fmt.Sprintf("画像をクリップボードへコピーできませんでした: %v", err)
+			p.logf("clipboard write error source=%q error=%q", sourcePath, result.Error)
 			return result
 		}
+		p.logf("clipboard write result source=%q bytes=%d", sourcePath, len(encoded.Data))
 	}
 
 	return result
+}
+
+func (p Processor) logf(format string, args ...any) {
+	AppendDiagnosticLog(p.Config.DiagnosticLogPath, format, args...)
 }
 
 func CopySingleURLIfNeeded(cfg Config, results []Result) error {

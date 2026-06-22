@@ -14,10 +14,11 @@ const (
 )
 
 type Config struct {
-	Image     ImageConfig     `json:"image"`
-	Output    OutputConfig    `json:"output"`
-	Discord   DiscordConfig   `json:"discord"`
-	AutoPhoto AutoPhotoConfig `json:"autoPhoto"`
+	Image             ImageConfig     `json:"image"`
+	Output            OutputConfig    `json:"output"`
+	Discord           DiscordConfig   `json:"discord"`
+	AutoPhoto         AutoPhotoConfig `json:"autoPhoto"`
+	DiagnosticLogPath string          `json:"-"`
 }
 
 type ImageConfig struct {
@@ -88,6 +89,7 @@ func ConfigExists(path string) bool {
 
 func LoadConfig(path string) (Config, error) {
 	cfg := DefaultConfig()
+	cfg.DiagnosticLogPath = DiagnosticLogPath(path)
 	data, err := os.ReadFile(path) // #nosec G304 -- config path is the app config path or an explicitly opened local config file.
 	if errors.Is(err, os.ErrNotExist) {
 		return cfg, SaveConfig(path, cfg)
@@ -98,6 +100,7 @@ func LoadConfig(path string) (Config, error) {
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return cfg, err
 	}
+	cfg.DiagnosticLogPath = DiagnosticLogPath(path)
 	cfg.Normalize()
 	return cfg, nil
 }

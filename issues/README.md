@@ -40,6 +40,7 @@
 | 032 | [QRコードURLの検出とDiscord投稿](032-detect-qr-url-and-post.md) | 完了 | 未リリース | 画像内QRコードのURLを検出し、Discord投稿本文と結果画面に表示する。 |
 | 033 | [WSLからのWindowsビルドスクリプト](033-wsl-windows-build-script.md) | 完了 | 未リリース | WSLからWindows向けexeをコミットハッシュ版としてローカルビルドするスクリプトを追加。 |
 | 034 | [GitHub ActionsビルドのバージョンにコミットIDを含める](034-release-version-includes-commit.md) | 完了 | 未リリース | Release workflow で表示バージョンをリリース番号.コミットIDにする。 |
+| 035 | [処理診断ログの追加](035-add-processing-diagnostic-log.md) | 完了 | 未リリース | QR検出などの原因調査用に処理時の診断ログを出力する。 |
 
 ## 状態の意味
 
