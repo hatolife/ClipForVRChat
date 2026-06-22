@@ -16,6 +16,7 @@ createApp({
       releasesUrl: 'https://github.com/hatolife/ClipForVRChat/releases',
       latestReleaseUrl: 'https://github.com/hatolife/ClipForVRChat/releases/latest',
       boothUrl: 'https://hatolife.booth.pm/items/8531663',
+      updateInfo: { available: false, currentVersion: '', currentReleaseTime: '', latestVersion: '', latestReleasePublished: '', url: '' },
       view: 'main',
       processing: false,
       dragging: false,
@@ -124,6 +125,7 @@ createApp({
       this.dragging = false
     })
     window.addEventListener('keydown', this.handleKeyDown)
+    void this.checkForUpdate()
   },
   unmounted() {
     window.removeEventListener('keydown', this.handleKeyDown)
@@ -536,6 +538,14 @@ createApp({
     async openURL(url) {
       await api.OpenURL(url)
     },
+    async checkForUpdate() {
+      if (!api?.CheckForUpdate) return
+      try {
+        this.updateInfo = await api.CheckForUpdate()
+      } catch (_err) {
+        this.updateInfo = { available: false, currentVersion: '', currentReleaseTime: '', latestVersion: '', latestReleasePublished: '', url: '' }
+      }
+    },
     sanitizeOutputDirectory() {
       if (!this.state.config?.image) return
       this.state.config.image.outputDirectory = String(this.state.config.image.outputDirectory || '').trim().replace(/^"+|"+$/g, '')
@@ -603,6 +613,10 @@ createApp({
           <button :class="{ active: activeView === 'settings' }" @click="toggleSettings">設定</button>
         </nav>
       </header>
+
+      <button v-if="updateInfo.available" class="update-banner" @click="openURL(updateInfo.url || latestReleaseUrl)">
+        新しいバージョン {{ updateInfo.latestVersion }} があります。クリックしてGitHub Releasesを開く
+      </button>
 
       <section v-if="view === 'help'" class="panel help">
         <div class="section-title">

@@ -59,14 +59,16 @@ jobs:
         shell: pwsh
         run: |
           $shortSha = "${{ github.sha }}".Substring(0, 7)
+          $releaseTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
           "app_version=${{ github.ref_name }}.$shortSha" >> $env:GITHUB_OUTPUT
           "version=${{ github.ref_name }}" >> $env:GITHUB_OUTPUT
           "revision=$shortSha" >> $env:GITHUB_OUTPUT
+          "release_time=$releaseTime" >> $env:GITHUB_OUTPUT
 
       - name: Build application
         working-directory: src
         shell: pwsh
-        run: wails build -ldflags "-X main.version=${{ steps.version.outputs.version }} -X main.revision=${{ steps.version.outputs.revision }}"
+        run: wails build -ldflags "-X main.version=${{ steps.version.outputs.version }} -X main.revision=${{ steps.version.outputs.revision }} -X main.releaseTime=${{ steps.version.outputs.release_time }}"
 
       - name: Prepare package directory
         shell: pwsh

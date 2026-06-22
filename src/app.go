@@ -66,6 +66,12 @@ func (a *App) OpenURL(url string) {
 	runtime.BrowserOpenURL(a.ctx, url)
 }
 
+func (a *App) CheckForUpdate() (appcore.UpdateInfo, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+	defer cancel()
+	return appcore.CheckLatestRelease(ctx, nil, appVersion(), appReleaseTime())
+}
+
 func (a *App) GetOSSLicenses() []OSSLicense {
 	return []OSSLicense{
 		{Name: "Wails", License: "MIT", Copyright: "Copyright (c) 2018-Present Lea Anthony", URL: "https://github.com/wailsapp/wails"},
