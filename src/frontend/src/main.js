@@ -931,11 +931,23 @@ createApp({
               <label class="switch"><input type="checkbox" v-model="state.config.screenshotAutoPost.enabled" /><span></span></label>
             </div>
             <div class="setting-row">
+              <div><strong>スキャン間隔</strong><p>スクリーンショット自動投稿でフォルダを確認する間隔です。短くすると反映は早くなりますが、PCへの負荷が少し増えます。</p></div>
+              <label>
+                <input type="number" min="1" max="3600" v-model.number="state.config.screenshotAutoPost.scanIntervalSeconds" />
+              </label>
+            </div>
+            <div class="setting-row">
               <div><strong>Screenshotsフォルダ</strong><p>Windowsのスクリーンショット保存先です。通常は「ピクチャ」内のScreenshotsフォルダです。</p></div>
               <div class="input-with-button">
                 <input v-model="state.config.screenshotAutoPost.screenshotDirectory" @blur="sanitizeScreenshotDirectory" placeholder="C:\\Users\\...\\Pictures\\Screenshots" />
                 <button class="secondary" @click="chooseScreenshotDirectory">選択</button>
               </div>
+            </div>
+            <div class="setting-row">
+              <div><strong>スクリーンショット投稿用Webhook URL</strong><p>通常のDiscord投稿とは別の投稿先にしたい場合だけ入力します。空の場合は上のDiscord Webhook URLへ投稿します。</p></div>
+              <label>
+                <input type="password" v-model="state.config.screenshotAutoPost.webhookUrl" placeholder="空なら通常のWebhook URLを使用" />
+              </label>
             </div>
           </section>
 

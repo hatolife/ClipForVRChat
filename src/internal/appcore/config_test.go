@@ -24,6 +24,7 @@ func TestConfigNormalizeAppliesDefaultsAndTrimsQuotes(t *testing.T) {
 		},
 		ScreenshotAutoPost: ScreenshotAutoPostConfig{
 			ScreenshotDirectory: ` "C:\Users\test\Pictures\Screenshots" `,
+			WebhookURL:          ` "https://discord.com/api/webhooks/2/screenshot" `,
 		},
 	}
 
@@ -61,6 +62,12 @@ func TestConfigNormalizeAppliesDefaultsAndTrimsQuotes(t *testing.T) {
 	}
 	if cfg.ScreenshotAutoPost.ScreenshotDirectory != `C:\Users\test\Pictures\Screenshots` {
 		t.Fatalf("ScreenshotDirectory = %q", cfg.ScreenshotAutoPost.ScreenshotDirectory)
+	}
+	if cfg.ScreenshotAutoPost.WebhookURL != "https://discord.com/api/webhooks/2/screenshot" {
+		t.Fatalf("Screenshot WebhookURL = %q", cfg.ScreenshotAutoPost.WebhookURL)
+	}
+	if cfg.ScreenshotAutoPost.ScanIntervalSeconds != 2 {
+		t.Fatalf("Screenshot ScanIntervalSeconds = %d, want 2", cfg.ScreenshotAutoPost.ScanIntervalSeconds)
 	}
 }
 

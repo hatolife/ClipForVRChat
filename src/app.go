@@ -429,23 +429,23 @@ func (a *App) restartAutoPhotoWatcher(cfg appcore.Config) {
 		a.state.Mode = appcore.ModeResults
 		runtime.EventsEmit(a.ctx, "auto-photo:result", event)
 	}
-	interval := time.Duration(cfg.AutoPhoto.ScanIntervalSeconds) * time.Second
 	if cfg.AutoPhoto.Enabled {
 		watcher := appcore.AutoPhotoWatcher{
 			Config:     cfg,
 			Directory:  cfg.AutoPhoto.PhotoDirectory,
 			WebhookURL: cfg.AutoPhoto.WebhookURL,
-			Interval:   interval,
+			Interval:   time.Duration(cfg.AutoPhoto.ScanIntervalSeconds) * time.Second,
 			Handler:    handler,
 		}
 		go watcher.Run(ctx)
 	}
 	if cfg.ScreenshotAutoPost.Enabled {
 		watcher := appcore.AutoPhotoWatcher{
-			Config:    cfg,
-			Directory: cfg.ScreenshotAutoPost.ScreenshotDirectory,
-			Interval:  interval,
-			Handler:   handler,
+			Config:     cfg,
+			Directory:  cfg.ScreenshotAutoPost.ScreenshotDirectory,
+			WebhookURL: cfg.ScreenshotAutoPost.WebhookURL,
+			Interval:   time.Duration(cfg.ScreenshotAutoPost.ScanIntervalSeconds) * time.Second,
+			Handler:    handler,
 		}
 		go watcher.Run(ctx)
 	}
