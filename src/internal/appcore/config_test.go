@@ -22,6 +22,9 @@ func TestConfigNormalizeAppliesDefaultsAndTrimsQuotes(t *testing.T) {
 			PhotoDirectory: ` "C:\VRChat Photos" `,
 			WebhookURL:     ` "https://discord.com/api/webhooks/1/token" `,
 		},
+		ScreenshotAutoPost: ScreenshotAutoPostConfig{
+			ScreenshotDirectory: ` "C:\Users\test\Pictures\Screenshots" `,
+		},
 	}
 
 	cfg.Normalize()
@@ -52,6 +55,12 @@ func TestConfigNormalizeAppliesDefaultsAndTrimsQuotes(t *testing.T) {
 	}
 	if cfg.AutoPhoto.WebhookURL != "https://discord.com/api/webhooks/1/token" {
 		t.Fatalf("WebhookURL = %q", cfg.AutoPhoto.WebhookURL)
+	}
+	if cfg.AutoPhoto.ScanIntervalSeconds != 2 {
+		t.Fatalf("ScanIntervalSeconds = %d, want 2", cfg.AutoPhoto.ScanIntervalSeconds)
+	}
+	if cfg.ScreenshotAutoPost.ScreenshotDirectory != `C:\Users\test\Pictures\Screenshots` {
+		t.Fatalf("ScreenshotDirectory = %q", cfg.ScreenshotAutoPost.ScreenshotDirectory)
 	}
 }
 
@@ -105,6 +114,15 @@ func TestDefaultVRChatPhotoDirectoryUsesUserProfile(t *testing.T) {
 	want := filepath.Join("C:", "Users", "test", "Pictures", "VRChat")
 	if got != want {
 		t.Fatalf("DefaultVRChatPhotoDirectory = %q, want %q", got, want)
+	}
+}
+
+func TestDefaultScreenshotsDirectoryUsesUserProfile(t *testing.T) {
+	t.Setenv("USERPROFILE", filepath.Join("C:", "Users", "test"))
+	got := DefaultScreenshotsDirectory()
+	want := filepath.Join("C:", "Users", "test", "Pictures", "Screenshots")
+	if got != want {
+		t.Fatalf("DefaultScreenshotsDirectory = %q, want %q", got, want)
 	}
 }
 

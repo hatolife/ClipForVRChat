@@ -48,3 +48,32 @@ func TestAutoPhotoWatcherTickLimitsProcessing(t *testing.T) {
 		t.Fatalf("processed = %d, want %d", processed, MaxAutoPhotoProcessPerTick)
 	}
 }
+
+func TestAutoPhotoWatcherUsesExplicitDirectory(t *testing.T) {
+	vrchatDir := t.TempDir()
+	screenshotDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(vrchatDir, "vrchat.png"), []byte("x"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	screenshotPath := filepath.Join(screenshotDir, "screenshot.png")
+	if err := os.WriteFile(screenshotPath, []byte("x"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	var processed []string
+	watcher := AutoPhotoWatcher{
+		Config:    Config{AutoPhoto: AutoPhotoConfig{PhotoDirectory: vrchatDir}},
+		Directory: screenshotDir,
+		seen:      map[string]time.Time{},
+		Process: func(path string) Result {
+			processed = append(processed, path)
+			return Result{Name: filepath.Base(path), SourcePath: path}
+		},
+	}
+
+	watcher.tick()
+
+	if len(processed) != 1 || processed[0] != screenshotPath {
+		t.Fatalf("processed = %v, want only %q", processed, screenshotPath)
+	}
+}

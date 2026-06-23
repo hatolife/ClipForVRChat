@@ -195,6 +195,7 @@ createApp({
       try {
         this.sanitizeOutputDirectory()
         this.sanitizePhotoDirectory()
+        this.sanitizeScreenshotDirectory()
         if (this.state.processOnSave) {
           this.state = await api.SaveConfigAndProcess(this.state.config, this.state.pendingPaths || [])
           this.resetSettingsBaseline()
@@ -554,6 +555,10 @@ createApp({
       if (!this.state.config?.autoPhoto) return
       this.state.config.autoPhoto.photoDirectory = String(this.state.config.autoPhoto.photoDirectory || '').trim().replace(/^"+|"+$/g, '')
     },
+    sanitizeScreenshotDirectory() {
+      if (!this.state.config?.screenshotAutoPost) return
+      this.state.config.screenshotAutoPost.screenshotDirectory = String(this.state.config.screenshotAutoPost.screenshotDirectory || '').trim().replace(/^"+|"+$/g, '')
+    },
     async chooseOutputDirectory() {
       this.sanitizeOutputDirectory()
       try {
@@ -576,6 +581,17 @@ createApp({
         this.error = String(err)
       }
     },
+    async chooseScreenshotDirectory() {
+      this.sanitizeScreenshotDirectory()
+      try {
+        const selected = await api.SelectScreenshotDirectory(this.state.config.screenshotAutoPost.screenshotDirectory)
+        if (selected) {
+          this.state.config.screenshotAutoPost.screenshotDirectory = selected
+        }
+      } catch (err) {
+        this.error = String(err)
+      }
+    },
     async saveSettings() {
       this.saving = true
       this.saved = false
@@ -583,6 +599,7 @@ createApp({
       try {
         this.sanitizeOutputDirectory()
         this.sanitizePhotoDirectory()
+        this.sanitizeScreenshotDirectory()
         if (this.state.processOnSave) {
           this.state = await api.SaveConfigAndProcess(this.state.config, this.state.pendingPaths || [])
         } else {
@@ -887,6 +904,12 @@ createApp({
               <label class="switch"><input type="checkbox" v-model="state.config.autoPhoto.enabled" /><span></span></label>
             </div>
             <div class="setting-row">
+              <div><strong>スキャン間隔</strong><p>自動投稿でフォルダを確認する間隔です。短くすると反映は早くなりますが、PCへの負荷が少し増えます。</p></div>
+              <label>
+                <input type="number" min="1" max="3600" v-model.number="state.config.autoPhoto.scanIntervalSeconds" />
+              </label>
+            </div>
+            <div class="setting-row">
               <div><strong>写真フォルダ</strong><p>VRChatが写真を保存するフォルダです。通常は「ピクチャ」内のVRChatフォルダです。</p></div>
               <div class="input-with-button">
                 <input v-model="state.config.autoPhoto.photoDirectory" @blur="sanitizePhotoDirectory" placeholder="C:\\Users\\...\\Pictures\\VRChat" />
@@ -898,6 +921,21 @@ createApp({
               <label>
                 <input type="password" v-model="state.config.autoPhoto.webhookUrl" placeholder="空なら通常のWebhook URLを使用" />
               </label>
+            </div>
+          </section>
+
+          <section class="settings-group">
+            <h3>スクリーンショット自動投稿</h3>
+            <div class="setting-row">
+              <div><strong>自動投稿</strong><p>Win+Shift+SなどでScreenshotsフォルダに保存された画像を、自動で縮小してDiscordへ投稿します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="state.config.screenshotAutoPost.enabled" /><span></span></label>
+            </div>
+            <div class="setting-row">
+              <div><strong>Screenshotsフォルダ</strong><p>Windowsのスクリーンショット保存先です。通常は「ピクチャ」内のScreenshotsフォルダです。</p></div>
+              <div class="input-with-button">
+                <input v-model="state.config.screenshotAutoPost.screenshotDirectory" @blur="sanitizeScreenshotDirectory" placeholder="C:\\Users\\...\\Pictures\\Screenshots" />
+                <button class="secondary" @click="chooseScreenshotDirectory">選択</button>
+              </div>
             </div>
           </section>
 

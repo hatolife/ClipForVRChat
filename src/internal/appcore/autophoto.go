@@ -21,18 +21,20 @@ type AutoPhotoEvent struct {
 }
 
 type AutoPhotoWatcher struct {
-	Config   Config
-	Interval time.Duration
-	Handler  func(AutoPhotoEvent)
-	Process  func(string) Result
-	seen     map[string]time.Time
+	Config     Config
+	Directory  string
+	WebhookURL string
+	Interval   time.Duration
+	Handler    func(AutoPhotoEvent)
+	Process    func(string) Result
+	seen       map[string]time.Time
 }
 
 func (w *AutoPhotoWatcher) Run(ctx context.Context) {
 	if w.Interval <= 0 {
 		w.Interval = 2 * time.Second
 	}
-	w.seen = scanPhotoFiles(w.Config.AutoPhoto.PhotoDirectory)
+	w.seen = scanPhotoFiles(w.directory())
 	ticker := time.NewTicker(w.Interval)
 	defer ticker.Stop()
 	for {
@@ -46,7 +48,7 @@ func (w *AutoPhotoWatcher) Run(ctx context.Context) {
 }
 
 func (w *AutoPhotoWatcher) tick() {
-	current := scanPhotoFiles(w.Config.AutoPhoto.PhotoDirectory)
+	current := scanPhotoFiles(w.directory())
 	processed := 0
 	for _, path := range sortedPhotoPaths(current) {
 		modTime := current[path]
@@ -83,8 +85,8 @@ func (w *AutoPhotoWatcher) process(path string) Result {
 	}
 	cfg := w.Config
 	cfg.Output.UploadDiscord = true
-	if strings.TrimSpace(cfg.AutoPhoto.WebhookURL) != "" {
-		cfg.Discord.WebhookURL = cfg.AutoPhoto.WebhookURL
+	if strings.TrimSpace(w.webhookURL()) != "" {
+		cfg.Discord.WebhookURL = w.webhookURL()
 	}
 	results, err := Processor{Config: cfg}.ProcessPaths([]string{path})
 	if err != nil {
@@ -94,6 +96,20 @@ func (w *AutoPhotoWatcher) process(path string) Result {
 		return Result{SourcePath: path, Name: filepath.Base(path), Error: "画像を処理できませんでした。"}
 	}
 	return results[0]
+}
+
+func (w *AutoPhotoWatcher) directory() string {
+	if strings.TrimSpace(w.Directory) != "" {
+		return w.Directory
+	}
+	return w.Config.AutoPhoto.PhotoDirectory
+}
+
+func (w *AutoPhotoWatcher) webhookURL() string {
+	if strings.TrimSpace(w.WebhookURL) != "" {
+		return w.WebhookURL
+	}
+	return w.Config.AutoPhoto.WebhookURL
 }
 
 func scanPhotoFiles(dir string) map[string]time.Time {

@@ -45,6 +45,7 @@
 | 038 | [情報画面に公式配布元とPGP確認方法を追加](038-about-official-distribution-and-pgp.md) | 完了 | 未リリース | 公式配布元とexe署名による改竄確認方法を情報画面に記載する。 |
 | 039 | [バージョンとリビジョンを分けてビルドに埋め込む](039-separate-version-and-revision-build-info.md) | 完了 | 未リリース | ビルド時にバージョンとリビジョンを別々に埋め込む。 |
 | 040 | [GitHub Release のアップデート通知](040-check-github-release-updates.md) | 完了 | 未リリース | GitHub Releases の最新Releaseを確認し、更新があればUI内に通知する。 |
+| 041 | [Win+Shift+S スクリーンショット自動投稿](041-screenshot-auto-post.md) | 完了 | 未リリース | Screenshotsフォルダを定期スキャンし、Win+Shift+Sで保存された画像を自動投稿する。 |
 
 ## 状態の意味
 
