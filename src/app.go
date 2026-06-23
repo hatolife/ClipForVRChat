@@ -91,6 +91,10 @@ func (a *App) SelectPhotoDirectory(current string) (string, error) {
 	return a.selectDirectory("VRChat写真フォルダを選択", current)
 }
 
+func (a *App) SelectScreenshotDirectory(current string) (string, error) {
+	return a.selectDirectory("スクリーンショットフォルダを選択", current)
+}
+
 func (a *App) selectDirectory(title string, current string) (string, error) {
 	dir := strings.Trim(strings.TrimSpace(current), `"`)
 	if dir != "" && !filepath.IsAbs(dir) {
@@ -406,27 +410,43 @@ func (a *App) restartAutoPhotoWatcher(cfg appcore.Config) {
 		a.autoCancel()
 		a.autoCancel = nil
 	}
-	if a.ctx == nil || !cfg.AutoPhoto.Enabled {
+	if a.ctx == nil || (!cfg.AutoPhoto.Enabled && !cfg.ScreenshotAutoPost.Enabled) {
 		return
 	}
 	ctx, cancel := context.WithCancel(a.ctx)
 	a.autoCancel = cancel
-	watcher := appcore.AutoPhotoWatcher{
-		Config: cfg,
-		Handler: func(event appcore.AutoPhotoEvent) {
-			a.mu.Lock()
-			defer a.mu.Unlock()
-			if event.Result.URL != "" && event.Result.Error == "" {
-				results := []appcore.Result{event.Result}
-				if history, err := appcore.AddResultsToHistory(appcore.HistoryPath(a.configPath), results); err == nil {
-					a.state.History = history
-					event.Result = results[0]
-				}
+	handler := func(event appcore.AutoPhotoEvent) {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		if event.Result.URL != "" && event.Result.Error == "" {
+			results := []appcore.Result{event.Result}
+			if history, err := appcore.AddResultsToHistory(appcore.HistoryPath(a.configPath), results); err == nil {
+				a.state.History = history
+				event.Result = results[0]
 			}
-			a.state.Results = append([]appcore.Result{event.Result}, a.state.Results...)
-			a.state.Mode = appcore.ModeResults
-			runtime.EventsEmit(a.ctx, "auto-photo:result", event)
-		},
+		}
+		a.state.Results = append([]appcore.Result{event.Result}, a.state.Results...)
+		a.state.Mode = appcore.ModeResults
+		runtime.EventsEmit(a.ctx, "auto-photo:result", event)
 	}
-	go watcher.Run(ctx)
+	interval := time.Duration(cfg.AutoPhoto.ScanIntervalSeconds) * time.Second
+	if cfg.AutoPhoto.Enabled {
+		watcher := appcore.AutoPhotoWatcher{
+			Config:     cfg,
+			Directory:  cfg.AutoPhoto.PhotoDirectory,
+			WebhookURL: cfg.AutoPhoto.WebhookURL,
+			Interval:   interval,
+			Handler:    handler,
+		}
+		go watcher.Run(ctx)
+	}
+	if cfg.ScreenshotAutoPost.Enabled {
+		watcher := appcore.AutoPhotoWatcher{
+			Config:    cfg,
+			Directory: cfg.ScreenshotAutoPost.ScreenshotDirectory,
+			Interval:  interval,
+			Handler:   handler,
+		}
+		go watcher.Run(ctx)
+	}
 }

@@ -1,5 +1,24 @@
 # Release Notes
 
+## v0.1.5
+
+### 更新内容
+
+- Win+Shift+SなどでScreenshotsフォルダに保存された画像を、自動でDiscordへ投稿する機能を追加しました。
+- スクリーンショット自動投稿を設定画面でON/OFFできるようにしました。初期値はOFFです。
+- 自動投稿のスキャン間隔を設定画面で変更できるようにしました。
+
+### ダウンロード
+
+- プログラムのダウンロード: https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.5/ClipForVRChat-v0.1.5-windows-amd64.zip
+- 署名確認用ファイル: https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.5/ClipForVRChat-v0.1.5-windows-amd64.exe.asc
+- 署名確認用公開鍵: https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.5/ClipForVRChat-v0.1.5-release-signing-public-key.asc
+- SHA256: https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.5/ClipForVRChat-v0.1.5-windows-amd64.zip.sha256
+
+### 比較
+
+https://github.com/hatolife/ClipForVRChat/compare/v0.1.4...v0.1.5
+
 ## v0.1.4
 
 ### 更新内容

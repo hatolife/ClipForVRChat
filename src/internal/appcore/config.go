@@ -14,11 +14,12 @@ const (
 )
 
 type Config struct {
-	Image             ImageConfig     `json:"image"`
-	Output            OutputConfig    `json:"output"`
-	Discord           DiscordConfig   `json:"discord"`
-	AutoPhoto         AutoPhotoConfig `json:"autoPhoto"`
-	DiagnosticLogPath string          `json:"-"`
+	Image              ImageConfig              `json:"image"`
+	Output             OutputConfig             `json:"output"`
+	Discord            DiscordConfig            `json:"discord"`
+	AutoPhoto          AutoPhotoConfig          `json:"autoPhoto"`
+	ScreenshotAutoPost ScreenshotAutoPostConfig `json:"screenshotAutoPost"`
+	DiagnosticLogPath  string                   `json:"-"`
 }
 
 type ImageConfig struct {
@@ -46,9 +47,15 @@ type DiscordConfig struct {
 }
 
 type AutoPhotoConfig struct {
-	Enabled        bool   `json:"enabled"`
-	PhotoDirectory string `json:"photoDirectory"`
-	WebhookURL     string `json:"webhookUrl"`
+	Enabled             bool   `json:"enabled"`
+	PhotoDirectory      string `json:"photoDirectory"`
+	WebhookURL          string `json:"webhookUrl"`
+	ScanIntervalSeconds int    `json:"scanIntervalSeconds"`
+}
+
+type ScreenshotAutoPostConfig struct {
+	Enabled             bool   `json:"enabled"`
+	ScreenshotDirectory string `json:"screenshotDirectory"`
 }
 
 func DefaultConfig() Config {
@@ -72,8 +79,13 @@ func DefaultConfig() Config {
 			DetectQRCodeURLs:           false,
 		},
 		AutoPhoto: AutoPhotoConfig{
-			Enabled:        false,
-			PhotoDirectory: DefaultVRChatPhotoDirectory(),
+			Enabled:             false,
+			PhotoDirectory:      DefaultVRChatPhotoDirectory(),
+			ScanIntervalSeconds: 2,
+		},
+		ScreenshotAutoPost: ScreenshotAutoPostConfig{
+			Enabled:             false,
+			ScreenshotDirectory: DefaultScreenshotsDirectory(),
 		},
 	}
 }
@@ -159,6 +171,16 @@ func (c *Config) Normalize() {
 		c.AutoPhoto.PhotoDirectory = DefaultVRChatPhotoDirectory()
 	}
 	c.AutoPhoto.WebhookURL = strings.Trim(strings.TrimSpace(c.AutoPhoto.WebhookURL), `"`)
+	if c.AutoPhoto.ScanIntervalSeconds <= 0 {
+		c.AutoPhoto.ScanIntervalSeconds = 2
+	}
+	if c.AutoPhoto.ScanIntervalSeconds > 3600 {
+		c.AutoPhoto.ScanIntervalSeconds = 3600
+	}
+	c.ScreenshotAutoPost.ScreenshotDirectory = strings.Trim(strings.TrimSpace(c.ScreenshotAutoPost.ScreenshotDirectory), `"`)
+	if c.ScreenshotAutoPost.ScreenshotDirectory == "" {
+		c.ScreenshotAutoPost.ScreenshotDirectory = DefaultScreenshotsDirectory()
+	}
 }
 
 func DefaultVRChatPhotoDirectory() string {
@@ -167,6 +189,16 @@ func DefaultVRChatPhotoDirectory() string {
 	}
 	if home, err := os.UserHomeDir(); err == nil && home != "" {
 		return filepath.Join(home, "Pictures", "VRChat")
+	}
+	return ""
+}
+
+func DefaultScreenshotsDirectory() string {
+	if userProfile := os.Getenv("USERPROFILE"); userProfile != "" {
+		return filepath.Join(userProfile, "Pictures", "Screenshots")
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		return filepath.Join(home, "Pictures", "Screenshots")
 	}
 	return ""
 }

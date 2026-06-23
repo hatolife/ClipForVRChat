@@ -269,6 +269,24 @@ VRChat写真自動投稿をONにすると、指定した写真フォルダを監
 
 初期対応ではOSCイベントではなく、写真フォルダの定期スキャンで検知します。実際に保存された画像を確実に処理するためです。
 
+スキャン間隔は設定画面で変更できます。初期値は2秒です。
+
+## スクリーンショット自動投稿
+
+スクリーンショット自動投稿をONにすると、指定したScreenshotsフォルダを監視します。初期値はOFFです。
+
+初期Screenshotsフォルダ:
+
+```txt
+%USERPROFILE%\Pictures\Screenshots
+```
+
+起動後に新しく保存された対応画像を検知した場合、通常の画像処理と同じように縮小、ローカル保存、Discord投稿、履歴保存を行います。
+
+投稿先は通常のDiscord Webhook URLを使用します。
+
+検知方法とスキャン間隔はVRChat写真自動投稿と同じです。
+
 ## クリップボード出力
 
 ### 1枚の場合
@@ -384,7 +402,8 @@ URL一覧は以下の場合に表示します。
 - 出力: ローカル保存、Discord投稿、1枚時のURL自動コピー、QRコードURL検出、出力形式、JPEG品質、UI表示。
 - 保存: 出力先フォルダ、ファイル名サフィックス。
 - Discord: Webhook URL。
-- VRChat写真自動投稿: ON/OFF、写真フォルダ、自動投稿用Webhook URL。
+- VRChat写真自動投稿: ON/OFF、スキャン間隔、写真フォルダ、自動投稿用Webhook URL。
+- スクリーンショット自動投稿: ON/OFF、Screenshotsフォルダ。
 
 各設定項目は、左側に設定名と説明、右側に入力欄または操作部品を表示します。
 
@@ -575,6 +594,16 @@ config.json
   },
   "discord": {
     "webhookUrl": ""
+  },
+  "autoPhoto": {
+    "enabled": false,
+    "photoDirectory": "%USERPROFILE%\\Pictures\\VRChat",
+    "webhookUrl": "",
+    "scanIntervalSeconds": 2
+  },
+  "screenshotAutoPost": {
+    "enabled": false,
+    "screenshotDirectory": "%USERPROFILE%\\Pictures\\Screenshots"
   }
 }
 ```
