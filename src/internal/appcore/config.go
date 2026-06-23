@@ -56,6 +56,8 @@ type AutoPhotoConfig struct {
 type ScreenshotAutoPostConfig struct {
 	Enabled             bool   `json:"enabled"`
 	ScreenshotDirectory string `json:"screenshotDirectory"`
+	WebhookURL          string `json:"webhookUrl"`
+	ScanIntervalSeconds int    `json:"scanIntervalSeconds"`
 }
 
 func DefaultConfig() Config {
@@ -86,6 +88,7 @@ func DefaultConfig() Config {
 		ScreenshotAutoPost: ScreenshotAutoPostConfig{
 			Enabled:             false,
 			ScreenshotDirectory: DefaultScreenshotsDirectory(),
+			ScanIntervalSeconds: 2,
 		},
 	}
 }
@@ -180,6 +183,13 @@ func (c *Config) Normalize() {
 	c.ScreenshotAutoPost.ScreenshotDirectory = strings.Trim(strings.TrimSpace(c.ScreenshotAutoPost.ScreenshotDirectory), `"`)
 	if c.ScreenshotAutoPost.ScreenshotDirectory == "" {
 		c.ScreenshotAutoPost.ScreenshotDirectory = DefaultScreenshotsDirectory()
+	}
+	c.ScreenshotAutoPost.WebhookURL = strings.Trim(strings.TrimSpace(c.ScreenshotAutoPost.WebhookURL), `"`)
+	if c.ScreenshotAutoPost.ScanIntervalSeconds <= 0 {
+		c.ScreenshotAutoPost.ScanIntervalSeconds = 2
+	}
+	if c.ScreenshotAutoPost.ScanIntervalSeconds > 3600 {
+		c.ScreenshotAutoPost.ScanIntervalSeconds = 3600
 	}
 }
 
