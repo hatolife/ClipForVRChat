@@ -7,6 +7,7 @@
 - Windowsで `ClipForVRChat.exe` のプロパティを開いたとき、ファイルの説明、ファイルバージョン、製品バージョンに `ClipForVRChat v0.1.6.<commit>` のような完全なビルド情報が表示されるようにしました。
 - Windowsのファイルプロパティに、製品名 `ClipForVRChat`、会社名 `hatolife`、著作権 `Copyright (c) 2026 hatolife` が表示されるようにしました。
 - ローカルビルドとGitHub ActionsのReleaseビルドで、同じ形式のWindowsプロパティ情報を埋め込むようにしました。
+- 機能に変更ありません。
 
 ### ダウンロード
 
