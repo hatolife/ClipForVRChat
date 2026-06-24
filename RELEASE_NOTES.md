@@ -1,5 +1,24 @@
 # Release Notes
 
+## v0.1.6
+
+### 更新内容
+
+- Windowsで `ClipForVRChat.exe` のプロパティを開いたとき、ファイルの説明、ファイルバージョン、製品バージョンに `ClipForVRChat v0.1.6.<commit>` のような完全なビルド情報が表示されるようにしました。
+- Windowsのファイルプロパティに、製品名 `ClipForVRChat`、会社名 `hatolife`、著作権 `Copyright (c) 2026 hatolife` が表示されるようにしました。
+- ローカルビルドとGitHub ActionsのReleaseビルドで、同じ形式のWindowsプロパティ情報を埋め込むようにしました。
+
+### ダウンロード
+
+- プログラムのダウンロード: https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.6/ClipForVRChat-v0.1.6-windows-amd64.zip
+- 署名確認用ファイル: https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.6/ClipForVRChat-v0.1.6-windows-amd64.exe.asc
+- 署名確認用公開鍵: https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.6/ClipForVRChat-v0.1.6-release-signing-public-key.asc
+- SHA256: https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.6/ClipForVRChat-v0.1.6-windows-amd64.zip.sha256
+
+### 比較
+
+https://github.com/hatolife/ClipForVRChat/compare/v0.1.5...v0.1.6
+
 ## v0.1.5
 
 ### 更新内容
