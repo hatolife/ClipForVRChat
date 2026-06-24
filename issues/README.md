@@ -48,6 +48,7 @@
 | 041 | [Win+Shift+S スクリーンショット自動投稿](041-screenshot-auto-post.md) | 完了 | 未リリース | Screenshotsフォルダを定期スキャンし、Win+Shift+Sで保存された画像を自動投稿する。 |
 | 046 | [初回設定を保存せず終了した場合に次回も初期設定画面を出す](046-fix-initial-config-save-timing.md) | 完了 | 未リリース | 初回設定画面を開いただけで `config.json` が作成されないようにする。 |
 | 047 | [CLIでversion/help引数に対応する](047-cli-version-help-args.md) | 完了 | 未リリース | `go-arg` で `--version` / `--help` の早期終了に対応する。 |
+| 048 | [Windows GUI exeのCLI出力をPowerShellに表示する](048-cli-output-from-windows-gui-exe.md) | 完了 | 未リリース | GUIサブシステムのexeでもCLI出力を親コンソールへ表示する。 |
 
 ## 状態の意味
 

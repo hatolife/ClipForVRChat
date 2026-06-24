@@ -31,7 +31,9 @@ func (cliArgs) Description() string {
 }
 
 func main() {
-	if handled, exitCode := handleCLIArgs(os.Args[1:], os.Stdout, os.Stderr); handled {
+	stdout, stderr, cleanup := cliOutputWriters(os.Args[1:], os.Stdout, os.Stderr)
+	defer cleanup()
+	if handled, exitCode := handleCLIArgs(os.Args[1:], stdout, stderr); handled {
 		os.Exit(exitCode)
 	}
 
