@@ -3,10 +3,12 @@ package main
 import (
 	"embed"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
+	arg "github.com/alexflint/go-arg"
 	"github.com/gofrs/flock"
 	"github.com/hatolife/ClipForVRChat/internal/appcore"
 	"github.com/wailsapp/wails/v2"
@@ -20,7 +22,19 @@ var assets embed.FS
 //go:embed build/appicon.png
 var icon []byte
 
+type cliArgs struct {
+	Version bool `arg:"--version" help:"バージョンを表示して終了します"`
+}
+
+func (cliArgs) Description() string {
+	return "ClipForVRChat"
+}
+
 func main() {
+	if handled, exitCode := handleCLIArgs(os.Args[1:], os.Stdout, os.Stderr); handled {
+		os.Exit(exitCode)
+	}
+
 	configPath := defaultConfigPath()
 	instanceLock, err := acquireInstanceLock(configPath)
 	if err != nil {
@@ -113,6 +127,27 @@ func main() {
 		state.Mode = appcore.ModeResults
 	}
 	runUI(configPath, state)
+}
+
+func handleCLIArgs(args []string, stdout io.Writer, stderr io.Writer) (bool, int) {
+	var parsed cliArgs
+	parser, err := arg.NewParser(arg.Config{Program: "ClipForVRChat"}, &parsed)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return true, 2
+	}
+	if err := parser.Parse(args); err != nil {
+		if err == arg.ErrHelp {
+			parser.WriteHelp(stdout)
+			return true, 0
+		}
+		return false, 0
+	}
+	if parsed.Version {
+		fmt.Fprintf(stdout, "ClipForVRChat %s\n", appVersion())
+		return true, 0
+	}
+	return false, 0
 }
 
 func acquireInstanceLock(configPath string) (*flock.Flock, error) {

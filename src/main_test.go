@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/hatolife/ClipForVRChat/internal/appcore"
@@ -71,5 +73,59 @@ func TestHasErrors(t *testing.T) {
 	}
 	if hasErrors([]appcore.Result{{}}) != false {
 		t.Fatal("expected hasErrors false")
+	}
+}
+
+func TestHandleCLIArgsVersion(t *testing.T) {
+	oldVersion := version
+	oldRevision := revision
+	t.Cleanup(func() {
+		version = oldVersion
+		revision = oldRevision
+	})
+	version = "v1.2.3"
+	revision = "abcdef0"
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	handled, code := handleCLIArgs([]string{"--version"}, &stdout, &stderr)
+
+	if !handled || code != 0 {
+		t.Fatalf("handled=%t code=%d", handled, code)
+	}
+	if got := stdout.String(); got != "ClipForVRChat v1.2.3.abcdef0\n" {
+		t.Fatalf("stdout = %q", got)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestHandleCLIArgsHelp(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	handled, code := handleCLIArgs([]string{"--help"}, &stdout, &stderr)
+
+	if !handled || code != 0 {
+		t.Fatalf("handled=%t code=%d", handled, code)
+	}
+	if got := stdout.String(); !strings.Contains(got, "--version") || !strings.Contains(got, "--help") {
+		t.Fatalf("help output = %q", got)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q", stderr.String())
+	}
+}
+
+func TestHandleCLIArgsLeavesExistingPositionalArgsAlone(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	handled, code := handleCLIArgs([]string{"image.png"}, &stdout, &stderr)
+
+	if handled || code != 0 {
+		t.Fatalf("handled=%t code=%d", handled, code)
+	}
+	if stdout.Len() != 0 || stderr.Len() != 0 {
+		t.Fatalf("stdout=%q stderr=%q", stdout.String(), stderr.String())
 	}
 }
