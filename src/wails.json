@@ -8,6 +8,12 @@
   "frontend:dev:serverUrl": "http://localhost:5173",
   "author": {
     "name": "hatolife"
+  },
+  "info": {
+    "companyName": "hatolife",
+    "productName": "ClipForVRChat",
+    "productVersion": "0.0.0",
+    "copyright": "Copyright (c) 2026 hatolife",
+    "comments": "ClipForVRChat official build"
   }
 }
-

@@ -65,6 +65,12 @@ jobs:
           "revision=$shortSha" >> $env:GITHUB_OUTPUT
           "release_time=$releaseTime" >> $env:GITHUB_OUTPUT
 
+      - name: Prepare Windows version info
+        shell: pwsh
+        run: |
+          node scripts/write-wails-info.mjs "${{ steps.version.outputs.version }}" src/wails.json
+          node scripts/write-wails-windows-info.mjs "${{ steps.version.outputs.version }}" "${{ steps.version.outputs.revision }}" src/build/windows/info.json
+
       - name: Build application
         working-directory: src
         shell: pwsh
