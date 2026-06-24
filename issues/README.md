@@ -20,7 +20,7 @@
 | 012 | [画像URL履歴とDiscord削除確認画面](012-image-history-and-discord-delete-review.md) | 完了 | `709370d` 以降 | 履歴保存、クリア済み表示、Discord削除確認画面、Ctrl/Shift選択、矩形範囲選択を実装。 |
 | 013 | [ユーザーフレンドリーなREADMEと設定画面改善](013-user-friendly-readme-and-settings-ui.md) | 完了 | `05d0105` | README、設定画面、WebHook説明、出力先選択などを改善。 |
 | 014 | [VRChat写真の自動検知とDiscord投稿](014-vrchat-photo-auto-post.md) | 完了 | `7efdf8d` | VRChat写真フォルダの定期スキャンと自動Discord投稿を実装。 |
-| 015 | [セキュリティチェック報告書の作成](015-security-review-report.md) | 完了 | `4c77718` | `SECURITY_REVIEW.md` を作成し、リスクと推奨対応を整理。 |
+| 015 | [セキュリティチェック報告書の作成](015-security-review-report.md) | 完了 | `4c77718` | `reports/2026-06-21-security-review.md` を作成し、リスクと推奨対応を整理。 |
 | 016 | [Webhook URL と履歴 URL の検証強化](016-validate-webhook-and-history-urls.md) | 完了 | `73fd6bf` | Discord Webhook URL と履歴画像URLの検証を強化。 |
 | 017 | [設定・履歴ファイルの権限と排他制御](017-harden-local-secret-storage-and-history-locking.md) | 完了 | `6df353c` | 設定/履歴ファイルの権限、履歴更新の排他制御を強化。 |
 | 018 | [画像入力のサイズ上限とピクセル数上限](018-limit-image-input-resource-usage.md) | 完了 | `bbfc9a3` | 入力画像のファイルサイズ上限とピクセル数上限を追加。 |
@@ -50,7 +50,8 @@
 | 047 | [CLIでversion/help引数に対応する](047-cli-version-help-args.md) | 完了 | 未リリース | `go-arg` で `--version` / `--help` の早期終了に対応する。 |
 | 048 | [Windows GUI exeのCLI出力をPowerShellに表示する](048-cli-output-from-windows-gui-exe.md) | 完了 | 未リリース | GUIサブシステムのexeでもCLI出力を親コンソールへ表示する。 |
 | 049 | [CLIヘルプをWindowsコンソールで文字化けさせない](049-use-wide-console-output-for-cli.md) | 完了 | 未リリース | `WriteConsoleW` でCLI出力し、cmdのコードページ差による文字化けを避ける。 |
-| 050 | [プロダクト全体の問題点チェック報告書を作成する](050-product-issue-review-report.md) | 完了 | 未リリース | `PRODUCT_ISSUE_REPORT.md` を作成し、Release/UX/履歴/設定/OSS表示などの残課題を整理。 |
+| 050 | [プロダクト全体の問題点チェック報告書を作成する](050-product-issue-review-report.md) | 完了 | 未リリース | `reports/2026-06-24-product-issue-report.md` を作成し、Release/UX/履歴/設定/OSS表示などの残課題を整理。 |
+| 051 | [監査報告書を日付付きで専用ディレクトリへ移動する](051-date-audit-reports-directory.md) | 完了 | 未リリース | 監査報告書を `reports/` 配下の日付付きファイル名へ整理。 |
 
 ## 状態の意味
 
