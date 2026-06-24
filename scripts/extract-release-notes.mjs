@@ -2,7 +2,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 
-const [, , versionArg, releaseNotesArg = 'RELEASE_NOTES.md', outPathArg = 'dist/release-body.md'] = process.argv
+const [, , versionArg, releaseNotesArg = 'RELEASE_NOTES.md', outPathArg = 'dist/release-body.md', ...flags] = process.argv
 
 if (!versionArg) {
   console.error('usage: extract-release-notes.mjs <version> [release-notes.md] [out.md]')
@@ -18,6 +18,11 @@ const pattern = new RegExp(`^## ${escapedVersion}\\s*$([\\s\\S]*?)(?=^##\\s+|(?!
 const match = content.match(pattern)
 
 if (!match) {
+  if (flags.includes('--fallback-draft-notes')) {
+    fs.mkdirSync(path.dirname(outPath), { recursive: true })
+    fs.writeFileSync(outPath, `Draft release for ${version}.\n\nThis tag does not have a dedicated RELEASE_NOTES.md entry.\n`)
+    process.exit(0)
+  }
   console.error(`release notes for ${version} were not found in ${releaseNotesArg}`)
   process.exit(1)
 }
