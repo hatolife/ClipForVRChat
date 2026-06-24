@@ -3,6 +3,7 @@ module github.com/hatolife/ClipForVRChat
 go 1.26.4
 
 require (
+	github.com/alexflint/go-arg v1.6.1
 	github.com/disintegration/imaging v1.6.2
 	github.com/gofrs/flock v0.13.0
 	github.com/makiuchi-d/gozxing v0.1.1
@@ -14,6 +15,7 @@ require (
 
 require (
 	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
+	github.com/alexflint/go-scalar v1.2.0 // indirect
 	github.com/bep/debounce v1.2.1 // indirect
 	github.com/ebitengine/purego v0.10.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
