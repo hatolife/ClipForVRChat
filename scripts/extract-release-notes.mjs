@@ -13,9 +13,24 @@ const version = String(versionArg).trim()
 const releaseNotesPath = path.resolve(process.cwd(), releaseNotesArg)
 const outPath = path.resolve(process.cwd(), outPathArg)
 const content = fs.readFileSync(releaseNotesPath, 'utf8')
-const escapedVersion = version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-const pattern = new RegExp(`^## ${escapedVersion}\\s*$([\\s\\S]*?)(?=^##\\s+|(?![\\s\\S]))`, 'm')
-const match = content.match(pattern)
+const findSection = (sectionVersion) => {
+  const escapedVersion = sectionVersion.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const pattern = new RegExp(`^## ${escapedVersion}\\s*$([\\s\\S]*?)(?=^##\\s+|(?![\\s\\S]))`, 'm')
+  return content.match(pattern)
+}
+
+let match = findSection(version)
+let sourceVersion = version
+
+if (!match) {
+  const rcMatch = version.match(/^(v\d+\.\d+\.\d+)-rc\d+$/)
+  if (flags.includes('--fallback-rc-notes') && rcMatch) {
+    match = findSection(rcMatch[1])
+    if (match) {
+      sourceVersion = rcMatch[1]
+    }
+  }
+}
 
 if (!match) {
   if (flags.includes('--fallback-draft-notes')) {
@@ -27,10 +42,15 @@ if (!match) {
   process.exit(1)
 }
 
-const body = match[1].trim()
+let body = match[1].trim()
 if (!body) {
   console.error(`release notes for ${version} are empty`)
   process.exit(1)
+}
+
+if (sourceVersion !== version) {
+  const escapedSourceVersion = sourceVersion.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  body = body.replace(new RegExp(escapedSourceVersion, 'g'), version)
 }
 
 fs.mkdirSync(path.dirname(outPath), { recursive: true })

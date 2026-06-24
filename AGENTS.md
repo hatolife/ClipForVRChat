@@ -9,3 +9,17 @@
 - Release成果物の確認が必要な変更では、GitHub ActionsのCI/Releaseステータスを確認する。
 - リリース時は `issues/README.md` の対象チケットについて、対応バージョン欄をリリースするバージョンに更新する。
 - Release workflowを変更した場合は、GitHub Release本文が `RELEASE_NOTES.md` の該当バージョンから作成されること、Release添付ファイル一覧、zip内ファイル一覧を確認する。不要な公開鍵ファイルなど、仕様外の成果物を添付・同梱しない。
+
+## ブランチ運用
+
+- `master` はリリース可能な状態を保つ。通常の不具合修正、改善、仕様変更、調査は `fix/...`、`feat/...`、`docs/...`、`chore/...` など目的が分かる作業ブランチを切って進める。
+- 作業ブランチは `master` またはリリース対象の基準コミットから作成し、作業完了後にCIが通っていることを確認してから `master` へ取り込む。
+- リリース直前の安定化作業は必要に応じて `release/vX.Y.Z` ブランチで行い、RC確認後に `master` へ反映する。
+- 履歴を書き換える必要がある場合は、作業ブランチ上で整理してから `master` へ反映する。共有済みブランチやタグの force push は、ユーザーの明示指示がある場合のみ行う。
+
+## リリース運用
+
+- 正式リリース前に release candidate を確認する場合は、`vX.Y.Z-rcW` 形式のタグを打つ。例: `v0.1.7-rc1`。
+- `vX.Y.Z-rcW` タグのGitHub Releaseは prerelease として作成される。Release本文は原則として `RELEASE_NOTES.md` の同じバージョン見出しから作成し、専用見出しがない場合は対応する `vX.Y.Z` の見出しを使う。
+- 正式リリースは `vX.Y.Z` 形式のタグを打つ。GitHub Releaseは draft でも prerelease でもない通常Releaseとして作成される。
+- `vX.Y.Z` / `vX.Y.Z-rcW` 以外の `v*` タグは検証用の draft Release として扱う。検証目的で作成したタグとReleaseは、確認後に削除する。

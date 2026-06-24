@@ -62,12 +62,15 @@ jobs:
           $shortSha = "${{ github.sha }}".Substring(0, 7)
           $releaseTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
           $isStable = $tagName -match '^v\d+\.\d+\.\d+$'
-          $draft = if ($isStable) { "false" } else { "true" }
+          $isReleaseCandidate = $tagName -match '^v\d+\.\d+\.\d+-rc\d+$'
+          $draft = if ($isStable -or $isReleaseCandidate) { "false" } else { "true" }
+          $prerelease = if ($isReleaseCandidate) { "true" } else { "false" }
           "app_version=$tagName.$shortSha" >> $env:GITHUB_OUTPUT
           "version=$tagName" >> $env:GITHUB_OUTPUT
           "revision=$shortSha" >> $env:GITHUB_OUTPUT
           "release_time=$releaseTime" >> $env:GITHUB_OUTPUT
           "draft=$draft" >> $env:GITHUB_OUTPUT
+          "prerelease=$prerelease" >> $env:GITHUB_OUTPUT
 
       - name: Prepare Windows version info
         shell: pwsh
@@ -161,7 +164,7 @@ jobs:
 
       - name: Prepare release notes
         if: steps.version.outputs.draft == 'false'
-        run: node scripts/extract-release-notes.mjs "${{ github.ref_name }}" RELEASE_NOTES.md dist/release-body.md
+        run: node scripts/extract-release-notes.mjs "${{ github.ref_name }}" RELEASE_NOTES.md dist/release-body.md --fallback-rc-notes
 
       - name: Prepare draft release notes
         if: steps.version.outputs.draft == 'true'
@@ -171,6 +174,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           draft: ${{ steps.version.outputs.draft }}
+          prerelease: ${{ steps.version.outputs.prerelease }}
           body_path: dist/release-body.md
           files: |
             dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip
