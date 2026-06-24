@@ -1,0 +1,28 @@
+# v0.1.6 Release Todo
+
+- [x] `reports/2026-06-24-product-issue-report.md` の Findings を対応チケットへ分解する。
+- [x] Release成果物と README / About / SPEC のPGP説明を統一する。
+- [x] Discord削除の部分成功を履歴に保存する。
+- [x] config読み込み失敗時にアクティブ設定パスを変えない。
+- [x] URL自動コピー失敗をUIに出す。
+- [x] OSSライセンス表示を direct dependency に合わせて更新する。
+- [x] 自動投稿の監視フォルダ異常やスキャン上限到達をUIまたは診断ログへ出す。
+- [x] ローカルWindowsビルドのバージョンをリリース候補として指定できるようにする。
+- [x] 診断ログの `gosec G304` を抑制または設計上問題ない形に整理する。
+- [x] 関連テストを追加・更新する。
+- [x] `go test ./...` を実行する。
+- [x] `go vet ./...` を実行する。
+- [x] `npm run build` を実行する。
+- [x] `npm audit --omit=dev` を実行する。
+- [x] `govulncheck ./...` を実行する。
+- [x] `gosec ./...` を実行する。
+- [ ] ローカルWindows exeをビルドして `--version` / `--help` を確認する。
+- [ ] 作業をコミットする。
+- [ ] v0.1.6リリース前の全体再チェックを行う。
+- [ ] `RELEASE_NOTES.md` を更新する。
+- [ ] `v0.1.6` タグを作成する。
+- [ ] branch と tag を push する。
+- [ ] GitHub Actions CI / Release workflow を確認する。
+- [ ] CI失敗時は原因を修正して再pushする。
+- [ ] `https://github.com/hatolife/ClipForVRChat/releases/latest` の v0.1.6 リリースノートを確認する。
+- [ ] GitHub の v0.1.6 Release を draft に変更する。

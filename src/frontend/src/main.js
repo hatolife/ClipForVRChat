@@ -694,7 +694,7 @@ createApp({
         <section class="about-note">
           <h3>PGPで改竄確認できます</h3>
           <p>
-            zipには <code>ClipForVRChat.exe.asc</code> 署名ファイルと公開鍵も入っています。GitHub Releasesでは、同じ署名ファイルと公開鍵をzipとは別にも配布しています。
+            GitHub Releasesでは、zipとは別に <code>ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc</code> 署名ファイルも配布しています。
           </p>
           <p>
             展開した <code>ClipForVRChat.exe</code> が改竄されていないことを確認できます。
@@ -702,9 +702,9 @@ createApp({
           <ol>
             <li><button class="link-button inline" @click="openURL(releasesUrl)">GitHub Releases</button> で使いたいバージョンを開きます。</li>
             <li>zipを展開し、確認したい <code>ClipForVRChat.exe</code> を用意します。</li>
-            <li>zip内の <code>ClipForVRChat.exe.asc</code>、または同じReleaseに別添付されている <code>.exe.asc</code> を、exeと同じフォルダに保存します。</li>
-            <li>公式の公開鍵を取り込みます。公開鍵はzip内または同じReleaseにある公開鍵ファイルを使用してください。</li>
-            <li>コマンドプロンプトやPowerShellで <code>gpg --verify ClipForVRChat.exe.asc ClipForVRChat.exe</code> を実行します。</li>
+            <li>同じReleaseに別添付されている <code>.exe.asc</code> を、exeと同じフォルダに保存します。</li>
+            <li>zip内の <code>Release-signing-public-key.url</code> から公式公開鍵を確認して取り込みます。</li>
+            <li>コマンドプロンプトやPowerShellで <code>gpg --verify ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc ClipForVRChat.exe</code> を実行します。</li>
             <li><code>Good signature</code> と表示されれば、公式配布のexeとして確認できています。</li>
           </ol>
           <p>PGPがよく分からない場合は、公式の配布場所から直接ダウンロードしてください。</p>

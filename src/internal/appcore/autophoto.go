@@ -2,6 +2,7 @@ package appcore
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -20,6 +21,11 @@ type AutoPhotoEvent struct {
 	Error  string `json:"error"`
 }
 
+type autoPhotoScanStatus struct {
+	Error        string
+	LimitReached bool
+}
+
 type AutoPhotoWatcher struct {
 	Config     Config
 	Directory  string
@@ -34,7 +40,9 @@ func (w *AutoPhotoWatcher) Run(ctx context.Context) {
 	if w.Interval <= 0 {
 		w.Interval = 2 * time.Second
 	}
-	w.seen = scanPhotoFiles(w.directory())
+	var status autoPhotoScanStatus
+	w.seen, status = scanPhotoFilesWithStatus(w.directory())
+	w.emitScanStatus(status)
 	ticker := time.NewTicker(w.Interval)
 	defer ticker.Stop()
 	for {
@@ -48,7 +56,8 @@ func (w *AutoPhotoWatcher) Run(ctx context.Context) {
 }
 
 func (w *AutoPhotoWatcher) tick() {
-	current := scanPhotoFiles(w.directory())
+	current, status := scanPhotoFilesWithStatus(w.directory())
+	w.emitScanStatus(status)
 	processed := 0
 	for _, path := range sortedPhotoPaths(current) {
 		modTime := current[path]
@@ -77,6 +86,32 @@ func (w *AutoPhotoWatcher) tick() {
 			delete(w.seen, path)
 		}
 	}
+}
+
+func (w *AutoPhotoWatcher) emitScanStatus(status autoPhotoScanStatus) {
+	if w.Handler == nil {
+		return
+	}
+	message := strings.TrimSpace(status.Error)
+	if message == "" && status.LimitReached {
+		message = fmt.Sprintf("自動投稿の監視対象が%d件を超えたため、一部のファイルはこのスキャンで確認されませんでした。", MaxAutoPhotoScanFiles)
+	}
+	if message == "" {
+		return
+	}
+	name := "自動投稿"
+	if dir := w.directory(); strings.TrimSpace(dir) != "" {
+		name = filepath.Base(dir)
+	}
+	w.Handler(AutoPhotoEvent{
+		Path: w.directory(),
+		Result: Result{
+			SourcePath: w.directory(),
+			Name:       name,
+			Error:      message,
+		},
+		Error: message,
+	})
 }
 
 func (w *AutoPhotoWatcher) process(path string) Result {
@@ -113,23 +148,48 @@ func (w *AutoPhotoWatcher) webhookURL() string {
 }
 
 func scanPhotoFiles(dir string) map[string]time.Time {
-	return scanPhotoFilesLimited(dir, MaxAutoPhotoScanFiles)
+	files, _ := scanPhotoFilesLimitedWithStatus(dir, MaxAutoPhotoScanFiles)
+	return files
 }
 
 func scanPhotoFilesLimited(dir string, maxFiles int) map[string]time.Time {
+	files, _ := scanPhotoFilesLimitedWithStatus(dir, maxFiles)
+	return files
+}
+
+func scanPhotoFilesWithStatus(dir string) (map[string]time.Time, autoPhotoScanStatus) {
+	return scanPhotoFilesLimitedWithStatus(dir, MaxAutoPhotoScanFiles)
+}
+
+func scanPhotoFilesLimitedWithStatus(dir string, maxFiles int) (map[string]time.Time, autoPhotoScanStatus) {
 	files := make(map[string]time.Time)
 	if strings.TrimSpace(dir) == "" {
-		return files
+		return files, autoPhotoScanStatus{Error: "自動投稿の監視フォルダが未設定です。"}
 	}
 	if maxFiles <= 0 {
-		return files
+		return files, autoPhotoScanStatus{Error: "自動投稿のスキャン上限が0以下です。"}
 	}
+	info, err := os.Stat(dir)
+	if err != nil {
+		return files, autoPhotoScanStatus{Error: fmt.Sprintf("自動投稿の監視フォルダを確認できません: %v", err)}
+	}
+	if !info.IsDir() {
+		return files, autoPhotoScanStatus{Error: "自動投稿の監視フォルダにファイルが指定されています。"}
+	}
+	status := autoPhotoScanStatus{}
 	paths := make([]string, 0, maxFiles)
 	_ = filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
-		if err != nil || entry.IsDir() || !isSupportedPhotoPath(path) {
+		if err != nil {
+			if status.Error == "" {
+				status.Error = fmt.Sprintf("自動投稿の監視フォルダを走査できません: %v", err)
+			}
+			return nil
+		}
+		if entry.IsDir() || !isSupportedPhotoPath(path) {
 			return nil
 		}
 		if len(paths) >= maxFiles {
+			status.LimitReached = true
 			return filepath.SkipAll
 		}
 		paths = append(paths, path)
@@ -143,7 +203,7 @@ func scanPhotoFilesLimited(dir string, maxFiles int) map[string]time.Time {
 		}
 		files[path] = info.ModTime()
 	}
-	return files
+	return files, status
 }
 
 func isSupportedPhotoPath(path string) bool {

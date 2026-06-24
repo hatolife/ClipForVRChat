@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +11,11 @@ import (
 
 	"github.com/hatolife/ClipForVRChat/internal/appcore"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
+)
+
+var (
+	copySingleURLIfNeeded = appcore.CopySingleURLIfNeeded
+	deleteDiscordMessage  = appcore.DeleteDiscordMessage
 )
 
 type App struct {
@@ -79,6 +85,9 @@ func (a *App) GetOSSLicenses() []OSSLicense {
 		{Name: "Vue.js", License: "MIT", Copyright: "Copyright (c) 2018-present, Yuxi (Evan) You", URL: "https://github.com/vuejs/core"},
 		{Name: "Vite", License: "MIT", Copyright: "Copyright (c) 2019-present, VoidZero Inc. and Vite contributors", URL: "https://github.com/vitejs/vite"},
 		{Name: "imaging", License: "MIT", Copyright: "Copyright (c) 2012 Grigory Dryapak", URL: "https://github.com/disintegration/imaging"},
+		{Name: "flock", License: "BSD-3-Clause", Copyright: "Copyright (c) 2018-2025, The Gofrs; Copyright (c) 2015-2020, Tim Heckman", URL: "https://github.com/gofrs/flock"},
+		{Name: "gozxing", License: "MIT", Copyright: "Copyright (c) 2018 Daisuke MAKIUCHI", URL: "https://github.com/makiuchi-d/gozxing"},
+		{Name: "go-qrcode", License: "MIT", Copyright: "Copyright (c) 2014 Tom Harwood", URL: "https://github.com/skip2/go-qrcode"},
 		{Name: "golang.design/x/clipboard", License: "MIT", Copyright: "Copyright (c) 2021 Changkun Ou", URL: "https://github.com/golang-design/clipboard"},
 		{Name: "golang.org/x/image", License: "BSD-3-Clause", Copyright: "Copyright (c) The Go Authors", URL: "https://cs.opensource.google/go/x/image"},
 	}
@@ -183,7 +192,11 @@ func (a *App) DeleteDiscordHistoryEntries(ids []string) ([]appcore.HistoryEntry,
 		if !idSet[history[i].ID] || history[i].Pinned {
 			continue
 		}
-		if err := appcore.DeleteDiscordMessage(history[i].DiscordWebhookID, history[i].DiscordToken, history[i].DiscordMessageID); err != nil {
+		if err := deleteDiscordMessage(history[i].DiscordWebhookID, history[i].DiscordToken, history[i].DiscordMessageID); err != nil {
+			if saveErr := appcore.SaveHistory(appcore.HistoryPath(a.configPath), history); saveErr != nil {
+				return history, fmt.Errorf("%v; 履歴保存にも失敗しました: %w", err, saveErr)
+			}
+			a.state.History = history
 			return history, err
 		}
 		history[i].DiscordDeleted = true
@@ -249,13 +262,15 @@ func (a *App) CloseSettings() appcore.UIState {
 func (a *App) OpenSettings(path string) (appcore.UIState, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	configPath := a.configPath
 	if strings.TrimSpace(path) != "" {
-		a.configPath = path
+		configPath = path
 	}
-	cfg, err := appcore.LoadConfig(a.configPath)
+	cfg, err := appcore.LoadConfig(configPath)
 	if err != nil {
 		return a.state, err
 	}
+	a.configPath = configPath
 	a.state.Mode = appcore.ModeSettings
 	a.state.Message = ""
 	a.state.ConfigPath = a.configPath
@@ -278,7 +293,7 @@ func (a *App) SaveConfigAndProcess(cfg appcore.Config, paths []string) (appcore.
 		a.state.Message = err.Error()
 		return a.state, nil
 	}
-	_ = appcore.CopySingleURLIfNeeded(cfg, results)
+	copyErr := copySingleURLIfNeeded(cfg, results)
 	if history, historyErr := appcore.AddResultsToHistory(appcore.HistoryPath(a.configPath), results); historyErr == nil {
 		a.state.History = history
 	}
@@ -290,7 +305,7 @@ func (a *App) SaveConfigAndProcess(cfg appcore.Config, paths []string) (appcore.
 		a.state.Message = "処理中にエラーが発生しました。内容を確認してください。"
 	} else {
 		a.state.Mode = appcore.ModeResults
-		a.state.Message = resultMessage(cfg, results)
+		a.state.Message = resultMessage(cfg, results, copyErr)
 	}
 	return a.state, nil
 }
@@ -317,7 +332,7 @@ func (a *App) ProcessToState(paths []string) (appcore.UIState, error) {
 		a.state.Results = nil
 		return a.state, nil
 	}
-	_ = appcore.CopySingleURLIfNeeded(cfg, results)
+	copyErr := copySingleURLIfNeeded(cfg, results)
 	if history, historyErr := appcore.AddResultsToHistory(appcore.HistoryPath(a.configPath), results); historyErr == nil {
 		a.state.History = history
 	}
@@ -328,7 +343,7 @@ func (a *App) ProcessToState(paths []string) (appcore.UIState, error) {
 		a.state.Message = "処理中にエラーが発生しました。内容を確認してください。"
 	} else {
 		a.state.Mode = appcore.ModeResults
-		a.state.Message = resultMessage(cfg, results)
+		a.state.Message = resultMessage(cfg, results, copyErr)
 	}
 	return a.state, nil
 }
@@ -344,7 +359,7 @@ func (a *App) Process(paths []string) ([]appcore.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	_ = appcore.CopySingleURLIfNeeded(cfg, results)
+	_ = copySingleURLIfNeeded(cfg, results)
 	_, _ = appcore.AddResultsToHistory(appcore.HistoryPath(a.configPath), results)
 	return results, nil
 }
@@ -370,8 +385,11 @@ func hasResultErrors(results []appcore.Result) bool {
 	return false
 }
 
-func resultMessage(cfg appcore.Config, results []appcore.Result) string {
+func resultMessage(cfg appcore.Config, results []appcore.Result, copyErr error) string {
 	if len(results) == 1 && results[0].URL != "" && cfg.Output.CopySingleURLToClipboard {
+		if copyErr != nil {
+			return fmt.Sprintf("画像URLを取得しましたが、クリップボードへコピーできませんでした: %v サムネイルをクリックすると再コピーできます。", copyErr)
+		}
 		return "画像URLをクリップボードにコピーしました。"
 	}
 	if len(results) == 1 && results[0].URL == "" && results[0].Error == "" {
@@ -419,6 +437,12 @@ func (a *App) restartAutoPhotoWatcher(cfg appcore.Config) {
 	handler := func(event appcore.AutoPhotoEvent) {
 		a.mu.Lock()
 		defer a.mu.Unlock()
+		if event.Error != "" {
+			a.state.Results = append([]appcore.Result{event.Result}, a.state.Results...)
+			a.state.Mode = appcore.ModeResults
+			runtime.EventsEmit(a.ctx, "auto-photo:result", event)
+			return
+		}
 		if event.Result.URL != "" && event.Result.Error == "" {
 			results := []appcore.Result{event.Result}
 			if history, err := appcore.AddResultsToHistory(appcore.HistoryPath(a.configPath), results); err == nil {

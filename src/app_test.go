@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -65,6 +66,21 @@ func TestAppSaveConfigAndOpenSettings(t *testing.T) {
 	closed := app.CloseSettings()
 	if closed.Mode != appcore.ModeResults {
 		t.Fatalf("closed mode = %s, want results", closed.Mode)
+	}
+}
+
+func TestAppOpenSettingsKeepsConfigPathOnLoadError(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.json")
+	badConfigPath := filepath.Join(dir, "bad.json")
+	writeTextFile(t, badConfigPath, "{")
+
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults, ConfigPath: configPath})
+	if _, err := app.OpenSettings(badConfigPath); err == nil {
+		t.Fatal("expected invalid config error")
+	}
+	if app.configPath != configPath {
+		t.Fatalf("configPath = %q, want %q", app.configPath, configPath)
 	}
 }
 
@@ -149,14 +165,62 @@ func TestAppDeleteDiscordHistoryEntriesRequiresStoredWebhookData(t *testing.T) {
 	}
 }
 
+func TestAppDeleteDiscordHistoryEntriesPersistsPartialSuccess(t *testing.T) {
+	oldDelete := deleteDiscordMessage
+	t.Cleanup(func() {
+		deleteDiscordMessage = oldDelete
+	})
+
+	calls := 0
+	deleteDiscordMessage = func(webhookID, token, messageID string) error {
+		calls++
+		if messageID == "m2" {
+			return errors.New("delete failed")
+		}
+		return nil
+	}
+
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	history := []appcore.HistoryEntry{
+		{ID: "1", URL: "https://cdn.discordapp.com/attachments/1/2/a.png", DiscordWebhookID: "w", DiscordToken: "t", DiscordMessageID: "m1"},
+		{ID: "2", URL: "https://cdn.discordapp.com/attachments/1/2/b.png", DiscordWebhookID: "w", DiscordToken: "t", DiscordMessageID: "m2"},
+	}
+	if err := appcore.SaveHistory(appcore.HistoryPath(configPath), history); err != nil {
+		t.Fatal(err)
+	}
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+
+	if _, err := app.DeleteDiscordHistoryEntries([]string{"1", "2"}); err == nil {
+		t.Fatal("expected partial delete error")
+	}
+	if calls != 2 {
+		t.Fatalf("calls = %d, want 2", calls)
+	}
+	loaded, err := appcore.LoadHistory(appcore.HistoryPath(configPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !loaded[0].DiscordDeleted || loaded[0].DeletedAt == "" {
+		t.Fatalf("first entry should be persisted as deleted: %+v", loaded[0])
+	}
+	if loaded[1].DiscordDeleted {
+		t.Fatalf("second entry should not be deleted: %+v", loaded[1])
+	}
+}
+
 func TestResultMessage(t *testing.T) {
 	cfg := appcore.DefaultConfig()
-	msg := resultMessage(cfg, []appcore.Result{{URL: "https://cdn.discordapp.com/attachments/1/2/a.png"}})
+	msg := resultMessage(cfg, []appcore.Result{{URL: "https://cdn.discordapp.com/attachments/1/2/a.png"}}, nil)
 	if !strings.Contains(msg, "コピー") {
 		t.Fatalf("message = %q", msg)
 	}
 
-	msg = resultMessage(cfg, []appcore.Result{{OutputPath: "out.png"}})
+	msg = resultMessage(cfg, []appcore.Result{{URL: "https://cdn.discordapp.com/attachments/1/2/a.png"}}, errors.New("clipboard busy"))
+	if !strings.Contains(msg, "コピーできません") {
+		t.Fatalf("copy error message = %q", msg)
+	}
+
+	msg = resultMessage(cfg, []appcore.Result{{OutputPath: "out.png"}}, nil)
 	if !strings.Contains(msg, "保存") {
 		t.Fatalf("message = %q", msg)
 	}

@@ -5,6 +5,28 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC_DIR="${ROOT_DIR}/src"
 DIST_DIR="${ROOT_DIR}/dist/local-windows"
 APP_NAME="ClipForVRChat"
+ZIP=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --zip)
+      ZIP=1
+      shift
+      ;;
+    --version)
+      if [[ $# -lt 2 ]]; then
+        echo "--version requires a value." >&2
+        exit 2
+      fi
+      VERSION="$2"
+      shift 2
+      ;;
+    *)
+      echo "usage: $0 [--version vX.Y.Z] [--zip]" >&2
+      exit 2
+      ;;
+  esac
+done
 
 if ! command -v git >/dev/null 2>&1; then
   echo "git is required." >&2
@@ -16,7 +38,7 @@ if ! command -v wails >/dev/null 2>&1; then
   exit 1
 fi
 
-VERSION="$(git -C "${ROOT_DIR}" tag -l 'v*' | sort -rV | head -n1)"
+VERSION="${VERSION:-$(git -C "${ROOT_DIR}" tag -l 'v*' | sort -rV | head -n1)}"
 if [[ -z "${VERSION}" ]]; then
   VERSION="develop"
 fi
@@ -65,7 +87,7 @@ if [[ ! -f "${EXE_PATH}" ]]; then
   exit 1
 fi
 
-if [[ "${1:-}" == "--zip" ]]; then
+if [[ "${ZIP}" == "1" ]]; then
   rm -rf "${DIST_DIR}/${APP_NAME}"
   mkdir -p "${DIST_DIR}/${APP_NAME}"
   cp "${EXE_PATH}" "${DIST_DIR}/${APP_NAME}/${APP_NAME}.exe"

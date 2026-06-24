@@ -69,12 +69,13 @@ func main() {
 	state.Config = cfg
 
 	if len(args) == 1 && strings.EqualFold(filepath.Ext(args[0]), ".json") {
-		configPath = args[0]
-		cfg, err := appcore.LoadConfig(configPath)
+		requestedConfigPath := args[0]
+		cfg, err := appcore.LoadConfig(requestedConfigPath)
 		if err != nil {
 			state.Mode = appcore.ModeError
 			state.Message = fmt.Sprintf("設定を読み込めませんでした: %v", err)
 		} else {
+			configPath = requestedConfigPath
 			state.Mode = appcore.ModeSettings
 			state.Config = cfg
 			state.ConfigPath = configPath
@@ -113,13 +114,13 @@ func main() {
 		runUI(configPath, state)
 		return
 	}
-	_ = appcore.CopySingleURLIfNeeded(cfg, results)
+	copyErr := copySingleURLIfNeeded(cfg, results)
 	if history, err := appcore.AddResultsToHistory(appcore.HistoryPath(configPath), results); err == nil {
 		state.History = history
 	}
 
 	state.Results = results
-	if shouldExitWithoutUI(cfg, results) {
+	if shouldExitWithoutUI(cfg, results, copyErr) {
 		return
 	}
 	if hasErrors(results) {
@@ -127,6 +128,7 @@ func main() {
 		state.Message = "処理中にエラーが発生しました。内容を確認してください。"
 	} else {
 		state.Mode = appcore.ModeResults
+		state.Message = resultMessage(cfg, results, copyErr)
 	}
 	runUI(configPath, state)
 }
@@ -165,8 +167,11 @@ func acquireInstanceLock(configPath string) (*flock.Flock, error) {
 	return fileLock, nil
 }
 
-func shouldExitWithoutUI(cfg appcore.Config, results []appcore.Result) bool {
+func shouldExitWithoutUI(cfg appcore.Config, results []appcore.Result, copyErr error) bool {
 	if cfg.Output.ShowUI == "always" {
+		return false
+	}
+	if copyErr != nil {
 		return false
 	}
 	if len(results) != 1 || hasErrors(results) {
