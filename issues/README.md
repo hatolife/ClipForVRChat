@@ -4,7 +4,7 @@
 
 状態はリポジトリ上の実装状況をもとに整理しています。実機確認が必要なものは「要確認」としています。
 
-| No. | Issue | 状態 | 対応バージョン/コミット | 概要 |
+| No. | Issue | 状態 | 対応バージョン | 概要 |
 | --- | --- | --- | --- | --- |
 | 001 | [アイコン品質と複数サイズ生成](001-icon-quality-and-sizes.md) | 完了 | `v0.1.0` | アプリアイコン生成と複数サイズの品質改善。 |
 | 002 | [Release zipの内容とバージョン付きファイル名](002-release-zip-contents-and-versioned-name.md) | 完了 | `v0.1.0` | 配布zipの内容整理、バージョン情報の埋め込み、Release workflow 整備。 |
@@ -66,6 +66,7 @@
 | 059 | [診断ログのgosec指摘を整理する](059-resolve-diagnostic-log-gosec-finding.md) | 完了 | `v0.1.6` | 診断ログの可変パス指摘を設計上明確にする。 |
 | 060 | [issue一覧のv0.1.6対応状況を整理する](060-update-issue-index-release-status.md) | 完了 | `v0.1.6` | issue一覧の未リリース表記と欠番を整理。 |
 | 061 | [リリース時にissue一覧へ対応バージョンを記録する](061-record-release-version-in-issue-index.md) | 完了 | `v0.1.6` | リリース時の対応バージョン記録ルールを追加し、既存一覧を補完。 |
+| 062 | [issue一覧の対応バージョン列名を整理する](062-rename-issue-index-version-column.md) | 完了 | `v0.1.6` | issue一覧の列名を対応バージョン記録の運用に合わせる。 |
 
 ## 状態の意味
 
