@@ -49,6 +49,7 @@
 | 046 | [初回設定を保存せず終了した場合に次回も初期設定画面を出す](046-fix-initial-config-save-timing.md) | 完了 | 未リリース | 初回設定画面を開いただけで `config.json` が作成されないようにする。 |
 | 047 | [CLIでversion/help引数に対応する](047-cli-version-help-args.md) | 完了 | 未リリース | `go-arg` で `--version` / `--help` の早期終了に対応する。 |
 | 048 | [Windows GUI exeのCLI出力をPowerShellに表示する](048-cli-output-from-windows-gui-exe.md) | 完了 | 未リリース | GUIサブシステムのexeでもCLI出力を親コンソールへ表示する。 |
+| 049 | [CLIヘルプをWindowsコンソールで文字化けさせない](049-use-wide-console-output-for-cli.md) | 完了 | 未リリース | `WriteConsoleW` でCLI出力し、cmdのコードページ差による文字化けを避ける。 |
 
 ## 状態の意味
 
