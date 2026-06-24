@@ -71,7 +71,7 @@ func TestConfigNormalizeAppliesDefaultsAndTrimsQuotes(t *testing.T) {
 	}
 }
 
-func TestLoadConfigCreatesDefaultWhenMissing(t *testing.T) {
+func TestLoadConfigReturnsDefaultWithoutCreatingFileWhenMissing(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	cfg, err := LoadConfig(path)
 	if err != nil {
@@ -80,8 +80,8 @@ func TestLoadConfigCreatesDefaultWhenMissing(t *testing.T) {
 	if cfg.Image.MaxWidth != 2048 {
 		t.Fatalf("MaxWidth = %d, want 2048", cfg.Image.MaxWidth)
 	}
-	if !ConfigExists(path) {
-		t.Fatal("LoadConfig should create config file")
+	if ConfigExists(path) {
+		t.Fatal("LoadConfig should not create config file")
 	}
 }
 
