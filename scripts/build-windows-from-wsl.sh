@@ -25,11 +25,27 @@ RELEASE_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 APP_VERSION="${VERSION}.${REVISION}"
 EXE_PATH="${SRC_DIR}/build/bin/${APP_NAME}.exe"
 ZIP_PATH="${DIST_DIR}/${APP_NAME}-${APP_VERSION}-windows-amd64.zip"
+WAILS_JSON="${SRC_DIR}/wails.json"
+WINDOWS_INFO_JSON="${SRC_DIR}/build/windows/info.json"
+WAILS_JSON_BACKUP="$(mktemp)"
+WINDOWS_INFO_JSON_BACKUP="$(mktemp)"
+
+cp "${WAILS_JSON}" "${WAILS_JSON_BACKUP}"
+cp "${WINDOWS_INFO_JSON}" "${WINDOWS_INFO_JSON_BACKUP}"
+cleanup() {
+  cp "${WAILS_JSON_BACKUP}" "${WAILS_JSON}"
+  cp "${WINDOWS_INFO_JSON_BACKUP}" "${WINDOWS_INFO_JSON}"
+  rm -f "${WAILS_JSON_BACKUP}" "${WINDOWS_INFO_JSON_BACKUP}"
+}
+trap cleanup EXIT
 
 echo "Building ${APP_NAME} for windows/amd64"
 echo "Version: ${VERSION}"
 echo "Revision: ${REVISION}"
 echo "Release time: ${RELEASE_TIME}"
+
+node "${ROOT_DIR}/scripts/write-wails-info.mjs" "${VERSION}" "${WAILS_JSON}"
+node "${ROOT_DIR}/scripts/write-wails-windows-info.mjs" "${VERSION}" "${REVISION}" "${WINDOWS_INFO_JSON}" >/dev/null
 
 (
   cd "${SRC_DIR}"
