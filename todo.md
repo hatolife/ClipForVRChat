@@ -1,28 +1,16 @@
-# v0.1.6 Release Todo
+# Current Todo
 
-- [x] `reports/2026-06-24-product-issue-report.md` の Findings を対応チケットへ分解する。
-- [x] Release成果物と README / About / SPEC のPGP説明を統一する。
-- [x] Discord削除の部分成功を履歴に保存する。
-- [x] config読み込み失敗時にアクティブ設定パスを変えない。
-- [x] URL自動コピー失敗をUIに出す。
-- [x] OSSライセンス表示を direct dependency に合わせて更新する。
-- [x] 自動投稿の監視フォルダ異常やスキャン上限到達をUIまたは診断ログへ出す。
-- [x] ローカルWindowsビルドのバージョンをリリース候補として指定できるようにする。
-- [x] 診断ログの `gosec G304` を抑制または設計上問題ない形に整理する。
-- [x] 関連テストを追加・更新する。
-- [x] `go test ./...` を実行する。
-- [x] `go vet ./...` を実行する。
-- [x] `npm run build` を実行する。
-- [x] `npm audit --omit=dev` を実行する。
-- [x] `govulncheck ./...` を実行する。
-- [x] `gosec ./...` を実行する。
-- [x] ローカルWindows exeをビルドして `--version` / `--help` を確認する。
-- [x] 作業をコミットする。
-- [x] v0.1.6リリース前の全体再チェックを行う。
-- [x] `RELEASE_NOTES.md` を更新する。
-- [ ] `v0.1.6` タグを作成する。
-- [ ] branch と tag を push する。
-- [ ] GitHub Actions CI / Release workflow を確認する。
-- [ ] CI失敗時は原因を修正して再pushする。
-- [ ] `https://github.com/hatolife/ClipForVRChat/releases/latest` の v0.1.6 リリースノートを確認する。
-- [ ] GitHub の v0.1.6 Release を draft に変更する。
+- [x] GitHub ActionsのNode.js 20 deprecation警告の原因を確認する。
+- [x] Go cache restoreの `go.sum` 警告の原因を確認する。
+- [x] 警告解消用のチケットを作成する。
+- [x] `todo.md` を直近作業用に整理し、運用ルールを `AGENTS.md` に追記する。
+- [x] CI/Release workflowの警告解消を実装する。
+- [x] workflow構文とrelease note抽出をローカル確認する。
+- [x] 変更を署名付きコミットしてブランチへpushする。
+- [x] ブランチCIを確認する。
+- [x] RCタグでRelease workflowの警告解消とprerelease動作を確認する。
+- [ ] `master` に反映する。
+- [ ] 正式 `v0.1.6` タグをpushしてRelease workflowを確認する。
+- [ ] `v0.1.6` Release本文、添付ファイル、zip内容、latest表示を確認する。
+- [ ] CI高速化の候補をActionsログから調査する。
+- [ ] CI高速化を実装、検証、コミットする。
