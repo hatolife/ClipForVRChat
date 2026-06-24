@@ -2,7 +2,7 @@
 
 調査日: 2026-06-24
 
-対象コミット: `0a158f9 Update v0.1.6 docs for CLI fixes`
+対象コミット: `8e93ac1 docs(cli): update v0.1.6 behavior`
 
 対象範囲: Go/Wails バックエンド、Vue フロントエンド、設定/履歴保存、Discord連携、自動投稿、CLI、CI/Release、README/SPEC/Release Notes、依存関係
 
