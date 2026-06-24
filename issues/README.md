@@ -72,6 +72,7 @@
 | 065 | [開発ブランチ運用とRCリリースを整備する](065-dev-flow-and-rc-release.md) | 完了 | `v0.1.6` | 作業ブランチ前提の開発フローと `vX.Y.Z-rcW` prerelease 発行を整理。 |
 | 066 | [GitHub ActionsのNode 20警告とGo cache警告を解消する](066-update-actions-runtime-and-go-cache.md) | 完了 | `v0.1.6` | Actions実行系とGo cache設定を更新し、CI/Releaseの警告を解消。 |
 | 067 | [todo.mdを直近作業用に整理する](067-maintain-short-term-todo.md) | 完了 | `v0.1.6` | `todo.md` を短期チェックリストとして整理し、運用ルールを明文化。 |
+| 068 | [GitHub Actions CIを高速化する](068-speed-up-github-actions-ci.md) | 完了 | `v0.1.7` | Wails CLI cacheを追加し、CI/Releaseのインストール時間短縮を試行。 |
 
 ## 状態の意味
 
