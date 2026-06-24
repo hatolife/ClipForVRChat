@@ -11,6 +11,6 @@
 - [x] 追加pushでcache hit時の動作を確認する。
 - [x] 一時draftタグでRelease workflowの動作を確認する。
 - [x] 効果と残課題を整理する。
-- [ ] 変更を `master` に反映する。
-- [ ] master CIでdefault branch cacheを確認する。
-- [ ] 一時draftタグでRelease workflowのdefault branch cache利用を再確認する。
+- [x] 変更を `master` に反映する。
+- [x] master CIでdefault branch cacheを確認する。
+- [x] 一時draftタグでRelease workflowのdefault branch cache利用を再確認する。
