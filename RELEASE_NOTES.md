@@ -4,13 +4,9 @@
 
 ### 更新内容
 
-- 初回起動時に設定画面を開いただけで `config.json` が作成される問題を修正しました。保存せず終了した場合、次回起動時も初期設定画面が表示されます。
-- `ClipForVRChat.exe --version` と `ClipForVRChat.exe --help` に対応しました。
-- Windowsのcmd、PowerShell、Git Bashで `--help` の日本語が文字化けしにくいように、CLI出力を改善しました。
-- Windowsで `ClipForVRChat.exe` のプロパティを開いたとき、ファイルの説明、ファイルバージョン、製品バージョンに `ClipForVRChat v0.1.6.<commit>` のような完全なビルド情報が表示されるようにしました。
-- Windowsのファイルプロパティに、製品名 `ClipForVRChat`、会社名 `hatolife`、著作権 `Copyright (c) 2026 hatolife` が表示されるようにしました。
-- ローカルビルドとGitHub ActionsのReleaseビルドで、同じ形式のWindowsプロパティ情報を埋め込むようにしました。
-- GitHub Release本文が `RELEASE_NOTES.md` の該当バージョンから作成されるようにし、Release添付物とzip同梱物を整理しました。
+- 初回起動時に、設定を保存するまで `config.json` を作成しないよう修正しました。
+- Windowsのファイルプロパティにバージョン情報・製品情報を追加しました。
+- セキュリティチェック (`gosec`) 対応と品質改善を行いました。
 
 ### ダウンロード
 
