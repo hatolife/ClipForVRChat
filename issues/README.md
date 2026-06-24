@@ -69,6 +69,7 @@
 | 062 | [issue一覧の対応バージョン列名を整理する](062-rename-issue-index-version-column.md) | 完了 | `v0.1.6` | issue一覧の列名を対応バージョン記録の運用に合わせる。 |
 | 063 | [v0.1.6履歴のコミットメッセージと署名を整理する](063-rewrite-v016-history-angular-signed.md) | 完了 | `v0.1.6` | v0.1.6向け履歴のコミットメッセージ、署名、相殺revertを整理。 |
 | 064 | [master以外のブランチCIと非正式タグのdraft release対応](064-run-ci-on-branches-and-draft-nonstable-tags.md) | 完了 | `v0.1.6` | ブランチCI対象と非正式タグのdraft Release作成を整理。 |
+| 065 | [開発ブランチ運用とRCリリースを整備する](065-dev-flow-and-rc-release.md) | 完了 | `v0.1.7` | 作業ブランチ前提の開発フローと `vX.Y.Z-rcW` prerelease 発行を整理。 |
 
 ## 状態の意味
 
