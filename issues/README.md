@@ -50,6 +50,7 @@
 | 047 | [CLIでversion/help引数に対応する](047-cli-version-help-args.md) | 完了 | 未リリース | `go-arg` で `--version` / `--help` の早期終了に対応する。 |
 | 048 | [Windows GUI exeのCLI出力をPowerShellに表示する](048-cli-output-from-windows-gui-exe.md) | 完了 | 未リリース | GUIサブシステムのexeでもCLI出力を親コンソールへ表示する。 |
 | 049 | [CLIヘルプをWindowsコンソールで文字化けさせない](049-use-wide-console-output-for-cli.md) | 完了 | 未リリース | `WriteConsoleW` でCLI出力し、cmdのコードページ差による文字化けを避ける。 |
+| 050 | [プロダクト全体の問題点チェック報告書を作成する](050-product-issue-review-report.md) | 完了 | 未リリース | `PRODUCT_ISSUE_REPORT.md` を作成し、Release/UX/履歴/設定/OSS表示などの残課題を整理。 |
 
 ## 状態の意味
 
