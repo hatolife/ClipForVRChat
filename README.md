@@ -28,9 +28,9 @@ https://github.com/hatolife/ClipForVRChat/releases/latest
 
 zipファイルを展開し、中にある `ClipForVRChat.exe` を起動してください。
 
-zipには `ClipForVRChat.exe.asc` と `ClipForVRChat-release-signing-public-key.asc` も入っています。同じリリースには、zip本体とは別に `.sha256`、`ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc`、`ClipForVRChat-vX.Y.Z-release-signing-public-key.asc` も添付されています。`.sha256` はzipのファイル破損確認用、`.exe.asc` はexeのPGP署名検証用です。通常はzipだけダウンロードすれば使用できます。
+同じリリースには、zip本体とは別に `.sha256` と `ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc` も添付されています。`.sha256` はzipのファイル破損確認用、`.exe.asc` はexeのPGP署名検証用です。通常はzipだけダウンロードすれば使用できます。
 
-PGP署名を確認する場合は、zipを展開して `ClipForVRChat.exe` を取り出します。zip内の `ClipForVRChat.exe.asc`、またはGitHub Releasesに別添付されている同じバージョンの `.exe.asc` をexeと同じフォルダに保存してください。そのうえで、zip内または同じリリースの公開鍵を取り込んでから、exeと `.asc` を検証してください。
+PGP署名を確認する場合は、zipを展開して `ClipForVRChat.exe` を取り出します。GitHub Releasesに別添付されている同じバージョンの `.exe.asc` をexeと同じフォルダに保存してください。そのうえで、zip内の `Release-signing-public-key.url` から公式公開鍵を確認して取り込み、exeと `.asc` を検証してください。
 
 ### 2. 初回設定
 

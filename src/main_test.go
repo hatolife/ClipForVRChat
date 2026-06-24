@@ -48,23 +48,34 @@ func TestShouldExitWithoutUI(t *testing.T) {
 	cfg.Output.ShowUI = "auto"
 	cfg.Output.CopySingleURLToClipboard = true
 	results := []appcore.Result{{URL: "https://cdn.discordapp.com/attachments/1/2/a.png"}}
-	if !shouldExitWithoutUI(cfg, results) {
+	if !shouldExitWithoutUI(cfg, results, nil) {
 		t.Fatal("auto mode with copied single URL should exit without UI")
 	}
 
 	cfg.Output.ShowUI = "always"
-	if shouldExitWithoutUI(cfg, results) {
+	if shouldExitWithoutUI(cfg, results, nil) {
 		t.Fatal("always mode should keep UI open")
 	}
 
 	cfg.Output.ShowUI = "never"
-	if !shouldExitWithoutUI(cfg, results) {
+	if !shouldExitWithoutUI(cfg, results, nil) {
 		t.Fatal("never mode with successful single result should exit")
 	}
 
-	if shouldExitWithoutUI(cfg, []appcore.Result{{Error: "x"}}) {
+	if shouldExitWithoutUI(cfg, []appcore.Result{{Error: "x"}}, nil) {
 		t.Fatal("error result should keep UI open")
 	}
+
+	cfg.Output.ShowUI = "auto"
+	if shouldExitWithoutUI(cfg, results, errTestCopyFailed{}) {
+		t.Fatal("copy failure should keep UI open")
+	}
+}
+
+type errTestCopyFailed struct{}
+
+func (errTestCopyFailed) Error() string {
+	return "copy failed"
 }
 
 func TestHasErrors(t *testing.T) {

@@ -22,6 +22,35 @@ func TestScanPhotoFilesLimitsFileCount(t *testing.T) {
 	if len(files) != maxFiles {
 		t.Fatalf("len(files) = %d, want %d", len(files), maxFiles)
 	}
+	_, status := scanPhotoFilesLimitedWithStatus(dir, maxFiles)
+	if !status.LimitReached {
+		t.Fatal("expected limit reached status")
+	}
+}
+
+func TestScanPhotoFilesReportsMissingDirectory(t *testing.T) {
+	_, status := scanPhotoFilesLimitedWithStatus(filepath.Join(t.TempDir(), "missing"), 3)
+	if status.Error == "" {
+		t.Fatal("expected missing directory error")
+	}
+}
+
+func TestAutoPhotoWatcherEmitsScanStatus(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "missing")
+	var events []AutoPhotoEvent
+	watcher := AutoPhotoWatcher{
+		Directory: missing,
+		seen:      map[string]time.Time{},
+		Handler: func(event AutoPhotoEvent) {
+			events = append(events, event)
+		},
+	}
+
+	watcher.tick()
+
+	if len(events) != 1 || events[0].Error == "" || events[0].Result.Error == "" {
+		t.Fatalf("events = %+v, want scan error event", events)
+	}
 }
 
 func TestAutoPhotoWatcherTickLimitsProcessing(t *testing.T) {

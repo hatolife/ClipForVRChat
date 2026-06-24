@@ -24,7 +24,7 @@ func AppendDiagnosticLog(path string, format string, args ...any) {
 	if err := os.MkdirAll(filepath.Dir(path), privateDirMode); err != nil {
 		return
 	}
-	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, privateFileMode)
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, privateFileMode) // #nosec G304 -- diagnostic log path is derived from the active config path and uses private permissions.
 	if err != nil {
 		return
 	}

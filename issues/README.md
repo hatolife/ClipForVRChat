@@ -52,11 +52,20 @@
 | 049 | [CLIヘルプをWindowsコンソールで文字化けさせない](049-use-wide-console-output-for-cli.md) | 完了 | 未リリース | `WriteConsoleW` でCLI出力し、cmdのコードページ差による文字化けを避ける。 |
 | 050 | [プロダクト全体の問題点チェック報告書を作成する](050-product-issue-review-report.md) | 完了 | 未リリース | `reports/2026-06-24-product-issue-report.md` を作成し、Release/UX/履歴/設定/OSS表示などの残課題を整理。 |
 | 051 | [監査報告書を日付付きで専用ディレクトリへ移動する](051-date-audit-reports-directory.md) | 完了 | 未リリース | 監査報告書を `reports/` 配下の日付付きファイル名へ整理。 |
+| 052 | [Release署名ファイルの説明を実際の成果物に合わせる](052-align-release-signing-docs.md) | 完了 | 未リリース | README/About/SPEC のPGP確認手順をRelease成果物に合わせる。 |
+| 053 | [Discord削除の部分成功を履歴へ保存する](053-persist-partial-discord-delete-results.md) | 完了 | 未リリース | 複数削除の一部失敗時も成功済み削除状態を保存する。 |
+| 054 | [config読み込み失敗時にアクティブ設定パスを変更しない](054-keep-config-path-on-load-error.md) | 完了 | 未リリース | 不正configの読み込み失敗時に既存の設定パスを維持する。 |
+| 055 | [URL自動コピー失敗をユーザーへ表示する](055-report-copy-single-url-failure.md) | 完了 | 未リリース | URL取得成功とクリップボードコピー失敗を分けて表示する。 |
+| 056 | [OSSライセンス表示を依存関係に合わせて更新する](056-complete-oss-license-list.md) | 完了 | 未リリース | direct dependency のライセンス表示漏れを補う。 |
+| 057 | [自動投稿の監視フォルダ異常を通知する](057-report-auto-post-watch-diagnostics.md) | 完了 | 未リリース | 監視フォルダ異常やスキャン上限到達をUIまたは診断ログへ出す。 |
+| 058 | [ローカルWindowsビルドのバージョンを指定できるようにする](058-allow-local-build-version-override.md) | 完了 | 未リリース | ローカルビルド時にリリース候補バージョンを指定可能にする。 |
+| 059 | [診断ログのgosec指摘を整理する](059-resolve-diagnostic-log-gosec-finding.md) | 完了 | 未リリース | 診断ログの可変パス指摘を設計上明確にする。 |
 
 ## 状態の意味
 
 | 状態 | 意味 |
 | --- | --- |
 | 完了 | 実装、テスト、またはドキュメント作成が完了している。 |
+| 要対応 | 問題を整理済みで、実装またはドキュメント更新が必要。 |
 | 要確認 | 修正は入っているが、対象環境や実機での再現確認が必要。 |
 | 一部将来対応あり | 主要な受け入れ条件は満たしているが、明示的に将来対応へ回した項目が残っている。 |
