@@ -87,6 +87,10 @@ jobs:
           Copy-Item "src/build/bin/ClipForVRChat.exe" "dist/ClipForVRChat/"
           Copy-Item "README.md" "dist/ClipForVRChat/"
           Copy-Item "LICENSE" "dist/ClipForVRChat/"
+          @(
+            "[InternetShortcut]",
+            "URL=https://keys.openpgp.org/search?q=release-signing@hato.life"
+          ) | Set-Content -Encoding ASCII "dist/ClipForVRChat/Release-signing-public-key.url"
 
       - name: Sign executable
         shell: bash
@@ -104,14 +108,11 @@ jobs:
           printf '%s' "$RELEASE_GPG_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
             --local-user "$RELEASE_GPG_FINGERPRINT" \
             --armor --detach-sign \
-            --output "dist/ClipForVRChat/ClipForVRChat.exe.asc" \
+            --output "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.exe.asc" \
             "dist/ClipForVRChat/ClipForVRChat.exe"
           gpg --batch --verify \
-            "dist/ClipForVRChat/ClipForVRChat.exe.asc" \
+            "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.exe.asc" \
             "dist/ClipForVRChat/ClipForVRChat.exe"
-          cp "dist/ClipForVRChat/ClipForVRChat.exe.asc" "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.exe.asc"
-          gpg --batch --armor --export "$RELEASE_GPG_FINGERPRINT" > "dist/ClipForVRChat/ClipForVRChat-release-signing-public-key.asc"
-          cp "dist/ClipForVRChat/ClipForVRChat-release-signing-public-key.asc" "dist/ClipForVRChat-${{ github.ref_name }}-release-signing-public-key.asc"
 
       - name: Package executable
         shell: pwsh
@@ -121,12 +122,47 @@ jobs:
             ForEach-Object { "$($_.Hash.ToLower())  ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip" } |
             Set-Content "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip.sha256"
 
+      - name: Validate release assets
+        shell: pwsh
+        run: |
+          $unexpected = Get-ChildItem dist -Recurse -File | Where-Object {
+            $_.Name -like "*release-signing-public-key.asc" -or
+            ($_.FullName -like "*\dist\ClipForVRChat\*" -and $_.Extension -eq ".asc")
+          }
+          if ($unexpected) {
+            $unexpected | ForEach-Object { Write-Error "Unexpected file in release output: $($_.FullName)" }
+            throw "Unexpected release output files were found"
+          }
+          $zipCheckDir = Join-Path $env:RUNNER_TEMP "release-zip-check"
+          Remove-Item -Recurse -Force $zipCheckDir -ErrorAction SilentlyContinue
+          Expand-Archive "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip" -DestinationPath $zipCheckDir
+          $unexpectedZipFiles = Get-ChildItem $zipCheckDir -Recurse -File | Where-Object {
+            $_.Name -like "*release-signing-public-key.asc" -or $_.Extension -eq ".asc"
+          }
+          if ($unexpectedZipFiles) {
+            $unexpectedZipFiles | ForEach-Object { Write-Error "Unexpected file in release zip: $($_.FullName)" }
+            throw "Unexpected files were found in release zip"
+          }
+          $required = @(
+            "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip",
+            "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip.sha256",
+            "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.exe.asc",
+            "dist/ClipForVRChat/Release-signing-public-key.url"
+          )
+          foreach ($path in $required) {
+            if (!(Test-Path $path)) {
+              throw "Required release output was not created: $path"
+            }
+          }
+
+      - name: Prepare release notes
+        run: node scripts/extract-release-notes.mjs "${{ github.ref_name }}" RELEASE_NOTES.md dist/release-body.md
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
+          body_path: dist/release-body.md
           files: |
             dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip
             dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip.sha256
             dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.exe.asc
-            dist/ClipForVRChat-${{ github.ref_name }}-release-signing-public-key.asc
-          generate_release_notes: true
