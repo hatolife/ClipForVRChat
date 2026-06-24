@@ -6,7 +6,11 @@
 - [x] CI高速化用のチケットを作成する。
 - [x] Wails CLI cacheをCI/Release workflowへ追加する。
 - [x] workflow構文をローカル確認する。
-- [ ] 変更を署名付きコミットしてブランチへpushする。
-- [ ] ブランチCIでcache miss時の動作と所要時間を確認する。
-- [ ] 追加pushまたはRelease検証でcache hit時の動作を確認する。
-- [ ] 効果と残課題を整理する。
+- [x] 変更を署名付きコミットしてブランチへpushする。
+- [x] ブランチCIでcache miss時の動作と所要時間を確認する。
+- [x] 追加pushでcache hit時の動作を確認する。
+- [x] 一時draftタグでRelease workflowの動作を確認する。
+- [x] 効果と残課題を整理する。
+- [ ] 変更を `master` に反映する。
+- [ ] master CIでdefault branch cacheを確認する。
+- [ ] 一時draftタグでRelease workflowのdefault branch cache利用を再確認する。
