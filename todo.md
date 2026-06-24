@@ -16,10 +16,10 @@
 - [x] `npm audit --omit=dev` を実行する。
 - [x] `govulncheck ./...` を実行する。
 - [x] `gosec ./...` を実行する。
-- [ ] ローカルWindows exeをビルドして `--version` / `--help` を確認する。
-- [ ] 作業をコミットする。
-- [ ] v0.1.6リリース前の全体再チェックを行う。
-- [ ] `RELEASE_NOTES.md` を更新する。
+- [x] ローカルWindows exeをビルドして `--version` / `--help` を確認する。
+- [x] 作業をコミットする。
+- [x] v0.1.6リリース前の全体再チェックを行う。
+- [x] `RELEASE_NOTES.md` を更新する。
 - [ ] `v0.1.6` タグを作成する。
 - [ ] branch と tag を push する。
 - [ ] GitHub Actions CI / Release workflow を確認する。
