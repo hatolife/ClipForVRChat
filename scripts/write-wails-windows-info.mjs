@@ -45,5 +45,6 @@ const data = {
   },
 }
 
+fs.mkdirSync(path.dirname(outPath), { recursive: true })
 fs.writeFileSync(outPath, `${JSON.stringify(data, null, 2)}\n`)
 process.stdout.write(windowsVersion)
