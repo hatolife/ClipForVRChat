@@ -67,6 +67,7 @@
 | 060 | [issue一覧のv0.1.6対応状況を整理する](060-update-issue-index-release-status.md) | 完了 | `v0.1.6` | issue一覧の未リリース表記と欠番を整理。 |
 | 061 | [リリース時にissue一覧へ対応バージョンを記録する](061-record-release-version-in-issue-index.md) | 完了 | `v0.1.6` | リリース時の対応バージョン記録ルールを追加し、既存一覧を補完。 |
 | 062 | [issue一覧の対応バージョン列名を整理する](062-rename-issue-index-version-column.md) | 完了 | `v0.1.6` | issue一覧の列名を対応バージョン記録の運用に合わせる。 |
+| 063 | [v0.1.6履歴のコミットメッセージと署名を整理する](063-rewrite-v016-history-angular-signed.md) | 完了 | `v0.1.6` | v0.1.6向け履歴のコミットメッセージ、署名、相殺revertを整理。 |
 
 ## 状態の意味
 
