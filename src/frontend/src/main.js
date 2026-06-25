@@ -60,6 +60,19 @@ createApp({
     hasAnyHistory() {
       return (this.state.history || []).length > 0
     },
+    selectedHistoryEntries() {
+      const selected = new Set(this.selectedHistoryIds)
+      return (this.state.history || []).filter((item) => selected.has(item.id))
+    },
+    hasDiscordDeletableSelection() {
+      return this.selectedHistoryEntries.some((item) => this.canDeleteHistoryDiscord(item))
+    },
+    hasLocalDeletableSelection() {
+      return this.selectedHistoryEntries.some((item) => this.canDeleteHistoryLocal(item))
+    },
+    hasHistoryDeletableSelection() {
+      return this.selectedHistoryEntries.some((item) => !item.pinned)
+    },
     isSettings() {
       return this.state.mode === 'settings'
     },
@@ -426,9 +439,6 @@ createApp({
       }
       this.selectedHistoryIds = [item.id]
       this.lastSelectedHistoryIndex = index
-      if (!item.discordDeleted && this.isTrustedDiscordImageURL(item.url)) {
-        this.copy(item.url)
-      }
     },
     startHistoryDragSelect(event) {
       if (event.button !== 0 || event.target.closest('.history-card')) return
@@ -519,12 +529,58 @@ createApp({
         return false
       }
     },
+    hasHistoryDiscordRecord(item) {
+      return !!(item && this.isTrustedDiscordImageURL(item.url))
+    },
+    canDeleteHistoryDiscord(item) {
+      return !!(item && !item.pinned && !item.discordDeleted && this.hasHistoryDiscordRecord(item) && item.discordMessageId && item.discordWebhookId && item.discordToken)
+    },
+    historyDiscordLabel(item) {
+      if (!this.hasHistoryDiscordRecord(item)) return 'Discord: なし'
+      if (item.discordDeleted) return 'Discord: 削除済み'
+      return 'Discord: あり'
+    },
+    historyLocalLabel(item) {
+      if (!item?.outputPath) return 'ローカル: なし'
+      if (item.localDeleted) return 'ローカル: 削除済み'
+      return item.localExists ? 'ローカル: あり' : 'ローカル: 不明'
+    },
+    canDeleteHistoryLocal(item) {
+      return !!(item && !item.pinned && item.outputPath && !item.localDeleted && item.localExists)
+    },
     async deleteSelectedFromDiscord() {
-      if (!this.selectedHistoryIds.length) return
+      if (!this.hasDiscordDeletableSelection) return
       this.error = ''
       try {
         this.state.history = await api.DeleteDiscordHistoryEntries(this.selectedHistoryIds)
         this.toast = 'Discordから削除しました'
+        setTimeout(() => {
+          this.toast = ''
+        }, 1800)
+      } catch (err) {
+        this.error = String(err)
+      }
+    },
+    async deleteSelectedLocalFiles() {
+      if (!this.hasLocalDeletableSelection) return
+      this.error = ''
+      try {
+        this.state.history = await api.DeleteLocalHistoryFiles(this.selectedHistoryIds)
+        this.toast = 'ローカルファイルを削除しました'
+        setTimeout(() => {
+          this.toast = ''
+        }, 1800)
+      } catch (err) {
+        this.error = String(err)
+      }
+    },
+    async deleteSelectedHistoryEntries() {
+      if (!this.hasHistoryDeletableSelection) return
+      this.error = ''
+      try {
+        this.state.history = await api.DeleteHistoryEntries(this.selectedHistoryIds)
+        this.selectedHistoryIds = this.selectedHistoryIds.filter((id) => (this.state.history || []).some((item) => item.id === id))
+        this.toast = '履歴から削除しました'
         setTimeout(() => {
           this.toast = ''
         }, 1800)
@@ -820,7 +876,7 @@ createApp({
         <div class="history-toolbar">
           <div>
             <h2>画像履歴</h2>
-            <p class="subtle">削除済みを含む履歴です。選択した画像はDiscord上の投稿だけを削除します。</p>
+            <p class="subtle">履歴として保存された記録です。Discord、ローカル、QRコードURLの状態を確認できます。</p>
           </div>
           <div class="button-row">
             <span class="tooltip-action">
@@ -828,12 +884,16 @@ createApp({
               <span class="tooltip">履歴に表示されている画像をすべて選択します。Ctrl+Aでも同じ操作ができます。</span>
             </span>
             <span class="tooltip-action">
-              <button @click="deleteSelectedFromDiscord" :disabled="!selectedHistoryIds.length">選択をDiscordから削除</button>
-              <span class="tooltip">選択した画像のDiscord上の投稿を削除します。ピン止めした画像と履歴データ自体は削除しません。</span>
+              <button @click="deleteSelectedFromDiscord" :disabled="!hasDiscordDeletableSelection">Discordから削除</button>
+              <span class="tooltip">選択中のうち、Discord上にあり削除可能な投稿だけを削除します。ピン止めした履歴は対象外です。</span>
             </span>
             <span class="tooltip-action">
-              <button class="secondary" @click="purgeDeletedHistory">削除済みURLの履歴を削除</button>
-              <span class="tooltip">Discord削除済みの履歴だけを取り除きます。設定がONならoutput画像も削除します。ピン止めした画像は対象外です。</span>
+              <button class="secondary" @click="deleteSelectedLocalFiles" :disabled="!hasLocalDeletableSelection">ローカルから削除</button>
+              <span class="tooltip">選択中のうち、ローカル保存ファイルがある履歴だけをPCから削除します。ピン止めした履歴は対象外です。</span>
+            </span>
+            <span class="tooltip-action">
+              <button class="secondary danger-button" @click="deleteSelectedHistoryEntries" :disabled="!hasHistoryDeletableSelection">履歴から削除</button>
+              <span class="tooltip">選択した記録を履歴から削除します。Discord投稿やローカルファイルは削除しません。ピン止めした履歴は対象外です。</span>
             </span>
             <span class="tooltip-action">
               <button class="secondary" @click="goHome">閉じる</button>
@@ -843,7 +903,7 @@ createApp({
         </div>
         <p v-if="error" class="error">{{ error }}</p>
         <div v-if="state.history && state.history.length" ref="historyGrid" class="history-grid" :class="{ selecting: historyDragSelecting }" @mousedown="startHistoryDragSelect">
-          <button v-for="(item, index) in state.history" :key="item.id" class="history-card" :data-history-id="item.id" :class="{ selected: isHistorySelected(item.id), cleared: item.cleared, deleted: item.discordDeleted, pinned: item.pinned }" @click="selectHistory($event, index, item)">
+          <button v-for="(item, index) in state.history" :key="item.id" class="history-card" :data-history-id="item.id" :class="{ selected: isHistorySelected(item.id), discordDeleted: item.discordDeleted, localDeleted: item.localDeleted, pinned: item.pinned }" @click="selectHistory($event, index, item)">
             <span class="pin-action">
               <span class="pin-button" :class="{ active: item.pinned }" @click.stop="toggleHistoryPinned(item)" title="ピン止め" aria-label="ピン止め"></span>
             </span>
@@ -852,12 +912,21 @@ createApp({
               <div v-else class="thumb-placeholder"></div>
               <div class="history-badges">
                 <span v-if="item.pinned">ピン止め</span>
-                <span v-if="item.cleared">クリア済み</span>
-                <span v-if="item.discordDeleted">Discord削除済み</span>
+                <span :class="{ ok: hasHistoryDiscordRecord(item) && !item.discordDeleted, muted: !hasHistoryDiscordRecord(item), deleted: item.discordDeleted }">{{ historyDiscordLabel(item) }}</span>
+                <span :class="{ ok: item.localExists, muted: !item.outputPath, deleted: item.localDeleted }">{{ historyLocalLabel(item) }}</span>
+                <span v-if="item.qrUrls && item.qrUrls.length" class="ok">QR: {{ item.qrUrls.length }}</span>
               </div>
             </div>
-            <span>{{ item.name }}</span>
+            <span class="history-name">{{ item.name || '画像' }}</span>
             <small>{{ item.createdAt }}</small>
+            <div v-if="item.url || item.outputPath" class="history-paths">
+              <button v-if="item.url" class="link-button inline" @click.stop="copy(item.url)" :disabled="item.discordDeleted">{{ item.url }}</button>
+              <button v-if="item.outputPath" class="link-button inline" @click.stop="revealResultFile($event, item)" :disabled="item.localDeleted || !item.localExists">{{ item.outputPath }}</button>
+            </div>
+            <div v-if="item.qrUrls && item.qrUrls.length" class="qr-url-list">
+              <strong>QRコードURL</strong>
+              <button v-for="qrUrl in item.qrUrls" :key="qrUrl" class="qr-url-chip" @click="copyQRURL($event, qrUrl)" :title="qrUrl">{{ qrUrl }}</button>
+            </div>
           </button>
           <div v-if="historyDragSelecting" class="selection-rect" :style="historySelectionRectStyle"></div>
         </div>
@@ -953,10 +1022,6 @@ createApp({
               <label>
                 <input type="number" min="1" max="100" v-model.number="state.config.image.jpegQuality" :disabled="!state.config.output.saveLocal || !isJpegOutput" />
               </label>
-            </div>
-            <div class="setting-row" :class="{ disabled: !state.config.output.saveLocal }">
-              <div><strong>履歴削除時にoutputも削除</strong><p>画像履歴画面でDiscord削除済みの履歴を削除するとき、PCに保存したoutput画像も一緒に削除します。</p></div>
-              <label class="switch"><input type="checkbox" v-model="state.config.output.deleteOutputOnHistoryPurge" :disabled="!state.config.output.saveLocal" /><span></span></label>
             </div>
           </section>
 

@@ -11,21 +11,25 @@ import (
 )
 
 type HistoryEntry struct {
-	ID               string `json:"id"`
-	Name             string `json:"name"`
-	URL              string `json:"url"`
-	Thumbnail        string `json:"thumbnail"`
-	SourcePath       string `json:"sourcePath"`
-	OutputPath       string `json:"outputPath"`
-	DiscordMessageID string `json:"discordMessageId"`
-	DiscordWebhookID string `json:"discordWebhookId"`
-	DiscordToken     string `json:"discordToken"`
-	Cleared          bool   `json:"cleared"`
-	Pinned           bool   `json:"pinned,omitempty"`
-	DiscordDeleted   bool   `json:"discordDeleted"`
-	CreatedAt        string `json:"createdAt"`
-	ClearedAt        string `json:"clearedAt,omitempty"`
-	DeletedAt        string `json:"deletedAt,omitempty"`
+	ID               string   `json:"id"`
+	Name             string   `json:"name"`
+	URL              string   `json:"url"`
+	Thumbnail        string   `json:"thumbnail"`
+	SourcePath       string   `json:"sourcePath"`
+	OutputPath       string   `json:"outputPath"`
+	QRURLs           []string `json:"qrUrls,omitempty"`
+	DiscordMessageID string   `json:"discordMessageId"`
+	DiscordWebhookID string   `json:"discordWebhookId"`
+	DiscordToken     string   `json:"discordToken"`
+	Cleared          bool     `json:"cleared"`
+	Pinned           bool     `json:"pinned,omitempty"`
+	DiscordDeleted   bool     `json:"discordDeleted"`
+	LocalExists      bool     `json:"localExists,omitempty"`
+	LocalDeleted     bool     `json:"localDeleted,omitempty"`
+	CreatedAt        string   `json:"createdAt"`
+	ClearedAt        string   `json:"clearedAt,omitempty"`
+	DeletedAt        string   `json:"deletedAt,omitempty"`
+	LocalDeletedAt   string   `json:"localDeletedAt,omitempty"`
 }
 
 func HistoryPath(configPath string) string {
@@ -47,6 +51,7 @@ func LoadHistory(path string) ([]HistoryEntry, error) {
 	if err := json.Unmarshal(data, &history); err != nil {
 		return nil, err
 	}
+	enrichHistoryStatus(history)
 	return history, nil
 }
 
@@ -68,25 +73,40 @@ func AddResultsToHistory(path string, results []Result) ([]HistoryEntry, error) 
 	}
 	now := time.Now().Format(time.RFC3339)
 	for i := range results {
-		if strings.TrimSpace(results[i].URL) == "" || results[i].Error != "" || !IsTrustedDiscordImageURL(results[i].URL) {
+		if results[i].Error != "" || !shouldKeepHistoryResult(results[i]) {
 			continue
 		}
+		trustedDiscordURL := strings.TrimSpace(results[i].URL) != "" && IsTrustedDiscordImageURL(results[i].URL)
 		entry := HistoryEntry{
-			ID:               historyID(now, len(history)),
-			Name:             results[i].Name,
-			URL:              results[i].URL,
-			Thumbnail:        results[i].Thumbnail,
-			SourcePath:       results[i].SourcePath,
-			OutputPath:       results[i].OutputPath,
-			DiscordMessageID: results[i].DiscordMessageID,
-			DiscordWebhookID: results[i].DiscordWebhookID,
-			DiscordToken:     results[i].DiscordToken,
-			CreatedAt:        now,
+			ID:         historyID(now, len(history)),
+			Name:       results[i].Name,
+			Thumbnail:  results[i].Thumbnail,
+			SourcePath: results[i].SourcePath,
+			OutputPath: results[i].OutputPath,
+			QRURLs:     results[i].QRURLs,
+			CreatedAt:  now,
+		}
+		if trustedDiscordURL {
+			entry.URL = results[i].URL
+			entry.DiscordMessageID = results[i].DiscordMessageID
+			entry.DiscordWebhookID = results[i].DiscordWebhookID
+			entry.DiscordToken = results[i].DiscordToken
 		}
 		history = append([]HistoryEntry{entry}, history...)
 		results[i].HistoryID = entry.ID
 	}
+	enrichHistoryStatus(history)
 	return history, SaveHistory(path, history)
+}
+
+func shouldKeepHistoryResult(result Result) bool {
+	if strings.TrimSpace(result.OutputPath) != "" {
+		return true
+	}
+	if len(result.QRURLs) > 0 {
+		return true
+	}
+	return strings.TrimSpace(result.URL) != "" && IsTrustedDiscordImageURL(result.URL)
 }
 
 func MarkHistoryCleared(path string, ids []string) ([]HistoryEntry, error) {
@@ -125,6 +145,53 @@ func SetHistoryPinned(path string, id string, pinned bool) ([]HistoryEntry, erro
 		}
 	}
 	return history, SaveHistory(path, history)
+}
+
+func DeleteHistoryEntries(path string, ids []string) ([]HistoryEntry, int, error) {
+	history, err := LoadHistory(path)
+	if err != nil {
+		return history, 0, err
+	}
+	idSet := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		idSet[id] = true
+	}
+	kept := make([]HistoryEntry, 0, len(history))
+	removed := 0
+	for _, entry := range history {
+		if idSet[entry.ID] && !entry.Pinned {
+			removed++
+			continue
+		}
+		kept = append(kept, entry)
+	}
+	return kept, removed, SaveHistory(path, kept)
+}
+
+func DeleteLocalHistoryFiles(path string, ids []string) ([]HistoryEntry, int, error) {
+	history, err := LoadHistory(path)
+	if err != nil {
+		return history, 0, err
+	}
+	now := time.Now().Format(time.RFC3339)
+	idSet := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		idSet[id] = true
+	}
+	deleted := 0
+	for i := range history {
+		if !idSet[history[i].ID] || history[i].Pinned || strings.TrimSpace(history[i].OutputPath) == "" || history[i].LocalDeleted {
+			continue
+		}
+		if err := removeHistoryOutputFile(history[i].OutputPath); err != nil {
+			return history, deleted, err
+		}
+		history[i].LocalDeleted = true
+		history[i].LocalDeletedAt = now
+		deleted++
+	}
+	enrichHistoryStatus(history)
+	return history, deleted, SaveHistory(path, history)
 }
 
 func PurgeUnavailableHistory(path string) ([]HistoryEntry, int, error) {
@@ -177,6 +244,21 @@ func removeHistoryOutputFile(path string) error {
 		return err
 	}
 	return nil
+}
+
+func enrichHistoryStatus(history []HistoryEntry) {
+	for i := range history {
+		history[i].LocalExists = localHistoryFileExists(history[i])
+	}
+}
+
+func localHistoryFileExists(entry HistoryEntry) bool {
+	path := strings.Trim(strings.TrimSpace(entry.OutputPath), `"`)
+	if path == "" || entry.LocalDeleted {
+		return false
+	}
+	stat, err := os.Stat(path)
+	return err == nil && !stat.IsDir()
 }
 
 func RemoteURLAvailable(url string) bool {

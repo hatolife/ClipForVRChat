@@ -32,6 +32,32 @@ func TestAddResultsToHistorySkipsUntrustedURL(t *testing.T) {
 	}
 }
 
+func TestAddResultsToHistoryKeepsLocalAndQRCodeResults(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "history.json")
+	results := []Result{
+		{Name: "local.png", OutputPath: filepath.Join(t.TempDir(), "local.png")},
+		{Name: "qr.png", QRURLs: []string{"https://example.com/qr"}},
+		{Name: "empty.png"},
+	}
+
+	history, err := AddResultsToHistory(path, results)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(history) != 2 {
+		t.Fatalf("len(history) = %d, want 2", len(history))
+	}
+	if history[0].Name != "qr.png" || len(history[0].QRURLs) != 1 {
+		t.Fatalf("first history = %+v, want qr entry", history[0])
+	}
+	if history[1].Name != "local.png" || history[1].OutputPath == "" {
+		t.Fatalf("second history = %+v, want local entry", history[1])
+	}
+	if results[2].HistoryID != "" {
+		t.Fatal("empty result should not receive history ID")
+	}
+}
+
 func TestRemoteURLAvailableRejectsUntrustedURLWithoutRequest(t *testing.T) {
 	if RemoteURLAvailable("http://127.0.0.1:1/attachments/1/2/image.png") {
 		t.Fatal("untrusted URL should not be available")
@@ -104,6 +130,52 @@ func TestSetHistoryPinned(t *testing.T) {
 	}
 	if len(history) != 1 || !history[0].Pinned {
 		t.Fatalf("history = %+v, want pinned entry", history)
+	}
+}
+
+func TestDeleteHistoryEntriesKeepsPinnedEntries(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "history.json")
+	initial := []HistoryEntry{
+		{ID: "delete", Name: "delete.png"},
+		{ID: "pinned", Name: "pinned.png", Pinned: true},
+	}
+	if err := SaveHistory(path, initial); err != nil {
+		t.Fatal(err)
+	}
+
+	history, removed, err := DeleteHistoryEntries(path, []string{"delete", "pinned"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if removed != 1 || len(history) != 1 || history[0].ID != "pinned" {
+		t.Fatalf("history = %+v removed = %d, want only pinned kept", history, removed)
+	}
+}
+
+func TestDeleteLocalHistoryFilesMarksDeleted(t *testing.T) {
+	dir := t.TempDir()
+	output := filepath.Join(dir, "out.png")
+	if err := os.WriteFile(output, []byte("image"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "history.json")
+	initial := []HistoryEntry{
+		{ID: "delete", OutputPath: output},
+		{ID: "pinned", OutputPath: output, Pinned: true},
+	}
+	if err := SaveHistory(path, initial); err != nil {
+		t.Fatal(err)
+	}
+
+	history, deleted, err := DeleteLocalHistoryFiles(path, []string{"delete", "pinned"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deleted != 1 || !history[0].LocalDeleted || history[0].LocalDeletedAt == "" || history[0].LocalExists {
+		t.Fatalf("history = %+v deleted = %d, want first local deleted", history, deleted)
+	}
+	if history[1].LocalDeleted {
+		t.Fatalf("pinned entry should not be deleted: %+v", history[1])
 	}
 }
 

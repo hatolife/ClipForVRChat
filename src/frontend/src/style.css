@@ -738,7 +738,7 @@ small {
 .history-grid {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 14px;
   user-select: none;
 }
@@ -771,16 +771,13 @@ small {
   border-color: #9bb7c7;
 }
 
-.history-card.cleared {
-  background: #f5f7f9;
-}
-
-.history-card.deleted img {
+.history-card.discordDeleted img,
+.history-card.localDeleted img {
   filter: grayscale(1);
   opacity: 0.58;
 }
 
-.history-card span {
+.history-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -803,6 +800,44 @@ small {
   color: #ffffff;
   font-size: 12px;
   font-weight: 400;
+}
+
+.history-badges span.ok {
+  background: rgba(35, 127, 73, 0.84);
+}
+
+.history-badges span.muted {
+  background: rgba(89, 104, 118, 0.78);
+}
+
+.history-badges span.deleted {
+  background: rgba(151, 61, 61, 0.82);
+}
+
+.history-paths {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.history-paths .link-button {
+  width: 100%;
+  min-width: 0;
+  justify-content: flex-start;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.danger-button {
+  border-color: #c78b8b;
+  color: #9b2f2f;
+}
+
+.danger-button:hover:not(:disabled) {
+  border-color: #ad5f5f;
+  background: #fff0f0;
 }
 
 .pin-action {
