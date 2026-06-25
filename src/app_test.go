@@ -311,8 +311,22 @@ func TestResultMessage(t *testing.T) {
 	}
 
 	msg = resultMessage(cfg, nil, nil)
-	if !strings.Contains(msg, "実行された処理はありません") {
+	if !strings.Contains(msg, "表示できる処理結果はありません") {
 		t.Fatalf("message = %q", msg)
+	}
+
+	cfg.Output.UploadDiscord = false
+	cfg.Output.SaveLocal = false
+	cfg.Output.DetectQRCodeURLs = false
+	msg = resultMessage(cfg, nil, nil)
+	if !strings.Contains(msg, "すべてOFF") || !strings.Contains(msg, "設定を確認") {
+		t.Fatalf("all disabled message = %q", msg)
+	}
+
+	cfg.Output.DetectQRCodeURLs = true
+	msg = resultMessage(cfg, nil, nil)
+	if !strings.Contains(msg, "URLを取得できません") || !strings.Contains(msg, "Discord投稿またはローカル保存") {
+		t.Fatalf("qr-only no result message = %q", msg)
 	}
 }
 
