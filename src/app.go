@@ -224,6 +224,9 @@ func (a *App) DeleteDiscordHistoryEntries(ids []string) ([]appcore.HistoryEntry,
 		if !idSet[history[i].ID] || history[i].Pinned {
 			continue
 		}
+		if history[i].DiscordDeleted || !appcore.IsTrustedDiscordImageURL(history[i].URL) || history[i].DiscordWebhookID == "" || history[i].DiscordToken == "" || history[i].DiscordMessageID == "" {
+			continue
+		}
 		if err := deleteDiscordMessage(history[i].DiscordWebhookID, history[i].DiscordToken, history[i].DiscordMessageID); err != nil {
 			if saveErr := appcore.SaveHistory(appcore.HistoryPath(a.configPath), history); saveErr != nil {
 				return history, fmt.Errorf("%v; 履歴保存にも失敗しました: %w", err, saveErr)
@@ -235,6 +238,28 @@ func (a *App) DeleteDiscordHistoryEntries(ids []string) ([]appcore.HistoryEntry,
 		history[i].DeletedAt = nowRFC3339()
 	}
 	if err := appcore.SaveHistory(appcore.HistoryPath(a.configPath), history); err != nil {
+		return history, err
+	}
+	a.state.History = history
+	return history, nil
+}
+
+func (a *App) DeleteLocalHistoryFiles(ids []string) ([]appcore.HistoryEntry, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	history, _, err := appcore.DeleteLocalHistoryFiles(appcore.HistoryPath(a.configPath), ids)
+	if err != nil {
+		return history, err
+	}
+	a.state.History = history
+	return history, nil
+}
+
+func (a *App) DeleteHistoryEntries(ids []string) ([]appcore.HistoryEntry, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	history, _, err := appcore.DeleteHistoryEntries(appcore.HistoryPath(a.configPath), ids)
+	if err != nil {
 		return history, err
 	}
 	a.state.History = history

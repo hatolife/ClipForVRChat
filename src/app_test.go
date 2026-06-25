@@ -191,7 +191,7 @@ func TestAppHistoryOperations(t *testing.T) {
 	}
 }
 
-func TestAppDeleteDiscordHistoryEntriesRequiresStoredWebhookData(t *testing.T) {
+func TestAppDeleteDiscordHistoryEntriesSkipsEntriesWithoutStoredWebhookData(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	history := []appcore.HistoryEntry{{ID: "1", URL: "https://cdn.discordapp.com/attachments/1/2/a.png"}}
 	if err := appcore.SaveHistory(appcore.HistoryPath(configPath), history); err != nil {
@@ -199,8 +199,12 @@ func TestAppDeleteDiscordHistoryEntriesRequiresStoredWebhookData(t *testing.T) {
 	}
 	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
 
-	if _, err := app.DeleteDiscordHistoryEntries([]string{"1"}); err == nil {
-		t.Fatal("expected missing webhook data error")
+	got, err := app.DeleteDiscordHistoryEntries([]string{"1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].DiscordDeleted {
+		t.Fatalf("history = %+v, want unchanged", got)
 	}
 }
 
