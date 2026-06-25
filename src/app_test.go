@@ -1,16 +1,20 @@
 package main
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"errors"
 	"image"
 	"image/color"
 	"image/png"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/hatolife/ClipForVRChat/internal/appcore"
 )
 
@@ -274,6 +278,49 @@ func TestCreateEncryptedDiagnosticPackageEncryptsZip(t *testing.T) {
 		if strings.Contains(string(data), leaked) {
 			t.Fatalf("encrypted package leaked %q", leaked)
 		}
+	}
+}
+
+func TestEncryptDiagnosticPackageUsesBinaryLiteralData(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.json")
+	cfg := appcore.DefaultConfig()
+	if err := appcore.SaveConfig(configPath, cfg); err != nil {
+		t.Fatal(err)
+	}
+	zipData, _, err := buildDiagnosticZip(configPath, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData))); err != nil {
+		t.Fatalf("plain diagnostic zip is invalid: %v", err)
+	}
+
+	entity, err := openpgp.NewEntity("Diagnostic Test", "", "diagnostic@example.test", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encrypted, err := encryptDiagnosticZip(zipData, openpgp.EntityList{entity})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if strings.Contains(string(encrypted), "config.json") {
+		t.Fatal("encrypted package leaked zip entry name")
+	}
+	message, err := openpgp.ReadMessage(bytes.NewReader(encrypted), openpgp.EntityList{entity}, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if message.LiteralData == nil || !message.LiteralData.IsBinary {
+		t.Fatalf("literal data = %+v, want binary", message.LiteralData)
+	}
+	decrypted, err := io.ReadAll(message.UnverifiedBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := zip.NewReader(bytes.NewReader(decrypted), int64(len(decrypted))); err != nil {
+		t.Fatalf("decrypted diagnostic zip is invalid: %v", err)
 	}
 }
 
