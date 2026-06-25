@@ -848,8 +848,8 @@ createApp({
 
           <article class="help-card">
             <h3>2. 必要なら設定する</h3>
-            <p>設定画面では、ローカル保存、Discord投稿、出力形式、出力先フォルダ、ファイル名サフィックスを変更できます。</p>
-            <p>出力形式はPNGまたはJPGを選べます。JPEG品質はJPG出力のときだけ使用します。</p>
+            <p>設定画面では、VRChat写真やスクリーンショットの自動処理、Discord投稿、QRコードURL検出、ローカル保存を変更できます。</p>
+            <p>ローカル保存を使う場合は、出力形式、出力先フォルダ、ファイル名サフィックス、JPEG品質を変更できます。</p>
           </article>
 
           <article class="help-card">
@@ -860,9 +860,9 @@ createApp({
           </article>
 
           <article class="help-card">
-            <h3>4. URLを使う</h3>
+            <h3>4. 結果を使う</h3>
             <p>1枚だけ処理した場合は、設定がONなら画像URLを自動でクリップボードへコピーします。</p>
-            <p>結果画面では、サムネイルをクリックするとその画像URLを再度コピーできます。</p>
+            <p>結果画面では、サムネイルの上側でURLコピー、下側でローカル保存先の表示ができます。URLやローカル保存先がない場合、その操作は表示されません。</p>
           </article>
         </div>
 
@@ -1164,13 +1164,13 @@ createApp({
               </label>
             </div>
             <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord || !state.config.autoPhoto.enabled }">
-              <div><strong>VRChat写真自動投稿用Webhook URL</strong><p>通常投稿とは別の投稿先にしたい場合だけ入力します。空の場合は通常投稿用Webhook URLへ投稿します。</p></div>
+              <div><strong>VRChat写真用Webhook URL</strong><p>通常投稿とは別の投稿先にしたい場合だけ入力します。空の場合は通常投稿用Webhook URLへ投稿します。</p></div>
               <label>
                 <input type="password" v-model="state.config.autoPhoto.webhookUrl" placeholder="空なら通常投稿用Webhook URLを使用" :disabled="!state.config.output.uploadDiscord || !state.config.autoPhoto.enabled" />
               </label>
             </div>
             <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord || !state.config.screenshotAutoPost.enabled }">
-              <div><strong>スクリーンショット自動投稿用Webhook URL</strong><p>通常投稿とは別の投稿先にしたい場合だけ入力します。空の場合は通常投稿用Webhook URLへ投稿します。</p></div>
+              <div><strong>スクリーンショット用Webhook URL</strong><p>通常投稿とは別の投稿先にしたい場合だけ入力します。空の場合は通常投稿用Webhook URLへ投稿します。</p></div>
               <label>
                 <input type="password" v-model="state.config.screenshotAutoPost.webhookUrl" placeholder="空なら通常投稿用Webhook URLを使用" :disabled="!state.config.output.uploadDiscord || !state.config.screenshotAutoPost.enabled" />
               </label>
@@ -1196,7 +1196,7 @@ createApp({
           <div class="result-heading">
             <div>
               <h2>{{ isError ? '確認が必要です' : '結果' }}</h2>
-              <p class="subtle">サムネイルをクリックすると画像URLをコピーできます。</p>
+              <p class="subtle">サムネイル上の表示からURLコピーやローカル保存先の表示ができます。</p>
             </div>
             <div class="result-actions">
               <span class="tooltip-action">
@@ -1205,7 +1205,7 @@ createApp({
               </span>
               <span class="tooltip-action">
                 <button class="secondary" @click="openHistory" :disabled="processing">履歴</button>
-                <span class="tooltip">過去に取得した画像URLを表示します。削除済み画像の確認やDiscord上の削除操作ができます。</span>
+                <span class="tooltip">過去の処理履歴を表示します。Discord、ローカル保存、QRコードURLの状態確認や削除操作ができます。</span>
               </span>
             </div>
           </div>
@@ -1273,7 +1273,7 @@ createApp({
       <div v-if="diagnosticGenerating" class="modal-backdrop busy-backdrop" role="dialog" aria-modal="true" aria-live="polite">
         <div class="busy-dialog">
           <h2>不具合報告用データを作成しています</h2>
-          <p>ログ、設定、履歴、実行ファイルを確認用フォルダにまとめ、zip化して暗号化しています。</p>
+          <p>ログ、設定、履歴、実行ファイルをzip化し、添付用に暗号化しています。</p>
           <div class="indeterminate-progress"><span></span></div>
         </div>
       </div>
