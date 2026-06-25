@@ -84,6 +84,7 @@
 | 077 | [処理結果がない場合に理由を表示する](077-explain-no-result-processing-message.md) | 完了 | `v0.1.7` | 明示的な処理で結果がない場合、設定により処理結果が出ない理由を表示する。 |
 | 078 | [履歴のローカル保存パスをconfig基準で解決する](078-resolve-history-local-paths-relative-to-config.md) | 完了 | `v0.1.7` | 履歴の相対ローカル保存パスをconfig基準で解決し、Explorer表示と削除可否を修正する。 |
 | 079 | [ユーザー操作を診断ログへ記録する](079-record-user-actions-in-diagnostic-log.md) | 完了 | `v0.1.7` | ボタンクリック、画面遷移、処理判断、処理結果表示を診断ログへ記録する。 |
+| 080 | [暗号化診断パッケージ作成](080-create-encrypted-diagnostic-package.md) | 一部将来対応あり | `v0.1.7` | 起動ログと診断パッケージ作成導線を追加。現在の公開鍵は署名専用のため、暗号化用公開鍵の同梱が必要。 |
 
 ## 状態の意味
 

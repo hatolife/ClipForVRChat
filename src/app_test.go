@@ -216,6 +216,57 @@ func TestAppLogUserActionWritesDiagnosticLog(t *testing.T) {
 	}
 }
 
+func TestAppStartupWritesVersionHashAndRedactedConfig(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.json")
+	cfg := appcore.DefaultConfig()
+	cfg.Discord.WebhookURL = "https://discord.com/api/webhooks/secret"
+	cfg.AutoPhoto.WebhookURL = "https://discord.com/api/webhooks/auto-secret"
+	app := NewApp(configPath, appcore.UIState{Config: cfg})
+
+	app.startup(context.Background())
+
+	data, err := os.ReadFile(appcore.DiagnosticLogPath(configPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if !strings.Contains(text, "startup app_version=") || !strings.Contains(text, "exe_sha256=") {
+		t.Fatalf("diagnostic log = %q, want startup version and hash", text)
+	}
+	if !strings.Contains(text, `"webhookConfigured":true`) {
+		t.Fatalf("diagnostic log = %q, want redacted webhook configured flag", text)
+	}
+	if strings.Contains(text, "secret") {
+		t.Fatalf("diagnostic log leaked webhook URL: %q", text)
+	}
+}
+
+func TestCreateEncryptedDiagnosticPackageRejectsSigningOnlyPublicKey(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.json")
+	cfg := appcore.DefaultConfig()
+	if err := appcore.SaveConfig(configPath, cfg); err != nil {
+		t.Fatal(err)
+	}
+	if err := appcore.SaveHistory(appcore.HistoryPath(configPath), []appcore.HistoryEntry{{ID: "1", URL: "https://example.com"}}); err != nil {
+		t.Fatal(err)
+	}
+	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(configPath), "test log")
+
+	app := NewApp(configPath, appcore.UIState{Config: cfg})
+	if _, err := app.CreateEncryptedDiagnosticPackage(); err == nil || !strings.Contains(err.Error(), "暗号化用途") {
+		t.Fatalf("err = %v, want encryption capability error", err)
+	}
+	matches, err := filepath.Glob(filepath.Join(dir, "ClipForVRChat-diagnostics-*.zip.gpg"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(matches) != 0 {
+		t.Fatalf("diagnostic package should not be written when encryption is unavailable: %+v", matches)
+	}
+}
+
 func TestAppProcessToStateRejectsMixedJSON(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
