@@ -1,5 +1,25 @@
 # Release Notes
 
+## v0.1.7
+
+### 更新内容
+
+- 設定画面のカテゴリを整理し、Discord投稿関連設定を「Discord投稿」タブへまとめました。
+- 初期設定でDiscord投稿と投稿URLの自動コピーをOFFにしました。
+- 開発ビルドのバージョン表記にコミットIDと `develop` を含めるようにしました。
+- 不具合報告用データと診断ログから、Webhook URLやDiscord tokenなどの秘密情報が残りにくいよう改善しました。
+- セキュリティ監査結果を受け、依存関係更新、外部URL制限、履歴ローカル削除範囲の制限、Release workflow権限の最小化、ビルドメタデータ添付を行いました。
+
+### ダウンロード
+
+- プログラムのダウンロード: https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.7/ClipForVRChat-v0.1.7-windows-amd64.zip
+- 署名確認用ファイル: https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.7/ClipForVRChat-v0.1.7-windows-amd64.exe.asc
+- 署名確認用公開鍵: https://keys.openpgp.org/search?q=release-signing@hato.life
+
+### 比較
+
+https://github.com/hatolife/ClipForVRChat/compare/v0.1.6...v0.1.7
+
 ## v0.1.6
 
 ### 更新内容

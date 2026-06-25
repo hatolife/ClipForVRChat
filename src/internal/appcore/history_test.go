@@ -167,7 +167,11 @@ func TestDeleteHistoryEntriesKeepsPinnedEntries(t *testing.T) {
 
 func TestDeleteLocalHistoryFilesMarksDeleted(t *testing.T) {
 	dir := t.TempDir()
-	output := filepath.Join(dir, "out.png")
+	outputDir := filepath.Join(dir, "output")
+	if err := os.MkdirAll(outputDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(outputDir, "out.png")
 	if err := os.WriteFile(output, []byte("image"), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -307,7 +311,11 @@ func TestPurgeDiscordDeletedHistoryRemovesOnlyDeletedEntries(t *testing.T) {
 
 func TestPurgeDiscordDeletedHistoryDeletesOutputWhenEnabled(t *testing.T) {
 	dir := t.TempDir()
-	output := filepath.Join(dir, "out.png")
+	outputDir := filepath.Join(dir, "output")
+	if err := os.MkdirAll(outputDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(outputDir, "out.png")
 	if err := os.WriteFile(output, []byte("image"), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -326,7 +334,11 @@ func TestPurgeDiscordDeletedHistoryDeletesOutputWhenEnabled(t *testing.T) {
 
 func TestPurgeDiscordDeletedHistoryKeepsOutputWhenDisabled(t *testing.T) {
 	dir := t.TempDir()
-	output := filepath.Join(dir, "out.png")
+	outputDir := filepath.Join(dir, "output")
+	if err := os.MkdirAll(outputDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(outputDir, "out.png")
 	if err := os.WriteFile(output, []byte("image"), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -340,6 +352,29 @@ func TestPurgeDiscordDeletedHistoryKeepsOutputWhenDisabled(t *testing.T) {
 	}
 	if _, err := os.Stat(output); err != nil {
 		t.Fatalf("output file should remain, stat err = %v", err)
+	}
+}
+
+func TestDeleteLocalHistoryFilesRejectsPathOutsideOutput(t *testing.T) {
+	dir := t.TempDir()
+	outside := filepath.Join(dir, "outside.png")
+	if err := os.WriteFile(outside, []byte("image"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "history.json")
+	if err := SaveHistory(path, []HistoryEntry{{ID: "delete", OutputPath: outside}}); err != nil {
+		t.Fatal(err)
+	}
+
+	history, deleted, err := DeleteLocalHistoryFiles(path, []string{"delete"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deleted != 1 || !history[0].LocalDeleted {
+		t.Fatalf("history = %+v deleted = %d, want entry marked deleted", history, deleted)
+	}
+	if _, err := os.Stat(outside); err != nil {
+		t.Fatalf("outside file should remain, stat err = %v", err)
 	}
 }
 

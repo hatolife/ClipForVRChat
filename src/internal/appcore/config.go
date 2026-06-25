@@ -80,9 +80,9 @@ func DefaultConfig() Config {
 		},
 		Output: OutputConfig{
 			SaveLocal:                  true,
-			UploadDiscord:              true,
+			UploadDiscord:              false,
 			ShowUI:                     "auto",
-			CopySingleURLToClipboard:   true,
+			CopySingleURLToClipboard:   false,
 			DeleteOutputOnHistoryPurge: true,
 			DetectQRCodeURLs:           false,
 		},

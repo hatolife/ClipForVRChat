@@ -33,12 +33,6 @@
 - スクリーンショット自動処理
   - 種別: ON/OFF
   - 説明: Win + Shift + S でスクリーンショットが撮られたときに処理する。
-- Discord投稿
-  - 種別: ON/OFF
-  - 説明: 処理した画像をDiscord Webhookへ投稿する。
-- 投稿URLの自動コピー
-  - 種別: ON/OFF
-  - 説明: Discordに投稿したURLをクリップボードに保存する。
 - QRコードURL検出
   - 種別: ON/OFF
   - 説明: 画像内のQRコードからURLを取得する。
@@ -62,7 +56,14 @@
   - 種別: 数値入力
   - 説明: JPG出力時の画質。
 
-### Webhook
+### Discord投稿
+
+- Discord投稿
+  - 種別: ON/OFF
+  - 説明: 処理した画像をDiscord Webhookへ投稿する。
+- 投稿URLの自動コピー
+  - 種別: ON/OFF
+  - 説明: Discordに投稿したURLをクリップボードに保存する。
 
 - 通常投稿用Webhook URL
   - 種別: パスワード入力
@@ -99,7 +100,7 @@
 
 - Discord投稿がOFFの場合
   - 投稿URLの自動コピーをグレーアウトし、編集不可にする。
-  - Webhookカテゴリの入力項目をグレーアウトし、編集不可にする。
+  - Discord投稿カテゴリの入力項目をグレーアウトし、編集不可にする。
   - VRChat写真自動処理とスクリーンショット自動処理はグレーアウトしない。縮小、QRコードURL検出、ローカル保存はDiscord投稿なしでも実行できる。
 - VRChat写真自動処理がOFFの場合
   - VRChat写真自動処理用Webhook URLをグレーアウトし、編集不可にする。
