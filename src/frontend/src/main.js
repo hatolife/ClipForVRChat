@@ -166,6 +166,16 @@ createApp({
     window.removeEventListener('mouseup', this.finishHistoryDragSelect)
   },
   methods: {
+    logUserAction(action, detail = '') {
+      if (!api?.LogUserAction) return
+      void api.LogUserAction(String(action || ''), String(detail || '')).catch(() => {})
+    },
+    setView(view, detail = '') {
+      if (this.view !== view) {
+        this.logUserAction('screen_transition', `${this.view}->${view}${detail ? ` ${detail}` : ''}`)
+      }
+      this.view = view
+    },
     handleKeyDown(event) {
       if (this.view !== 'history' || !(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'a') return
       event.preventDefault()
@@ -205,19 +215,19 @@ createApp({
         this.resetSettingsBaseline()
       }
       if (action === 'help') {
-        this.view = 'help'
+        this.setView('help', 'after_settings')
       } else if (action === 'about') {
-        this.view = 'about'
+        this.setView('about', 'after_settings')
       } else if (action === 'history') {
-        this.view = 'history'
+        this.setView('history', 'after_settings')
         this.state.history = await api.GetHistory()
       } else if (action === 'drop') {
         const paths = [...this.pendingDropPaths]
         this.pendingDropPaths = []
-        this.view = 'main'
+        this.setView('main', 'drop_after_settings')
         await this.handleDrop(paths, true)
       } else {
-        this.view = 'main'
+        this.setView('main', 'after_settings')
       }
     },
     async confirmSaveAndLeaveSettings() {
@@ -231,11 +241,13 @@ createApp({
         this.sanitizePhotoDirectory()
         this.sanitizeScreenshotDirectory()
         if (this.state.processOnSave) {
+          this.logUserAction('button_click', 'settings_save_and_process')
           this.state = await api.SaveConfigAndProcess(this.state.config, this.state.pendingPaths || [])
           this.resetSettingsBaseline()
-          this.view = 'main'
+          this.setView('main', 'save_config_and_process')
           return
         }
+        this.logUserAction('button_click', 'settings_save')
         await api.SaveConfig(this.state.config)
         this.resetSettingsBaseline()
         await this.performSettingsLeave(action)
@@ -252,6 +264,7 @@ createApp({
       await this.performSettingsLeave(action)
     },
     cancelSettingsLeave() {
+      this.logUserAction('button_click', 'cancel_settings_leave')
       this.pendingSettingsLeave = null
       this.pendingDropPaths = []
     },
@@ -260,9 +273,10 @@ createApp({
         await this.leaveSettings('home')
         return
       }
-      this.view = 'main'
+      this.setView('main', 'go_home')
     },
     async toggleHelp() {
+      this.logUserAction('button_click', 'header_help')
       if (this.activeView === 'help') {
         await this.goHome()
         return
@@ -271,9 +285,10 @@ createApp({
         await this.leaveSettings('help')
         return
       }
-      this.view = 'help'
+      this.setView('help', 'header_help')
     },
     async toggleAbout() {
+      this.logUserAction('button_click', 'header_about')
       if (this.activeView === 'about' || this.activeView === 'licenses') {
         await this.goHome()
         return
@@ -282,9 +297,10 @@ createApp({
         await this.leaveSettings('about')
         return
       }
-      this.view = 'about'
+      this.setView('about', 'header_about')
     },
     async toggleSettings() {
+      this.logUserAction('button_click', 'header_settings')
       if (this.activeView === 'settings') {
         await this.leaveSettings('home')
         return
@@ -293,7 +309,7 @@ createApp({
     },
     async openSettings() {
       this.error = ''
-      this.view = 'main'
+      this.setView('main', 'open_settings')
       try {
         this.state = await api.OpenSettings('')
         this.rememberSettingsBaseline()
@@ -302,7 +318,12 @@ createApp({
       }
     },
     async closeSettings() {
+      this.logUserAction('button_click', 'settings_close')
       await this.leaveSettings('home')
+    },
+    selectSettingsTab(tabId) {
+      this.logUserAction('button_click', `settings_tab ${tabId}`)
+      this.settingsTab = tabId
     },
     resultPlaceholder(path, index, total) {
       const normalized = path || 'clipboard.png'
@@ -364,12 +385,13 @@ createApp({
     async handleDrop(paths, skipSettingsGuard = false) {
       this.error = ''
       this.saved = false
+      this.logUserAction('input', `drop count=${(paths || []).length}`)
       if (!skipSettingsGuard && this.isSettings && this.hasUnsavedSettings) {
         this.pendingDropPaths = [...paths]
         this.pendingSettingsLeave = 'drop'
         return
       }
-      this.view = 'main'
+      this.setView('main', 'drop')
       if (!paths.length) return
       const jsonPaths = paths.filter((path) => path.toLowerCase().endsWith('.json'))
       try {
@@ -403,8 +425,9 @@ createApp({
     },
     async processClipboard() {
       this.error = ''
+      this.logUserAction('button_click', 'process_clipboard')
       if (this.isSettings && !(await this.leaveSettings('home'))) return
-      this.view = 'main'
+      this.setView('main', 'process_clipboard')
       try {
         this.processing = true
         this.state = {
@@ -422,25 +445,28 @@ createApp({
     },
     async clearResults() {
       this.error = ''
+      this.logUserAction('button_click', this.hasResults ? 'clear_results' : 'clear_visible_history')
       if (this.hasResults) {
         this.state = await api.ClearResults()
       } else {
         const ids = this.visibleHistory.map((item) => item.id)
         this.state.history = await api.MarkHistoryCleared(ids)
       }
-      this.view = 'main'
+      this.setView('main', 'clear_results')
     },
     async openHistory() {
+      this.logUserAction('button_click', 'open_history')
       if (this.isSettings) {
         await this.leaveSettings('history')
         return
       }
-      this.view = 'history'
+      this.setView('history', 'open_history')
       this.state.history = await api.GetHistory()
     },
     selectAllHistory() {
       this.selectedHistoryIds = (this.state.history || []).map((item) => item.id).filter(Boolean)
       this.lastSelectedHistoryIndex = this.selectedHistoryIds.length ? 0 : -1
+      this.logUserAction('button_click', `history_select_all count=${this.selectedHistoryIds.length}`)
     },
     selectHistory(event, index, item) {
       if (this.historyDragSelecting) return
@@ -451,15 +477,18 @@ createApp({
         const end = Math.max(this.lastSelectedHistoryIndex, index)
         const range = (this.state.history || []).slice(start, end + 1).map((entry) => entry.id)
         this.selectedHistoryIds = Array.from(new Set([...ids, ...range]))
+        this.logUserAction('selection', `history_range selected=${this.selectedHistoryIds.length}`)
         return
       }
       if (event.ctrlKey || event.metaKey) {
         this.selectedHistoryIds = ids.includes(item.id) ? ids.filter((id) => id !== item.id) : [...ids, item.id]
         this.lastSelectedHistoryIndex = index
+        this.logUserAction('selection', `history_toggle id=${item.id} selected=${this.selectedHistoryIds.length}`)
         return
       }
       this.selectedHistoryIds = [item.id]
       this.lastSelectedHistoryIndex = index
+      this.logUserAction('selection', `history_single id=${item.id}`)
     },
     startHistoryDragSelect(event) {
       if (event.button !== 0 || event.target.closest('.history-card')) return
@@ -507,6 +536,7 @@ createApp({
       window.removeEventListener('mouseup', this.finishHistoryDragSelect)
       this.historyDragSelecting = false
       this.historyDragBaseIds = []
+      this.logUserAction('selection', `history_drag selected=${this.selectedHistoryIds.length}`)
     },
     normalizedHistorySelectionRect() {
       const left = Math.min(this.historyDragStart.x, this.historyDragCurrent.x)
@@ -534,6 +564,7 @@ createApp({
     async toggleHistoryPinned(item) {
       if (!item?.id) return
       this.error = ''
+      this.logUserAction('button_click', `history_pin id=${item.id} next=${!item.pinned}`)
       try {
         this.state.history = await api.SetHistoryPinned(item.id, !item.pinned)
       } catch (err) {
@@ -572,6 +603,7 @@ createApp({
     async deleteSelectedFromDiscord() {
       if (!this.hasDiscordDeletableSelection) return
       this.error = ''
+      this.logUserAction('button_click', `history_delete_discord selected=${this.selectedHistoryIds.length}`)
       try {
         this.state.history = await api.DeleteDiscordHistoryEntries(this.selectedHistoryIds)
         this.toast = 'Discordから削除しました'
@@ -585,6 +617,7 @@ createApp({
     async deleteSelectedLocalFiles() {
       if (!this.hasLocalDeletableSelection) return
       this.error = ''
+      this.logUserAction('button_click', `history_delete_local selected=${this.selectedHistoryIds.length}`)
       try {
         this.state.history = await api.DeleteLocalHistoryFiles(this.selectedHistoryIds)
         this.toast = 'ローカルファイルを削除しました'
@@ -598,6 +631,7 @@ createApp({
     async deleteSelectedHistoryEntries() {
       if (!this.hasHistoryDeletableSelection) return
       this.error = ''
+      this.logUserAction('button_click', `history_delete_entries selected=${this.selectedHistoryIds.length}`)
       try {
         this.state.history = await api.DeleteHistoryEntries(this.selectedHistoryIds)
         this.selectedHistoryIds = this.selectedHistoryIds.filter((id) => (this.state.history || []).some((item) => item.id === id))
@@ -624,6 +658,7 @@ createApp({
     },
     async copy(url) {
       if (!url) return
+      this.logUserAction('button_click', 'copy_text')
       await api.CopyText(url)
       this.toast = 'コピーしました'
       setTimeout(() => {
@@ -652,11 +687,13 @@ createApp({
     async copyResultURL(event, item) {
       event.stopPropagation()
       if (!this.canCopyResultURL(item)) return
+      this.logUserAction('button_click', `result_copy_url name=${item.name || ''}`)
       await this.copy(item.url)
     },
     async revealResultFile(event, item) {
       event.stopPropagation()
       if (!this.canRevealResultFile(item)) return
+      this.logUserAction('button_click', `result_reveal_file name=${item.name || ''}`)
       try {
         await api.RevealFileInExplorer(item.outputPath)
       } catch (err) {
@@ -664,6 +701,7 @@ createApp({
       }
     },
     async openURL(url) {
+      this.logUserAction('button_click', `open_url ${url}`)
       await api.OpenURL(url)
     },
     async checkForUpdate() {
@@ -678,6 +716,7 @@ createApp({
       }
     },
     dismissUpdateBanner() {
+      this.logUserAction('button_click', 'dismiss_update_banner')
       this.updateBannerDismissed = true
     },
     sanitizeOutputDirectory() {
@@ -809,7 +848,7 @@ createApp({
         </div>
 
         <div class="button-row">
-          <button class="secondary" @click="view = 'main'">閉じる</button>
+          <button class="secondary" @click="setView('main', 'help_close')">閉じる</button>
         </div>
       </section>
 
@@ -874,8 +913,8 @@ createApp({
           </p>
         </section>
         <div class="button-row">
-          <button @click="view = 'licenses'">OSSライセンス</button>
-          <button class="secondary" @click="view = 'main'">閉じる</button>
+          <button @click="setView('licenses', 'about_licenses')">OSSライセンス</button>
+          <button class="secondary" @click="setView('main', 'about_close')">閉じる</button>
         </div>
       </section>
 
@@ -890,7 +929,7 @@ createApp({
             <button class="link-button" @click="openURL(license.url)">{{ license.url }}</button>
           </article>
         </div>
-        <button class="secondary" @click="view = 'about'">戻る</button>
+        <button class="secondary" @click="setView('about', 'licenses_back')">戻る</button>
       </section>
 
       <section v-else-if="view === 'history'" class="panel history-page">
@@ -905,15 +944,15 @@ createApp({
             </span>
             <span class="tooltip-action">
               <button @click="deleteSelectedFromDiscord" :disabled="!hasDiscordDeletableSelection">Discordから削除</button>
-              <span class="tooltip">選択中のうち、Discord上にあり削除可能な投稿だけを削除します。ピン止めした履歴は対象外です。</span>
+              <span class="tooltip">選択されている履歴のうち、Discord上にあり削除可能な投稿だけを削除します。ピン止めした履歴は対象外です。</span>
             </span>
             <span class="tooltip-action">
               <button class="secondary" @click="deleteSelectedLocalFiles" :disabled="!hasLocalDeletableSelection">ローカルから削除</button>
-              <span class="tooltip">選択中のうち、ローカル保存ファイルがある履歴だけをPCから削除します。ピン止めした履歴は対象外です。</span>
+              <span class="tooltip">選択されている履歴のうち、ローカル保存ファイルがある履歴だけをPCから削除します。ピン止めした履歴は対象外です。</span>
             </span>
             <span class="tooltip-action">
               <button class="secondary danger-button" @click="deleteSelectedHistoryEntries" :disabled="!hasHistoryDeletableSelection">履歴から削除</button>
-              <span class="tooltip">選択した記録を履歴から削除します。Discord投稿やローカルファイルは削除しません。ピン止めした履歴は対象外です。</span>
+              <span class="tooltip">選択されている履歴だけを履歴から削除します。Discord投稿やローカルファイルは削除しません。ピン止めした履歴は対象外です。</span>
             </span>
             <span class="tooltip-action">
               <button class="secondary" @click="goHome">閉じる</button>
@@ -975,7 +1014,7 @@ createApp({
                 role="tab"
                 :aria-selected="settingsTab === tab.id"
                 :class="{ active: settingsTab === tab.id }"
-                @click="settingsTab = tab.id"
+                @click="selectSettingsTab(tab.id)"
               >{{ tab.label }}</button>
             </div>
           </div>

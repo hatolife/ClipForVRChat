@@ -74,16 +74,26 @@ func (a *App) OpenURL(url string) {
 	runtime.BrowserOpenURL(a.ctx, url)
 }
 
+func (a *App) LogUserAction(action string, detail string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.logUserActionLocked(action, detail)
+}
+
+func (a *App) logUserActionLocked(action string, detail string) {
+	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "ui action=%q detail=%q", strings.TrimSpace(action), strings.TrimSpace(detail))
+}
+
 func (a *App) RevealFileInExplorer(path string) error {
-	target, args, err := explorerSelectArgs(path)
+	target, args, err := explorerSelectArgs(path, filepath.Dir(a.configPath))
 	if err != nil {
 		return err
 	}
 	return exec.Command(target, args...).Start() // #nosec G204 -- path is selected by the local user from app output.
 }
 
-func explorerSelectArgs(path string) (string, []string, error) {
-	cleaned := strings.Trim(strings.TrimSpace(path), `"`)
+func explorerSelectArgs(path string, baseDir string) (string, []string, error) {
+	cleaned := appcore.ResolveHistoryOutputPath(path, baseDir)
 	if cleaned == "" {
 		return "", nil, fmt.Errorf("保存済みファイルがありません")
 	}
@@ -344,8 +354,10 @@ func (a *App) SaveConfigAndProcess(cfg appcore.Config, paths []string) (appcore.
 	if err := a.saveConfigLocked(cfg); err != nil {
 		return a.state, err
 	}
+	a.logProcessingStartLocked("save_config_and_process", cfg, len(paths))
 	results, err := appcore.Processor{Config: cfg}.ProcessPaths(paths)
 	if err != nil {
+		a.logUserActionLocked("process_error", err.Error())
 		a.state.Mode = appcore.ModeError
 		a.state.Message = err.Error()
 		return a.state, nil
@@ -365,6 +377,7 @@ func (a *App) SaveConfigAndProcess(cfg appcore.Config, paths []string) (appcore.
 		a.state.Mode = appcore.ModeResults
 		a.state.Message = resultMessage(cfg, visibleResults, copyErr)
 	}
+	a.logProcessingResultLocked("save_config_and_process", results, visibleResults, a.state.Message)
 	return a.state, nil
 }
 
@@ -381,12 +394,18 @@ func (a *App) ProcessToState(paths []string) (appcore.UIState, error) {
 	if err != nil {
 		return a.state, err
 	}
+	source := "drop"
+	if len(paths) == 0 {
+		source = "clipboard"
+	}
+	a.logProcessingStartLocked(source, cfg, len(paths))
 	results, err := appcore.Processor{Config: cfg}.ProcessPathsWithProgress(paths, func(event appcore.ProgressEvent) {
 		if a.ctx != nil {
 			runtime.EventsEmit(a.ctx, "process:progress", event)
 		}
 	})
 	if err != nil {
+		a.logUserActionLocked("process_error", err.Error())
 		a.state.Mode = appcore.ModeError
 		a.state.Message = err.Error()
 		a.state.Results = nil
@@ -406,6 +425,7 @@ func (a *App) ProcessToState(paths []string) (appcore.UIState, error) {
 		a.state.Mode = appcore.ModeResults
 		a.state.Message = resultMessage(cfg, visibleResults, copyErr)
 	}
+	a.logProcessingResultLocked(source, results, visibleResults, a.state.Message)
 	return a.state, nil
 }
 
@@ -416,12 +436,15 @@ func (a *App) Process(paths []string) ([]appcore.Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	a.logProcessingStartLocked("process_api", cfg, len(paths))
 	results, err := appcore.Processor{Config: cfg}.ProcessPaths(paths)
 	if err != nil {
+		a.logUserActionLocked("process_error", err.Error())
 		return nil, err
 	}
 	_ = copySingleURLIfNeeded(cfg, results)
 	_, _ = appcore.AddResultsToHistory(appcore.HistoryPath(a.configPath), results)
+	a.logProcessingResultLocked("process_api", results, userVisibleResults(results), "")
 	return results, nil
 }
 
@@ -454,6 +477,53 @@ func userVisibleResults(results []appcore.Result) []appcore.Result {
 		}
 	}
 	return visible
+}
+
+func (a *App) logProcessingStartLocked(source string, cfg appcore.Config, inputCount int) {
+	appcore.AppendDiagnosticLog(
+		appcore.DiagnosticLogPath(a.configPath),
+		"process start source=%q input_count=%d save_local=%t upload_discord=%t detect_qr=%t copy_single_url=%t output_format=%q",
+		source,
+		inputCount,
+		cfg.Output.SaveLocal,
+		cfg.Output.UploadDiscord,
+		cfg.Output.DetectQRCodeURLs,
+		cfg.Output.CopySingleURLToClipboard,
+		cfg.Image.OutputFormat,
+	)
+}
+
+func (a *App) logProcessingResultLocked(source string, results []appcore.Result, visibleResults []appcore.Result, message string) {
+	discordCount := 0
+	localCount := 0
+	qrCount := 0
+	errorCount := 0
+	for _, result := range results {
+		if result.URL != "" {
+			discordCount++
+		}
+		if result.OutputPath != "" {
+			localCount++
+		}
+		if len(result.QRURLs) > 0 {
+			qrCount++
+		}
+		if result.Error != "" {
+			errorCount++
+		}
+	}
+	appcore.AppendDiagnosticLog(
+		appcore.DiagnosticLogPath(a.configPath),
+		"process result source=%q total=%d visible=%d discord=%d local=%d qr=%d errors=%d message=%q",
+		source,
+		len(results),
+		len(visibleResults),
+		discordCount,
+		localCount,
+		qrCount,
+		errorCount,
+		message,
+	)
 }
 
 func resultMessage(cfg appcore.Config, results []appcore.Result, copyErr error) string {
