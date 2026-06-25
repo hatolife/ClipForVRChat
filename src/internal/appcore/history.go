@@ -73,7 +73,7 @@ func AddResultsToHistory(path string, results []Result) ([]HistoryEntry, error) 
 	}
 	now := time.Now().Format(time.RFC3339)
 	for i := range results {
-		if results[i].Error != "" || !shouldKeepHistoryResult(results[i]) {
+		if results[i].Error != "" || !ResultHasUserVisibleWork(results[i]) {
 			continue
 		}
 		trustedDiscordURL := strings.TrimSpace(results[i].URL) != "" && IsTrustedDiscordImageURL(results[i].URL)
@@ -99,7 +99,10 @@ func AddResultsToHistory(path string, results []Result) ([]HistoryEntry, error) 
 	return history, SaveHistory(path, history)
 }
 
-func shouldKeepHistoryResult(result Result) bool {
+func ResultHasUserVisibleWork(result Result) bool {
+	if strings.TrimSpace(result.Error) != "" {
+		return true
+	}
 	if strings.TrimSpace(result.OutputPath) != "" {
 		return true
 	}

@@ -3,6 +3,10 @@ package main
 import (
 	"context"
 	"errors"
+	"image"
+	"image/color"
+	"image/png"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -102,6 +106,39 @@ func TestAppSaveConfigAndProcessHandlesDecodeError(t *testing.T) {
 	}
 	if state.Mode != appcore.ModeError || !strings.Contains(state.Message, "処理中にエラー") {
 		t.Fatalf("state = %+v", state)
+	}
+}
+
+func TestAppProcessToStateHidesNoWorkResults(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.json")
+	source := filepath.Join(dir, "image.png")
+	writeTestPNG(t, source, 2, 2)
+	cfg := appcore.DefaultConfig()
+	cfg.Output.UploadDiscord = false
+	cfg.Output.SaveLocal = false
+	cfg.Output.DetectQRCodeURLs = false
+	if err := appcore.SaveConfig(configPath, cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+	state, err := app.ProcessToState([]string{source})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(state.Results) != 0 {
+		t.Fatalf("results = %+v, want empty", state.Results)
+	}
+	if !strings.Contains(state.Message, "実行された処理はありません") {
+		t.Fatalf("message = %q", state.Message)
+	}
+	history, err := appcore.LoadHistory(appcore.HistoryPath(configPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(history) != 0 {
+		t.Fatalf("history = %+v, want empty", history)
 	}
 }
 
@@ -267,11 +304,39 @@ func TestResultMessage(t *testing.T) {
 	if !strings.Contains(msg, "保存") {
 		t.Fatalf("message = %q", msg)
 	}
+
+	msg = resultMessage(cfg, []appcore.Result{{QRURLs: []string{"https://example.com/qr"}}}, nil)
+	if !strings.Contains(msg, "QRコードURL") {
+		t.Fatalf("message = %q", msg)
+	}
+
+	msg = resultMessage(cfg, nil, nil)
+	if !strings.Contains(msg, "実行された処理はありません") {
+		t.Fatalf("message = %q", msg)
+	}
 }
 
 func writeTextFile(t *testing.T, path string, text string) {
 	t.Helper()
 	if err := appcore.WritePrivateFile(path, []byte(text)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeTestPNG(t *testing.T, path string, width int, height int) {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			img.Set(x, y, color.RGBA{R: 80, G: 120, B: 180, A: 255})
+		}
+	}
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	if err := png.Encode(file, img); err != nil {
 		t.Fatal(err)
 	}
 }

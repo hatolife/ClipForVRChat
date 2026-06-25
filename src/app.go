@@ -354,7 +354,8 @@ func (a *App) SaveConfigAndProcess(cfg appcore.Config, paths []string) (appcore.
 	if history, historyErr := appcore.AddResultsToHistory(appcore.HistoryPath(a.configPath), results); historyErr == nil {
 		a.state.History = history
 	}
-	a.state.Results = results
+	visibleResults := userVisibleResults(results)
+	a.state.Results = visibleResults
 	a.state.PendingPaths = nil
 	a.state.ProcessOnSave = false
 	if hasResultErrors(results) {
@@ -362,7 +363,7 @@ func (a *App) SaveConfigAndProcess(cfg appcore.Config, paths []string) (appcore.
 		a.state.Message = "処理中にエラーが発生しました。内容を確認してください。"
 	} else {
 		a.state.Mode = appcore.ModeResults
-		a.state.Message = resultMessage(cfg, results, copyErr)
+		a.state.Message = resultMessage(cfg, visibleResults, copyErr)
 	}
 	return a.state, nil
 }
@@ -381,7 +382,9 @@ func (a *App) ProcessToState(paths []string) (appcore.UIState, error) {
 		return a.state, err
 	}
 	results, err := appcore.Processor{Config: cfg}.ProcessPathsWithProgress(paths, func(event appcore.ProgressEvent) {
-		runtime.EventsEmit(a.ctx, "process:progress", event)
+		if a.ctx != nil {
+			runtime.EventsEmit(a.ctx, "process:progress", event)
+		}
 	})
 	if err != nil {
 		a.state.Mode = appcore.ModeError
@@ -394,13 +397,14 @@ func (a *App) ProcessToState(paths []string) (appcore.UIState, error) {
 		a.state.History = history
 	}
 	a.state.Config = cfg
-	a.state.Results = results
+	visibleResults := userVisibleResults(results)
+	a.state.Results = visibleResults
 	if hasResultErrors(results) {
 		a.state.Mode = appcore.ModeError
 		a.state.Message = "処理中にエラーが発生しました。内容を確認してください。"
 	} else {
 		a.state.Mode = appcore.ModeResults
-		a.state.Message = resultMessage(cfg, results, copyErr)
+		a.state.Message = resultMessage(cfg, visibleResults, copyErr)
 	}
 	return a.state, nil
 }
@@ -442,7 +446,20 @@ func hasResultErrors(results []appcore.Result) bool {
 	return false
 }
 
+func userVisibleResults(results []appcore.Result) []appcore.Result {
+	visible := make([]appcore.Result, 0, len(results))
+	for _, result := range results {
+		if appcore.ResultHasUserVisibleWork(result) {
+			visible = append(visible, result)
+		}
+	}
+	return visible
+}
+
 func resultMessage(cfg appcore.Config, results []appcore.Result, copyErr error) string {
+	if len(results) == 0 {
+		return "実行された処理はありません。"
+	}
 	if len(results) == 1 && results[0].URL != "" && cfg.Output.CopySingleURLToClipboard {
 		if copyErr != nil {
 			return fmt.Sprintf("画像URLを取得しましたが、クリップボードへコピーできませんでした: %v サムネイルをクリックすると再コピーできます。", copyErr)
@@ -454,10 +471,34 @@ func resultMessage(cfg appcore.Config, results []appcore.Result, copyErr error) 
 		if results[0].OutputPath != "" {
 			parts = append(parts, "縮小画像を保存しました")
 		}
+		if len(results[0].QRURLs) > 0 {
+			parts = append(parts, "QRコードURLを取得しました")
+		}
 		if len(parts) == 0 {
-			parts = append(parts, "縮小画像をクリップボードにコピーしました")
+			parts = append(parts, "処理しました")
 		}
 		return strings.Join(parts, "。") + "。"
+	}
+	actions := map[string]bool{}
+	for _, result := range results {
+		if result.URL != "" {
+			actions["Discordへ投稿"] = true
+		}
+		if result.OutputPath != "" {
+			actions["ローカル保存"] = true
+		}
+		if len(result.QRURLs) > 0 {
+			actions["QRコードURL取得"] = true
+		}
+	}
+	var parts []string
+	for _, label := range []string{"Discordへ投稿", "ローカル保存", "QRコードURL取得"} {
+		if actions[label] {
+			parts = append(parts, label)
+		}
+	}
+	if len(parts) > 0 {
+		return strings.Join(parts, "、") + "を行いました。"
 	}
 	return ""
 }
@@ -500,14 +541,16 @@ func (a *App) restartAutoPhotoWatcher(cfg appcore.Config) {
 			runtime.EventsEmit(a.ctx, "auto-photo:result", event)
 			return
 		}
-		if event.Result.URL != "" && event.Result.Error == "" {
+		if appcore.ResultHasUserVisibleWork(event.Result) && event.Result.Error == "" {
 			results := []appcore.Result{event.Result}
 			if history, err := appcore.AddResultsToHistory(appcore.HistoryPath(a.configPath), results); err == nil {
 				a.state.History = history
 				event.Result = results[0]
 			}
 		}
-		a.state.Results = append([]appcore.Result{event.Result}, a.state.Results...)
+		if appcore.ResultHasUserVisibleWork(event.Result) {
+			a.state.Results = append([]appcore.Result{event.Result}, a.state.Results...)
+		}
 		a.state.Mode = appcore.ModeResults
 		runtime.EventsEmit(a.ctx, "auto-photo:result", event)
 	}
