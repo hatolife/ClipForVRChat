@@ -103,8 +103,13 @@ nav button.active {
   color: #ffffff;
 }
 
-.update-banner {
+.banner-stack {
   grid-row: 2;
+  width: 100%;
+  display: grid;
+}
+
+.update-banner {
   width: 100%;
   min-height: 48px;
   display: flex;
@@ -116,6 +121,12 @@ nav button.active {
   background: #fff4c8;
   color: #5c4300;
   font-weight: 700;
+}
+
+.warning-banner {
+  border-bottom-color: #d78b5b;
+  background: #fff0e4;
+  color: #7a340f;
 }
 
 .update-actions {
@@ -385,6 +396,12 @@ input:disabled,
 select:disabled {
   background: #edf1f5;
   color: #6d7884;
+}
+
+input.attention-input {
+  border-color: #d87822;
+  background: #fff4e8;
+  box-shadow: 0 0 0 2px rgba(216, 120, 34, 0.18);
 }
 
 small {
