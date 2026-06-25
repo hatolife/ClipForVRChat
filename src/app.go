@@ -429,7 +429,7 @@ func (a *App) restartAutoPhotoWatcher(cfg appcore.Config) {
 		a.autoCancel()
 		a.autoCancel = nil
 	}
-	if a.ctx == nil || !cfg.Output.UploadDiscord || (!cfg.AutoPhoto.Enabled && !cfg.ScreenshotAutoPost.Enabled) {
+	if a.ctx == nil || (!cfg.AutoPhoto.Enabled && !cfg.ScreenshotAutoPost.Enabled) {
 		return
 	}
 	ctx, cancel := context.WithCancel(a.ctx)
