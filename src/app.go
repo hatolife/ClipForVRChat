@@ -17,7 +17,15 @@ import (
 var (
 	copySingleURLIfNeeded = appcore.CopySingleURLIfNeeded
 	deleteDiscordMessage  = appcore.DeleteDiscordMessage
+	runningGoTest         = strings.HasSuffix(filepath.Base(os.Args[0]), ".test")
 )
+
+func emitWailsEvent(ctx context.Context, name string, data any) {
+	if ctx == nil || runningGoTest {
+		return
+	}
+	runtime.EventsEmit(ctx, name, data)
+}
 
 type App struct {
 	ctx        context.Context
@@ -429,9 +437,7 @@ func (a *App) ProcessToState(paths []string) (appcore.UIState, error) {
 	}
 	a.logProcessingStartLocked(source, cfg, len(paths))
 	results, err := appcore.Processor{Config: cfg}.ProcessPathsWithProgress(paths, func(event appcore.ProgressEvent) {
-		if a.ctx != nil {
-			runtime.EventsEmit(a.ctx, "process:progress", event)
-		}
+		emitWailsEvent(a.ctx, "process:progress", event)
 	})
 	if err != nil {
 		a.logUserActionLocked("process_error", err.Error())
@@ -671,7 +677,7 @@ func (a *App) restartAutoPhotoWatcher(cfg appcore.Config) {
 		if event.Error != "" {
 			a.state.Results = append([]appcore.Result{event.Result}, a.state.Results...)
 			a.state.Mode = appcore.ModeResults
-			runtime.EventsEmit(a.ctx, "auto-photo:result", event)
+			emitWailsEvent(a.ctx, "auto-photo:result", event)
 			return
 		}
 		if appcore.ResultHasUserVisibleWork(event.Result) && event.Result.Error == "" {
@@ -685,7 +691,7 @@ func (a *App) restartAutoPhotoWatcher(cfg appcore.Config) {
 			a.state.Results = append([]appcore.Result{event.Result}, a.state.Results...)
 		}
 		a.state.Mode = appcore.ModeResults
-		runtime.EventsEmit(a.ctx, "auto-photo:result", event)
+		emitWailsEvent(a.ctx, "auto-photo:result", event)
 	}
 	if cfg.AutoPhoto.Enabled {
 		watcher := appcore.AutoPhotoWatcher{
