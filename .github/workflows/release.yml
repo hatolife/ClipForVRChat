@@ -211,7 +211,7 @@ jobs:
         run: node scripts/extract-release-notes.mjs "${{ github.ref_name }}" RELEASE_NOTES.md dist/release-body.md --fallback-draft-notes
 
       - name: Upload release assets artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: release-assets-${{ github.ref_name }}
           path: |
