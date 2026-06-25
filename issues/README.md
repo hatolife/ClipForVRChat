@@ -88,6 +88,7 @@
 | 081 | [診断ログを日付付きログフォルダへ出力する](081-write-diagnostic-logs-to-dated-log-directory.md) | 完了 | `v0.1.7` | 診断ログを `log/YYYY-MM-DD.log` に出力し、診断パッケージがログフォルダを収集するようにする。 |
 | 082 | [診断パッケージ暗号化鍵をpoppo@hato.lifeへ変更する](082-use-poppo-openpgp-key-for-diagnostics.md) | 完了 | `v0.1.7` | 診断パッケージ暗号化用の公開鍵を暗号化サブキー付きの `poppo@hato.life` に変更する。 |
 | 083 | [不具合報告用データ生成UIを改善する](083-improve-diagnostic-data-generation-ui.md) | 完了 | `v0.1.7` | 情報画面下部に生成ボタンを配置し、生成中オーバーレイと完了後Explorer表示を追加する。 |
+| 084 | [Explorerで生成ファイルを選択表示できない](084-fix-explorer-file-selection.md) | 完了 | `v0.1.7` | `explorer.exe /select,` ではなく Windows Shell API でファイル選択表示する。 |
 
 ## 状態の意味
 

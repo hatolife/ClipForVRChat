@@ -166,16 +166,16 @@ func TestAppStartupStartsAutoPhotoWatcherWithoutDiscordUpload(t *testing.T) {
 }
 
 func TestExplorerSelectArgsRejectsMissingPath(t *testing.T) {
-	if _, _, err := explorerSelectArgs("", ""); err == nil {
+	if _, err := explorerRevealPath("", ""); err == nil {
 		t.Fatal("expected empty path error")
 	}
-	if _, _, err := explorerSelectArgs(filepath.Join(t.TempDir(), "missing.png"), ""); err == nil {
+	if _, err := explorerRevealPath(filepath.Join(t.TempDir(), "missing.png"), ""); err == nil {
 		t.Fatal("expected missing file error")
 	}
 }
 
 func TestExplorerSelectArgsRejectsDirectory(t *testing.T) {
-	if _, _, err := explorerSelectArgs(t.TempDir(), ""); err == nil {
+	if _, err := explorerRevealPath(t.TempDir(), ""); err == nil {
 		t.Fatal("expected directory error")
 	}
 }
@@ -190,12 +190,12 @@ func TestExplorerSelectArgsResolvesRelativePathFromBaseDir(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, _, err := explorerSelectArgs("output/out.png", dir)
-	if err == nil {
-		return
+	got, err := explorerRevealPath("output/out.png", dir)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(err.Error(), "Windows") {
-		t.Fatalf("err = %v, want Windows-only error after relative path resolution", err)
+	if got != filepath.Join(outputDir, "out.png") {
+		t.Fatalf("path = %q, want resolved relative output path", got)
 	}
 }
 

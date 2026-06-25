@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	goruntime "runtime"
 	"strings"
 	"sync"
 	"time"
@@ -98,33 +96,30 @@ func (a *App) logUserActionLocked(action string, detail string) {
 }
 
 func (a *App) RevealFileInExplorer(path string) error {
-	target, args, err := explorerSelectArgs(path, filepath.Dir(a.configPath))
+	target, err := explorerRevealPath(path, filepath.Dir(a.configPath))
 	if err != nil {
 		return err
 	}
-	return exec.Command(target, args...).Start() // #nosec G204 -- path is selected by the local user from app output.
+	return revealFileInExplorer(target)
 }
 
-func explorerSelectArgs(path string, baseDir string) (string, []string, error) {
+func explorerRevealPath(path string, baseDir string) (string, error) {
 	cleaned := appcore.ResolveHistoryOutputPath(path, baseDir)
 	if cleaned == "" {
-		return "", nil, fmt.Errorf("保存済みファイルがありません")
+		return "", fmt.Errorf("保存済みファイルがありません")
 	}
 	abs, err := filepath.Abs(cleaned)
 	if err != nil {
-		return "", nil, err
+		return "", err
 	}
 	stat, err := os.Stat(abs)
 	if err != nil {
-		return "", nil, fmt.Errorf("保存済みファイルを確認できません: %w", err)
+		return "", fmt.Errorf("保存済みファイルを確認できません: %w", err)
 	}
 	if stat.IsDir() {
-		return "", nil, fmt.Errorf("保存済み画像ファイルではありません: %s", abs)
+		return "", fmt.Errorf("保存済み画像ファイルではありません: %s", abs)
 	}
-	if goruntime.GOOS != "windows" {
-		return "", nil, fmt.Errorf("Explorerでの表示はWindowsでのみ利用できます")
-	}
-	return "explorer.exe", []string{"/select," + abs}, nil
+	return abs, nil
 }
 
 func (a *App) CheckForUpdate() (appcore.UpdateInfo, error) {
