@@ -19,6 +19,7 @@ type Config struct {
 	Discord            DiscordConfig            `json:"discord"`
 	AutoPhoto          AutoPhotoConfig          `json:"autoPhoto"`
 	ScreenshotAutoPost ScreenshotAutoPostConfig `json:"screenshotAutoPost"`
+	Update             UpdateConfig             `json:"update"`
 	DiagnosticLogPath  string                   `json:"-"`
 }
 
@@ -60,6 +61,11 @@ type ScreenshotAutoPostConfig struct {
 	ScanIntervalSeconds int    `json:"scanIntervalSeconds"`
 }
 
+type UpdateConfig struct {
+	CheckEnabled        bool `json:"checkEnabled"`
+	NotificationEnabled bool `json:"notificationEnabled"`
+}
+
 func DefaultConfig() Config {
 	return Config{
 		Image: ImageConfig{
@@ -89,6 +95,10 @@ func DefaultConfig() Config {
 			Enabled:             false,
 			ScreenshotDirectory: DefaultScreenshotsDirectory(),
 			ScanIntervalSeconds: 2,
+		},
+		Update: UpdateConfig{
+			CheckEnabled:        true,
+			NotificationEnabled: true,
 		},
 	}
 }

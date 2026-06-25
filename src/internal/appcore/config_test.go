@@ -103,8 +103,24 @@ func TestSaveAndLoadConfigRoundTrip(t *testing.T) {
 	if got.Image.MaxWidth != want.Image.MaxWidth ||
 		got.Image.OutputFormat != want.Image.OutputFormat ||
 		got.Image.MaxInputMB != want.Image.MaxInputMB ||
-		got.Output.ShowUI != want.Output.ShowUI {
+		got.Output.ShowUI != want.Output.ShowUI ||
+		got.Update.CheckEnabled != want.Update.CheckEnabled ||
+		got.Update.NotificationEnabled != want.Update.NotificationEnabled {
 		t.Fatalf("loaded config mismatch: %+v", got)
+	}
+}
+
+func TestLoadConfigDefaultsUpdateSettingsWhenMissing(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(`{"image":{"maxWidth":1024}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := LoadConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Update.CheckEnabled || !got.Update.NotificationEnabled {
+		t.Fatalf("update defaults = %+v, want both enabled", got.Update)
 	}
 }
 

@@ -106,18 +106,39 @@ nav button.active {
 .update-banner {
   grid-row: 2;
   width: 100%;
-  padding: 10px 24px;
-  border: 0;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px 8px 24px;
   border-bottom: 1px solid #d1bd7a;
-  border-radius: 0;
   background: #fff4c8;
   color: #5c4300;
-  text-align: left;
   font-weight: 700;
 }
 
-.update-banner:hover {
-  background: #ffeaa1;
+.update-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.update-actions button {
+  padding: 7px 10px;
+}
+
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-color: #b9c5cf;
+  background: #ffffff;
+  color: #17212b;
 }
 
 button:disabled {
