@@ -76,14 +76,14 @@ func TestHistoryPathUsesConfigDirectory(t *testing.T) {
 
 func TestDiagnosticLogPathUsesDatedLogDirectory(t *testing.T) {
 	got := DiagnosticLogPath(filepath.Join("base", "config.json"))
-	if filepath.Dir(got) != filepath.Join("base", "log") {
-		t.Fatalf("DiagnosticLogPath dir = %q, want base/log", filepath.Dir(got))
+	if filepath.Dir(got) != filepath.Join("base", "logs") {
+		t.Fatalf("DiagnosticLogPath dir = %q, want base/logs", filepath.Dir(got))
 	}
 	if filepath.Ext(got) != ".log" {
 		t.Fatalf("DiagnosticLogPath = %q, want .log", got)
 	}
-	if DiagnosticLogDir("") != "log" {
-		t.Fatalf("DiagnosticLogDir empty = %q, want log", DiagnosticLogDir(""))
+	if DiagnosticLogDir("") != "logs" {
+		t.Fatalf("DiagnosticLogDir empty = %q, want logs", DiagnosticLogDir(""))
 	}
 }
 

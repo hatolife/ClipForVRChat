@@ -92,6 +92,45 @@ func createEncryptedDiagnosticPackage(configPath string, cfg appcore.Config) (st
 	return outputPath, nil
 }
 
+func encryptZipFileWithPublicKey(path string) (string, error) {
+	if strings.TrimSpace(path) == "" {
+		return "", fmt.Errorf("zipファイルを指定してください")
+	}
+	if !strings.EqualFold(filepath.Ext(path), ".zip") {
+		return "", fmt.Errorf("zipファイルではありません: %s", path)
+	}
+	info, err := os.Stat(path) // #nosec G304,G703 -- path comes from explicit CLI zip argument and is validated as a local .zip file.
+	if err != nil {
+		return "", fmt.Errorf("zipファイルを確認できません: %w", err)
+	}
+	if info.IsDir() {
+		return "", fmt.Errorf("zipファイルではありません: %s", path)
+	}
+	data, err := os.ReadFile(path) // #nosec G304,G703 -- path comes from explicit CLI zip argument and is validated as a local .zip file.
+	if err != nil {
+		return "", fmt.Errorf("zipファイルを読み込めません: %w", err)
+	}
+	if _, err := zip.NewReader(bytes.NewReader(data), int64(len(data))); err != nil {
+		return "", fmt.Errorf("zipファイルを読み込めません: %w", err)
+	}
+	entities, err := openpgp.ReadArmoredKeyRing(strings.NewReader(releaseSigningPublicKeyArmored))
+	if err != nil {
+		return "", fmt.Errorf("公開鍵を読み込めません: %w", err)
+	}
+	if !hasEncryptionCapableKey(entities) {
+		return "", fmt.Errorf("公開鍵は暗号化用途に対応していません")
+	}
+	encrypted, err := encryptDiagnosticZip(data, entities)
+	if err != nil {
+		return "", err
+	}
+	outputPath := path + ".gpg"
+	if err := appcore.WritePrivateFile(outputPath, encrypted); err != nil {
+		return "", fmt.Errorf("暗号化zipを保存できません: %w", err)
+	}
+	return outputPath, nil
+}
+
 func encryptDiagnosticZip(zipData []byte, entities openpgp.EntityList) ([]byte, error) {
 	var encrypted bytes.Buffer
 	writer, err := openpgp.Encrypt(&encrypted, entities, nil, &openpgp.FileHints{

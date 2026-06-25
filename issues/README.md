@@ -85,12 +85,15 @@
 | 078 | [履歴のローカル保存パスをconfig基準で解決する](078-resolve-history-local-paths-relative-to-config.md) | 完了 | `v0.1.7` | 履歴の相対ローカル保存パスをconfig基準で解決し、Explorer表示と削除可否を修正する。 |
 | 079 | [ユーザー操作を診断ログへ記録する](079-record-user-actions-in-diagnostic-log.md) | 完了 | `v0.1.7` | ボタンクリック、画面遷移、処理判断、処理結果表示を診断ログへ記録する。 |
 | 080 | [暗号化診断パッケージ作成](080-create-encrypted-diagnostic-package.md) | 完了 | `v0.1.7` | 起動ログと診断パッケージ作成導線を追加。暗号化用公開鍵で診断パッケージを作成する。 |
-| 081 | [診断ログを日付付きログフォルダへ出力する](081-write-diagnostic-logs-to-dated-log-directory.md) | 完了 | `v0.1.7` | 診断ログを `log/YYYY-MM-DD.log` に出力し、診断パッケージがログフォルダを収集するようにする。 |
+| 081 | [診断ログを日付付きログフォルダへ出力する](081-write-diagnostic-logs-to-dated-log-directory.md) | 完了 | `v0.1.7` | 診断ログを `logs/YYYY-MM-DD.log` に出力し、診断パッケージがログフォルダを収集するようにする。 |
 | 082 | [診断パッケージ暗号化鍵をpoppo@hato.lifeへ変更する](082-use-poppo-openpgp-key-for-diagnostics.md) | 完了 | `v0.1.7` | 診断パッケージ暗号化用の公開鍵を暗号化サブキー付きの `poppo@hato.life` に変更する。 |
 | 083 | [不具合報告用データ生成UIを改善する](083-improve-diagnostic-data-generation-ui.md) | 完了 | `v0.1.7` | 情報画面下部に生成ボタンを配置し、生成中オーバーレイと完了後Explorer表示を追加する。 |
 | 084 | [Explorerで生成ファイルを選択表示できない](084-fix-explorer-file-selection.md) | 完了 | `v0.1.7` | `explorer.exe /select,` ではなく Windows Shell API でファイル選択表示する。 |
 | 085 | [診断データ復号後のzipが破損する](085-encrypt-diagnostic-package-as-binary.md) | 完了 | `v0.1.7` | 診断データをOpenPGP binary literal dataとして暗号化し、復号後zipの破損を防ぐ。 |
 | 086 | [診断zip内のログとoutput構成を整理する](086-normalize-diagnostic-zip-layout-and-output-dummies.md) | 完了 | `v0.1.7` | zip内ログを `logs/` に統一し、output画像は同名同形式の1x1ダミーで含める。 |
+| 087 | [zipファイル引数を公開鍵で暗号化する](087-encrypt-zip-from-cli-argument.md) | 完了 | `v0.1.7` | zip単体引数でUIを起動せず、同じ公開鍵で `<zip>.gpg` を生成する。 |
+| 088 | [診断ログ実フォルダ名をlogsへ統一する](088-use-logs-directory-for-diagnostic-logs.md) | 完了 | `v0.1.7` | アプリ実フォルダの診断ログ出力先も `logs/YYYY-MM-DD.log` に統一する。 |
+| 089 | [不具合報告用データの説明を情報画面に追加する](089-explain-diagnostic-data-in-about.md) | 完了 | `v0.1.7` | 情報画面に含まれる情報、暗号化方法、利用目的の説明を追加する。 |
 
 ## 状態の意味
 
