@@ -35,7 +35,8 @@ createApp({
       historySelectionAdditive: false,
       historyDragStart: { x: 0, y: 0 },
       historyDragCurrent: { x: 0, y: 0 },
-      historyDragBaseIds: []
+      historyDragBaseIds: [],
+      diagnosticGenerating: false
     }
   },
   computed: {
@@ -705,16 +706,21 @@ createApp({
       await api.OpenURL(url)
     },
     async createDiagnosticPackage() {
+      if (this.diagnosticGenerating) return
       this.error = ''
+      this.diagnosticGenerating = true
       this.logUserAction('button_click', 'create_diagnostic_package')
       try {
         const path = await api.CreateEncryptedDiagnosticPackage()
-        this.toast = `診断パッケージを作成しました: ${path}`
+        await api.RevealFileInExplorer(path)
+        this.toast = `不具合報告用データを作成しました: ${path}`
         setTimeout(() => {
           this.toast = ''
         }, 5000)
       } catch (err) {
         this.error = String(err)
+      } finally {
+        this.diagnosticGenerating = false
       }
     },
     async checkForUpdate() {
@@ -906,18 +912,6 @@ createApp({
           </ul>
         </section>
         <section class="about-note">
-          <h3>診断パッケージ</h3>
-          <p>
-            不具合調査用にログ、設定、履歴、起動中のexeを暗号化したファイルとして作成します。
-          </p>
-          <p>
-            作成したファイルはGitHub Issueなどに添付できます。復号前に中身やファイル一覧は確認できません。
-          </p>
-          <div class="button-row">
-            <button @click="createDiagnosticPackage">診断パッケージを作成</button>
-          </div>
-        </section>
-        <section class="about-note">
           <h3>連絡・要望</h3>
           <p>
             不具合や使いにくいところがあれば、Twitterの <button class="link-button inline" @click="openURL(authorTwitterUrl)">@hato_poppo_life</button> にご連絡ください。
@@ -939,6 +933,7 @@ createApp({
         </section>
         <div class="button-row">
           <button @click="setView('licenses', 'about_licenses')">OSSライセンス</button>
+          <button @click="createDiagnosticPackage" :disabled="diagnosticGenerating">不具合報告用データ生成</button>
           <button class="secondary" @click="setView('main', 'about_close')">閉じる</button>
         </div>
       </section>
@@ -1238,6 +1233,13 @@ createApp({
             <button class="secondary" @click="discardSettingsAndLeave" :disabled="saving">保存せずに移動</button>
             <button class="secondary" @click="cancelSettingsLeave" :disabled="saving">キャンセル</button>
           </div>
+        </div>
+      </div>
+      <div v-if="diagnosticGenerating" class="modal-backdrop busy-backdrop" role="dialog" aria-modal="true" aria-live="polite">
+        <div class="busy-dialog">
+          <h2>不具合報告用データを作成しています</h2>
+          <p>ログ、設定、履歴、実行ファイルをまとめて暗号化しています。</p>
+          <div class="indeterminate-progress"><span></span></div>
         </div>
       </div>
       <div v-if="toast" class="toast">{{ toast }}</div>
