@@ -85,6 +85,7 @@
 | 078 | [履歴のローカル保存パスをconfig基準で解決する](078-resolve-history-local-paths-relative-to-config.md) | 完了 | `v0.1.7` | 履歴の相対ローカル保存パスをconfig基準で解決し、Explorer表示と削除可否を修正する。 |
 | 079 | [ユーザー操作を診断ログへ記録する](079-record-user-actions-in-diagnostic-log.md) | 完了 | `v0.1.7` | ボタンクリック、画面遷移、処理判断、処理結果表示を診断ログへ記録する。 |
 | 080 | [暗号化診断パッケージ作成](080-create-encrypted-diagnostic-package.md) | 一部将来対応あり | `v0.1.7` | 起動ログと診断パッケージ作成導線を追加。現在の公開鍵は署名専用のため、暗号化用公開鍵の同梱が必要。 |
+| 081 | [診断ログを日付付きログフォルダへ出力する](081-write-diagnostic-logs-to-dated-log-directory.md) | 完了 | `v0.1.7` | 診断ログを `log/YYYY-MM-DD.log` に出力し、診断パッケージがログフォルダを収集するようにする。 |
 
 ## 状態の意味
 
