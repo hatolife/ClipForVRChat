@@ -128,6 +128,21 @@ func TestAppStartupStartsAutoPhotoWatcherWithoutDiscordUpload(t *testing.T) {
 	}
 }
 
+func TestExplorerSelectArgsRejectsMissingPath(t *testing.T) {
+	if _, _, err := explorerSelectArgs(""); err == nil {
+		t.Fatal("expected empty path error")
+	}
+	if _, _, err := explorerSelectArgs(filepath.Join(t.TempDir(), "missing.png")); err == nil {
+		t.Fatal("expected missing file error")
+	}
+}
+
+func TestExplorerSelectArgsRejectsDirectory(t *testing.T) {
+	if _, _, err := explorerSelectArgs(t.TempDir()); err == nil {
+		t.Fatal("expected directory error")
+	}
+}
+
 func TestAppProcessToStateRejectsMixedJSON(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})

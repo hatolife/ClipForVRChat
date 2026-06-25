@@ -599,25 +599,89 @@ small {
   background: #dff1e5;
 }
 
-.copy-overlay,
+.result-action-overlay,
 .processing-overlay {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
-  padding: 14px;
-  background: rgba(23, 33, 43, 0.68);
   color: #ffffff;
   text-align: center;
   opacity: 0;
   transition: opacity 160ms ease;
 }
 
-.thumb-card:not(:disabled):hover .copy-overlay {
+.result-action-overlay {
+  display: grid;
+  pointer-events: none;
+}
+
+.result-action-zone {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  min-height: 0;
+  padding: 10px;
+  background: rgba(23, 33, 43, 0.72);
+}
+
+.result-action-zone + .result-action-zone {
+  border-top: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.result-action-zone strong {
+  font-size: 13px;
+}
+
+.result-action-zone span {
+  color: #d9e5ef;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.thumb-media.actionable:hover .result-action-overlay,
+.thumb-media.actionable:focus-within .result-action-overlay {
   opacity: 1;
 }
 
+.result-action-button {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: transparent;
+  cursor: pointer;
+}
+
+.result-action-button:focus-visible {
+  outline: 3px solid #ffffff;
+  outline-offset: -5px;
+}
+
+.result-action-copy {
+  top: 0;
+  height: 50%;
+}
+
+.result-action-reveal {
+  bottom: 0;
+  height: 50%;
+}
+
+.result-action-copy:only-of-type,
+.result-action-reveal:only-of-type {
+  inset: 0;
+  height: 100%;
+}
+
 .processing-overlay {
+  display: grid;
+  place-items: center;
+  padding: 14px;
+  background: rgba(23, 33, 43, 0.68);
   align-content: center;
   gap: 10px;
   opacity: 1;

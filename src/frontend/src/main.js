@@ -557,6 +557,35 @@ createApp({
       event.stopPropagation()
       await this.copy(url)
     },
+    canCopyResultURL(item) {
+      return !!(item && item.url && !item.processing)
+    },
+    canRevealResultFile(item) {
+      return !!(item && item.outputPath && !item.processing)
+    },
+    hasResultImageAction(item) {
+      return this.canCopyResultURL(item) || this.canRevealResultFile(item)
+    },
+    resultImageActionLabel(item) {
+      if (this.canCopyResultURL(item) && this.canRevealResultFile(item)) return '上: URLをコピー / 下: 保存先で表示'
+      if (this.canCopyResultURL(item)) return 'URLをコピー'
+      if (this.canRevealResultFile(item)) return '保存先で表示'
+      return ''
+    },
+    async copyResultURL(event, item) {
+      event.stopPropagation()
+      if (!this.canCopyResultURL(item)) return
+      await this.copy(item.url)
+    },
+    async revealResultFile(event, item) {
+      event.stopPropagation()
+      if (!this.canRevealResultFile(item)) return
+      try {
+        await api.RevealFileInExplorer(item.outputPath)
+      } catch (err) {
+        this.error = String(err)
+      }
+    },
     async openURL(url) {
       await api.OpenURL(url)
     },
@@ -1009,8 +1038,8 @@ createApp({
           <p v-if="error" class="error">{{ error }}</p>
 
           <div v-if="hasResultItems" class="thumb-grid">
-            <button v-for="(item, index) in resultItems" :key="item.name + item.outputPath + item.url + item.error + index" class="thumb-card" @click="copy(item.url)" :disabled="!item.url || item.processing">
-              <div class="thumb-media">
+            <article v-for="(item, index) in resultItems" :key="item.name + item.outputPath + item.url + item.error + index" class="thumb-card">
+              <div class="thumb-media" :class="{ actionable: hasResultImageAction(item) }" :title="resultImageActionLabel(item)">
                 <img v-if="item.thumbnail" :src="item.thumbnail" alt="" />
                 <div v-else class="thumb-placeholder">
                   <span class="progress-ring" :style="{ '--progress': (item.progress || 35) + '%' }"></span>
@@ -1019,7 +1048,18 @@ createApp({
                   <span class="progress-ring" :style="{ '--progress': (item.progress || 35) + '%' }"></span>
                   <strong>処理中</strong>
                 </div>
-                <div v-else-if="item.url" class="copy-overlay">クリックでURLをコピー</div>
+                <div v-else-if="hasResultImageAction(item)" class="result-action-overlay" aria-hidden="true">
+                  <div v-if="canCopyResultURL(item)" class="result-action-zone copy-zone">
+                    <strong>URLをコピー</strong>
+                    <span>Discord投稿URL</span>
+                  </div>
+                  <div v-if="canRevealResultFile(item)" class="result-action-zone reveal-zone">
+                    <strong>保存先で表示</strong>
+                    <span>Explorerで画像を選択</span>
+                  </div>
+                </div>
+                <button v-if="canCopyResultURL(item)" class="result-action-button result-action-copy" @click="copyResultURL($event, item)" aria-label="URLをコピー"></button>
+                <button v-if="canRevealResultFile(item)" class="result-action-button result-action-reveal" @click="revealResultFile($event, item)" aria-label="保存先で表示"></button>
               </div>
               <span>{{ item.name }}</span>
               <div v-if="item.qrUrls && item.qrUrls.length" class="qr-url-list">
@@ -1027,7 +1067,7 @@ createApp({
                 <button v-for="qrUrl in item.qrUrls" :key="qrUrl" class="qr-url-chip" @click="copyQRURL($event, qrUrl)" :title="qrUrl">{{ qrUrl }}</button>
               </div>
               <small v-if="item.error" class="error">{{ item.error }}</small>
-            </button>
+            </article>
           </div>
           <p v-else class="empty">まだ処理結果はありません。</p>
         </div>
