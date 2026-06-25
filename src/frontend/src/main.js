@@ -837,9 +837,16 @@ createApp({
       </section>
 
       <section v-else-if="isSettings" class="panel settings-page">
-        <div class="section-title">
-          <h2>設定</h2>
-          <p v-if="state.message" class="message" :class="{ warning: isError }">{{ state.message }}</p>
+        <div class="section-title settings-titlebar">
+          <div>
+            <h2>設定</h2>
+            <p v-if="state.message" class="message" :class="{ warning: isError }">{{ state.message }}</p>
+          </div>
+          <div v-if="state.config" class="settings-title-actions">
+            <button @click="saveSettings" :disabled="saving">{{ saving ? '保存中' : '保存' }}</button>
+            <button class="secondary" @click="closeSettings">閉じる</button>
+            <span v-if="saved" class="saved">保存しました</span>
+          </div>
         </div>
         <div v-if="state.config" class="settings-layout">
           <div class="settings-topbar">
@@ -853,11 +860,6 @@ createApp({
                 :class="{ active: settingsTab === tab.id }"
                 @click="settingsTab = tab.id"
               >{{ tab.label }}</button>
-            </div>
-            <div class="settings-top-actions">
-              <button @click="saveSettings" :disabled="saving">{{ saving ? '保存中' : '保存' }}</button>
-              <button class="secondary" @click="closeSettings">閉じる</button>
-              <span v-if="saved" class="saved">保存しました</span>
             </div>
           </div>
           <p v-if="error" class="error settings-error">{{ error }}</p>
