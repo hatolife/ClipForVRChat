@@ -5,9 +5,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/color"
+	"image/jpeg"
+	"image/png"
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -51,8 +56,9 @@ type diagnosticPackageManifest struct {
 type diagnosticPackageFile struct {
 	Name   string `json:"name"`
 	Path   string `json:"path"`
-	SHA256 string `json:"sha256"`
+	SHA256 string `json:"sha256,omitempty"`
 	Size   int64  `json:"size"`
+	Dummy  bool   `json:"dummy,omitempty"`
 }
 
 func createEncryptedDiagnosticPackage(configPath string, cfg appcore.Config) (string, error) {
@@ -185,6 +191,10 @@ func buildDiagnosticZip(configPath string, cfg appcore.Config) ([]byte, diagnost
 			return nil, manifest, err
 		}
 	}
+	if err := addDummyOutputImages(zipWriter, &manifest, configPath, cfg); err != nil {
+		_ = zipWriter.Close()
+		return nil, manifest, err
+	}
 
 	manifestData, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
@@ -206,6 +216,87 @@ func buildDiagnosticZip(configPath string, cfg appcore.Config) ([]byte, diagnost
 		return nil, manifest, err
 	}
 	return buf.Bytes(), manifest, nil
+}
+
+func addDummyOutputImages(zipWriter *zip.Writer, manifest *diagnosticPackageManifest, configPath string, cfg appcore.Config) error {
+	names := diagnosticOutputImageNames(configPath, cfg)
+	for _, name := range names {
+		data, err := dummyImageBytesForName(name)
+		if err != nil {
+			continue
+		}
+		zipName := filepath.ToSlash(filepath.Join("output", name))
+		header := &zip.FileHeader{Name: zipName, Method: zip.Deflate}
+		header.SetMode(0600)
+		writer, err := zipWriter.CreateHeader(header)
+		if err != nil {
+			return fmt.Errorf("%s をzipに追加できません: %w", zipName, err)
+		}
+		if _, err := writer.Write(data); err != nil {
+			return fmt.Errorf("%s をzipへ書き込めません: %w", zipName, err)
+		}
+		manifest.Files = append(manifest.Files, diagnosticPackageFile{Name: zipName, Path: name, Size: int64(len(data)), Dummy: true})
+	}
+	return nil
+}
+
+func diagnosticOutputImageNames(configPath string, cfg appcore.Config) []string {
+	baseDir := filepath.Dir(configPath)
+	names := make(map[string]bool)
+	history, err := appcore.LoadHistory(appcore.HistoryPath(configPath))
+	if err == nil {
+		for _, entry := range history {
+			addDiagnosticOutputImageName(names, appcore.ResolveHistoryOutputPath(entry.OutputPath, baseDir))
+		}
+	}
+
+	outputDir := strings.TrimSpace(cfg.Image.OutputDirectory)
+	if outputDir != "" {
+		if !filepath.IsAbs(outputDir) && strings.TrimSpace(baseDir) != "" {
+			outputDir = filepath.Join(baseDir, outputDir)
+		}
+		matches, _ := filepath.Glob(filepath.Join(outputDir, "*"))
+		for _, match := range matches {
+			addDiagnosticOutputImageName(names, match)
+		}
+	}
+
+	result := make([]string, 0, len(names))
+	for name := range names {
+		result = append(result, name)
+	}
+	sort.Strings(result)
+	return result
+}
+
+func addDiagnosticOutputImageName(names map[string]bool, path string) {
+	name := filepath.Base(strings.TrimSpace(path))
+	if name == "." || name == string(filepath.Separator) || name == "" {
+		return
+	}
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".png", ".jpg", ".jpeg":
+		names[name] = true
+	}
+}
+
+func dummyImageBytesForName(name string) ([]byte, error) {
+	img := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	img.Set(0, 0, color.RGBA{R: 255, G: 255, B: 255, A: 255})
+	var buf bytes.Buffer
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".png":
+		if err := png.Encode(&buf, img); err != nil {
+			return nil, err
+		}
+	case ".jpg", ".jpeg":
+		if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 85}); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("未対応の画像形式です: %s", name)
+	}
+	return buf.Bytes(), nil
 }
 
 func addFileToZip(zipWriter *zip.Writer, name, path string) error {

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"image"
 	"image/color"
+	"image/jpeg"
 	"image/png"
 	"io"
 	"os"
@@ -285,15 +286,68 @@ func TestEncryptDiagnosticPackageUsesBinaryLiteralData(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.json")
 	cfg := appcore.DefaultConfig()
+	cfg.Image.OutputDirectory = "./output"
 	if err := appcore.SaveConfig(configPath, cfg); err != nil {
 		t.Fatal(err)
 	}
+	outputDir := filepath.Join(dir, "output")
+	if err := os.MkdirAll(outputDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(outputDir, "real.png"), []byte("not the real image in diagnostics"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(outputDir, "real.jpg"), []byte("not the real jpeg in diagnostics"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := appcore.SaveHistory(appcore.HistoryPath(configPath), []appcore.HistoryEntry{{ID: "1", OutputPath: "output/history.png"}}); err != nil {
+		t.Fatal(err)
+	}
+	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(configPath), "test log")
 	zipData, _, err := buildDiagnosticZip(configPath, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData))); err != nil {
+	plainZip, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
+	if err != nil {
 		t.Fatalf("plain diagnostic zip is invalid: %v", err)
+	}
+	entries := zipEntryNames(plainZip.File)
+	for _, want := range []string{"logs/" + filepath.Base(appcore.DiagnosticLogPath(configPath)), "output/history.png", "output/real.jpg", "output/real.png"} {
+		if !entries[want] {
+			t.Fatalf("zip entries = %+v, missing %s", entries, want)
+		}
+	}
+	if entries["log/"+filepath.Base(appcore.DiagnosticLogPath(configPath))] {
+		t.Fatalf("zip entries = %+v, should use logs/ not log/", entries)
+	}
+	for _, name := range []string{"output/history.png", "output/real.png"} {
+		file := mustZipFile(t, plainZip.File, name)
+		rc, err := file.Open()
+		if err != nil {
+			t.Fatal(err)
+		}
+		img, err := png.Decode(rc)
+		_ = rc.Close()
+		if err != nil {
+			t.Fatalf("%s should be png dummy: %v", name, err)
+		}
+		if img.Bounds().Dx() != 1 || img.Bounds().Dy() != 1 {
+			t.Fatalf("%s size = %v, want 1x1", name, img.Bounds())
+		}
+	}
+	jpg := mustZipFile(t, plainZip.File, "output/real.jpg")
+	rc, err := jpg.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	jpgCfg, err := jpeg.DecodeConfig(rc)
+	_ = rc.Close()
+	if err != nil {
+		t.Fatalf("output/real.jpg should be jpeg dummy: %v", err)
+	}
+	if jpgCfg.Width != 1 || jpgCfg.Height != 1 {
+		t.Fatalf("output/real.jpg size = %dx%d, want 1x1", jpgCfg.Width, jpgCfg.Height)
 	}
 
 	entity, err := openpgp.NewEntity("Diagnostic Test", "", "diagnostic@example.test", nil)
@@ -322,6 +376,25 @@ func TestEncryptDiagnosticPackageUsesBinaryLiteralData(t *testing.T) {
 	if _, err := zip.NewReader(bytes.NewReader(decrypted), int64(len(decrypted))); err != nil {
 		t.Fatalf("decrypted diagnostic zip is invalid: %v", err)
 	}
+}
+
+func zipEntryNames(files []*zip.File) map[string]bool {
+	names := make(map[string]bool, len(files))
+	for _, file := range files {
+		names[file.Name] = true
+	}
+	return names
+}
+
+func mustZipFile(t *testing.T, files []*zip.File, name string) *zip.File {
+	t.Helper()
+	for _, file := range files {
+		if file.Name == name {
+			return file
+		}
+	}
+	t.Fatalf("zip entry %s not found", name)
+	return nil
 }
 
 func TestAppProcessToStateRejectsMixedJSON(t *testing.T) {
