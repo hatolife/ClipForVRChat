@@ -245,10 +245,11 @@ func TestAppStartupWritesVersionHashAndRedactedConfig(t *testing.T) {
 	}
 }
 
-func TestCreateEncryptedDiagnosticPackageRejectsSigningOnlyPublicKey(t *testing.T) {
+func TestCreateEncryptedDiagnosticPackageEncryptsZip(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.json")
 	cfg := appcore.DefaultConfig()
+	cfg.Discord.WebhookURL = "https://discord.com/api/webhooks/secret"
 	if err := appcore.SaveConfig(configPath, cfg); err != nil {
 		t.Fatal(err)
 	}
@@ -258,15 +259,21 @@ func TestCreateEncryptedDiagnosticPackageRejectsSigningOnlyPublicKey(t *testing.
 	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(configPath), "test log")
 
 	app := NewApp(configPath, appcore.UIState{Config: cfg})
-	if _, err := app.CreateEncryptedDiagnosticPackage(); err == nil || !strings.Contains(err.Error(), "暗号化用途") {
-		t.Fatalf("err = %v, want encryption capability error", err)
-	}
-	matches, err := filepath.Glob(filepath.Join(dir, "ClipForVRChat-diagnostics-*.zip.gpg"))
+	path, err := app.CreateEncryptedDiagnosticPackage()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(matches) != 0 {
-		t.Fatalf("diagnostic package should not be written when encryption is unavailable: %+v", matches)
+	if filepath.Dir(path) != dir || filepath.Ext(path) != ".gpg" {
+		t.Fatalf("path = %q, want encrypted package under config dir", path)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, leaked := range []string{"config.json", "history.json", "manifest.json", "secret"} {
+		if strings.Contains(string(data), leaked) {
+			t.Fatalf("encrypted package leaked %q", leaked)
+		}
 	}
 }
 
