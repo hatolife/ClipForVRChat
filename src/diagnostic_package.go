@@ -5,10 +5,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"image"
-	"image/color"
-	"image/jpeg"
-	"image/png"
 	"io"
 	"os"
 	"path/filepath"
@@ -58,7 +54,15 @@ type diagnosticPackageFile struct {
 	Path   string `json:"path"`
 	SHA256 string `json:"sha256,omitempty"`
 	Size   int64  `json:"size"`
-	Dummy  bool   `json:"dummy,omitempty"`
+}
+
+type diagnosticPathRedactor struct {
+	replacements []string
+}
+
+type diagnosticPathReplacement struct {
+	source      string
+	placeholder string
 }
 
 func createEncryptedDiagnosticPackage(configPath string, cfg appcore.Config) (string, error) {
@@ -70,25 +74,38 @@ func createEncryptedDiagnosticPackage(configPath string, cfg appcore.Config) (st
 		return "", fmt.Errorf("診断パッケージ用公開鍵は暗号化用途に対応していません。暗号化用の公開鍵を同梱する必要があります")
 	}
 
-	zipData, manifest, err := buildDiagnosticZip(configPath, cfg)
-	if err != nil {
-		return "", err
-	}
-
-	encrypted, err := encryptDiagnosticZip(zipData, entities)
-	if err != nil {
-		return "", err
-	}
-
 	outputDir := filepath.Dir(configPath)
 	if strings.TrimSpace(configPath) == "" {
 		outputDir = "."
 	}
-	outputPath := filepath.Join(outputDir, fmt.Sprintf("ClipForVRChat-diagnostics-%s.zip.gpg", time.Now().Format("20060102-150405")))
+	stamp := time.Now().Format("20060102-150405")
+	workDir := filepath.Join(outputDir, "diagnostics", stamp)
+	dataDir := filepath.Join(workDir, "data")
+	zipPath := filepath.Join(workDir, fmt.Sprintf("ClipForVRChat-diagnostics-%s.zip", stamp))
+	outputPath := zipPath + ".gpg"
+	redactor := newDiagnosticPathRedactor(configPath)
+
+	appendDiagnosticOutputDirectoryLog(configPath, cfg, redactor)
+
+	manifest, err := prepareDiagnosticDataDirectory(configPath, cfg, dataDir)
+	if err != nil {
+		return "", err
+	}
+	if err := zipDirectory(dataDir, zipPath); err != nil {
+		return "", err
+	}
+	zipData, err := os.ReadFile(zipPath) // #nosec G304 -- zip path is generated inside the app-owned diagnostics work directory.
+	if err != nil {
+		return "", fmt.Errorf("診断zipを読み込めません: %w", err)
+	}
+	encrypted, err := encryptDiagnosticZip(zipData, entities)
+	if err != nil {
+		return "", err
+	}
 	if err := appcore.WritePrivateFile(outputPath, encrypted); err != nil {
 		return "", fmt.Errorf("診断パッケージを保存できません: %w", err)
 	}
-	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(configPath), "diagnostic package=%q files=%d missing=%d", outputPath, len(manifest.Files), len(manifest.MissingFiles))
+	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(configPath), "diagnostic package=%q zip=%q data_dir=%q files=%d missing=%d", outputPath, zipPath, dataDir, len(manifest.Files), len(manifest.MissingFiles))
 	return outputPath, nil
 }
 
@@ -167,6 +184,28 @@ func hasEncryptionCapableKey(entities openpgp.EntityList) bool {
 }
 
 func buildDiagnosticZip(configPath string, cfg appcore.Config) ([]byte, diagnosticPackageManifest, error) {
+	tempDir, err := os.MkdirTemp("", "clipforvrchat-diagnostics-*")
+	if err != nil {
+		return nil, diagnosticPackageManifest{}, err
+	}
+	defer os.RemoveAll(tempDir)
+	dataDir := filepath.Join(tempDir, "data")
+	zipPath := filepath.Join(tempDir, "diagnostics.zip")
+	manifest, err := prepareDiagnosticDataDirectory(configPath, cfg, dataDir)
+	if err != nil {
+		return nil, manifest, err
+	}
+	if err := zipDirectory(dataDir, zipPath); err != nil {
+		return nil, manifest, err
+	}
+	data, err := os.ReadFile(zipPath) // #nosec G304 -- zip path is generated inside a temporary diagnostics work directory.
+	if err != nil {
+		return nil, manifest, err
+	}
+	return data, manifest, nil
+}
+
+func prepareDiagnosticDataDirectory(configPath string, cfg appcore.Config, dataDir string) (diagnosticPackageManifest, error) {
 	exePath, err := os.Executable()
 	if err != nil {
 		exePath = ""
@@ -176,22 +215,21 @@ func buildDiagnosticZip(configPath string, cfg appcore.Config) ([]byte, diagnost
 		exeSHA256, _ = fileSHA256(exePath)
 	}
 	configJSON := json.RawMessage(configSummaryForLog(cfg))
+	redactor := newDiagnosticPathRedactor(configPath)
 	manifest := diagnosticPackageManifest{
 		CreatedAt:   time.Now().Format(time.RFC3339),
 		AppVersion:  appVersion(),
 		Version:     version,
 		Revision:    revision,
 		ReleaseTime: appReleaseTime(),
-		Executable:  exePath,
+		Executable:  redactor.Redact(exePath),
 		ExeSHA256:   exeSHA256,
-		ConfigPath:  configPath,
-		HistoryPath: appcore.HistoryPath(configPath),
-		LogPath:     appcore.DiagnosticLogPath(configPath),
-		Config:      configJSON,
+		ConfigPath:  redactor.Redact(configPath),
+		HistoryPath: redactor.Redact(appcore.HistoryPath(configPath)),
+		LogPath:     redactor.Redact(appcore.DiagnosticLogPath(configPath)),
+		Config:      json.RawMessage(redactor.Redact(string(configJSON))),
 	}
 
-	var buf bytes.Buffer
-	zipWriter := zip.NewWriter(&buf)
 	add := func(name, path string) error {
 		info, err := os.Stat(path)
 		if err != nil {
@@ -202,22 +240,22 @@ func buildDiagnosticZip(configPath string, cfg appcore.Config) ([]byte, diagnost
 			return nil
 		}
 		hash, _ := fileSHA256(path)
-		manifest.Files = append(manifest.Files, diagnosticPackageFile{Name: name, Path: path, SHA256: hash, Size: info.Size()})
-		return addFileToZip(zipWriter, name, path)
+		manifest.Files = append(manifest.Files, diagnosticPackageFile{Name: name, Path: redactor.Redact(path), SHA256: hash, Size: info.Size()})
+		if isDiagnosticTextFile(name) {
+			return addRedactedTextFileToDirectory(dataDir, name, path, redactor)
+		}
+		return copyFileToDirectory(dataDir, name, path)
 	}
 
 	if err := add("config.json", configPath); err != nil {
-		_ = zipWriter.Close()
-		return nil, manifest, err
+		return manifest, err
 	}
 	if err := add("history.json", appcore.HistoryPath(configPath)); err != nil {
-		_ = zipWriter.Close()
-		return nil, manifest, err
+		return manifest, err
 	}
 	if exePath != "" {
 		if err := add("ClipForVRChat.exe", exePath); err != nil {
-			_ = zipWriter.Close()
-			return nil, manifest, err
+			return manifest, err
 		}
 	} else {
 		manifest.MissingFiles = append(manifest.MissingFiles, "ClipForVRChat.exe")
@@ -226,120 +264,134 @@ func buildDiagnosticZip(configPath string, cfg appcore.Config) ([]byte, diagnost
 	for _, logPath := range logFiles {
 		name := filepath.Join("logs", filepath.Base(logPath))
 		if err := add(name, logPath); err != nil {
-			_ = zipWriter.Close()
-			return nil, manifest, err
+			return manifest, err
 		}
 	}
-	if err := addDummyOutputImages(zipWriter, &manifest, configPath, cfg); err != nil {
-		_ = zipWriter.Close()
-		return nil, manifest, err
-	}
-
 	manifestData, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
-		_ = zipWriter.Close()
-		return nil, manifest, err
+		return manifest, err
 	}
-	manifestHeader := &zip.FileHeader{Name: "manifest.json", Method: zip.Deflate}
-	manifestHeader.SetMode(0600)
-	manifestWriter, err := zipWriter.CreateHeader(manifestHeader)
-	if err != nil {
-		_ = zipWriter.Close()
-		return nil, manifest, err
+	if err := writePrivateFileInDirectory(dataDir, "manifest.json", append(manifestData, '\n')); err != nil {
+		return manifest, err
 	}
-	if _, err := manifestWriter.Write(append(manifestData, '\n')); err != nil {
-		_ = zipWriter.Close()
-		return nil, manifest, err
-	}
-	if err := zipWriter.Close(); err != nil {
-		return nil, manifest, err
-	}
-	return buf.Bytes(), manifest, nil
+	return manifest, nil
 }
 
-func addDummyOutputImages(zipWriter *zip.Writer, manifest *diagnosticPackageManifest, configPath string, cfg appcore.Config) error {
-	names := diagnosticOutputImageNames(configPath, cfg)
-	for _, name := range names {
-		data, err := dummyImageBytesForName(name)
+func appendDiagnosticOutputDirectoryLog(configPath string, cfg appcore.Config, redactor diagnosticPathRedactor) {
+	logPath := appcore.DiagnosticLogPath(configPath)
+	outputDir := diagnosticOutputDirectory(configPath, cfg)
+	if outputDir == "" {
+		appcore.AppendDiagnosticLog(logPath, "diagnostic output directory is not configured")
+		return
+	}
+	info, err := os.Stat(outputDir) // #nosec G304 -- output directory path comes from user configuration and is only listed for diagnostics.
+	if err != nil {
+		appcore.AppendDiagnosticLog(logPath, "diagnostic output directory=%q status=missing error=%q", redactor.Redact(outputDir), err.Error())
+		return
+	}
+	if !info.IsDir() {
+		appcore.AppendDiagnosticLog(logPath, "diagnostic output directory=%q status=not_directory", redactor.Redact(outputDir))
+		return
+	}
+	entries, err := os.ReadDir(outputDir) // #nosec G304 -- output directory path comes from user configuration and is only listed for diagnostics.
+	if err != nil {
+		appcore.AppendDiagnosticLog(logPath, "diagnostic output directory=%q status=read_error error=%q", redactor.Redact(outputDir), err.Error())
+		return
+	}
+	sort.SliceStable(entries, func(i, j int) bool {
+		return entries[i].Name() < entries[j].Name()
+	})
+	appcore.AppendDiagnosticLog(logPath, "diagnostic output directory=%q entries=%d", redactor.Redact(outputDir), len(entries))
+	for _, entry := range entries {
+		entryInfo, err := entry.Info()
 		if err != nil {
+			appcore.AppendDiagnosticLog(logPath, "diagnostic output entry name=%q status=stat_error error=%q", entry.Name(), err.Error())
 			continue
 		}
-		zipName := filepath.ToSlash(filepath.Join("output", name))
-		header := &zip.FileHeader{Name: zipName, Method: zip.Deflate}
-		header.SetMode(0600)
-		writer, err := zipWriter.CreateHeader(header)
-		if err != nil {
-			return fmt.Errorf("%s をzipに追加できません: %w", zipName, err)
-		}
-		if _, err := writer.Write(data); err != nil {
-			return fmt.Errorf("%s をzipへ書き込めません: %w", zipName, err)
-		}
-		manifest.Files = append(manifest.Files, diagnosticPackageFile{Name: zipName, Path: name, Size: int64(len(data)), Dummy: true})
+		appcore.AppendDiagnosticLog(logPath, "diagnostic output entry name=%q size=%d dir=%t", entry.Name(), entryInfo.Size(), entryInfo.IsDir())
+	}
+}
+
+func diagnosticOutputDirectory(configPath string, cfg appcore.Config) string {
+	baseDir := filepath.Dir(configPath)
+	outputDir := strings.TrimSpace(cfg.Image.OutputDirectory)
+	if outputDir == "" {
+		outputDir = "./output"
+	}
+	if !filepath.IsAbs(outputDir) && strings.TrimSpace(baseDir) != "" {
+		outputDir = filepath.Join(baseDir, outputDir)
+	}
+	return outputDir
+}
+
+func copyFileToDirectory(baseDir string, name string, path string) error {
+	file, err := os.Open(path) // #nosec G304 -- diagnostic package paths are derived from app-owned config/history/log paths and the running executable.
+	if err != nil {
+		return fmt.Errorf("%s を読み込めません: %w", name, err)
+	}
+	defer file.Close()
+	target := filepath.Join(baseDir, filepath.FromSlash(filepath.ToSlash(name)))
+	if err := os.MkdirAll(filepath.Dir(target), 0700); err != nil {
+		return err
+	}
+	writer, err := os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600) // #nosec G304 -- target path is generated under the diagnostics work directory from fixed package entry names.
+	if err != nil {
+		return fmt.Errorf("%s を作成できません: %w", name, err)
+	}
+	defer writer.Close()
+	if _, err := io.Copy(writer, file); err != nil {
+		return fmt.Errorf("%s を書き込めません: %w", name, err)
 	}
 	return nil
 }
 
-func diagnosticOutputImageNames(configPath string, cfg appcore.Config) []string {
-	baseDir := filepath.Dir(configPath)
-	names := make(map[string]bool)
-	history, err := appcore.LoadHistory(appcore.HistoryPath(configPath))
-	if err == nil {
-		for _, entry := range history {
-			addDiagnosticOutputImageName(names, appcore.ResolveHistoryOutputPath(entry.OutputPath, baseDir))
-		}
+func addRedactedTextFileToDirectory(baseDir string, name string, path string, redactor diagnosticPathRedactor) error {
+	data, err := os.ReadFile(path) // #nosec G304 -- diagnostic text paths are app-owned config/history/log files.
+	if err != nil {
+		return fmt.Errorf("%s を読み込めません: %w", name, err)
 	}
-
-	outputDir := strings.TrimSpace(cfg.Image.OutputDirectory)
-	if outputDir != "" {
-		if !filepath.IsAbs(outputDir) && strings.TrimSpace(baseDir) != "" {
-			outputDir = filepath.Join(baseDir, outputDir)
-		}
-		matches, _ := filepath.Glob(filepath.Join(outputDir, "*"))
-		for _, match := range matches {
-			addDiagnosticOutputImageName(names, match)
-		}
-	}
-
-	result := make([]string, 0, len(names))
-	for name := range names {
-		result = append(result, name)
-	}
-	sort.Strings(result)
-	return result
+	return writePrivateFileInDirectory(baseDir, name, []byte(redactor.Redact(string(data))))
 }
 
-func addDiagnosticOutputImageName(names map[string]bool, path string) {
-	name := filepath.Base(strings.TrimSpace(path))
-	if name == "." || name == string(filepath.Separator) || name == "" {
-		return
+func writePrivateFileInDirectory(baseDir string, name string, data []byte) error {
+	target := filepath.Join(baseDir, filepath.FromSlash(filepath.ToSlash(name)))
+	if err := os.MkdirAll(filepath.Dir(target), 0700); err != nil {
+		return err
 	}
-	switch strings.ToLower(filepath.Ext(name)) {
-	case ".png", ".jpg", ".jpeg":
-		names[name] = true
-	}
+	return appcore.WritePrivateFile(target, data)
 }
 
-func dummyImageBytesForName(name string) ([]byte, error) {
-	img := image.NewRGBA(image.Rect(0, 0, 1, 1))
-	img.Set(0, 0, color.RGBA{R: 255, G: 255, B: 255, A: 255})
+func zipDirectory(sourceDir string, zipPath string) error {
 	var buf bytes.Buffer
-	switch strings.ToLower(filepath.Ext(name)) {
-	case ".png":
-		if err := png.Encode(&buf, img); err != nil {
-			return nil, err
+	zipWriter := zip.NewWriter(&buf)
+	err := filepath.WalkDir(sourceDir, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
 		}
-	case ".jpg", ".jpeg":
-		if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 85}); err != nil {
-			return nil, err
+		if entry.IsDir() {
+			return nil
 		}
-	default:
-		return nil, fmt.Errorf("未対応の画像形式です: %s", name)
+		rel, err := filepath.Rel(sourceDir, path)
+		if err != nil {
+			return err
+		}
+		if err := addFileToZip(zipWriter, filepath.ToSlash(rel), path); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		_ = zipWriter.Close()
+		return err
 	}
-	return buf.Bytes(), nil
+	if err := zipWriter.Close(); err != nil {
+		return err
+	}
+	return appcore.WritePrivateFile(zipPath, buf.Bytes())
 }
 
 func addFileToZip(zipWriter *zip.Writer, name, path string) error {
-	file, err := os.Open(path) // #nosec G304 -- diagnostic package paths are derived from app-owned config/history/log paths and the running executable.
+	file, err := os.Open(path) // #nosec G304 -- zip source paths are generated in diagnostics work directory.
 	if err != nil {
 		return fmt.Errorf("%s を読み込めません: %w", name, err)
 	}
@@ -354,4 +406,76 @@ func addFileToZip(zipWriter *zip.Writer, name, path string) error {
 		return fmt.Errorf("%s をzipへ書き込めません: %w", name, err)
 	}
 	return nil
+}
+
+func isDiagnosticTextFile(name string) bool {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".json", ".log", ".txt":
+		return true
+	default:
+		return false
+	}
+}
+
+func newDiagnosticPathRedactor(configPath string) diagnosticPathRedactor {
+	candidates := []struct {
+		name  string
+		value string
+	}{
+		{"USERPROFILE", os.Getenv("USERPROFILE")},
+		{"APPDATA", os.Getenv("APPDATA")},
+		{"LOCALAPPDATA", os.Getenv("LOCALAPPDATA")},
+		{"TEMP", os.Getenv("TEMP")},
+		{"TMP", os.Getenv("TMP")},
+		{"HOME", os.Getenv("HOME")},
+	}
+	if strings.TrimSpace(configPath) != "" {
+		candidates = append(candidates, struct {
+			name  string
+			value string
+		}{"CLIPFORVRCHAT_DIR", filepath.Dir(configPath)})
+	}
+	pairs := make([]diagnosticPathReplacement, 0, len(candidates)*4)
+	seen := map[string]bool{}
+	for _, candidate := range candidates {
+		value := strings.Trim(strings.TrimSpace(candidate.value), `"`)
+		if value == "" {
+			continue
+		}
+		addPathReplacement(&pairs, seen, value, "%"+candidate.name+"%")
+	}
+	sort.SliceStable(pairs, func(i, j int) bool {
+		return len(pairs[i].source) > len(pairs[j].source)
+	})
+	replacements := make([]string, 0, len(pairs)*2)
+	for _, pair := range pairs {
+		replacements = append(replacements, pair.source, pair.placeholder)
+	}
+	return diagnosticPathRedactor{replacements: replacements}
+}
+
+func addPathReplacement(replacements *[]diagnosticPathReplacement, seen map[string]bool, path string, placeholder string) {
+	variants := []string{filepath.Clean(path)}
+	slash := strings.ReplaceAll(filepath.Clean(path), `\`, `/`)
+	backslash := strings.ReplaceAll(filepath.Clean(path), `/`, `\`)
+	escapedBackslash := strings.ReplaceAll(backslash, `\`, `\\`)
+	variants = append(variants, slash, backslash, escapedBackslash)
+	sort.SliceStable(variants, func(i, j int) bool {
+		return len(variants[i]) > len(variants[j])
+	})
+	for _, value := range variants {
+		if value == "." || value == "" || seen[value] {
+			continue
+		}
+		seen[value] = true
+		*replacements = append(*replacements, diagnosticPathReplacement{source: value, placeholder: placeholder})
+	}
+}
+
+func (r diagnosticPathRedactor) Redact(text string) string {
+	if text == "" || len(r.replacements) == 0 {
+		return text
+	}
+	replacer := strings.NewReplacer(r.replacements...)
+	return replacer.Replace(text)
 }
