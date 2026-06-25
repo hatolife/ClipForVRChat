@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"sync"
 	"time"
@@ -70,6 +72,36 @@ func (a *App) GetAppInfo() AppInfo {
 
 func (a *App) OpenURL(url string) {
 	runtime.BrowserOpenURL(a.ctx, url)
+}
+
+func (a *App) RevealFileInExplorer(path string) error {
+	target, args, err := explorerSelectArgs(path)
+	if err != nil {
+		return err
+	}
+	return exec.Command(target, args...).Start() // #nosec G204 -- path is selected by the local user from app output.
+}
+
+func explorerSelectArgs(path string) (string, []string, error) {
+	cleaned := strings.Trim(strings.TrimSpace(path), `"`)
+	if cleaned == "" {
+		return "", nil, fmt.Errorf("保存済みファイルがありません")
+	}
+	abs, err := filepath.Abs(cleaned)
+	if err != nil {
+		return "", nil, err
+	}
+	stat, err := os.Stat(abs)
+	if err != nil {
+		return "", nil, fmt.Errorf("保存済みファイルを確認できません: %w", err)
+	}
+	if stat.IsDir() {
+		return "", nil, fmt.Errorf("保存済み画像ファイルではありません: %s", abs)
+	}
+	if goruntime.GOOS != "windows" {
+		return "", nil, fmt.Errorf("Explorerでの表示はWindowsでのみ利用できます")
+	}
+	return "explorer.exe", []string{"/select," + abs}, nil
 }
 
 func (a *App) CheckForUpdate() (appcore.UpdateInfo, error) {

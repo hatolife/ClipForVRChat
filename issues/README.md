@@ -78,6 +78,7 @@
 | 071 | [Discord投稿OFFでも自動投稿でDiscordへ投稿される](071-prevent-discord-post-when-disabled.md) | 完了 | `v0.1.7` | Discord投稿OFF時に自動投稿経路からDiscordへ投稿されないようにする。 |
 | 072 | [設定画面仕様を独立ファイルへ分離する](072-split-settings-screen-spec.md) | 完了 | `v0.1.7` | 設定画面仕様を専用Markdownへ分離し、カテゴリと依存関係を整理する。 |
 | 073 | [設定画面を機能/処理/Webhook/更新へ再編する](073-reorganize-settings-screen-categories.md) | 完了 | `v0.1.7` | 設定画面を利用者視点のカテゴリへ再編する。 |
+| 074 | [結果画像のクリック領域をURLコピーと保存先表示に分ける](074-result-card-split-actions.md) | 完了 | `v0.1.7` | 結果画像の上半分でURLコピー、下半分で保存先表示を行えるようにする。 |
 
 ## 状態の意味
 
