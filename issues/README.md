@@ -76,6 +76,8 @@
 | 069 | [更新通知の開き先選択と通知設定](069-update-notification-destination-and-settings.md) | 完了 | `v0.1.7` | 更新通知からGitHub/BOOTHを選んで開き、更新確認と通知を設定でON/OFFできるようにする。 |
 | 070 | [設定画面をカテゴリ別タブに分ける](070-tabbed-settings-page.md) | 完了 | `v0.1.7` | 設定画面上部にカテゴリタブを追加し、設定項目を分類して表示する。 |
 | 071 | [Discord投稿OFFでも自動投稿でDiscordへ投稿される](071-prevent-discord-post-when-disabled.md) | 完了 | `v0.1.7` | Discord投稿OFF時に自動投稿経路からDiscordへ投稿されないようにする。 |
+| 072 | [設定画面仕様を独立ファイルへ分離する](072-split-settings-screen-spec.md) | 完了 | `v0.1.7` | 設定画面仕様を専用Markdownへ分離し、カテゴリと依存関係を整理する。 |
+| 073 | [設定画面を機能/処理/Webhook/更新へ再編する](073-reorganize-settings-screen-categories.md) | 完了 | `v0.1.7` | 設定画面を利用者視点のカテゴリへ再編する。 |
 
 ## 状態の意味
 

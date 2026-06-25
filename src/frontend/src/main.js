@@ -110,11 +110,10 @@ createApp({
     },
     settingsTabs() {
       return [
-        { id: 'output', label: '出力' },
-        { id: 'save', label: '保存' },
-        { id: 'update', label: '更新' },
+        { id: 'feature', label: '機能' },
+        { id: 'process', label: '処理' },
         { id: 'webhook', label: 'Webhook' },
-        { id: 'autoPost', label: '自動投稿' }
+        { id: 'update', label: '更新' }
       ]
     },
     shouldShowUpdateBanner() {
@@ -173,7 +172,7 @@ createApp({
     },
     rememberSettingsBaseline() {
       this.settingsBaseline = this.serializeSettings(this.state.config)
-      this.settingsTab = 'output'
+      this.settingsTab = 'feature'
     },
     resetSettingsBaseline() {
       this.settingsBaseline = ''
@@ -864,30 +863,55 @@ createApp({
           </div>
           <p v-if="error" class="error settings-error">{{ error }}</p>
 
-          <section v-if="settingsTab === 'output'" class="settings-group" role="tabpanel">
-            <h3>出力</h3>
-            <div class="setting-row">
-              <div><strong>ローカル保存</strong><p>縮小した画像ファイルをPCにも保存します。</p></div>
-              <label class="switch"><input type="checkbox" v-model="state.config.output.saveLocal" /><span></span></label>
+          <section v-if="settingsTab === 'feature'" class="settings-group" role="tabpanel">
+            <h3>機能</h3>
+            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord }">
+              <div><strong>VRChat写真自動処理</strong><p>VRChat上で撮影されたときに処理します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="state.config.autoPhoto.enabled" :disabled="!state.config.output.uploadDiscord" /><span></span></label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord }">
+              <div><strong>スクリーンショット自動処理</strong><p>Win + Shift + Sでスクリーンショットが撮られたときに処理します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="state.config.screenshotAutoPost.enabled" :disabled="!state.config.output.uploadDiscord" /><span></span></label>
             </div>
             <div class="setting-row">
               <div><strong>Discord投稿</strong><p>縮小した画像をDiscord Webhookへ投稿し、VRChatで使うURLを取得します。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.output.uploadDiscord" /><span></span></label>
             </div>
-            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord }">
-              <div><strong>1枚時にURLを自動コピー</strong><p>1枚だけ処理したとき、取得したURLを自動でクリップボードへコピーします。</p></div>
-              <label class="switch"><input type="checkbox" v-model="state.config.output.copySingleUrlToClipboard" :disabled="!state.config.output.uploadDiscord" /><span></span></label>
-            </div>
             <div class="setting-row">
-              <div><strong>QRコードURL検出</strong><p>処理した画像内のQRコードを読み取り、URLが含まれていればDiscord本文と結果画面に表示します。複数のQRコードにも対応します。</p></div>
+              <div><strong>QRコードURL検出</strong><p>画像内のQRコードからURLを取得します。取得したURLはDiscord本文と結果画面に表示します。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.output.detectQrCodeUrls" /><span></span></label>
             </div>
+          </section>
+
+          <section v-if="settingsTab === 'process'" class="settings-group" role="tabpanel">
+            <h3>処理</h3>
             <div class="setting-row">
-              <div><strong>履歴削除時にoutputも削除</strong><p>画像履歴画面でDiscord削除済みの履歴を削除するとき、PCに保存したoutput画像も一緒に削除します。</p></div>
-              <label class="switch"><input type="checkbox" v-model="state.config.output.deleteOutputOnHistoryPurge" /><span></span></label>
+              <div><strong>ローカル保存</strong><p>処理した画像をローカルに保存します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="state.config.output.saveLocal" /><span></span></label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord }">
+              <div><strong>投稿URLの自動コピー</strong><p>Discordに投稿したURLをクリップボードに保存します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="state.config.output.copySingleUrlToClipboard" :disabled="!state.config.output.uploadDiscord" /><span></span></label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !state.config.output.saveLocal }">
+              <div><strong>出力先フォルダ</strong><p>ローカル保存時の保存先です。初期値はアプリと同じ場所にある output フォルダです。</p></div>
+              <div class="input-with-button">
+                <input v-model="state.config.image.outputDirectory" @blur="sanitizeOutputDirectory" placeholder="./output" :disabled="!state.config.output.saveLocal" />
+                <button class="secondary" @click="chooseOutputDirectory" :disabled="!state.config.output.saveLocal">選択</button>
+              </div>
+            </div>
+            <div class="setting-row" :class="{ disabled: !state.config.output.saveLocal }">
+              <div>
+                <strong>ファイル名サフィックス</strong>
+                <p>ローカル保存時のファイル名末尾に付ける文字です。</p>
+                <p>例: {{ outputExample }}</p>
+              </div>
+              <label>
+                <input v-model="state.config.image.suffix" :disabled="!state.config.output.saveLocal" />
+              </label>
             </div>
             <div class="setting-row">
-              <div><strong>出力形式</strong><p>PNGは画質を保ちやすく、JPGは写真向きです。</p></div>
+              <div><strong>出力形式</strong><p>保存または投稿に使う画像形式です。PNGは画質を保ちやすく、JPGは写真向きです。</p></div>
               <label>
                 <select v-model="state.config.image.outputFormat">
                   <option value="png">PNG</option>
@@ -895,48 +919,15 @@ createApp({
                 </select>
               </label>
             </div>
-            <div class="setting-row">
-              <div><strong>最大入力サイズ</strong><p>処理する画像ファイルとクリップボード画像の上限です。大きくしすぎると処理が重くなります。</p></div>
-              <label>
-                <input type="number" min="1" max="512" v-model.number="state.config.image.maxInputMb" />
-              </label>
-            </div>
-            <div class="setting-row">
+            <div class="setting-row" :class="{ disabled: !isJpegOutput }">
               <div><strong>JPEG品質</strong><p>{{ isJpegOutput ? 'JPG出力時の画質です。数字が大きいほど高画質です。' : 'PNG出力では使用しません。' }}</p></div>
               <label>
                 <input type="number" min="1" max="100" v-model.number="state.config.image.jpegQuality" :disabled="!isJpegOutput" />
               </label>
             </div>
-            <div class="setting-row">
-              <div><strong>UI表示</strong><p>処理後に画面を表示する条件を選びます。通常はautoのままで問題ありません。</p></div>
-              <label>
-                <select v-model="state.config.output.showUi">
-                  <option value="auto">auto</option>
-                  <option value="always">always</option>
-                  <option value="never">never</option>
-                </select>
-              </label>
-            </div>
-          </section>
-
-          <section v-if="settingsTab === 'save'" class="settings-group" role="tabpanel">
-            <h3>保存</h3>
-            <div class="setting-row">
-              <div><strong>出力先フォルダ</strong><p>保存先です。初期値はアプリと同じ場所にある output フォルダです。</p></div>
-              <div class="input-with-button">
-                <input v-model="state.config.image.outputDirectory" @blur="sanitizeOutputDirectory" placeholder="./output" />
-                <button class="secondary" @click="chooseOutputDirectory">選択</button>
-              </div>
-            </div>
-            <div class="setting-row">
-              <div>
-                <strong>サフィックス</strong>
-                <p>保存するファイル名の末尾に付ける文字です。</p>
-                <p>例: {{ outputExample }}</p>
-              </div>
-              <label>
-                <input v-model="state.config.image.suffix" />
-              </label>
+            <div class="setting-row" :class="{ disabled: !state.config.output.saveLocal }">
+              <div><strong>履歴削除時にoutputも削除</strong><p>画像履歴画面でDiscord削除済みの履歴を削除するとき、PCに保存したoutput画像も一緒に削除します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="state.config.output.deleteOutputOnHistoryPurge" :disabled="!state.config.output.saveLocal" /><span></span></label>
             </div>
           </section>
 
@@ -977,50 +968,6 @@ createApp({
               </label>
             </div>
           </section>
-
-          <template v-if="settingsTab === 'autoPost'">
-          <section class="settings-group" role="tabpanel">
-            <h3>VRChat写真自動投稿</h3>
-            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord }">
-              <div><strong>自動投稿</strong><p>VRChatの写真フォルダに新しい画像が保存されたら、自動で縮小してDiscordへ投稿します。</p></div>
-              <label class="switch"><input type="checkbox" v-model="state.config.autoPhoto.enabled" :disabled="!state.config.output.uploadDiscord" /><span></span></label>
-            </div>
-            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord || !state.config.autoPhoto.enabled }">
-              <div><strong>スキャン間隔</strong><p>自動投稿でフォルダを確認する間隔です。短くすると反映は早くなりますが、PCへの負荷が少し増えます。</p></div>
-              <label>
-                <input type="number" min="1" max="3600" v-model.number="state.config.autoPhoto.scanIntervalSeconds" :disabled="!state.config.output.uploadDiscord || !state.config.autoPhoto.enabled" />
-              </label>
-            </div>
-            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord || !state.config.autoPhoto.enabled }">
-              <div><strong>写真フォルダ</strong><p>VRChatが写真を保存するフォルダです。通常は「ピクチャ」内のVRChatフォルダです。</p></div>
-              <div class="input-with-button">
-                <input v-model="state.config.autoPhoto.photoDirectory" @blur="sanitizePhotoDirectory" placeholder="C:\\Users\\...\\Pictures\\VRChat" :disabled="!state.config.output.uploadDiscord || !state.config.autoPhoto.enabled" />
-                <button class="secondary" @click="choosePhotoDirectory" :disabled="!state.config.output.uploadDiscord || !state.config.autoPhoto.enabled">選択</button>
-              </div>
-            </div>
-          </section>
-
-          <section class="settings-group" role="tabpanel">
-            <h3>スクリーンショット自動投稿</h3>
-            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord }">
-              <div><strong>自動投稿</strong><p>Win+Shift+SなどでScreenshotsフォルダに保存された画像を、自動で縮小してDiscordへ投稿します。</p></div>
-              <label class="switch"><input type="checkbox" v-model="state.config.screenshotAutoPost.enabled" :disabled="!state.config.output.uploadDiscord" /><span></span></label>
-            </div>
-            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord || !state.config.screenshotAutoPost.enabled }">
-              <div><strong>スキャン間隔</strong><p>スクリーンショット自動投稿でフォルダを確認する間隔です。短くすると反映は早くなりますが、PCへの負荷が少し増えます。</p></div>
-              <label>
-                <input type="number" min="1" max="3600" v-model.number="state.config.screenshotAutoPost.scanIntervalSeconds" :disabled="!state.config.output.uploadDiscord || !state.config.screenshotAutoPost.enabled" />
-              </label>
-            </div>
-            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord || !state.config.screenshotAutoPost.enabled }">
-              <div><strong>Screenshotsフォルダ</strong><p>Windowsのスクリーンショット保存先です。通常は「ピクチャ」内のScreenshotsフォルダです。</p></div>
-              <div class="input-with-button">
-                <input v-model="state.config.screenshotAutoPost.screenshotDirectory" @blur="sanitizeScreenshotDirectory" placeholder="C:\\Users\\...\\Pictures\\Screenshots" :disabled="!state.config.output.uploadDiscord || !state.config.screenshotAutoPost.enabled" />
-                <button class="secondary" @click="chooseScreenshotDirectory" :disabled="!state.config.output.uploadDiscord || !state.config.screenshotAutoPost.enabled">選択</button>
-              </div>
-            </div>
-          </section>
-          </template>
         </div>
       </section>
 
