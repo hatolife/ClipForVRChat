@@ -874,9 +874,9 @@ createApp({
               <div><strong>Discord投稿</strong><p>縮小した画像をDiscord Webhookへ投稿し、VRChatで使うURLを取得します。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.output.uploadDiscord" /><span></span></label>
             </div>
-            <div class="setting-row">
+            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord }">
               <div><strong>1枚時にURLを自動コピー</strong><p>1枚だけ処理したとき、取得したURLを自動でクリップボードへコピーします。</p></div>
-              <label class="switch"><input type="checkbox" v-model="state.config.output.copySingleUrlToClipboard" /><span></span></label>
+              <label class="switch"><input type="checkbox" v-model="state.config.output.copySingleUrlToClipboard" :disabled="!state.config.output.uploadDiscord" /><span></span></label>
             </div>
             <div class="setting-row">
               <div><strong>QRコードURL検出</strong><p>処理した画像内のQRコードを読み取り、URLが含まれていればDiscord本文と結果画面に表示します。複数のQRコードにも対応します。</p></div>
@@ -954,26 +954,26 @@ createApp({
 
           <section v-if="settingsTab === 'webhook'" class="settings-group" role="tabpanel">
             <h3>Webhook</h3>
-            <div class="setting-row">
+            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord }">
               <div>
                 <strong>通常投稿用Webhook URL</strong>
                 <p>Discordの投稿先チャンネルでWebhookを作成し、そのURLを貼り付けます。</p>
-                <button class="link-button" @click="openURL(webhookGuideUrl)">Discord公式: Webhookの作成方法</button>
+                <button class="link-button" @click="openURL(webhookGuideUrl)" :disabled="!state.config.output.uploadDiscord">Discord公式: Webhookの作成方法</button>
               </div>
               <label>
-              <input type="password" v-model="state.config.discord.webhookUrl" placeholder="https://discord.com/api/webhooks/..." />
+              <input type="password" v-model="state.config.discord.webhookUrl" placeholder="https://discord.com/api/webhooks/..." :disabled="!state.config.output.uploadDiscord" />
               </label>
             </div>
-            <div class="setting-row" :class="{ disabled: !state.config.autoPhoto.enabled }">
+            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord || !state.config.autoPhoto.enabled }">
               <div><strong>VRChat写真自動投稿用Webhook URL</strong><p>通常投稿とは別の投稿先にしたい場合だけ入力します。空の場合は通常投稿用Webhook URLへ投稿します。</p></div>
               <label>
-                <input type="password" v-model="state.config.autoPhoto.webhookUrl" placeholder="空なら通常投稿用Webhook URLを使用" :disabled="!state.config.autoPhoto.enabled" />
+                <input type="password" v-model="state.config.autoPhoto.webhookUrl" placeholder="空なら通常投稿用Webhook URLを使用" :disabled="!state.config.output.uploadDiscord || !state.config.autoPhoto.enabled" />
               </label>
             </div>
-            <div class="setting-row" :class="{ disabled: !state.config.screenshotAutoPost.enabled }">
+            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord || !state.config.screenshotAutoPost.enabled }">
               <div><strong>スクリーンショット自動投稿用Webhook URL</strong><p>通常投稿とは別の投稿先にしたい場合だけ入力します。空の場合は通常投稿用Webhook URLへ投稿します。</p></div>
               <label>
-                <input type="password" v-model="state.config.screenshotAutoPost.webhookUrl" placeholder="空なら通常投稿用Webhook URLを使用" :disabled="!state.config.screenshotAutoPost.enabled" />
+                <input type="password" v-model="state.config.screenshotAutoPost.webhookUrl" placeholder="空なら通常投稿用Webhook URLを使用" :disabled="!state.config.output.uploadDiscord || !state.config.screenshotAutoPost.enabled" />
               </label>
             </div>
           </section>
@@ -981,42 +981,42 @@ createApp({
           <template v-if="settingsTab === 'autoPost'">
           <section class="settings-group" role="tabpanel">
             <h3>VRChat写真自動投稿</h3>
-            <div class="setting-row">
+            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord }">
               <div><strong>自動投稿</strong><p>VRChatの写真フォルダに新しい画像が保存されたら、自動で縮小してDiscordへ投稿します。</p></div>
-              <label class="switch"><input type="checkbox" v-model="state.config.autoPhoto.enabled" /><span></span></label>
+              <label class="switch"><input type="checkbox" v-model="state.config.autoPhoto.enabled" :disabled="!state.config.output.uploadDiscord" /><span></span></label>
             </div>
-            <div class="setting-row" :class="{ disabled: !state.config.autoPhoto.enabled }">
+            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord || !state.config.autoPhoto.enabled }">
               <div><strong>スキャン間隔</strong><p>自動投稿でフォルダを確認する間隔です。短くすると反映は早くなりますが、PCへの負荷が少し増えます。</p></div>
               <label>
-                <input type="number" min="1" max="3600" v-model.number="state.config.autoPhoto.scanIntervalSeconds" :disabled="!state.config.autoPhoto.enabled" />
+                <input type="number" min="1" max="3600" v-model.number="state.config.autoPhoto.scanIntervalSeconds" :disabled="!state.config.output.uploadDiscord || !state.config.autoPhoto.enabled" />
               </label>
             </div>
-            <div class="setting-row" :class="{ disabled: !state.config.autoPhoto.enabled }">
+            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord || !state.config.autoPhoto.enabled }">
               <div><strong>写真フォルダ</strong><p>VRChatが写真を保存するフォルダです。通常は「ピクチャ」内のVRChatフォルダです。</p></div>
               <div class="input-with-button">
-                <input v-model="state.config.autoPhoto.photoDirectory" @blur="sanitizePhotoDirectory" placeholder="C:\\Users\\...\\Pictures\\VRChat" :disabled="!state.config.autoPhoto.enabled" />
-                <button class="secondary" @click="choosePhotoDirectory" :disabled="!state.config.autoPhoto.enabled">選択</button>
+                <input v-model="state.config.autoPhoto.photoDirectory" @blur="sanitizePhotoDirectory" placeholder="C:\\Users\\...\\Pictures\\VRChat" :disabled="!state.config.output.uploadDiscord || !state.config.autoPhoto.enabled" />
+                <button class="secondary" @click="choosePhotoDirectory" :disabled="!state.config.output.uploadDiscord || !state.config.autoPhoto.enabled">選択</button>
               </div>
             </div>
           </section>
 
           <section class="settings-group" role="tabpanel">
             <h3>スクリーンショット自動投稿</h3>
-            <div class="setting-row">
+            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord }">
               <div><strong>自動投稿</strong><p>Win+Shift+SなどでScreenshotsフォルダに保存された画像を、自動で縮小してDiscordへ投稿します。</p></div>
-              <label class="switch"><input type="checkbox" v-model="state.config.screenshotAutoPost.enabled" /><span></span></label>
+              <label class="switch"><input type="checkbox" v-model="state.config.screenshotAutoPost.enabled" :disabled="!state.config.output.uploadDiscord" /><span></span></label>
             </div>
-            <div class="setting-row" :class="{ disabled: !state.config.screenshotAutoPost.enabled }">
+            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord || !state.config.screenshotAutoPost.enabled }">
               <div><strong>スキャン間隔</strong><p>スクリーンショット自動投稿でフォルダを確認する間隔です。短くすると反映は早くなりますが、PCへの負荷が少し増えます。</p></div>
               <label>
-                <input type="number" min="1" max="3600" v-model.number="state.config.screenshotAutoPost.scanIntervalSeconds" :disabled="!state.config.screenshotAutoPost.enabled" />
+                <input type="number" min="1" max="3600" v-model.number="state.config.screenshotAutoPost.scanIntervalSeconds" :disabled="!state.config.output.uploadDiscord || !state.config.screenshotAutoPost.enabled" />
               </label>
             </div>
-            <div class="setting-row" :class="{ disabled: !state.config.screenshotAutoPost.enabled }">
+            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord || !state.config.screenshotAutoPost.enabled }">
               <div><strong>Screenshotsフォルダ</strong><p>Windowsのスクリーンショット保存先です。通常は「ピクチャ」内のScreenshotsフォルダです。</p></div>
               <div class="input-with-button">
-                <input v-model="state.config.screenshotAutoPost.screenshotDirectory" @blur="sanitizeScreenshotDirectory" placeholder="C:\\Users\\...\\Pictures\\Screenshots" :disabled="!state.config.screenshotAutoPost.enabled" />
-                <button class="secondary" @click="chooseScreenshotDirectory" :disabled="!state.config.screenshotAutoPost.enabled">選択</button>
+                <input v-model="state.config.screenshotAutoPost.screenshotDirectory" @blur="sanitizeScreenshotDirectory" placeholder="C:\\Users\\...\\Pictures\\Screenshots" :disabled="!state.config.output.uploadDiscord || !state.config.screenshotAutoPost.enabled" />
+                <button class="secondary" @click="chooseScreenshotDirectory" :disabled="!state.config.output.uploadDiscord || !state.config.screenshotAutoPost.enabled">選択</button>
               </div>
             </div>
           </section>
