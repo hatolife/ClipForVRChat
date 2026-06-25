@@ -17,8 +17,13 @@ import (
 var (
 	copySingleURLIfNeeded = appcore.CopySingleURLIfNeeded
 	deleteDiscordMessage  = appcore.DeleteDiscordMessage
-	runningGoTest         = strings.HasSuffix(filepath.Base(os.Args[0]), ".test")
+	runningGoTest         = isGoTestBinary(os.Args[0])
 )
+
+func isGoTestBinary(path string) bool {
+	name := strings.ToLower(filepath.Base(path))
+	return strings.HasSuffix(name, ".test") || strings.HasSuffix(name, ".test.exe")
+}
 
 func emitWailsEvent(ctx context.Context, name string, data any) {
 	if ctx == nil || runningGoTest {
