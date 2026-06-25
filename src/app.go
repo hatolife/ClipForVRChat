@@ -458,7 +458,7 @@ func userVisibleResults(results []appcore.Result) []appcore.Result {
 
 func resultMessage(cfg appcore.Config, results []appcore.Result, copyErr error) string {
 	if len(results) == 0 {
-		return "実行された処理はありません。"
+		return noVisibleResultMessage(cfg)
 	}
 	if len(results) == 1 && results[0].URL != "" && cfg.Output.CopySingleURLToClipboard {
 		if copyErr != nil {
@@ -501,6 +501,29 @@ func resultMessage(cfg appcore.Config, results []appcore.Result, copyErr error) 
 		return strings.Join(parts, "、") + "を行いました。"
 	}
 	return ""
+}
+
+func noVisibleResultMessage(cfg appcore.Config) string {
+	if !cfg.Output.UploadDiscord && !cfg.Output.SaveLocal && !cfg.Output.DetectQRCodeURLs {
+		return "実行された処理はありません。Discord投稿、ローカル保存、QRコードURL取得がすべてOFFのため、表示できる処理結果がありません。設定を確認してください。"
+	}
+	if cfg.Output.DetectQRCodeURLs && !cfg.Output.UploadDiscord && !cfg.Output.SaveLocal {
+		return "表示できる処理結果はありません。QRコードURL取得はONですが、この画像からURLを取得できませんでした。Discord投稿またはローカル保存をONにすると、画像の処理結果も残せます。"
+	}
+	var disabled []string
+	if !cfg.Output.UploadDiscord {
+		disabled = append(disabled, "Discord投稿")
+	}
+	if !cfg.Output.SaveLocal {
+		disabled = append(disabled, "ローカル保存")
+	}
+	if !cfg.Output.DetectQRCodeURLs {
+		disabled = append(disabled, "QRコードURL取得")
+	}
+	if len(disabled) > 0 {
+		return fmt.Sprintf("表示できる処理結果はありません。%sがOFFのため、今回の画像では結果として残せる処理がありませんでした。設定を確認してください。", strings.Join(disabled, "、"))
+	}
+	return "表示できる処理結果はありません。"
 }
 
 func hasJSONPath(paths []string) bool {
