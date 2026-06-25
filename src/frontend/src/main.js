@@ -654,9 +654,9 @@ createApp({
           <h1>{{ info.name }}</h1>
         </div>
         <nav>
+          <button :class="{ active: activeView === 'settings' }" @click="toggleSettings">設定</button>
           <button :class="{ active: activeView === 'help' }" @click="toggleHelp">使い方</button>
           <button :class="{ active: activeView === 'about' || activeView === 'licenses' }" @click="toggleAbout">情報</button>
-          <button :class="{ active: activeView === 'settings' }" @click="toggleSettings">設定</button>
         </nav>
       </header>
 
@@ -865,17 +865,21 @@ createApp({
 
           <section v-if="settingsTab === 'feature'" class="settings-group" role="tabpanel">
             <h3>機能</h3>
-            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord }">
+            <div class="setting-row">
               <div><strong>VRChat写真自動処理</strong><p>VRChat上で撮影されたときに処理します。</p></div>
-              <label class="switch"><input type="checkbox" v-model="state.config.autoPhoto.enabled" :disabled="!state.config.output.uploadDiscord" /><span></span></label>
+              <label class="switch"><input type="checkbox" v-model="state.config.autoPhoto.enabled" /><span></span></label>
             </div>
-            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord }">
+            <div class="setting-row">
               <div><strong>スクリーンショット自動処理</strong><p>Win + Shift + Sでスクリーンショットが撮られたときに処理します。</p></div>
-              <label class="switch"><input type="checkbox" v-model="state.config.screenshotAutoPost.enabled" :disabled="!state.config.output.uploadDiscord" /><span></span></label>
+              <label class="switch"><input type="checkbox" v-model="state.config.screenshotAutoPost.enabled" /><span></span></label>
             </div>
             <div class="setting-row">
               <div><strong>Discord投稿</strong><p>縮小した画像をDiscord Webhookへ投稿し、VRChatで使うURLを取得します。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.output.uploadDiscord" /><span></span></label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord }">
+              <div><strong>投稿URLの自動コピー</strong><p>Discordに投稿したURLをクリップボードに保存します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="state.config.output.copySingleUrlToClipboard" :disabled="!state.config.output.uploadDiscord" /><span></span></label>
             </div>
             <div class="setting-row">
               <div><strong>QRコードURL検出</strong><p>画像内のQRコードからURLを取得します。取得したURLはDiscord本文と結果画面に表示します。</p></div>
@@ -888,10 +892,6 @@ createApp({
             <div class="setting-row">
               <div><strong>ローカル保存</strong><p>処理した画像をローカルに保存します。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.output.saveLocal" /><span></span></label>
-            </div>
-            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord }">
-              <div><strong>投稿URLの自動コピー</strong><p>Discordに投稿したURLをクリップボードに保存します。</p></div>
-              <label class="switch"><input type="checkbox" v-model="state.config.output.copySingleUrlToClipboard" :disabled="!state.config.output.uploadDiscord" /><span></span></label>
             </div>
             <div class="setting-row" :class="{ disabled: !state.config.output.saveLocal }">
               <div><strong>出力先フォルダ</strong><p>ローカル保存時の保存先です。初期値はアプリと同じ場所にある output フォルダです。</p></div>
@@ -910,19 +910,19 @@ createApp({
                 <input v-model="state.config.image.suffix" :disabled="!state.config.output.saveLocal" />
               </label>
             </div>
-            <div class="setting-row">
+            <div class="setting-row" :class="{ disabled: !state.config.output.saveLocal }">
               <div><strong>出力形式</strong><p>保存または投稿に使う画像形式です。PNGは画質を保ちやすく、JPGは写真向きです。</p></div>
               <label>
-                <select v-model="state.config.image.outputFormat">
+                <select v-model="state.config.image.outputFormat" :disabled="!state.config.output.saveLocal">
                   <option value="png">PNG</option>
                   <option value="jpg">JPG</option>
                 </select>
               </label>
             </div>
-            <div class="setting-row" :class="{ disabled: !isJpegOutput }">
-              <div><strong>JPEG品質</strong><p>{{ isJpegOutput ? 'JPG出力時の画質です。数字が大きいほど高画質です。' : 'PNG出力では使用しません。' }}</p></div>
+            <div class="setting-row" :class="{ disabled: !state.config.output.saveLocal || !isJpegOutput }">
+              <div><strong>JPEG品質</strong><p>{{ state.config.output.saveLocal && isJpegOutput ? 'JPG出力時の画質です。数字が大きいほど高画質です。' : 'ローカル保存OFFまたはPNG出力では使用しません。' }}</p></div>
               <label>
-                <input type="number" min="1" max="100" v-model.number="state.config.image.jpegQuality" :disabled="!isJpegOutput" />
+                <input type="number" min="1" max="100" v-model.number="state.config.image.jpegQuality" :disabled="!state.config.output.saveLocal || !isJpegOutput" />
               </label>
             </div>
             <div class="setting-row" :class="{ disabled: !state.config.output.saveLocal }">

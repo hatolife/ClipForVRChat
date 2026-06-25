@@ -10,7 +10,7 @@
 
 ## 受け入れ条件
 
-- Discord投稿OFFの場合、自動投稿 watcher がDiscord投稿を開始しない。
+- Discord投稿OFFの場合、自動投稿 watcher が動作してもDiscord投稿を行わない。
 - AutoPhotoWatcher内部で `UploadDiscord` を強制的にONへ変更しない。
 - 既存configで自動投稿ONが残っていても、Discord投稿OFFならDiscordへ投稿しない。
 - 回帰テストでDiscord投稿OFF時にWebhookエラーにならず、ローカル保存など設定通りに処理されることを確認する。
@@ -18,5 +18,5 @@
 ## 対応
 
 - `AutoPhotoWatcher.process` で `UploadDiscord` を強制的にONへ変更しないようにした。
-- `restartAutoPhotoWatcher` でDiscord投稿OFFの場合は自動投稿 watcher を起動しないようにした。
+- `restartAutoPhotoWatcher` は自動処理ON/OFFだけで起動を判断し、Discord投稿可否は `UploadDiscord` に従って処理するようにした。
 - Discord投稿OFF時に自動投稿処理がWebhookエラーにならず、ローカル保存として完了する回帰テストを追加した。

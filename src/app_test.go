@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"path/filepath"
 	"strings"
@@ -101,6 +102,29 @@ func TestAppSaveConfigAndProcessHandlesDecodeError(t *testing.T) {
 	}
 	if state.Mode != appcore.ModeError || !strings.Contains(state.Message, "処理中にエラー") {
 		t.Fatalf("state = %+v", state)
+	}
+}
+
+func TestAppStartupStartsAutoPhotoWatcherWithoutDiscordUpload(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	cfg := appcore.DefaultConfig()
+	cfg.Output.UploadDiscord = false
+	cfg.AutoPhoto.Enabled = true
+	cfg.AutoPhoto.PhotoDirectory = t.TempDir()
+	cfg.AutoPhoto.ScanIntervalSeconds = 3600
+
+	app := NewApp(configPath, appcore.UIState{Config: cfg})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	app.startup(ctx)
+	defer func() {
+		if app.autoCancel != nil {
+			app.autoCancel()
+		}
+	}()
+
+	if app.autoCancel == nil {
+		t.Fatal("auto photo watcher was not started")
 	}
 }
 
