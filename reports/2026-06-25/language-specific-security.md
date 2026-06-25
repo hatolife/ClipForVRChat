@@ -27,9 +27,9 @@
 ### 問題・注意点
 
 - `govulncheck` が `github.com/cloudflare/circl@v1.6.2` の到達可能脆弱性を検出。
-- 診断用の平文zipにWebhook URLや履歴tokenが残る。
+- 診断用の確認用zipにWebhook URLや履歴tokenが残る。確認用zipは残す前提で、秘密情報だけをダミー値へ置換する必要がある。
 - `history.json` の `OutputPath` に絶対パスが入ると削除対象になる。
-- Windowsファイル権限は実機ACL確認が必要。
+- Windowsファイル権限は実機ACL確認が必要。Goの `0600` 指定はWindowsのDACLをUnixと同じ形で制御するものではない。
 
 ## JavaScript / Vue
 
@@ -69,7 +69,7 @@
 
 ### 問題・注意点
 
-- Release workflow全体が `contents: write`。
+- Release workflow全体が `contents: write`。Release作成には必要だが、job分離とEnvironment protectionでRelease権限と署名鍵へ到達できる範囲を狭められる。
 - 外部ActionがSHA pinningではなくメジャーバージョン指定。
 - SBOM生成はない。
 

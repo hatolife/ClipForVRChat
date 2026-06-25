@@ -35,7 +35,7 @@
 - `config.json` / `history.json` と実行中アプリの境界
 - Wails frontendとGo backendの境界
 - Discord/GitHub APIレスポンスとアプリ内部状態の境界
-- ローカル平文zipと暗号化済み診断データの境界
+- ユーザー確認用の安全化済みzipと暗号化済み診断データの境界
 - GitHub Actions runnerとRelease成果物の境界
 
 ## 入力経路
@@ -101,7 +101,7 @@
 ### Information Disclosure
 
 - config/history/log/diagnosticsにWebhook URL、token、パス、QR URL、利用状況が含まれ得る。
-- 確認用zipの誤添付が最大の情報漏えい経路。
+- 確認用zipに秘密情報が残っている場合、その誤添付が最大の情報漏えい経路になる。確認用zip自体はユーザー確認用として必要なため、Webhook URLやtokenを入れない設計にする。
 
 ### Denial of Service
 
@@ -115,7 +115,7 @@
 
 ## 想定される攻撃シナリオ
 
-1. ユーザーが不具合報告用データの平文zipをGitHub Issueへ添付し、Webhook URLと履歴tokenが漏えいする。
+1. ユーザーが不具合報告用データの確認用zipをGitHub Issueへ添付したとき、zip内にWebhook URLや履歴tokenが残っていると漏えいする。
 2. ローカル攻撃者が `history.json` の `outputPath` を改ざんし、ユーザーに履歴画面から削除操作をさせる。
 3. 細工画像により画像デコーダやQRライブラリの脆弱性を突く。
 4. Release workflowやAction更新経路を侵害し、成果物を改ざんする。
@@ -124,7 +124,7 @@
 ## 優先的に対策すべきリスク
 
 1. 依存関係既知脆弱性の解消。
-2. 診断データ平文zipから秘密情報を除外。
+2. 診断データの確認用zipから秘密情報を除外し、Webhook URLやtokenをダミー化する。
 3. Discord tokenの保存最小化またはOS保護。
 4. Release workflow権限・Action pinningの硬化。
 5. 任意URLオープンの許可リスト化。
