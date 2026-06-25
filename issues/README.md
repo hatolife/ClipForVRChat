@@ -109,6 +109,8 @@
 | 102 | [診断ログのローカルパスと秘密情報を抑制する](102-redact-diagnostic-log-paths.md) | 完了 | `v0.1.7` | 診断ログ出力時点でパスと秘密情報を可能な範囲で抑制する。 |
 | 103 | [Windows実機でACLを確認する](103-check-windows-acl.md) | 要確認 | 未定 | Windows実機でconfig/history/logs/diagnosticsのACLを確認する。 |
 | 104 | [ReleaseにSBOMまたはビルドメタデータを追加する](104-add-release-sbom-or-build-metadata.md) | 完了 | `v0.1.7` | Release成果物に依存関係やビルド環境の追跡情報を追加する。 |
+| 105 | [Windows GoテストでWailsイベント送信ガードが効かない](105-fix-windows-test-wails-event-guard.md) | 完了 | `v0.1.7` | Windowsの `.test.exe` テストバイナリでもWailsイベント送信を抑制する。 |
+| 106 | [Release NotesのダウンロードURLをMarkdownリンクにする](106-release-notes-download-links.md) | 完了 | `v0.1.7` | Release本文のダウンロード欄でファイル名をリンクテキストとして表示する。 |
 
 ## 状態の意味
 

@@ -251,6 +251,23 @@ func TestTrustedExternalURL(t *testing.T) {
 	}
 }
 
+func TestIsGoTestBinary(t *testing.T) {
+	tests := []struct {
+		path string
+		want bool
+	}{
+		{path: "/tmp/app.test", want: true},
+		{path: `C:\Users\runner\AppData\Local\Temp\app.test.exe`, want: true},
+		{path: `C:\app\ClipForVRChat.exe`, want: false},
+		{path: "/tmp/not-test", want: false},
+	}
+	for _, tt := range tests {
+		if got := isGoTestBinary(tt.path); got != tt.want {
+			t.Fatalf("isGoTestBinary(%q) = %v, want %v", tt.path, got, tt.want)
+		}
+	}
+}
+
 func TestAppStartupWritesVersionHashAndRedactedConfig(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.json")
