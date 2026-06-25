@@ -285,32 +285,69 @@ button:disabled {
 .settings-layout {
   max-width: 960px;
   display: grid;
-  gap: 16px;
+  gap: 0;
 }
 
-.settings-tabs {
+.settings-topbar {
   position: sticky;
   top: -24px;
   z-index: 2;
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 8px 0 12px;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 54px;
+  padding-top: 8px;
   background: #edf3f7;
+  border-bottom: 1px solid #c9d4df;
+}
+
+.settings-tabs {
+  align-self: end;
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0;
 }
 
 .settings-tabs button {
-  min-width: 92px;
-  border-color: #b9c5cf;
-  background: #ffffff;
+  min-width: 96px;
+  padding: 10px 14px;
+  border-color: #c9d4df;
+  border-bottom-color: transparent;
+  border-radius: 7px 7px 0 0;
+  background: #f7fafc;
   color: #17212b;
+  margin-bottom: -1px;
+  font-weight: 600;
 }
 
 .settings-tabs button.active {
   border-color: #1f6f9d;
-  background: #2478a9;
-  color: #ffffff;
+  border-bottom-color: #ffffff;
+  background: #ffffff;
+  color: #1b638f;
+}
+
+.settings-top-actions {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #d6dee7;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.settings-top-actions button {
+  padding: 7px 12px;
+}
+
+.settings-error {
+  margin-top: 14px;
 }
 
 .settings-group {
@@ -320,6 +357,7 @@ button:disabled {
   border: 1px solid #d6dee7;
   border-radius: 8px;
   background: #ffffff;
+  margin-top: 16px;
 }
 
 label {
@@ -371,6 +409,16 @@ small {
 .setting-row p {
   color: #5b6875;
   line-height: 1.55;
+}
+
+.setting-row.disabled {
+  opacity: 0.58;
+}
+
+.setting-row.disabled button,
+.setting-row.disabled input,
+.setting-row.disabled select {
+  cursor: default;
 }
 
 .switch {
