@@ -28,6 +28,7 @@ createApp({
       saved: false,
       error: '',
       settingsBaseline: '',
+      settingsTab: 'output',
       pendingSettingsLeave: null,
       pendingDropPaths: [],
       historyDragSelecting: false,
@@ -107,6 +108,15 @@ createApp({
     updateSettings() {
       return this.state.config?.update || { checkEnabled: true, notificationEnabled: true }
     },
+    settingsTabs() {
+      return [
+        { id: 'output', label: '出力' },
+        { id: 'save', label: '保存' },
+        { id: 'update', label: '更新' },
+        { id: 'discord', label: 'Discord' },
+        { id: 'autoPost', label: '自動投稿' }
+      ]
+    },
     shouldShowUpdateBanner() {
       return Boolean(
         this.updateInfo.available &&
@@ -163,6 +173,7 @@ createApp({
     },
     rememberSettingsBaseline() {
       this.settingsBaseline = this.serializeSettings(this.state.config)
+      this.settingsTab = 'output'
     },
     resetSettingsBaseline() {
       this.settingsBaseline = ''
@@ -831,7 +842,19 @@ createApp({
           <p v-if="state.message" class="message" :class="{ warning: isError }">{{ state.message }}</p>
         </div>
         <div v-if="state.config" class="settings-layout">
-          <section class="settings-group">
+          <div class="settings-tabs" role="tablist" aria-label="設定カテゴリ">
+            <button
+              v-for="tab in settingsTabs"
+              :key="tab.id"
+              type="button"
+              role="tab"
+              :aria-selected="settingsTab === tab.id"
+              :class="{ active: settingsTab === tab.id }"
+              @click="settingsTab = tab.id"
+            >{{ tab.label }}</button>
+          </div>
+
+          <section v-if="settingsTab === 'output'" class="settings-group" role="tabpanel">
             <h3>出力</h3>
             <div class="setting-row">
               <div><strong>ローカル保存</strong><p>縮小した画像ファイルをPCにも保存します。</p></div>
@@ -886,7 +909,7 @@ createApp({
             </div>
           </section>
 
-          <section class="settings-group">
+          <section v-if="settingsTab === 'save'" class="settings-group" role="tabpanel">
             <h3>保存</h3>
             <div class="setting-row">
               <div><strong>出力先フォルダ</strong><p>保存先です。初期値はアプリと同じ場所にある output フォルダです。</p></div>
@@ -907,7 +930,7 @@ createApp({
             </div>
           </section>
 
-          <section class="settings-group">
+          <section v-if="settingsTab === 'update'" class="settings-group" role="tabpanel">
             <h3>更新</h3>
             <div class="setting-row">
               <div><strong>更新確認</strong><p>起動時にGitHub Releasesを確認し、新しいバージョンがあるか調べます。</p></div>
@@ -919,7 +942,7 @@ createApp({
             </div>
           </section>
 
-          <section class="settings-group">
+          <section v-if="settingsTab === 'discord'" class="settings-group" role="tabpanel">
             <h3>Discord</h3>
             <div class="setting-row">
               <div>
@@ -933,7 +956,8 @@ createApp({
             </div>
           </section>
 
-          <section class="settings-group">
+          <template v-if="settingsTab === 'autoPost'">
+          <section class="settings-group" role="tabpanel">
             <h3>VRChat写真自動投稿</h3>
             <div class="setting-row">
               <div><strong>自動投稿</strong><p>VRChatの写真フォルダに新しい画像が保存されたら、自動で縮小してDiscordへ投稿します。</p></div>
@@ -960,7 +984,7 @@ createApp({
             </div>
           </section>
 
-          <section class="settings-group">
+          <section class="settings-group" role="tabpanel">
             <h3>スクリーンショット自動投稿</h3>
             <div class="setting-row">
               <div><strong>自動投稿</strong><p>Win+Shift+SなどでScreenshotsフォルダに保存された画像を、自動で縮小してDiscordへ投稿します。</p></div>
@@ -986,6 +1010,7 @@ createApp({
               </label>
             </div>
           </section>
+          </template>
 
           <div class="button-row footer-actions">
             <button @click="saveSettings" :disabled="saving">{{ saving ? '保存中' : '保存' }}</button>

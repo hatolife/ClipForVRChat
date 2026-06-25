@@ -288,6 +288,31 @@ button:disabled {
   gap: 16px;
 }
 
+.settings-tabs {
+  position: sticky;
+  top: -24px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 0 12px;
+  background: #edf3f7;
+}
+
+.settings-tabs button {
+  min-width: 92px;
+  border-color: #b9c5cf;
+  background: #ffffff;
+  color: #17212b;
+}
+
+.settings-tabs button.active {
+  border-color: #1f6f9d;
+  background: #2478a9;
+  color: #ffffff;
+}
+
 .settings-group {
   display: grid;
   gap: 14px;
