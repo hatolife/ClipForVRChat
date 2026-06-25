@@ -20,7 +20,7 @@
 | 012 | [画像URL履歴とDiscord削除確認画面](012-image-history-and-discord-delete-review.md) | 完了 | `v0.1.0`, `v0.1.2` | 履歴保存、クリア済み表示、Discord削除確認画面、Ctrl/Shift選択、矩形範囲選択を実装。 |
 | 013 | [ユーザーフレンドリーなREADMEと設定画面改善](013-user-friendly-readme-and-settings-ui.md) | 完了 | `v0.1.0` | README、設定画面、WebHook説明、出力先選択などを改善。 |
 | 014 | [VRChat写真の自動検知とDiscord投稿](014-vrchat-photo-auto-post.md) | 完了 | `v0.1.0` | VRChat写真フォルダの定期スキャンと自動Discord投稿を実装。 |
-| 015 | [セキュリティチェック報告書の作成](015-security-review-report.md) | 完了 | `v0.1.0` | `reports/2026-06-21-security-review.md` を作成し、リスクと推奨対応を整理。 |
+| 015 | [セキュリティチェック報告書の作成](015-security-review-report.md) | 完了 | `v0.1.0` | `reports/2026-06-21/security-review.md` を作成し、リスクと推奨対応を整理。 |
 | 016 | [Webhook URL と履歴 URL の検証強化](016-validate-webhook-and-history-urls.md) | 完了 | `v0.1.0` | Discord Webhook URL と履歴画像URLの検証を強化。 |
 | 017 | [設定・履歴ファイルの権限と排他制御](017-harden-local-secret-storage-and-history-locking.md) | 完了 | `v0.1.0` | 設定/履歴ファイルの権限、履歴更新の排他制御を強化。 |
 | 018 | [画像入力のサイズ上限とピクセル数上限](018-limit-image-input-resource-usage.md) | 完了 | `v0.1.0` | 入力画像のファイルサイズ上限とピクセル数上限を追加。 |
@@ -54,8 +54,8 @@
 | 047 | [CLIでversion/help引数に対応する](047-cli-version-help-args.md) | 完了 | `v0.1.6` | `go-arg` で `--version` / `--help` の早期終了に対応する。 |
 | 048 | [Windows GUI exeのCLI出力をPowerShellに表示する](048-cli-output-from-windows-gui-exe.md) | 完了 | `v0.1.6` | GUIサブシステムのexeでもCLI出力を親コンソールへ表示する。 |
 | 049 | [CLIヘルプをWindowsコンソールで文字化けさせない](049-use-wide-console-output-for-cli.md) | 完了 | `v0.1.6` | `WriteConsoleW` でCLI出力し、cmdのコードページ差による文字化けを避ける。 |
-| 050 | [プロダクト全体の問題点チェック報告書を作成する](050-product-issue-review-report.md) | 完了 | `v0.1.6` | `reports/2026-06-24-product-issue-report.md` を作成し、Release/UX/履歴/設定/OSS表示などの残課題を整理。 |
-| 051 | [監査報告書を日付付きで専用ディレクトリへ移動する](051-date-audit-reports-directory.md) | 完了 | `v0.1.6` | 監査報告書を `reports/` 配下の日付付きファイル名へ整理。 |
+| 050 | [プロダクト全体の問題点チェック報告書を作成する](050-product-issue-review-report.md) | 完了 | `v0.1.6` | `reports/2026-06-24/product-issue-report.md` を作成し、Release/UX/履歴/設定/OSS表示などの残課題を整理。 |
+| 051 | [監査報告書を日付付きで専用ディレクトリへ移動する](051-date-audit-reports-directory.md) | 完了 | `v0.1.6` | 監査報告書を `reports/` 配下の日付ディレクトリへ整理。 |
 | 052 | [Release署名ファイルの説明を実際の成果物に合わせる](052-align-release-signing-docs.md) | 完了 | `v0.1.6` | README/About/SPEC のPGP確認手順をRelease成果物に合わせる。 |
 | 053 | [Discord削除の部分成功を履歴へ保存する](053-persist-partial-discord-delete-results.md) | 完了 | `v0.1.6` | 複数削除の一部失敗時も成功済み削除状態を保存する。 |
 | 054 | [config読み込み失敗時にアクティブ設定パスを変更しない](054-keep-config-path-on-load-error.md) | 完了 | `v0.1.6` | 不正configの読み込み失敗時に既存の設定パスを維持する。 |
@@ -95,7 +95,8 @@
 | 088 | [診断ログ実フォルダ名をlogsへ統一する](088-use-logs-directory-for-diagnostic-logs.md) | 完了 | `v0.1.7` | アプリ実フォルダの診断ログ出力先も `logs/YYYY-MM-DD.log` に統一する。 |
 | 089 | [不具合報告用データの説明を情報画面に追加する](089-explain-diagnostic-data-in-about.md) | 完了 | `v0.1.7` | 情報画面に含まれる情報、暗号化方法、利用目的の説明を追加する。 |
 | 090 | [不具合報告用データを段階作成しパスを置換する](090-stage-and-sanitize-diagnostic-data.md) | 完了 | `v0.1.7` | `diagnostics/<timestamp>/` に確認用zipと暗号化zipを作成し、テキスト内パスを環境変数表記へ置換する。 |
-| 091 | [セキュリティ監査報告書を作成する](091-security-audit-2026-06-25.md) | 完了 | `8e46ffd` | `reports/security_audit_prompt.md` に基づき、現行リポジトリのセキュリティ監査報告書を作成した。 |
+| 091 | [セキュリティ監査報告書を作成する](091-security-audit-2026-06-25.md) | 完了 | `8e46ffd` | `reports/2026-06-25/security-audit-prompt.md` に基づき、現行リポジトリのセキュリティ監査報告書を作成した。 |
+| 092 | [監査報告書の配置と説明を整理する](092-organize-reports-and-clarify-security-notes.md) | 完了 | `v0.1.7` | 監査報告書を日付ディレクトリへ移動し、診断zip、Release workflow、Windows ACLの説明を補足する。 |
 
 ## 状態の意味
 

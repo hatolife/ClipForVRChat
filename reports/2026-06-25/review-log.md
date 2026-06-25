@@ -6,7 +6,7 @@
 
 ## 実施した確認作業
 
-- `reports/security_audit_prompt.md` の全体を確認。
+- `reports/2026-06-25/security-audit-prompt.md` の元になった監査プロンプト全体を確認。
 - リポジトリ構成、主要ファイル、CI/Release workflowを確認。
 - Goコードの入力経路、ファイル処理、ネットワーク処理、暗号処理、ログ処理を確認。
 - FrontendコードのURL処理、Wails API呼び出し、HTML挿入リスクを確認。
@@ -51,7 +51,7 @@
 
 ```sh
 git status --short --branch
-sed -n '1,900p' reports/security_audit_prompt.md
+sed -n '1,900p' reports/2026-06-25/security-audit-prompt.md
 find . -path './src/frontend/node_modules' -prune -o -path './src/build/bin' -prune -o -path './.git' -prune -o -maxdepth 3 -type f -print
 rg --glob '!src/frontend/node_modules/**' ...
 go test ./...
@@ -99,7 +99,7 @@ git ls-files
 ## 追加で人間が確認すべき事項
 
 - `GO-2026-4550` の実影響と更新後の互換性。
-- 診断データに平文zipを残す仕様の是非。
+- 診断データに確認用zipを残す前提で、Webhook URLやDiscord tokenなどをダミー化する範囲。
 - Webhook tokenを履歴へ保存し続ける必要性。
 - Release workflowのenvironment protectionとtag作成権限。
 - ユーザー向け文言で、zipではなく `.zip.gpg` を添付する注意が十分か。

@@ -66,7 +66,7 @@ go run github.com/securego/gosec/v2/cmd/gosec@latest ./...
 ## CI/CDのリスク
 
 - CIは `contents: read` で良い。
-- Releaseは `contents: write` が必要だがworkflow全体に設定されている。
+- Releaseは `contents: write` が必要だがworkflow全体に設定されている。`contents: write` はGitHub Actionsの `GITHUB_TOKEN` にRelease作成、Release asset更新、tag/ref更新などリポジトリcontentsを書き換える権限を与える設定である。
 - 外部ActionはSHA pinningではない。
 - GPG秘密鍵はRelease job内で取り込む。`GNUPGHOME` は一時ディレクトリだが、cleanupは明示されていない。
 
@@ -104,12 +104,13 @@ go run github.com/securego/gosec/v2/cmd/gosec@latest ./...
 - Release workflow: `contents: write`
 - Release secrets: `CI_RELEASE_GPG_PRIVATE_KEY`, `CI_RELEASE_GPG_PASSPHRASE`, `CI_RELEASE_GPG_FINGERPRINT`
 - 推奨: GitHub Environmentsの承認、tag作成権限制限、Release job分離。
+- Environment protection: `environment: release` のようなEnvironmentをRelease jobへ設定し、GitHub側で承認者、実行可能ブランチ/タグ、Environment secretの公開条件を制御する。これにより、Release署名鍵やRelease作成権限が、承認前のjobや想定外のrefから使われるリスクを下げられる。
 
 ## シークレット管理
 
 - GitHub Actions secretsを使用。
 - アプリ側はWebhook URLをconfig/historyへ保存する。
-- 診断データにシークレットが含まれ得るため、平文zipの扱いを修正すべき。
+- 診断データにシークレットが含まれ得るため、平文zipはユーザー確認用として残しつつ、Webhook URLやDiscord tokenなどをダミー値へ置換するべき。
 
 ## 外部アクション
 

@@ -17,4 +17,4 @@
 
 ## 報告書
 
-- `reports/2026-06-21-security-review.md`
+- `reports/2026-06-21/security-review.md`

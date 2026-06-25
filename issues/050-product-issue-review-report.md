@@ -17,7 +17,7 @@
 
 ## 報告書
 
-- `reports/2026-06-24-product-issue-report.md`
+- `reports/2026-06-24/product-issue-report.md`
 
 ## 調査結果
 
