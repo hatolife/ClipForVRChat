@@ -17,6 +17,7 @@ createApp({
       latestReleaseUrl: 'https://github.com/hatolife/ClipForVRChat/releases/latest',
       boothUrl: 'https://hatolife.booth.pm/items/8531663',
       updateInfo: { available: false, currentVersion: '', currentReleaseTime: '', latestVersion: '', latestReleasePublished: '', url: '' },
+      updateBannerDismissed: false,
       view: 'main',
       processing: false,
       dragging: false,
@@ -102,6 +103,16 @@ createApp({
         width: `${width}px`,
         height: `${height}px`
       }
+    },
+    updateSettings() {
+      return this.state.config?.update || { checkEnabled: true, notificationEnabled: true }
+    },
+    shouldShowUpdateBanner() {
+      return Boolean(
+        this.updateInfo.available &&
+        this.updateSettings.notificationEnabled !== false &&
+        !this.updateBannerDismissed
+      )
     }
   },
   async mounted() {
@@ -540,12 +551,18 @@ createApp({
       await api.OpenURL(url)
     },
     async checkForUpdate() {
-      if (!api?.CheckForUpdate) return
+      if (!api?.CheckForUpdate || this.updateSettings.checkEnabled === false) {
+        this.updateInfo = { available: false, currentVersion: '', currentReleaseTime: '', latestVersion: '', latestReleasePublished: '', url: '' }
+        return
+      }
       try {
         this.updateInfo = await api.CheckForUpdate()
       } catch (_err) {
         this.updateInfo = { available: false, currentVersion: '', currentReleaseTime: '', latestVersion: '', latestReleasePublished: '', url: '' }
       }
+    },
+    dismissUpdateBanner() {
+      this.updateBannerDismissed = true
     },
     sanitizeOutputDirectory() {
       if (!this.state.config?.image) return
@@ -608,6 +625,8 @@ createApp({
         }
         this.resetSettingsBaseline()
         this.saved = true
+        this.updateBannerDismissed = false
+        void this.checkForUpdate()
         setTimeout(() => {
           this.saved = false
         }, 1800)
@@ -631,9 +650,14 @@ createApp({
         </nav>
       </header>
 
-      <button v-if="updateInfo.available" class="update-banner" @click="openURL(updateInfo.url || latestReleaseUrl)">
-        新しいバージョン {{ updateInfo.latestVersion }} があります。クリックしてGitHub Releasesを開く
-      </button>
+      <div v-if="shouldShowUpdateBanner" class="update-banner">
+        <span>新しいバージョン {{ updateInfo.latestVersion }} があります。</span>
+        <div class="update-actions">
+          <button @click="openURL(updateInfo.url || latestReleaseUrl)">GitHub Releases</button>
+          <button class="secondary" @click="openURL(boothUrl)">BOOTH</button>
+          <button class="icon-button" @click="dismissUpdateBanner" aria-label="更新通知を閉じる" title="更新通知を閉じる">×</button>
+        </div>
+      </div>
 
       <section v-if="view === 'help'" class="panel help">
         <div class="section-title">
@@ -880,6 +904,18 @@ createApp({
               <label>
                 <input v-model="state.config.image.suffix" />
               </label>
+            </div>
+          </section>
+
+          <section class="settings-group">
+            <h3>更新</h3>
+            <div class="setting-row">
+              <div><strong>更新確認</strong><p>起動時にGitHub Releasesを確認し、新しいバージョンがあるか調べます。</p></div>
+              <label class="switch"><input type="checkbox" v-model="state.config.update.checkEnabled" /><span></span></label>
+            </div>
+            <div class="setting-row">
+              <div><strong>更新通知</strong><p>新しいバージョンが見つかったとき、画面上部に通知を表示します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="state.config.update.notificationEnabled" :disabled="!state.config.update.checkEnabled" /><span></span></label>
             </div>
           </section>
 
