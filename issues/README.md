@@ -90,6 +90,7 @@
 | 083 | [不具合報告用データ生成UIを改善する](083-improve-diagnostic-data-generation-ui.md) | 完了 | `v0.1.7` | 情報画面下部に生成ボタンを配置し、生成中オーバーレイと完了後Explorer表示を追加する。 |
 | 084 | [Explorerで生成ファイルを選択表示できない](084-fix-explorer-file-selection.md) | 完了 | `v0.1.7` | `explorer.exe /select,` ではなく Windows Shell API でファイル選択表示する。 |
 | 085 | [診断データ復号後のzipが破損する](085-encrypt-diagnostic-package-as-binary.md) | 完了 | `v0.1.7` | 診断データをOpenPGP binary literal dataとして暗号化し、復号後zipの破損を防ぐ。 |
+| 086 | [診断zip内のログとoutput構成を整理する](086-normalize-diagnostic-zip-layout-and-output-dummies.md) | 完了 | `v0.1.7` | zip内ログを `logs/` に統一し、output画像は同名同形式の1x1ダミーで含める。 |
 
 ## 状態の意味
 
