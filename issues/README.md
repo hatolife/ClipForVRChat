@@ -95,6 +95,7 @@
 | 088 | [診断ログ実フォルダ名をlogsへ統一する](088-use-logs-directory-for-diagnostic-logs.md) | 完了 | `v0.1.7` | アプリ実フォルダの診断ログ出力先も `logs/YYYY-MM-DD.log` に統一する。 |
 | 089 | [不具合報告用データの説明を情報画面に追加する](089-explain-diagnostic-data-in-about.md) | 完了 | `v0.1.7` | 情報画面に含まれる情報、暗号化方法、利用目的の説明を追加する。 |
 | 090 | [不具合報告用データを段階作成しパスを置換する](090-stage-and-sanitize-diagnostic-data.md) | 完了 | `v0.1.7` | `diagnostics/<timestamp>/` に確認用zipと暗号化zipを作成し、テキスト内パスを環境変数表記へ置換する。 |
+| 091 | [セキュリティ監査報告書を作成する](091-security-audit-2026-06-25.md) | 完了 | `8e46ffd` | `reports/security_audit_prompt.md` に基づき、現行リポジトリのセキュリティ監査報告書を作成した。 |
 
 ## 状態の意味
 
