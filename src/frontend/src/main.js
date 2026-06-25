@@ -331,14 +331,35 @@ createApp({
       const message = event.total > 1 ? `画像を処理しています。${done} / ${event.total}` : this.state.message
       this.state = { ...this.state, results, message }
     },
-    applyAutoPhotoResult(event) {
+    async applyAutoPhotoResult(event) {
       if (!event?.result) return
-      const results = [event.result, ...(this.state.results || [])]
-      this.state = { ...this.state, mode: 'results', results, message: event.error ? 'VRChat写真の自動処理でエラーが発生しました。' : 'VRChat写真を自動投稿しました。' }
-      this.toast = event.error ? '自動投稿に失敗しました' : 'VRChat写真を自動投稿しました'
+      const result = event.result
+      const hasVisibleWork = this.hasResultVisibleWork(result)
+      const results = hasVisibleWork ? [result, ...(this.state.results || [])] : (this.state.results || [])
+      const message = event.error ? '自動処理でエラーが発生しました。' : this.resultSummaryMessage([result])
+      this.state = { ...this.state, mode: 'results', results, message }
+      try {
+        this.state.history = await api.GetHistory()
+      } catch {
+        // Result display should not fail just because history refresh failed.
+      }
+      this.toast = event.error ? '自動処理に失敗しました' : (message || '自動処理を確認しました')
       setTimeout(() => {
         this.toast = ''
       }, 2200)
+    },
+    hasResultVisibleWork(item) {
+      return !!(item && (item.error || item.url || item.outputPath || (item.qrUrls && item.qrUrls.length)))
+    },
+    resultSummaryMessage(items) {
+      const results = (items || []).filter((item) => this.hasResultVisibleWork(item))
+      if (!results.length) return '実行された処理はありません。'
+      const actions = []
+      if (results.some((item) => item.url)) actions.push('Discord投稿')
+      if (results.some((item) => item.outputPath)) actions.push('ローカル保存')
+      if (results.some((item) => item.qrUrls && item.qrUrls.length)) actions.push('QRコードURL取得')
+      if (!actions.length) return '処理しました。'
+      return `${actions.join('、')}を行いました。`
     },
     async handleDrop(paths, skipSettingsGuard = false) {
       this.error = ''
@@ -543,7 +564,7 @@ createApp({
     historyLocalLabel(item) {
       if (!item?.outputPath) return 'ローカル: なし'
       if (item.localDeleted) return 'ローカル: 削除済み'
-      return item.localExists ? 'ローカル: あり' : 'ローカル: 不明'
+      return item.localExists ? 'ローカル: あり' : 'ローカル: なし'
     },
     canDeleteHistoryLocal(item) {
       return !!(item && !item.pinned && item.outputPath && !item.localDeleted && item.localExists)
@@ -876,7 +897,6 @@ createApp({
         <div class="history-toolbar">
           <div>
             <h2>画像履歴</h2>
-            <p class="subtle">履歴として保存された記録です。Discord、ローカル、QRコードURLの状態を確認できます。</p>
           </div>
           <div class="button-row">
             <span class="tooltip-action">
@@ -921,7 +941,7 @@ createApp({
             <small>{{ item.createdAt }}</small>
             <div v-if="item.url || item.outputPath" class="history-paths">
               <button v-if="item.url" class="link-button inline" @click.stop="copy(item.url)" :disabled="item.discordDeleted">{{ item.url }}</button>
-              <button v-if="item.outputPath" class="link-button inline" @click.stop="revealResultFile($event, item)" :disabled="item.localDeleted || !item.localExists">{{ item.outputPath }}</button>
+              <button v-if="item.outputPath && item.localExists && !item.localDeleted" class="link-button inline" @click.stop="revealResultFile($event, item)">{{ item.outputPath }}</button>
             </div>
             <div v-if="item.qrUrls && item.qrUrls.length" class="qr-url-list">
               <strong>QRコードURL</strong>

@@ -41,17 +41,23 @@ func TestProcessorProcessPathsSavesLocalImage(t *testing.T) {
 	}
 }
 
-func TestProcessorRejectsMultipleClipboardOnlyOutputs(t *testing.T) {
+func TestProcessorAllowsMultipleNoOutputResults(t *testing.T) {
+	dir := t.TempDir()
+	first := filepath.Join(dir, "first.png")
+	second := filepath.Join(dir, "second.png")
+	writeTestPNG(t, first, 2, 2)
+	writeTestPNG(t, second, 2, 2)
+
 	cfg := DefaultConfig()
 	cfg.Output.SaveLocal = false
 	cfg.Output.UploadDiscord = false
 
-	_, err := Processor{Config: cfg}.ProcessPaths([]string{"a.png", "b.png"})
-	if err == nil {
-		t.Fatal("expected error")
+	results, err := Processor{Config: cfg}.ProcessPaths([]string{first, second})
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(err.Error(), "複数画像") {
-		t.Fatalf("unexpected error: %v", err)
+	if len(results) != 2 || ResultHasUserVisibleWork(results[0]) || ResultHasUserVisibleWork(results[1]) {
+		t.Fatalf("results = %+v, want two non-visible results", results)
 	}
 }
 

@@ -27,9 +27,6 @@ func (p Processor) ProcessPathsWithProgress(paths []string, progress func(Progre
 		}
 		return results, err
 	}
-	if !p.Config.Output.SaveLocal && !p.Config.Output.UploadDiscord && len(paths) > 1 {
-		return nil, fmt.Errorf("複数画像はクリップボードへ直接保持できません。ローカル保存またはDiscord投稿をONにするか、1枚ずつ処理してください。")
-	}
 	results := make([]Result, 0, len(paths))
 	for i, path := range paths {
 		if progress != nil {
@@ -115,13 +112,6 @@ func (p Processor) processImage(img image.Image, format string, sourcePath strin
 		result.DiscordWebhookID = uploaded.WebhookID
 		result.DiscordToken = uploaded.Token
 		p.logf("discord result source=%q url=%q message_id=%q", sourcePath, result.URL, result.DiscordMessageID)
-	} else if !p.Config.Output.SaveLocal {
-		if err := WriteClipboardImage(encoded.Data); err != nil {
-			result.Error = fmt.Sprintf("画像をクリップボードへコピーできませんでした: %v", err)
-			p.logf("clipboard write error source=%q error=%q", sourcePath, result.Error)
-			return result
-		}
-		p.logf("clipboard write result source=%q bytes=%d", sourcePath, len(encoded.Data))
 	}
 
 	return result

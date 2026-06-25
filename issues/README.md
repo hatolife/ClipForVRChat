@@ -80,6 +80,7 @@
 | 073 | [設定画面を機能/処理/Webhook/更新へ再編する](073-reorganize-settings-screen-categories.md) | 完了 | `v0.1.7` | 設定画面を利用者視点のカテゴリへ再編する。 |
 | 074 | [結果画像のクリック領域をURLコピーと保存先表示に分ける](074-result-card-split-actions.md) | 完了 | `v0.1.7` | 結果画像の上半分でURLコピー、下半分で保存先表示を行えるようにする。 |
 | 075 | [履歴画面をDiscord/ローカル/履歴の状態別操作に作り直す](075-rebuild-history-screen.md) | 完了 | `v0.1.7` | 履歴画面を状態表示とDiscord/ローカル/履歴削除の独立操作へ作り直す。 |
+| 076 | [履歴と結果表示を実際に行った処理に合わせる](076-history-and-result-display-follow-actual-work.md) | 完了 | `v0.1.7` | 結果画面と履歴画面を実際に行った処理内容に合わせて表示する。 |
 
 ## 状態の意味
 
