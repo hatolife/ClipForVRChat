@@ -87,6 +87,7 @@
 | 080 | [暗号化診断パッケージ作成](080-create-encrypted-diagnostic-package.md) | 完了 | `v0.1.7` | 起動ログと診断パッケージ作成導線を追加。暗号化用公開鍵で診断パッケージを作成する。 |
 | 081 | [診断ログを日付付きログフォルダへ出力する](081-write-diagnostic-logs-to-dated-log-directory.md) | 完了 | `v0.1.7` | 診断ログを `log/YYYY-MM-DD.log` に出力し、診断パッケージがログフォルダを収集するようにする。 |
 | 082 | [診断パッケージ暗号化鍵をpoppo@hato.lifeへ変更する](082-use-poppo-openpgp-key-for-diagnostics.md) | 完了 | `v0.1.7` | 診断パッケージ暗号化用の公開鍵を暗号化サブキー付きの `poppo@hato.life` に変更する。 |
+| 083 | [不具合報告用データ生成UIを改善する](083-improve-diagnostic-data-generation-ui.md) | 完了 | `v0.1.7` | 情報画面下部に生成ボタンを配置し、生成中オーバーレイと完了後Explorer表示を追加する。 |
 
 ## 状態の意味
 
