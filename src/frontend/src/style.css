@@ -269,6 +269,29 @@ button:disabled {
   margin-bottom: 18px;
 }
 
+.settings-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.settings-title-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #d6dee7;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.settings-title-actions button {
+  padding: 7px 12px;
+}
+
 .message {
   color: #5b6875;
   line-height: 1.6;
@@ -294,8 +317,7 @@ button:disabled {
   z-index: 2;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
+  justify-content: flex-start;
   min-height: 54px;
   padding-top: 8px;
   background: #edf3f7;
@@ -327,23 +349,6 @@ button:disabled {
   border-bottom-color: #ffffff;
   background: #ffffff;
   color: #1b638f;
-}
-
-.settings-top-actions {
-  align-self: center;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 8px 10px;
-  border: 1px solid #d6dee7;
-  border-radius: 8px;
-  background: #ffffff;
-}
-
-.settings-top-actions button {
-  padding: 7px 12px;
 }
 
 .settings-error {
