@@ -26,4 +26,5 @@
 - `2026-06-25/dependency-and-supply-chain.md`: 依存関係・サプライチェーン確認
 - `2026-06-25/review-log.md`: 監査作業ログ
 - `2026-06-25/release-security-checklist.md`: Release前セキュリティチェックリスト
+- `2026-06-25/human-verification-guide.md`: 人間確認が必要な作業と手順
 - `2026-06-25/findings.json`: 発見事項JSON
