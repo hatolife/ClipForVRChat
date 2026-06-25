@@ -56,14 +56,15 @@
 ## SBOM
 
 - [ ] SBOM作成要否を判断する。
-- [ ] 作成する場合はGo/npm双方の依存関係を含める。
-- [ ] Release assetへSBOMを添付する。
+- [ ] build metadataでtag、commit、Go/Node/Wailsバージョンを追跡できる。
+- [ ] SBOMを作成する場合はGo/npm双方の依存関係を含める。
+- [ ] SBOMを作成する場合はRelease assetへ添付する。
 
 ## 配布物
 
 - [ ] zip内に `ClipForVRChat.exe`、`README.md`、`LICENSE`、`Release-signing-public-key.url` が含まれる。
 - [ ] zip内に `.asc` や不要な公開鍵実体ファイルが混入していない。
-- [ ] Release assetsにzip、sha256、exe.ascが添付される。
+- [ ] Release assetsにzip、sha256、exe.asc、build metadataが添付される。
 - [ ] Release本文が `RELEASE_NOTES.md` の対象バージョンから作成される。
 
 ## 更新経路

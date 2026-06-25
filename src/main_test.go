@@ -90,12 +90,15 @@ func TestHasErrors(t *testing.T) {
 func TestHandleCLIArgsVersion(t *testing.T) {
 	oldVersion := version
 	oldRevision := revision
+	oldBuildChannel := buildChannel
 	t.Cleanup(func() {
 		version = oldVersion
 		revision = oldRevision
+		buildChannel = oldBuildChannel
 	})
 	version = "v1.2.3"
 	revision = "abcdef0"
+	buildChannel = "release"
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

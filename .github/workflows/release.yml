@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   GO_VERSION: "1.26.4"
@@ -15,9 +15,11 @@ env:
   WAILS_VERSION: "v2.12.0"
 
 jobs:
-  release:
-    name: Build exe and create GitHub release
+  build:
+    name: Build exe and package release assets
     runs-on: windows-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
@@ -102,7 +104,7 @@ jobs:
       - name: Build application
         working-directory: src
         shell: pwsh
-        run: wails build -ldflags "-X main.version=${{ steps.version.outputs.version }} -X main.revision=${{ steps.version.outputs.revision }} -X main.releaseTime=${{ steps.version.outputs.release_time }}"
+        run: wails build -ldflags "-X main.version=${{ steps.version.outputs.version }} -X main.revision=${{ steps.version.outputs.revision }} -X main.releaseTime=${{ steps.version.outputs.release_time }} -X main.buildChannel=release"
 
       - name: Prepare package directory
         shell: pwsh
@@ -150,6 +152,22 @@ jobs:
             ForEach-Object { "$($_.Hash.ToLower())  ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip" } |
             Set-Content "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip.sha256"
 
+      - name: Write build metadata
+        shell: pwsh
+        run: |
+          $metadata = [ordered]@{
+            tag = "${{ github.ref_name }}"
+            commit = "${{ github.sha }}"
+            appVersion = "${{ steps.version.outputs.app_version }}"
+            version = "${{ steps.version.outputs.version }}"
+            revision = "${{ steps.version.outputs.revision }}"
+            releaseTime = "${{ steps.version.outputs.release_time }}"
+            goVersion = "${{ env.GO_VERSION }}"
+            nodeVersion = "${{ env.NODE_VERSION }}"
+            wailsVersion = "${{ env.WAILS_VERSION }}"
+          }
+          $metadata | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 "dist/ClipForVRChat-${{ github.ref_name }}-build-metadata.json"
+
       - name: Validate release assets
         shell: pwsh
         run: |
@@ -175,6 +193,7 @@ jobs:
             "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip",
             "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip.sha256",
             "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.exe.asc",
+            "dist/ClipForVRChat-${{ github.ref_name }}-build-metadata.json",
             "dist/ClipForVRChat/Release-signing-public-key.url"
           )
           foreach ($path in $required) {
@@ -191,6 +210,49 @@ jobs:
         if: steps.version.outputs.draft == 'true'
         run: node scripts/extract-release-notes.mjs "${{ github.ref_name }}" RELEASE_NOTES.md dist/release-body.md --fallback-draft-notes
 
+      - name: Upload release assets artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: release-assets-${{ github.ref_name }}
+          path: |
+            dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip
+            dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip.sha256
+            dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.exe.asc
+            dist/ClipForVRChat-${{ github.ref_name }}-build-metadata.json
+            dist/release-body.md
+
+  release:
+    name: Create GitHub release
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download release assets artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: release-assets-${{ github.ref_name }}
+          path: dist
+
+      - name: Prepare version
+        id: version
+        shell: bash
+        run: |
+          tag_name="${{ github.ref_name }}"
+          if [[ "$tag_name" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ || "$tag_name" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc[0-9]+$ ]]; then
+            draft=false
+          else
+            draft=true
+          fi
+          if [[ "$tag_name" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc[0-9]+$ ]]; then
+            prerelease=true
+          else
+            prerelease=false
+          fi
+          echo "draft=$draft" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
       - name: Create release
         uses: softprops/action-gh-release@v3
         with:
@@ -201,3 +263,4 @@ jobs:
             dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip
             dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip.sha256
             dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.exe.asc
+            dist/ClipForVRChat-${{ github.ref_name }}-build-metadata.json

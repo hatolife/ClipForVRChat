@@ -224,6 +224,33 @@ func TestAppLogUserActionWritesDiagnosticLog(t *testing.T) {
 	}
 }
 
+func TestTrustedExternalURL(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		ok   bool
+	}{
+		{name: "github", raw: "https://github.com/hatolife/ClipForVRChat/releases", ok: true},
+		{name: "booth", raw: "https://hatolife.booth.pm/items/8531663", ok: true},
+		{name: "discord help", raw: "https://support.discord.com/hc/ja/articles/228383668", ok: true},
+		{name: "twitter", raw: "https://x.com/hato_poppo_life", ok: true},
+		{name: "http", raw: "http://github.com/hatolife/ClipForVRChat", ok: false},
+		{name: "file", raw: "file:///C:/Windows/win.ini", ok: false},
+		{name: "unknown host", raw: "https://example.com", ok: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := trustedExternalURL(tt.raw)
+			if tt.ok && err != nil {
+				t.Fatalf("trustedExternalURL() error = %v", err)
+			}
+			if !tt.ok && err == nil {
+				t.Fatal("trustedExternalURL() should reject URL")
+			}
+		})
+	}
+}
+
 func TestAppStartupWritesVersionHashAndRedactedConfig(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.json")
@@ -574,6 +601,7 @@ func TestAppDeleteDiscordHistoryEntriesPersistsPartialSuccess(t *testing.T) {
 
 func TestResultMessage(t *testing.T) {
 	cfg := appcore.DefaultConfig()
+	cfg.Output.CopySingleURLToClipboard = true
 	msg := resultMessage(cfg, []appcore.Result{{URL: "https://cdn.discordapp.com/attachments/1/2/a.png"}}, nil)
 	if !strings.Contains(msg, "コピー") {
 		t.Fatalf("message = %q", msg)

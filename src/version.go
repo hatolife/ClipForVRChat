@@ -6,9 +6,10 @@ import (
 )
 
 var (
-	version     = "develop"
-	revision    = "unknown"
-	releaseTime = ""
+	version      = "v0.1.7"
+	revision     = "unknown"
+	releaseTime  = ""
+	buildChannel = "develop"
 )
 
 const githubURL = "https://github.com/hatolife/ClipForVRChat"
@@ -21,9 +22,16 @@ func init() {
 
 func appVersion() string {
 	if strings.TrimSpace(revision) == "" || revision == "unknown" {
+		if strings.TrimSpace(buildChannel) == "develop" {
+			return version + ".unknown.develop"
+		}
 		return version
 	}
-	return version + "." + revision
+	appVersion := version + "." + revision
+	if strings.TrimSpace(buildChannel) == "develop" {
+		appVersion += ".develop"
+	}
+	return appVersion
 }
 
 func appReleaseTime() string {

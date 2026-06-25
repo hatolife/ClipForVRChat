@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -69,14 +70,32 @@ func (a *App) GetAppInfo() AppInfo {
 	}
 }
 
-func (a *App) OpenURL(url string) {
-	runtime.BrowserOpenURL(a.ctx, url)
+func (a *App) OpenURL(rawURL string) error {
+	trustedURL, err := trustedExternalURL(rawURL)
+	if err != nil {
+		return err
+	}
+	runtime.BrowserOpenURL(a.ctx, trustedURL)
+	return nil
 }
 
 func (a *App) LogUserAction(action string, detail string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.logUserActionLocked(action, detail)
+}
+
+func trustedExternalURL(rawURL string) (string, error) {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || parsed.Scheme != "https" {
+		return "", fmt.Errorf("開けないURLです")
+	}
+	switch strings.ToLower(parsed.Hostname()) {
+	case "github.com", "hatolife.booth.pm", "support.discord.com", "x.com":
+	default:
+		return "", fmt.Errorf("許可されていないURLです")
+	}
+	return parsed.String(), nil
 }
 
 func (a *App) CreateEncryptedDiagnosticPackage() (string, error) {
@@ -199,7 +218,7 @@ func (a *App) ClearResults() appcore.UIState {
 func (a *App) GetHistory() ([]appcore.HistoryEntry, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	history, err := appcore.LoadHistory(appcore.HistoryPath(a.configPath))
+	history, err := appcore.LoadHistoryWithManagedOutputDir(appcore.HistoryPath(a.configPath), filepath.Dir(a.configPath), managedOutputDir(a.configPath, a.state.Config))
 	if err != nil {
 		return nil, err
 	}
@@ -267,7 +286,7 @@ func (a *App) DeleteDiscordHistoryEntries(ids []string) ([]appcore.HistoryEntry,
 func (a *App) DeleteLocalHistoryFiles(ids []string) ([]appcore.HistoryEntry, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	history, _, err := appcore.DeleteLocalHistoryFiles(appcore.HistoryPath(a.configPath), ids)
+	history, _, err := appcore.DeleteLocalHistoryFilesWithManagedOutputDir(appcore.HistoryPath(a.configPath), ids, managedOutputDir(a.configPath, a.state.Config))
 	if err != nil {
 		return history, err
 	}
@@ -616,9 +635,20 @@ func hasJSONPath(paths []string) bool {
 }
 
 func (a *App) refreshHistory() {
-	if history, err := appcore.LoadHistory(appcore.HistoryPath(a.configPath)); err == nil {
+	if history, err := appcore.LoadHistoryWithManagedOutputDir(appcore.HistoryPath(a.configPath), filepath.Dir(a.configPath), managedOutputDir(a.configPath, a.state.Config)); err == nil {
 		a.state.History = history
 	}
+}
+
+func managedOutputDir(configPath string, cfg appcore.Config) string {
+	outputDir := strings.TrimSpace(cfg.Image.OutputDirectory)
+	if outputDir == "" {
+		outputDir = "./output"
+	}
+	if filepath.IsAbs(outputDir) {
+		return outputDir
+	}
+	return filepath.Join(filepath.Dir(configPath), outputDir)
 }
 
 func nowRFC3339() string {

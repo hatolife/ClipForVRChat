@@ -584,9 +584,9 @@ config.json
   },
   "output": {
     "saveLocal": true,
-    "uploadDiscord": true,
+    "uploadDiscord": false,
     "showUi": "auto",
-    "copySingleUrlToClipboard": true,
+    "copySingleUrlToClipboard": false,
     "detectQrCodeUrls": false
   },
   "discord": {

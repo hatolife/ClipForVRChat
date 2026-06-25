@@ -353,7 +353,7 @@ func addRedactedTextFileToDirectory(baseDir string, name string, path string, re
 	if err != nil {
 		return fmt.Errorf("%s を読み込めません: %w", name, err)
 	}
-	return writePrivateFileInDirectory(baseDir, name, []byte(redactor.Redact(string(data))))
+	return writePrivateFileInDirectory(baseDir, name, []byte(appcore.RedactDiagnosticText(redactor.Redact(string(data)))))
 }
 
 func writePrivateFileInDirectory(baseDir string, name string, data []byte) error {
@@ -477,8 +477,8 @@ func addPathReplacement(replacements *[]diagnosticPathReplacement, seen map[stri
 
 func (r diagnosticPathRedactor) Redact(text string) string {
 	if text == "" || len(r.replacements) == 0 {
-		return text
+		return appcore.RedactDiagnosticText(text)
 	}
 	replacer := strings.NewReplacer(r.replacements...)
-	return replacer.Replace(text)
+	return appcore.RedactDiagnosticText(replacer.Replace(text))
 }

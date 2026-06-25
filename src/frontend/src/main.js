@@ -28,7 +28,7 @@ createApp({
       saved: false,
       error: '',
       settingsBaseline: '',
-      settingsTab: 'output',
+      settingsTab: 'feature',
       pendingSettingsLeave: null,
       pendingDropPaths: [],
       historyDragSelecting: false,
@@ -126,7 +126,7 @@ createApp({
       return [
         { id: 'feature', label: '機能' },
         { id: 'process', label: '処理' },
-        { id: 'webhook', label: 'Webhook' },
+        { id: 'webhook', label: 'Discord投稿' },
         { id: 'update', label: '更新' }
       ]
     },
@@ -1086,14 +1086,6 @@ createApp({
               <label class="switch"><input type="checkbox" v-model="state.config.screenshotAutoPost.enabled" /><span></span></label>
             </div>
             <div class="setting-row">
-              <div><strong>Discord投稿</strong><p>縮小した画像をDiscord Webhookへ投稿し、VRChatで使うURLを取得します。</p></div>
-              <label class="switch"><input type="checkbox" v-model="state.config.output.uploadDiscord" /><span></span></label>
-            </div>
-            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord }">
-              <div><strong>投稿URLの自動コピー</strong><p>Discordに投稿したURLをクリップボードに保存します。</p></div>
-              <label class="switch"><input type="checkbox" v-model="state.config.output.copySingleUrlToClipboard" :disabled="!state.config.output.uploadDiscord" /><span></span></label>
-            </div>
-            <div class="setting-row">
               <div><strong>QRコードURL検出</strong><p>画像内のQRコードからURLを取得します。取得したURLはDiscord本文と結果画面に表示します。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.output.detectQrCodeUrls" /><span></span></label>
             </div>
@@ -1152,7 +1144,15 @@ createApp({
           </section>
 
           <section v-if="settingsTab === 'webhook'" class="settings-group" role="tabpanel">
-            <h3>Webhook</h3>
+            <h3>Discord投稿</h3>
+            <div class="setting-row">
+              <div><strong>Discord投稿</strong><p>縮小した画像をDiscord Webhookへ投稿し、VRChatで使うURLを取得します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="state.config.output.uploadDiscord" /><span></span></label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord }">
+              <div><strong>投稿URLの自動コピー</strong><p>Discordに投稿したURLをクリップボードに保存します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="state.config.output.copySingleUrlToClipboard" :disabled="!state.config.output.uploadDiscord" /><span></span></label>
+            </div>
             <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord }">
               <div>
                 <strong>通常投稿用Webhook URL</strong>

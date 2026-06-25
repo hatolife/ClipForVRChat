@@ -62,9 +62,6 @@ func main() {
 		Mode:       appcore.ModeResults,
 		ConfigPath: configPath,
 	}
-	if history, err := appcore.LoadHistory(appcore.HistoryPath(configPath)); err == nil {
-		state.History = history
-	}
 
 	configExists := appcore.ConfigExists(configPath)
 	cfg, err := appcore.LoadConfig(configPath)
@@ -76,6 +73,9 @@ func main() {
 		return
 	}
 	state.Config = cfg
+	if history, err := appcore.LoadHistoryWithManagedOutputDir(appcore.HistoryPath(configPath), filepath.Dir(configPath), managedOutputDir(configPath, cfg)); err == nil {
+		state.History = history
+	}
 
 	if len(args) == 1 && strings.EqualFold(filepath.Ext(args[0]), ".json") {
 		requestedConfigPath := args[0]
