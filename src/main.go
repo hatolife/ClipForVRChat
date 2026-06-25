@@ -37,6 +37,17 @@ func main() {
 		os.Exit(exitCode)
 	}
 
+	args := os.Args[1:]
+	if len(args) == 1 && strings.EqualFold(filepath.Ext(args[0]), ".zip") {
+		outputPath, err := encryptZipFileWithPublicKey(args[0])
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			os.Exit(1)
+		}
+		fmt.Fprintf(stdout, "Encrypted: %s\n", outputPath)
+		return
+	}
+
 	configPath := defaultConfigPath()
 	instanceLock, err := acquireInstanceLock(configPath)
 	if err != nil {
@@ -46,8 +57,6 @@ func main() {
 	defer func() {
 		_ = instanceLock.Unlock()
 	}()
-
-	args := os.Args[1:]
 
 	state := appcore.UIState{
 		Mode:       appcore.ModeResults,

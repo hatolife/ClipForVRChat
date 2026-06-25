@@ -15,9 +15,9 @@ func DiagnosticLogPath(configPath string) string {
 
 func DiagnosticLogDir(configPath string) string {
 	if strings.TrimSpace(configPath) == "" {
-		return "log"
+		return "logs"
 	}
-	return filepath.Join(filepath.Dir(configPath), "log")
+	return filepath.Join(filepath.Dir(configPath), "logs")
 }
 
 func AppendDiagnosticLog(path string, format string, args ...any) {

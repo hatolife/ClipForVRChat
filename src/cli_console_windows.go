@@ -5,6 +5,7 @@ package main
 import (
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"unicode/utf16"
@@ -65,6 +66,9 @@ func (w windowsConsoleWriter) Write(data []byte) (int, error) {
 
 func needsConsoleOutput(args []string) bool {
 	for _, value := range args {
+		if strings.EqualFold(filepath.Ext(strings.TrimSpace(value)), ".zip") {
+			return true
+		}
 		switch strings.TrimSpace(value) {
 		case "--version", "--help", "-h":
 			return true

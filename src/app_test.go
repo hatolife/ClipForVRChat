@@ -219,7 +219,7 @@ func TestAppLogUserActionWritesDiagnosticLog(t *testing.T) {
 	if !strings.Contains(text, `ui action="button_click"`) || !strings.Contains(text, `history_delete_entries`) {
 		t.Fatalf("diagnostic log = %q", text)
 	}
-	if filepath.Dir(appcore.DiagnosticLogPath(configPath)) != filepath.Join(dir, "log") {
+	if filepath.Dir(appcore.DiagnosticLogPath(configPath)) != filepath.Join(dir, "logs") {
 		t.Fatalf("diagnostic log path = %q, want dated log under log dir", appcore.DiagnosticLogPath(configPath))
 	}
 }
@@ -278,6 +278,43 @@ func TestCreateEncryptedDiagnosticPackageEncryptsZip(t *testing.T) {
 	for _, leaked := range []string{"config.json", "history.json", "manifest.json", "secret"} {
 		if strings.Contains(string(data), leaked) {
 			t.Fatalf("encrypted package leaked %q", leaked)
+		}
+	}
+}
+
+func TestEncryptZipFileWithPublicKey(t *testing.T) {
+	dir := t.TempDir()
+	zipPath := filepath.Join(dir, "sample.zip")
+	var buf bytes.Buffer
+	zipWriter := zip.NewWriter(&buf)
+	writer, err := zipWriter.Create("inside.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := writer.Write([]byte("secret text")); err != nil {
+		t.Fatal(err)
+	}
+	if err := zipWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(zipPath, buf.Bytes(), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	outputPath, err := encryptZipFileWithPublicKey(zipPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if outputPath != zipPath+".gpg" {
+		t.Fatalf("outputPath = %q, want %q", outputPath, zipPath+".gpg")
+	}
+	data, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, leaked := range []string{"inside.txt", "secret text"} {
+		if strings.Contains(string(data), leaked) {
+			t.Fatalf("encrypted zip leaked %q", leaked)
 		}
 	}
 }
