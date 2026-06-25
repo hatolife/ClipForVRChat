@@ -136,6 +136,9 @@ createApp({
         this.updateSettings.notificationEnabled !== false &&
         !this.updateBannerDismissed
       )
+    },
+    shouldShowDiscordWebhookWarning() {
+      return this.shouldWarnMissingPrimaryWebhook()
     }
   },
   async mounted() {
@@ -244,12 +247,18 @@ createApp({
         if (this.state.processOnSave) {
           this.logUserAction('button_click', 'settings_save_and_process')
           this.state = await api.SaveConfigAndProcess(this.state.config, this.state.pendingPaths || [])
+          if (this.shouldWarnMissingPrimaryWebhook()) {
+            this.logUserAction('settings_warning', 'missing_primary_discord_webhook')
+          }
           this.resetSettingsBaseline()
           this.setView('main', 'save_config_and_process')
           return
         }
         this.logUserAction('button_click', 'settings_save')
         await api.SaveConfig(this.state.config)
+        if (this.shouldWarnMissingPrimaryWebhook()) {
+          this.logUserAction('settings_warning', 'missing_primary_discord_webhook')
+        }
         this.resetSettingsBaseline()
         await this.performSettingsLeave(action)
       } catch (err) {
@@ -325,6 +334,19 @@ createApp({
     selectSettingsTab(tabId) {
       this.logUserAction('button_click', `settings_tab ${tabId}`)
       this.settingsTab = tabId
+    },
+    shouldWarnMissingPrimaryWebhook(config = this.state.config) {
+      return Boolean(config?.output?.uploadDiscord && !String(config?.discord?.webhookUrl || '').trim())
+    },
+    openDiscordWebhookSettings() {
+      this.logUserAction('button_click', 'open_discord_webhook_settings_from_banner')
+      if (this.isSettings) {
+        this.settingsTab = 'webhook'
+        return
+      }
+      void this.openSettings().then(() => {
+        this.settingsTab = 'webhook'
+      })
     },
     resultPlaceholder(path, index, total) {
       const normalized = path || 'clipboard.png'
@@ -793,8 +815,14 @@ createApp({
         this.sanitizeScreenshotDirectory()
         if (this.state.processOnSave) {
           this.state = await api.SaveConfigAndProcess(this.state.config, this.state.pendingPaths || [])
+          if (this.shouldWarnMissingPrimaryWebhook()) {
+            this.logUserAction('settings_warning', 'missing_primary_discord_webhook')
+          }
         } else {
           await api.SaveConfig(this.state.config)
+          if (this.shouldWarnMissingPrimaryWebhook()) {
+            this.logUserAction('settings_warning', 'missing_primary_discord_webhook')
+          }
           this.state = await api.CloseSettings()
         }
         this.resetSettingsBaseline()
@@ -824,12 +852,20 @@ createApp({
         </nav>
       </header>
 
-      <div v-if="shouldShowUpdateBanner" class="update-banner">
-        <span>新しいバージョン {{ updateInfo.latestVersion }} があります。</span>
-        <div class="update-actions">
-          <button @click="openURL(updateInfo.url || latestReleaseUrl)">GitHub Releases</button>
-          <button class="secondary" @click="openURL(boothUrl)">BOOTH</button>
-          <button class="icon-button" @click="dismissUpdateBanner" aria-label="更新通知を閉じる" title="更新通知を閉じる">×</button>
+      <div v-if="shouldShowUpdateBanner || shouldShowDiscordWebhookWarning" class="banner-stack">
+        <div v-if="shouldShowDiscordWebhookWarning" class="update-banner warning-banner">
+          <span>Discord投稿がONですが、通常投稿用Webhook URLが空欄です。空の時は投稿できません。</span>
+          <div class="update-actions">
+            <button @click="openDiscordWebhookSettings">設定する</button>
+          </div>
+        </div>
+        <div v-if="shouldShowUpdateBanner" class="update-banner">
+          <span>新しいバージョン {{ updateInfo.latestVersion }} があります。</span>
+          <div class="update-actions">
+            <button @click="openURL(updateInfo.url || latestReleaseUrl)">GitHub Releases</button>
+            <button class="secondary" @click="openURL(boothUrl)">BOOTH</button>
+            <button class="icon-button" @click="dismissUpdateBanner" aria-label="更新通知を閉じる" title="更新通知を閉じる">×</button>
+          </div>
         </div>
       </div>
 
@@ -1156,11 +1192,11 @@ createApp({
             <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord }">
               <div>
                 <strong>通常投稿用Webhook URL</strong>
-                <p>Discordの投稿先チャンネルでWebhookを作成し、そのURLを貼り付けます。</p>
+                <p>Discordの投稿先チャンネルでWebhookを作成し、そのURLを貼り付けます。空の時は投稿できません。</p>
                 <button class="link-button" @click="openURL(webhookGuideUrl)" :disabled="!state.config.output.uploadDiscord">Discord公式: Webhookの作成方法</button>
               </div>
               <label>
-              <input type="password" v-model="state.config.discord.webhookUrl" placeholder="https://discord.com/api/webhooks/..." :disabled="!state.config.output.uploadDiscord" />
+              <input type="password" v-model="state.config.discord.webhookUrl" placeholder="https://discord.com/api/webhooks/..." :disabled="!state.config.output.uploadDiscord" :class="{ 'attention-input': shouldWarnMissingPrimaryWebhook() }" />
               </label>
             </div>
             <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord || !state.config.autoPhoto.enabled }">
