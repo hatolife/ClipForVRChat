@@ -69,17 +69,9 @@ func createEncryptedDiagnosticPackage(configPath string, cfg appcore.Config) (st
 		return "", err
 	}
 
-	var encrypted bytes.Buffer
-	writer, err := openpgp.Encrypt(&encrypted, entities, nil, nil, nil)
+	encrypted, err := encryptDiagnosticZip(zipData, entities)
 	if err != nil {
-		return "", fmt.Errorf("診断パッケージを暗号化できません: %w", err)
-	}
-	if _, err := writer.Write(zipData); err != nil {
-		_ = writer.Close()
-		return "", fmt.Errorf("診断パッケージを書き込めません: %w", err)
-	}
-	if err := writer.Close(); err != nil {
-		return "", fmt.Errorf("診断パッケージを完了できません: %w", err)
+		return "", err
 	}
 
 	outputDir := filepath.Dir(configPath)
@@ -87,11 +79,30 @@ func createEncryptedDiagnosticPackage(configPath string, cfg appcore.Config) (st
 		outputDir = "."
 	}
 	outputPath := filepath.Join(outputDir, fmt.Sprintf("ClipForVRChat-diagnostics-%s.zip.gpg", time.Now().Format("20060102-150405")))
-	if err := appcore.WritePrivateFile(outputPath, encrypted.Bytes()); err != nil {
+	if err := appcore.WritePrivateFile(outputPath, encrypted); err != nil {
 		return "", fmt.Errorf("診断パッケージを保存できません: %w", err)
 	}
 	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(configPath), "diagnostic package=%q files=%d missing=%d", outputPath, len(manifest.Files), len(manifest.MissingFiles))
 	return outputPath, nil
+}
+
+func encryptDiagnosticZip(zipData []byte, entities openpgp.EntityList) ([]byte, error) {
+	var encrypted bytes.Buffer
+	writer, err := openpgp.Encrypt(&encrypted, entities, nil, &openpgp.FileHints{
+		IsBinary: true,
+		FileName: "diagnostics.zip",
+	}, nil)
+	if err != nil {
+		return nil, fmt.Errorf("診断パッケージを暗号化できません: %w", err)
+	}
+	if _, err := writer.Write(zipData); err != nil {
+		_ = writer.Close()
+		return nil, fmt.Errorf("診断パッケージを書き込めません: %w", err)
+	}
+	if err := writer.Close(); err != nil {
+		return nil, fmt.Errorf("診断パッケージを完了できません: %w", err)
+	}
+	return encrypted.Bytes(), nil
 }
 
 func hasEncryptionCapableKey(entities openpgp.EntityList) bool {
