@@ -169,7 +169,7 @@ func buildDiagnosticZip(configPath string, cfg appcore.Config) ([]byte, diagnost
 	} else {
 		manifest.MissingFiles = append(manifest.MissingFiles, "ClipForVRChat.exe")
 	}
-	logFiles, _ := filepath.Glob(filepath.Join(filepath.Dir(configPath), "*.log"))
+	logFiles, _ := filepath.Glob(filepath.Join(appcore.DiagnosticLogDir(configPath), "*.log"))
 	for _, logPath := range logFiles {
 		name := filepath.Join("logs", filepath.Base(logPath))
 		if err := add(name, logPath); err != nil {

@@ -9,10 +9,15 @@ import (
 )
 
 func DiagnosticLogPath(configPath string) string {
+	name := time.Now().Format("2006-01-02") + ".log"
+	return filepath.Join(DiagnosticLogDir(configPath), name)
+}
+
+func DiagnosticLogDir(configPath string) string {
 	if strings.TrimSpace(configPath) == "" {
-		return "diagnostic.log"
+		return "log"
 	}
-	return filepath.Join(filepath.Dir(configPath), "diagnostic.log")
+	return filepath.Join(filepath.Dir(configPath), "log")
 }
 
 func AppendDiagnosticLog(path string, format string, args ...any) {

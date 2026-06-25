@@ -214,6 +214,9 @@ func TestAppLogUserActionWritesDiagnosticLog(t *testing.T) {
 	if !strings.Contains(text, `ui action="button_click"`) || !strings.Contains(text, `history_delete_entries`) {
 		t.Fatalf("diagnostic log = %q", text)
 	}
+	if filepath.Dir(appcore.DiagnosticLogPath(configPath)) != filepath.Join(dir, "log") {
+		t.Fatalf("diagnostic log path = %q, want dated log under log dir", appcore.DiagnosticLogPath(configPath))
+	}
 }
 
 func TestAppStartupWritesVersionHashAndRedactedConfig(t *testing.T) {
