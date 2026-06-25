@@ -704,6 +704,19 @@ createApp({
       this.logUserAction('button_click', `open_url ${url}`)
       await api.OpenURL(url)
     },
+    async createDiagnosticPackage() {
+      this.error = ''
+      this.logUserAction('button_click', 'create_diagnostic_package')
+      try {
+        const path = await api.CreateEncryptedDiagnosticPackage()
+        this.toast = `診断パッケージを作成しました: ${path}`
+        setTimeout(() => {
+          this.toast = ''
+        }, 5000)
+      } catch (err) {
+        this.error = String(err)
+      }
+    },
     async checkForUpdate() {
       if (!api?.CheckForUpdate || this.updateSettings.checkEnabled === false) {
         this.updateInfo = { available: false, currentVersion: '', currentReleaseTime: '', latestVersion: '', latestReleasePublished: '', url: '' }
@@ -891,6 +904,18 @@ createApp({
             <li><button class="link-button inline" @click="openURL(latestReleaseUrl)">GitHub - https://github.com/hatolife/ClipForVRChat/releases/latest</button></li>
             <li><button class="link-button inline" @click="openURL(boothUrl)">BOOTH - https://hatolife.booth.pm/items/8531663</button></li>
           </ul>
+        </section>
+        <section class="about-note">
+          <h3>診断パッケージ</h3>
+          <p>
+            不具合調査用にログ、設定、履歴、起動中のexeを暗号化したファイルとして作成します。
+          </p>
+          <p>
+            作成したファイルはGitHub Issueなどに添付できます。復号前に中身やファイル一覧は確認できません。
+          </p>
+          <div class="button-row">
+            <button @click="createDiagnosticPackage">診断パッケージを作成</button>
+          </div>
         </section>
         <section class="about-note">
           <h3>連絡・要望</h3>

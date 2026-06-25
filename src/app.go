@@ -52,6 +52,7 @@ func (a *App) startup(ctx context.Context) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.ctx = ctx
+	a.logStartupLocked()
 	a.restartAutoPhotoWatcher(a.state.Config)
 }
 
@@ -78,6 +79,18 @@ func (a *App) LogUserAction(action string, detail string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.logUserActionLocked(action, detail)
+}
+
+func (a *App) CreateEncryptedDiagnosticPackage() (string, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	path, err := createEncryptedDiagnosticPackage(a.configPath, a.state.Config)
+	if err != nil {
+		a.logUserActionLocked("diagnostic_package_failed", err.Error())
+		return "", err
+	}
+	a.logUserActionLocked("diagnostic_package_created", path)
+	return path, nil
 }
 
 func (a *App) logUserActionLocked(action string, detail string) {
@@ -126,11 +139,13 @@ func (a *App) GetOSSLicenses() []OSSLicense {
 		{Name: "go-arg", License: "MIT", Copyright: "Copyright (c) 2015, Alex Flint", URL: "https://github.com/alexflint/go-arg"},
 		{Name: "Vue.js", License: "MIT", Copyright: "Copyright (c) 2018-present, Yuxi (Evan) You", URL: "https://github.com/vuejs/core"},
 		{Name: "Vite", License: "MIT", Copyright: "Copyright (c) 2019-present, VoidZero Inc. and Vite contributors", URL: "https://github.com/vitejs/vite"},
+		{Name: "ProtonMail/go-crypto", License: "MIT", Copyright: "Copyright (c) 2022 Proton AG", URL: "https://github.com/ProtonMail/go-crypto"},
 		{Name: "imaging", License: "MIT", Copyright: "Copyright (c) 2012 Grigory Dryapak", URL: "https://github.com/disintegration/imaging"},
 		{Name: "flock", License: "BSD-3-Clause", Copyright: "Copyright (c) 2018-2025, The Gofrs; Copyright (c) 2015-2020, Tim Heckman", URL: "https://github.com/gofrs/flock"},
 		{Name: "gozxing", License: "MIT", Copyright: "Copyright (c) 2018 Daisuke MAKIUCHI", URL: "https://github.com/makiuchi-d/gozxing"},
 		{Name: "go-qrcode", License: "MIT", Copyright: "Copyright (c) 2014 Tom Harwood", URL: "https://github.com/skip2/go-qrcode"},
 		{Name: "golang.design/x/clipboard", License: "MIT", Copyright: "Copyright (c) 2021 Changkun Ou", URL: "https://github.com/golang-design/clipboard"},
+		{Name: "golang.org/x/crypto", License: "BSD-3-Clause", Copyright: "Copyright (c) The Go Authors", URL: "https://cs.opensource.google/go/x/crypto"},
 		{Name: "golang.org/x/image", License: "BSD-3-Clause", Copyright: "Copyright (c) The Go Authors", URL: "https://cs.opensource.google/go/x/image"},
 	}
 }
