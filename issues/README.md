@@ -75,6 +75,7 @@
 | 068 | [GitHub Actions CIを高速化する](068-speed-up-github-actions-ci.md) | 完了 | `v0.1.7` | Wails CLI cacheを追加し、CI/Releaseのインストール時間短縮を試行。 |
 | 069 | [更新通知の開き先選択と通知設定](069-update-notification-destination-and-settings.md) | 完了 | `v0.1.7` | 更新通知からGitHub/BOOTHを選んで開き、更新確認と通知を設定でON/OFFできるようにする。 |
 | 070 | [設定画面をカテゴリ別タブに分ける](070-tabbed-settings-page.md) | 完了 | `v0.1.7` | 設定画面上部にカテゴリタブを追加し、設定項目を分類して表示する。 |
+| 071 | [Discord投稿OFFでも自動投稿でDiscordへ投稿される](071-prevent-discord-post-when-disabled.md) | 完了 | `v0.1.7` | Discord投稿OFF時に自動投稿経路からDiscordへ投稿されないようにする。 |
 
 ## 状態の意味
 

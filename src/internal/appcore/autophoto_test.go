@@ -106,3 +106,30 @@ func TestAutoPhotoWatcherUsesExplicitDirectory(t *testing.T) {
 		t.Fatalf("processed = %v, want only %q", processed, screenshotPath)
 	}
 }
+
+func TestAutoPhotoWatcherProcessDoesNotForceDiscordUpload(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "source.png")
+	writeTestPNG(t, source, 2, 2)
+
+	cfg := DefaultConfig()
+	cfg.Image.OutputDirectory = filepath.Join(dir, "out")
+	cfg.Output.SaveLocal = true
+	cfg.Output.UploadDiscord = false
+	cfg.Discord.WebhookURL = ""
+
+	watcher := AutoPhotoWatcher{Config: cfg}
+	result := watcher.process(source)
+	if result.Error != "" {
+		t.Fatalf("unexpected result error: %s", result.Error)
+	}
+	if result.URL != "" {
+		t.Fatalf("URL = %q, want empty when Discord upload is disabled", result.URL)
+	}
+	if result.OutputPath == "" {
+		t.Fatal("expected local output path")
+	}
+	if _, err := os.Stat(result.OutputPath); err != nil {
+		t.Fatal(err)
+	}
+}

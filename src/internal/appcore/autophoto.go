@@ -119,8 +119,7 @@ func (w *AutoPhotoWatcher) process(path string) Result {
 		return w.Process(path)
 	}
 	cfg := w.Config
-	cfg.Output.UploadDiscord = true
-	if strings.TrimSpace(w.webhookURL()) != "" {
+	if cfg.Output.UploadDiscord && strings.TrimSpace(w.webhookURL()) != "" {
 		cfg.Discord.WebhookURL = w.webhookURL()
 	}
 	results, err := Processor{Config: cfg}.ProcessPaths([]string{path})
