@@ -1,3 +1,3 @@
 # Current Todo
 
-- 現在の作業TODOはありません。
+現在の作業TODOはありません。

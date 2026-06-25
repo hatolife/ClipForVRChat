@@ -7,7 +7,6 @@ import (
 	"errors"
 	"image"
 	"image/color"
-	"image/jpeg"
 	"image/png"
 	"io"
 	"os"
@@ -253,23 +252,66 @@ func TestAppStartupWritesVersionHashAndRedactedConfig(t *testing.T) {
 func TestCreateEncryptedDiagnosticPackageEncryptsZip(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.json")
+	userProfile := filepath.Join(dir, "Users", "alice")
+	t.Setenv("USERPROFILE", userProfile)
 	cfg := appcore.DefaultConfig()
 	cfg.Discord.WebhookURL = "https://discord.com/api/webhooks/secret"
+	cfg.AutoPhoto.PhotoDirectory = filepath.Join(userProfile, "Pictures", "VRChat")
+	cfg.Image.OutputDirectory = filepath.Join(userProfile, "Pictures", "ClipForVRChatOutput")
 	if err := appcore.SaveConfig(configPath, cfg); err != nil {
 		t.Fatal(err)
 	}
-	if err := appcore.SaveHistory(appcore.HistoryPath(configPath), []appcore.HistoryEntry{{ID: "1", URL: "https://example.com"}}); err != nil {
+	if err := os.MkdirAll(cfg.Image.OutputDirectory, 0700); err != nil {
 		t.Fatal(err)
 	}
-	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(configPath), "test log")
+	if err := os.WriteFile(filepath.Join(cfg.Image.OutputDirectory, "result.png"), []byte("real output image"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := appcore.SaveHistory(appcore.HistoryPath(configPath), []appcore.HistoryEntry{{ID: "1", URL: "https://example.com", SourcePath: filepath.Join(userProfile, "Pictures", "VRChat", "photo.png")}}); err != nil {
+		t.Fatal(err)
+	}
+	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(configPath), "test log path=%q", filepath.Join(userProfile, "Pictures", "VRChat", "photo.png"))
 
 	app := NewApp(configPath, appcore.UIState{Config: cfg})
 	path, err := app.CreateEncryptedDiagnosticPackage()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if filepath.Dir(path) != dir || filepath.Ext(path) != ".gpg" {
-		t.Fatalf("path = %q, want encrypted package under config dir", path)
+	workDir := filepath.Dir(path)
+	if filepath.Base(filepath.Dir(workDir)) != "diagnostics" || filepath.Ext(path) != ".gpg" {
+		t.Fatalf("path = %q, want encrypted package under diagnostics timestamp dir", path)
+	}
+	zipPath := strings.TrimSuffix(path, ".gpg")
+	if _, err := os.Stat(zipPath); err != nil {
+		t.Fatalf("plain zip should remain for user review: %v", err)
+	}
+	dataDir := filepath.Join(workDir, "data")
+	if stat, err := os.Stat(dataDir); err != nil || !stat.IsDir() {
+		t.Fatalf("data dir should remain for user review, stat=%+v err=%v", stat, err)
+	}
+	logData, err := os.ReadFile(filepath.Join(dataDir, "logs", filepath.Base(appcore.DiagnosticLogPath(configPath))))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(logData), userProfile) || !strings.Contains(string(logData), `%USERPROFILE%`) {
+		t.Fatalf("redacted log = %q, want USERPROFILE placeholder and no raw profile path", string(logData))
+	}
+	if !strings.Contains(string(logData), "diagnostic output directory=") || !strings.Contains(string(logData), "result.png") {
+		t.Fatalf("redacted log = %q, want output directory listing", string(logData))
+	}
+	configData, err := os.ReadFile(filepath.Join(dataDir, "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(configData), userProfile) || !strings.Contains(string(configData), `%USERPROFILE%`) {
+		t.Fatalf("redacted config = %q, want USERPROFILE placeholder and no raw profile path", string(configData))
+	}
+	historyData, err := os.ReadFile(filepath.Join(dataDir, "history.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(historyData), userProfile) || !strings.Contains(string(historyData), `%USERPROFILE%`) {
+		t.Fatalf("redacted history = %q, want USERPROFILE placeholder and no raw profile path", string(historyData))
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -319,7 +361,7 @@ func TestEncryptZipFileWithPublicKey(t *testing.T) {
 	}
 }
 
-func TestEncryptDiagnosticPackageUsesBinaryLiteralData(t *testing.T) {
+func TestDiagnosticZipDoesNotIncludeOutputImages(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.json")
 	cfg := appcore.DefaultConfig()
@@ -350,7 +392,7 @@ func TestEncryptDiagnosticPackageUsesBinaryLiteralData(t *testing.T) {
 		t.Fatalf("plain diagnostic zip is invalid: %v", err)
 	}
 	entries := zipEntryNames(plainZip.File)
-	for _, want := range []string{"logs/" + filepath.Base(appcore.DiagnosticLogPath(configPath)), "output/history.png", "output/real.jpg", "output/real.png"} {
+	for _, want := range []string{"logs/" + filepath.Base(appcore.DiagnosticLogPath(configPath))} {
 		if !entries[want] {
 			t.Fatalf("zip entries = %+v, missing %s", entries, want)
 		}
@@ -358,33 +400,10 @@ func TestEncryptDiagnosticPackageUsesBinaryLiteralData(t *testing.T) {
 	if entries["log/"+filepath.Base(appcore.DiagnosticLogPath(configPath))] {
 		t.Fatalf("zip entries = %+v, should use logs/ not log/", entries)
 	}
-	for _, name := range []string{"output/history.png", "output/real.png"} {
-		file := mustZipFile(t, plainZip.File, name)
-		rc, err := file.Open()
-		if err != nil {
-			t.Fatal(err)
+	for _, unwanted := range []string{"output/history.png", "output/real.jpg", "output/real.png"} {
+		if entries[unwanted] {
+			t.Fatalf("zip entries = %+v, should not include output images", entries)
 		}
-		img, err := png.Decode(rc)
-		_ = rc.Close()
-		if err != nil {
-			t.Fatalf("%s should be png dummy: %v", name, err)
-		}
-		if img.Bounds().Dx() != 1 || img.Bounds().Dy() != 1 {
-			t.Fatalf("%s size = %v, want 1x1", name, img.Bounds())
-		}
-	}
-	jpg := mustZipFile(t, plainZip.File, "output/real.jpg")
-	rc, err := jpg.Open()
-	if err != nil {
-		t.Fatal(err)
-	}
-	jpgCfg, err := jpeg.DecodeConfig(rc)
-	_ = rc.Close()
-	if err != nil {
-		t.Fatalf("output/real.jpg should be jpeg dummy: %v", err)
-	}
-	if jpgCfg.Width != 1 || jpgCfg.Height != 1 {
-		t.Fatalf("output/real.jpg size = %dx%d, want 1x1", jpgCfg.Width, jpgCfg.Height)
 	}
 
 	entity, err := openpgp.NewEntity("Diagnostic Test", "", "diagnostic@example.test", nil)
@@ -421,17 +440,6 @@ func zipEntryNames(files []*zip.File) map[string]bool {
 		names[file.Name] = true
 	}
 	return names
-}
-
-func mustZipFile(t *testing.T, files []*zip.File, name string) *zip.File {
-	t.Helper()
-	for _, file := range files {
-		if file.Name == name {
-			return file
-		}
-	}
-	t.Fatalf("zip entry %s not found", name)
-	return nil
 }
 
 func TestAppProcessToStateRejectsMixedJSON(t *testing.T) {

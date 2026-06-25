@@ -90,10 +90,11 @@
 | 083 | [不具合報告用データ生成UIを改善する](083-improve-diagnostic-data-generation-ui.md) | 完了 | `v0.1.7` | 情報画面下部に生成ボタンを配置し、生成中オーバーレイと完了後Explorer表示を追加する。 |
 | 084 | [Explorerで生成ファイルを選択表示できない](084-fix-explorer-file-selection.md) | 完了 | `v0.1.7` | `explorer.exe /select,` ではなく Windows Shell API でファイル選択表示する。 |
 | 085 | [診断データ復号後のzipが破損する](085-encrypt-diagnostic-package-as-binary.md) | 完了 | `v0.1.7` | 診断データをOpenPGP binary literal dataとして暗号化し、復号後zipの破損を防ぐ。 |
-| 086 | [診断zip内のログとoutput構成を整理する](086-normalize-diagnostic-zip-layout-and-output-dummies.md) | 完了 | `v0.1.7` | zip内ログを `logs/` に統一し、output画像は同名同形式の1x1ダミーで含める。 |
+| 086 | [診断zip内のログとoutput構成を整理する](086-normalize-diagnostic-zip-layout-and-output-log.md) | 完了 | `v0.1.7` | zip内ログを `logs/` に統一し、output画像は含めず一覧を診断ログへ記録する。 |
 | 087 | [zipファイル引数を公開鍵で暗号化する](087-encrypt-zip-from-cli-argument.md) | 完了 | `v0.1.7` | zip単体引数でUIを起動せず、同じ公開鍵で `<zip>.gpg` を生成する。 |
 | 088 | [診断ログ実フォルダ名をlogsへ統一する](088-use-logs-directory-for-diagnostic-logs.md) | 完了 | `v0.1.7` | アプリ実フォルダの診断ログ出力先も `logs/YYYY-MM-DD.log` に統一する。 |
 | 089 | [不具合報告用データの説明を情報画面に追加する](089-explain-diagnostic-data-in-about.md) | 完了 | `v0.1.7` | 情報画面に含まれる情報、暗号化方法、利用目的の説明を追加する。 |
+| 090 | [不具合報告用データを段階作成しパスを置換する](090-stage-and-sanitize-diagnostic-data.md) | 完了 | `v0.1.7` | `diagnostics/<timestamp>/` に確認用データ、zip、暗号化zipを作成し、テキスト内パスを環境変数表記へ置換する。 |
 
 ## 状態の意味
 

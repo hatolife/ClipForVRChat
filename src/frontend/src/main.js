@@ -928,10 +928,16 @@ createApp({
             GitHubのIssueでも問題ありません。気軽に日本語で書いてください。
           </p>
           <p>
-            不具合報告用データには、設定ファイル、履歴、診断ログ、実行中のexe情報、output内のファイル名確認用ダミー画像が含まれます。実際に処理した画像そのものは含めず、output画像は同じ名前と形式の1x1画像に置き換えます。
+            不具合報告用データには、設定ファイル、履歴、診断ログ、実行中のexe情報が含まれます。実際に処理した画像そのものは含めず、outputフォルダの内容は診断ログにファイル名、サイズ、フォルダかどうかだけを記録します。
           </p>
           <p>
-            作成したファイルは <code>poppo@hato.life</code> の公開鍵で暗号化されます。GitHub Issueなどへ添付しても、秘密鍵なしでは中身やファイル一覧を確認できません。
+            ログや設定などのテキストに含まれるユーザーフォルダのパスは、可能な範囲で <code>%USERPROFILE%</code> などの環境変数表記へ置き換えてから入れます。
+          </p>
+          <p>
+            作成時には時刻付きの作業フォルダを作り、確認用の <code>data</code> フォルダ、暗号化前zip、暗号化後の <code>.zip.gpg</code> を同じ場所に残します。添付するファイルは <code>.zip.gpg</code> ですが、送る前に内容を確認できます。
+          </p>
+          <p>
+            作成した <code>.zip.gpg</code> は <code>poppo@hato.life</code> の公開鍵で暗号化されます。GitHub Issueなどへ添付しても、秘密鍵なしでは中身やファイル一覧を確認できません。
           </p>
           <p>
             受け取ったデータは、設定や履歴、ログの状態を確認して不具合の原因を調べるためだけに使います。調査に不要な内容を公開したり、別の目的に使ったりしません。
@@ -1247,7 +1253,7 @@ createApp({
       <div v-if="diagnosticGenerating" class="modal-backdrop busy-backdrop" role="dialog" aria-modal="true" aria-live="polite">
         <div class="busy-dialog">
           <h2>不具合報告用データを作成しています</h2>
-          <p>ログ、設定、履歴、実行ファイルをまとめて暗号化しています。</p>
+          <p>ログ、設定、履歴、実行ファイルを確認用フォルダにまとめ、zip化して暗号化しています。</p>
           <div class="indeterminate-progress"><span></span></div>
         </div>
       </div>
