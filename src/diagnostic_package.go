@@ -94,6 +94,9 @@ func createEncryptedDiagnosticPackage(configPath string, cfg appcore.Config) (st
 	if err := zipDirectory(dataDir, zipPath); err != nil {
 		return "", err
 	}
+	if err := os.RemoveAll(dataDir); err != nil {
+		return "", fmt.Errorf("診断データ一時フォルダを削除できません: %w", err)
+	}
 	zipData, err := os.ReadFile(zipPath) // #nosec G304 -- zip path is generated inside the app-owned diagnostics work directory.
 	if err != nil {
 		return "", fmt.Errorf("診断zipを読み込めません: %w", err)
@@ -105,7 +108,7 @@ func createEncryptedDiagnosticPackage(configPath string, cfg appcore.Config) (st
 	if err := appcore.WritePrivateFile(outputPath, encrypted); err != nil {
 		return "", fmt.Errorf("診断パッケージを保存できません: %w", err)
 	}
-	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(configPath), "diagnostic package=%q zip=%q data_dir=%q files=%d missing=%d", outputPath, zipPath, dataDir, len(manifest.Files), len(manifest.MissingFiles))
+	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(configPath), "diagnostic package=%q zip=%q staged_data_dir=%q files=%d missing=%d", outputPath, zipPath, dataDir, len(manifest.Files), len(manifest.MissingFiles))
 	return outputPath, nil
 }
 

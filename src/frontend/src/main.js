@@ -914,43 +914,63 @@ createApp({
         <section class="about-note">
           <h3>連絡・要望</h3>
           <p>
-            不具合や使いにくいところがあれば、Twitterの <button class="link-button inline" @click="openURL(authorTwitterUrl)">@hato_poppo_life</button> にご連絡ください。
+            不具合や使いにくい点、要望などがありましたら、Twitterの <button class="link-button inline" @click="openURL(authorTwitterUrl)">@hato_poppo_life</button> までお気軽にご連絡ください。
           </p>
           <p>
-            「こういう機能が欲しい」みたいな話でも大丈夫です。全て対応は難しいですがある程度対応させていただきます。
+            「こんな機能が欲しい」といったご意見でも問題ありません。全てのご要望にお応えすることは難しいですが、できる限り改善していきます。
           </p>
           <p>
             できれば
             <button class="link-button inline" @click="openURL(feedbackTweetUrl)">このツイートへの返信</button>
-            で書いてもらえると、見やすくて助かります。
+            でご連絡いただけると、管理しやすく助かります。
           </p>
           <p>
-            GitHubのIssueでも問題ありません。気軽に日本語で書いてください。
+            GitHubのIssueからの報告でも問題ありません。日本語で気軽に投稿してください。
           </p>
           <p>
-            不具合報告用データには、設定ファイル、履歴、診断ログ、実行中のexe情報が含まれます。実際に処理した画像そのものは含めず、outputフォルダの内容は診断ログにファイル名、サイズ、フォルダかどうかだけを記録します。
+            恐らく反応はTwitterのほうが早いです。GitHub Issueは返信が遅くなる場合がありますが、ご容赦ください。
+          </p>
+        </section>
+        <section class="about-note">
+          <h3>不具合報告について</h3>
+          <p>
+            不具合報告の際は、下記のボタンから生成できる不具合報告用データを添付していただけると助かります。
+          </p>
+          <p>
+            不具合報告用データ作成ボタンを押して作成されるデータはzip形式のデータとzipを暗号化したgpgファイルになります。
+          </p>
+          <p>
+            正式リリースされたプログラムで作成される不具合報告用データは、作者の <button class="link-button inline" @click="openURL(authorTwitterUrl)">@hato_poppo_life</button> のみ復号できます。
+          </p>
+          <p>
+            不具合報告用データには、設定ファイル、履歴、ログ、実行ファイル本体、画像保持フォルダの情報が含まれます。
           </p>
           <p>
             ログや設定などのテキストに含まれるユーザーフォルダのパスは、可能な範囲で <code>%USERPROFILE%</code> などの環境変数表記へ置き換えてから入れます。
           </p>
           <p>
-            作成時には時刻付きの作業フォルダを作り、確認用の <code>data</code> フォルダ、暗号化前zip、暗号化後の <code>.zip.gpg</code> を同じ場所に残します。添付するファイルは <code>.zip.gpg</code> ですが、送る前に内容を確認できます。
+            作成時には時刻付きの作業フォルダを作り、一時的な <code>data</code> フォルダへデータを用意してから、暗号化前zipと暗号化後の <code>.zip.gpg</code> を同じ場所に作成します。<code>data</code> フォルダはzip作成後に削除します。
           </p>
           <p>
-            作成した <code>.zip.gpg</code> は <code>poppo@hato.life</code> の公開鍵で暗号化されます。GitHub Issueなどへ添付しても、秘密鍵なしでは中身やファイル一覧を確認できません。
+            zipは確認用のものです。何が暗号化されたzipに含まれるか確認したいときにご使用ください。gpgファイルが暗号化されたzipファイルで、これを不具合報告で使用してください。
           </p>
           <p>
-            受け取ったデータは、設定や履歴、ログの状態を確認して不具合の原因を調べるためだけに使います。調査に不要な内容を公開したり、別の目的に使ったりしません。
+            誤ってzipを添付された場合、中身が公開されてしまいます。とは言え、含まれるデータに致命的な情報はないと思われますので、基本的に問題はないと思われます。
           </p>
           <p>
-            恐らく反応はTwitterのほうが早いです。GitHubは反応が遅いと思われますが許してください。
+            お送りいただいたデータは、不具合の調査および原因解析の目的にのみ使用します。
           </p>
+          <div class="button-row">
+            <button @click="createDiagnosticPackage" :disabled="diagnosticGenerating">不具合報告用データ生成</button>
+          </div>
         </section>
-        <div class="button-row">
-          <button @click="setView('licenses', 'about_licenses')">OSSライセンス</button>
-          <button @click="createDiagnosticPackage" :disabled="diagnosticGenerating">不具合報告用データ生成</button>
-          <button class="secondary" @click="setView('main', 'about_close')">閉じる</button>
-        </div>
+        <section class="about-note">
+          <h3>その他</h3>
+          <div class="button-row">
+            <button @click="setView('licenses', 'about_licenses')">OSSライセンス</button>
+            <button class="secondary" @click="setView('main', 'about_close')">閉じる</button>
+          </div>
+        </section>
       </section>
 
       <section v-else-if="view === 'licenses'" class="panel licenses">

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
@@ -286,10 +287,15 @@ func TestCreateEncryptedDiagnosticPackageEncryptsZip(t *testing.T) {
 		t.Fatalf("plain zip should remain for user review: %v", err)
 	}
 	dataDir := filepath.Join(workDir, "data")
-	if stat, err := os.Stat(dataDir); err != nil || !stat.IsDir() {
-		t.Fatalf("data dir should remain for user review, stat=%+v err=%v", stat, err)
+	if _, err := os.Stat(dataDir); !os.IsNotExist(err) {
+		t.Fatalf("data dir should be removed after zip creation, err=%v", err)
 	}
-	logData, err := os.ReadFile(filepath.Join(dataDir, "logs", filepath.Base(appcore.DiagnosticLogPath(configPath))))
+	plainZip, err := zip.OpenReader(zipPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer plainZip.Close()
+	logData, err := readZipFile(t, plainZip.File, "logs/"+filepath.Base(appcore.DiagnosticLogPath(configPath)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -299,14 +305,14 @@ func TestCreateEncryptedDiagnosticPackageEncryptsZip(t *testing.T) {
 	if !strings.Contains(string(logData), "diagnostic output directory=") || !strings.Contains(string(logData), "result.png") {
 		t.Fatalf("redacted log = %q, want output directory listing", string(logData))
 	}
-	configData, err := os.ReadFile(filepath.Join(dataDir, "config.json"))
+	configData, err := readZipFile(t, plainZip.File, "config.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(string(configData), userProfile) || !strings.Contains(string(configData), `%USERPROFILE%`) {
 		t.Fatalf("redacted config = %q, want USERPROFILE placeholder and no raw profile path", string(configData))
 	}
-	historyData, err := os.ReadFile(filepath.Join(dataDir, "history.json"))
+	historyData, err := readZipFile(t, plainZip.File, "history.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -440,6 +446,22 @@ func zipEntryNames(files []*zip.File) map[string]bool {
 		names[file.Name] = true
 	}
 	return names
+}
+
+func readZipFile(t *testing.T, files []*zip.File, name string) ([]byte, error) {
+	t.Helper()
+	for _, file := range files {
+		if file.Name != name {
+			continue
+		}
+		rc, err := file.Open()
+		if err != nil {
+			return nil, err
+		}
+		defer rc.Close()
+		return io.ReadAll(rc)
+	}
+	return nil, fmt.Errorf("zip entry %s not found", name)
 }
 
 func TestAppProcessToStateRejectsMixedJSON(t *testing.T) {
