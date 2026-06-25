@@ -179,6 +179,56 @@ func TestDeleteLocalHistoryFilesMarksDeleted(t *testing.T) {
 	}
 }
 
+func TestDeleteLocalHistoryFilesResolvesRelativePathFromHistoryDirectory(t *testing.T) {
+	dir := t.TempDir()
+	outputDir := filepath.Join(dir, "output")
+	if err := os.MkdirAll(outputDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(outputDir, "out.png")
+	if err := os.WriteFile(output, []byte("image"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "history.json")
+	if err := SaveHistory(path, []HistoryEntry{{ID: "delete", OutputPath: "output/out.png"}}); err != nil {
+		t.Fatal(err)
+	}
+
+	history, deleted, err := DeleteLocalHistoryFiles(path, []string{"delete"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deleted != 1 || !history[0].LocalDeleted || history[0].LocalExists {
+		t.Fatalf("history = %+v deleted = %d, want relative local deleted", history, deleted)
+	}
+	if _, err := os.Stat(output); !os.IsNotExist(err) {
+		t.Fatalf("relative output file should be removed, stat err = %v", err)
+	}
+}
+
+func TestLoadHistoryResolvesRelativeLocalExistsFromHistoryDirectory(t *testing.T) {
+	dir := t.TempDir()
+	outputDir := filepath.Join(dir, "output")
+	if err := os.MkdirAll(outputDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(outputDir, "out.png"), []byte("image"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "history.json")
+	if err := SaveHistory(path, []HistoryEntry{{ID: "local", OutputPath: "output/out.png"}}); err != nil {
+		t.Fatal(err)
+	}
+
+	history, err := LoadHistory(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(history) != 1 || !history[0].LocalExists {
+		t.Fatalf("history = %+v, want relative local exists", history)
+	}
+}
+
 func TestPurgeUnavailableHistoryRemovesUntrustedURLs(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "history.json")
 	initial := []HistoryEntry{

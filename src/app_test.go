@@ -166,17 +166,53 @@ func TestAppStartupStartsAutoPhotoWatcherWithoutDiscordUpload(t *testing.T) {
 }
 
 func TestExplorerSelectArgsRejectsMissingPath(t *testing.T) {
-	if _, _, err := explorerSelectArgs(""); err == nil {
+	if _, _, err := explorerSelectArgs("", ""); err == nil {
 		t.Fatal("expected empty path error")
 	}
-	if _, _, err := explorerSelectArgs(filepath.Join(t.TempDir(), "missing.png")); err == nil {
+	if _, _, err := explorerSelectArgs(filepath.Join(t.TempDir(), "missing.png"), ""); err == nil {
 		t.Fatal("expected missing file error")
 	}
 }
 
 func TestExplorerSelectArgsRejectsDirectory(t *testing.T) {
-	if _, _, err := explorerSelectArgs(t.TempDir()); err == nil {
+	if _, _, err := explorerSelectArgs(t.TempDir(), ""); err == nil {
 		t.Fatal("expected directory error")
+	}
+}
+
+func TestExplorerSelectArgsResolvesRelativePathFromBaseDir(t *testing.T) {
+	dir := t.TempDir()
+	outputDir := filepath.Join(dir, "output")
+	if err := os.MkdirAll(outputDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(outputDir, "out.png"), []byte("image"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, _, err := explorerSelectArgs("output/out.png", dir)
+	if err == nil {
+		return
+	}
+	if !strings.Contains(err.Error(), "Windows") {
+		t.Fatalf("err = %v, want Windows-only error after relative path resolution", err)
+	}
+}
+
+func TestAppLogUserActionWritesDiagnosticLog(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.json")
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+
+	app.LogUserAction("button_click", "history_delete_entries selected=1")
+
+	data, err := os.ReadFile(appcore.DiagnosticLogPath(configPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if !strings.Contains(text, `ui action="button_click"`) || !strings.Contains(text, `history_delete_entries`) {
+		t.Fatalf("diagnostic log = %q", text)
 	}
 }
 

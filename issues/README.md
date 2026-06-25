@@ -82,6 +82,8 @@
 | 075 | [履歴画面をDiscord/ローカル/履歴の状態別操作に作り直す](075-rebuild-history-screen.md) | 完了 | `v0.1.7` | 履歴画面を状態表示とDiscord/ローカル/履歴削除の独立操作へ作り直す。 |
 | 076 | [履歴と結果表示を実際に行った処理に合わせる](076-history-and-result-display-follow-actual-work.md) | 完了 | `v0.1.7` | 結果画面と履歴画面を実際に行った処理内容に合わせて表示する。 |
 | 077 | [処理結果がない場合に理由を表示する](077-explain-no-result-processing-message.md) | 完了 | `v0.1.7` | 明示的な処理で結果がない場合、設定により処理結果が出ない理由を表示する。 |
+| 078 | [履歴のローカル保存パスをconfig基準で解決する](078-resolve-history-local-paths-relative-to-config.md) | 完了 | `v0.1.7` | 履歴の相対ローカル保存パスをconfig基準で解決し、Explorer表示と削除可否を修正する。 |
+| 079 | [ユーザー操作を診断ログへ記録する](079-record-user-actions-in-diagnostic-log.md) | 完了 | `v0.1.7` | ボタンクリック、画面遷移、処理判断、処理結果表示を診断ログへ記録する。 |
 
 ## 状態の意味
 

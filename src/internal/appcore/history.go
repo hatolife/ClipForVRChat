@@ -40,6 +40,10 @@ func HistoryPath(configPath string) string {
 }
 
 func LoadHistory(path string) ([]HistoryEntry, error) {
+	return LoadHistoryWithBaseDir(path, filepath.Dir(path))
+}
+
+func LoadHistoryWithBaseDir(path string, baseDir string) ([]HistoryEntry, error) {
 	data, err := os.ReadFile(path) // #nosec G304 -- history path is derived from the active app config path.
 	if os.IsNotExist(err) {
 		return nil, nil
@@ -51,7 +55,7 @@ func LoadHistory(path string) ([]HistoryEntry, error) {
 	if err := json.Unmarshal(data, &history); err != nil {
 		return nil, err
 	}
-	enrichHistoryStatus(history)
+	enrichHistoryStatus(history, baseDir)
 	return history, nil
 }
 
@@ -95,7 +99,7 @@ func AddResultsToHistory(path string, results []Result) ([]HistoryEntry, error) 
 		history = append([]HistoryEntry{entry}, history...)
 		results[i].HistoryID = entry.ID
 	}
-	enrichHistoryStatus(history)
+	enrichHistoryStatus(history, filepath.Dir(path))
 	return history, SaveHistory(path, history)
 }
 
@@ -113,7 +117,7 @@ func ResultHasUserVisibleWork(result Result) bool {
 }
 
 func MarkHistoryCleared(path string, ids []string) ([]HistoryEntry, error) {
-	history, err := LoadHistory(path)
+	history, err := LoadHistoryWithBaseDir(path, filepath.Dir(path))
 	if err != nil {
 		return history, err
 	}
@@ -186,14 +190,14 @@ func DeleteLocalHistoryFiles(path string, ids []string) ([]HistoryEntry, int, er
 		if !idSet[history[i].ID] || history[i].Pinned || strings.TrimSpace(history[i].OutputPath) == "" || history[i].LocalDeleted {
 			continue
 		}
-		if err := removeHistoryOutputFile(history[i].OutputPath); err != nil {
+		if err := removeHistoryOutputFile(history[i].OutputPath, filepath.Dir(path)); err != nil {
 			return history, deleted, err
 		}
 		history[i].LocalDeleted = true
 		history[i].LocalDeletedAt = now
 		deleted++
 	}
-	enrichHistoryStatus(history)
+	enrichHistoryStatus(history, filepath.Dir(path))
 	return history, deleted, SaveHistory(path, history)
 }
 
@@ -231,16 +235,16 @@ func PurgeDiscordDeletedHistory(path string, deleteOutput bool) ([]HistoryEntry,
 			continue
 		}
 		if deleteOutput {
-			_ = removeHistoryOutputFile(entry.OutputPath)
+			_ = removeHistoryOutputFile(entry.OutputPath, filepath.Dir(path))
 		}
 		removed++
 	}
 	return kept, removed, SaveHistory(path, kept)
 }
 
-func removeHistoryOutputFile(path string) error {
-	path = strings.Trim(strings.TrimSpace(path), `"`)
-	if path == "" || !filepath.IsAbs(path) {
+func removeHistoryOutputFile(path string, baseDir string) error {
+	path = ResolveHistoryOutputPath(path, baseDir)
+	if path == "" {
 		return nil
 	}
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
@@ -249,19 +253,33 @@ func removeHistoryOutputFile(path string) error {
 	return nil
 }
 
-func enrichHistoryStatus(history []HistoryEntry) {
+func enrichHistoryStatus(history []HistoryEntry, baseDir string) {
 	for i := range history {
-		history[i].LocalExists = localHistoryFileExists(history[i])
+		history[i].LocalExists = localHistoryFileExists(history[i], baseDir)
 	}
 }
 
-func localHistoryFileExists(entry HistoryEntry) bool {
-	path := strings.Trim(strings.TrimSpace(entry.OutputPath), `"`)
+func localHistoryFileExists(entry HistoryEntry, baseDir string) bool {
+	path := ResolveHistoryOutputPath(entry.OutputPath, baseDir)
 	if path == "" || entry.LocalDeleted {
 		return false
 	}
 	stat, err := os.Stat(path)
 	return err == nil && !stat.IsDir()
+}
+
+func ResolveHistoryOutputPath(path string, baseDir string) string {
+	cleaned := strings.Trim(strings.TrimSpace(path), `"`)
+	if cleaned == "" {
+		return ""
+	}
+	if filepath.IsAbs(cleaned) {
+		return cleaned
+	}
+	if strings.TrimSpace(baseDir) == "" {
+		return ""
+	}
+	return filepath.Join(baseDir, cleaned)
 }
 
 func RemoteURLAvailable(url string) bool {
