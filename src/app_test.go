@@ -155,7 +155,7 @@ func TestAppStartupStartsAutoPhotoWatcherWithoutDiscordUpload(t *testing.T) {
 	cfg.AutoPhoto.PhotoDirectory = t.TempDir()
 	cfg.AutoPhoto.ScanIntervalSeconds = 3600
 
-	app := NewApp(configPath, appcore.UIState{Config: cfg})
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults, Config: cfg})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	app.startup(ctx)
@@ -167,6 +167,26 @@ func TestAppStartupStartsAutoPhotoWatcherWithoutDiscordUpload(t *testing.T) {
 
 	if app.autoCancel == nil {
 		t.Fatal("auto photo watcher was not started")
+	}
+}
+
+func TestAppStartupDoesNotStartAutoPhotoWatcherWhileReviewingSettings(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "imported.json")
+	cfg := appcore.DefaultConfig()
+	cfg.Output.UploadDiscord = true
+	cfg.AutoPhoto.Enabled = true
+	cfg.AutoPhoto.PhotoDirectory = t.TempDir()
+	cfg.AutoPhoto.WebhookURL = "https://example.com/api/webhooks/attacker/token"
+	cfg.AutoPhoto.ScanIntervalSeconds = 3600
+
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeSettings, Config: cfg, ConfigPath: configPath})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	app.startup(ctx)
+
+	if app.autoCancel != nil {
+		app.autoCancel()
+		t.Fatal("auto photo watcher started while imported settings were only open for review")
 	}
 }
 
