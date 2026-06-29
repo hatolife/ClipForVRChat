@@ -669,13 +669,48 @@ func nowRFC3339() string {
 }
 
 func (a *App) restartAutoPhotoWatcher(cfg appcore.Config) {
+	cfg.Normalize()
+	logPath := appcore.DiagnosticLogPath(a.configPath)
 	if a.autoCancel != nil {
+		appcore.AppendDiagnosticLog(logPath, "auto-watchers restart: cancelling existing watchers")
 		a.autoCancel()
 		a.autoCancel = nil
 	}
 	if a.ctx == nil || (!cfg.AutoPhoto.Enabled && !cfg.ScreenshotAutoPost.Enabled && !cfg.AutoCapture.Schedule.Enabled) {
+		appcore.AppendDiagnosticLog(
+			logPath,
+			"auto-watchers disabled: ctx_nil=%t autoPhoto=%t screenshotAutoPost=%t autoCaptureSchedule=%t",
+			a.ctx == nil,
+			cfg.AutoPhoto.Enabled,
+			cfg.ScreenshotAutoPost.Enabled,
+			cfg.AutoCapture.Schedule.Enabled,
+		)
 		return
 	}
+	enabledAutoCaptureViews := 0
+	for _, view := range cfg.AutoCapture.Views {
+		if view.Enabled {
+			enabledAutoCaptureViews++
+		}
+	}
+	appcore.AppendDiagnosticLog(
+		logPath,
+		"auto-watchers start: autoPhoto=%t screenshotAutoPost=%t autoCaptureSchedule=%t autoCapture_captureOnStart=%t autoCapture_interval_sec=%d autoCapture_initial_delay_sec=%d autoCapture_max_batches=%d autoCapture_mode=%q osc=%s:%d photo_dir=%q auto_capture_output_dir=%q auto_capture_views=%d/%d",
+		cfg.AutoPhoto.Enabled,
+		cfg.ScreenshotAutoPost.Enabled,
+		cfg.AutoCapture.Schedule.Enabled,
+		cfg.AutoCapture.Schedule.CaptureOnStart,
+		cfg.AutoCapture.Schedule.CaptureIntervalSec,
+		cfg.AutoCapture.Schedule.InitialDelaySec,
+		cfg.AutoCapture.Schedule.MaxBatches,
+		cfg.AutoCapture.Capture.Mode,
+		cfg.AutoCapture.OSC.Host,
+		cfg.AutoCapture.OSC.SendPort,
+		cfg.AutoPhoto.PhotoDirectory,
+		cfg.AutoCapture.Output.Directory,
+		enabledAutoCaptureViews,
+		len(cfg.AutoCapture.Views),
+	)
 	ctx, cancel := context.WithCancel(a.ctx)
 	a.autoCancel = cancel
 	handler := func(event appcore.AutoPhotoEvent) {
@@ -721,18 +756,33 @@ func (a *App) restartAutoPhotoWatcher(cfg appcore.Config) {
 		go watcher.Run(ctx)
 	}
 	if cfg.AutoCapture.Schedule.Enabled {
+		appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler launch")
 		go a.runAutoCaptureScheduler(ctx, cfg)
 	}
 }
 
 func (a *App) runAutoCaptureScheduler(ctx context.Context, cfg appcore.Config) {
+	cfg.Normalize()
+	logPath := appcore.DiagnosticLogPath(a.configPath)
 	ac := cfg.AutoCapture
+	appcore.AppendDiagnosticLog(
+		logPath,
+		"auto-capture scheduler start: capture_on_start=%t initial_delay_sec=%d interval_sec=%d max_batches=%d",
+		ac.Schedule.CaptureOnStart,
+		ac.Schedule.InitialDelaySec,
+		ac.Schedule.CaptureIntervalSec,
+		ac.Schedule.MaxBatches,
+	)
 	if ac.Schedule.InitialDelaySec > 0 {
+		appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler initial_delay begin: seconds=%d", ac.Schedule.InitialDelaySec)
 		if !sleepWithContext(ctx, time.Duration(ac.Schedule.InitialDelaySec)*time.Second) {
+			appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler initial_delay cancelled: err=%v", ctx.Err())
 			return
 		}
+		appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler initial_delay complete")
 	}
 	if ac.Schedule.CaptureOnStart {
+		appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler trigger: reason=%q", "capture_on_start")
 		a.runAutoCaptureBatch(ctx, cfg)
 	}
 	interval := time.Duration(ac.Schedule.CaptureIntervalSec) * time.Second
@@ -745,11 +795,14 @@ func (a *App) runAutoCaptureScheduler(ctx context.Context, cfg appcore.Config) {
 	for {
 		select {
 		case <-ctx.Done():
+			appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler stop: reason=%q err=%v", "context_done", ctx.Err())
 			return
 		case <-ticker.C:
 			if ac.Schedule.MaxBatches > 0 && batches >= ac.Schedule.MaxBatches {
+				appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler stop: reason=%q batches=%d max_batches=%d", "max_batches", batches, ac.Schedule.MaxBatches)
 				return
 			}
+			appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler trigger: reason=%q batch_index=%d", "interval", batches+1)
 			a.runAutoCaptureBatch(ctx, cfg)
 			batches++
 		}
@@ -757,6 +810,9 @@ func (a *App) runAutoCaptureScheduler(ctx context.Context, cfg appcore.Config) {
 }
 
 func (a *App) runAutoCaptureBatch(ctx context.Context, cfg appcore.Config) {
+	logPath := appcore.DiagnosticLogPath(a.configPath)
+	cfg.DiagnosticLogPath = logPath
+	appcore.AppendDiagnosticLog(logPath, "auto-capture batch begin")
 	runner := appcore.AutoCaptureRunner{
 		Config: cfg,
 		Handler: func(event appcore.AutoCaptureEvent) {
@@ -767,12 +823,20 @@ func (a *App) runAutoCaptureBatch(ctx context.Context, cfg appcore.Config) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if err != nil {
+		appcore.AppendDiagnosticLog(logPath, "auto-capture batch error: %v", err)
 		result := appcore.Result{Name: "自動撮影", Error: err.Error()}
 		a.state.Results = append([]appcore.Result{result}, a.state.Results...)
 		a.state.Mode = appcore.ModeResults
 		emitWailsEvent(a.ctx, "auto-photo:result", appcore.AutoPhotoEvent{Result: result, Error: result.Error})
 		return
 	}
+	errorCount := 0
+	for _, result := range results {
+		if result.Error != "" {
+			errorCount++
+		}
+	}
+	appcore.AppendDiagnosticLog(logPath, "auto-capture batch complete: results=%d errors=%d", len(results), errorCount)
 	if len(results) > 0 {
 		a.state.Results = append(results, a.state.Results...)
 		if history, historyErr := appcore.AddResultsToHistory(appcore.HistoryPath(a.configPath), results); historyErr == nil {
