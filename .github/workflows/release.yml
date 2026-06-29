@@ -237,13 +237,13 @@ jobs:
         if: steps.version.outputs.draft == 'false'
         env:
           TAG_NAME: ${{ steps.version.outputs.version }}
-        run: node scripts/extract-release-notes.mjs "$TAG_NAME" RELEASE_NOTES.md dist/release-body.md --fallback-rc-notes
+        run: node scripts/extract-release-notes.mjs "$env:TAG_NAME" RELEASE_NOTES.md dist/release-body.md --fallback-rc-notes
 
       - name: Prepare draft release notes
         if: steps.version.outputs.draft == 'true'
         env:
           TAG_NAME: ${{ steps.version.outputs.version }}
-        run: node scripts/extract-release-notes.mjs "$TAG_NAME" RELEASE_NOTES.md dist/release-body.md --fallback-draft-notes
+        run: node scripts/extract-release-notes.mjs "$env:TAG_NAME" RELEASE_NOTES.md dist/release-body.md --fallback-draft-notes
 
       - name: Upload release assets artifact
         uses: actions/upload-artifact@v6
