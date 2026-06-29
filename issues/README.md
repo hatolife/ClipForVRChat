@@ -113,6 +113,8 @@
 | 106 | [Release NotesのダウンロードURLをMarkdownリンクにする](106-release-notes-download-links.md) | 完了 | `v0.1.7` | Release本文のダウンロード欄でファイル名をリンクテキストとして表示する。 |
 | 107 | [Git Flow運用をAGENTS.mdへ明文化する](107-update-git-flow-agents.md) | 完了 | `v0.1.7` | `develop` 基準の通常開発と `master` 基準のリリースブランチ運用を明文化する。 |
 | 108 | [Discord投稿ONで通常投稿用Webhook URLが空欄の場合に保存時警告を出す](108-warn-empty-discord-webhook-on-save.md) | 完了 | `v0.1.7` | Discord投稿ONで通常投稿用Webhook URLが空欄の場合、保存後も画面上部に警告を表示する。 |
+| 109 | [VRChat自動構図撮影](109-vrc-auto-composition-capture.md) | 要確認 | `v0.1.8` | OSCでUser Cameraを制御し、構図ごとの自動撮影とsidecar JSON保存を実装する。 |
+| 110 | [VRChat output logからの同席ユーザー保持](110-vrc-output-log-presence-users.md) | 要確認 | `v0.1.8` | output_log監視で撮影時点の同席ユーザー情報を保持し、画像メタデータやDiscord投稿へ紐づける。 |
 
 ## 状態の意味
 
