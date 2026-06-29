@@ -937,9 +937,9 @@ createApp({
             <li><button class="link-button inline" @click="openURL(releasesUrl)">GitHub Releases</button> で使いたいバージョンを開きます。</li>
             <li>zipを展開し、確認したい <code>ClipForVRChat.exe</code> を用意します。</li>
             <li>同じReleaseに別添付されている <code>.exe.asc</code> を、exeと同じフォルダに保存します。</li>
-            <li>zip内の <code>Release-signing-public-key.url</code> から公式公開鍵を確認して取り込みます。</li>
+            <li>公開鍵は、ダウンロードしたzip内の <code>Release-signing-public-key.url</code> だけで信頼せず、公式READMEなどダウンロード物とは別経路の案内と照合してから取り込みます。</li>
             <li>コマンドプロンプトやPowerShellで <code>gpg --verify ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc ClipForVRChat.exe</code> を実行します。</li>
-            <li><code>Good signature</code> と表示されれば、公式配布のexeとして確認できています。</li>
+            <li><code>Good signature</code> は「取り込んだ公開鍵で署名されたファイルから変更されていない」ことを示します。公開鍵自体が公式のものかも別途確認してください。</li>
           </ol>
           <p>PGPがよく分からない場合は、公式の配布場所から直接ダウンロードしてください。</p>
           <ul>
