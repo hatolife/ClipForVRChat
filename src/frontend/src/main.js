@@ -134,7 +134,18 @@ createApp({
       autoCapture.output ||= {}
       autoCapture.presence ||= {}
       autoCapture.discord ||= {}
+      autoCapture.views ||= []
       return autoCapture
+    },
+    autoCaptureViews() {
+      const views = this.autoCaptureSettings.views || []
+      views.forEach((view, index) => {
+        view.sortOrder = Number.isFinite(Number(view.sortOrder)) ? Number(view.sortOrder) : index
+        view.pose ||= {}
+        view.pose.position ||= {}
+        view.pose.rotation ||= {}
+      })
+      return views.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
     },
     settingsTabs() {
       return [
@@ -760,6 +771,135 @@ createApp({
         this.diagnosticGenerating = false
       }
     },
+    normalizeAutoCaptureViewOrders() {
+      this.autoCaptureViews.forEach((view, index) => {
+        view.sortOrder = index
+      })
+    },
+    newAutoCaptureView(overrides = {}) {
+      const id = overrides.id || this.uniqueAutoCaptureViewId('view')
+      return {
+        id,
+        name: overrides.name || `構図 ${this.autoCaptureViews.length + 1}`,
+        enabled: overrides.enabled ?? true,
+        sortOrder: overrides.sortOrder ?? this.autoCaptureViews.length,
+        coordinateSpace: overrides.coordinateSpace || 'world',
+        pose: {
+          position: { x: 0, y: 0, z: 0, ...(overrides.pose?.position || {}) },
+          rotation: { x: 0, y: 0, z: 0, ...(overrides.pose?.rotation || {}) }
+        },
+        zoom: overrides.zoom ?? null,
+        exposure: overrides.exposure ?? null,
+        focalDistance: overrides.focalDistance ?? null,
+        aperture: overrides.aperture ?? null,
+        lookAtMe: overrides.lookAtMe ?? null,
+        showUiInCamera: overrides.showUiInCamera ?? null,
+        localPlayer: overrides.localPlayer ?? null,
+        remotePlayer: overrides.remotePlayer ?? null,
+        environment: overrides.environment ?? null,
+        settleDelayMs: overrides.settleDelayMs ?? 1500,
+        captureDelayMs: overrides.captureDelayMs ?? 0,
+        calibrated: overrides.calibrated ?? false
+      }
+    },
+    uniqueAutoCaptureViewId(prefix) {
+      const used = new Set(this.autoCaptureViews.map((view) => view.id))
+      const base = String(prefix || 'view').trim().replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'view'
+      let id = base
+      let index = 2
+      while (used.has(id)) {
+        id = `${base}-${index}`
+        index += 1
+      }
+      return id
+    },
+    addAutoCaptureView() {
+      this.autoCaptureSettings.views.push(this.newAutoCaptureView({ calibrated: false, coordinateSpace: 'world' }))
+      this.normalizeAutoCaptureViewOrders()
+    },
+    duplicateAutoCaptureView(view) {
+      const copy = JSON.parse(JSON.stringify(view || {}))
+      copy.id = this.uniqueAutoCaptureViewId(`${copy.id || 'view'}-copy`)
+      copy.name = `${copy.name || '構図'} コピー`
+      copy.sortOrder = this.autoCaptureViews.indexOf(view) + 1
+      const index = this.autoCaptureSettings.views.indexOf(view)
+      this.autoCaptureSettings.views.splice(index + 1, 0, this.newAutoCaptureView(copy))
+      this.normalizeAutoCaptureViewOrders()
+    },
+    deleteAutoCaptureView(view) {
+      const index = this.autoCaptureSettings.views.indexOf(view)
+      if (index >= 0) {
+        this.autoCaptureSettings.views.splice(index, 1)
+        this.normalizeAutoCaptureViewOrders()
+      }
+    },
+    moveAutoCaptureView(view, direction) {
+      const views = this.autoCaptureViews
+      const index = views.indexOf(view)
+      const nextIndex = index + direction
+      if (index < 0 || nextIndex < 0 || nextIndex >= views.length) return
+      const currentOrder = views[index].sortOrder
+      views[index].sortOrder = views[nextIndex].sortOrder
+      views[nextIndex].sortOrder = currentOrder
+      this.normalizeAutoCaptureViewOrders()
+    },
+    viewPoseValue(view, part, axis) {
+      const value = view?.pose?.[part]?.[axis]
+      return Number.isFinite(Number(value)) ? Number(value).toFixed(3) : '-'
+    },
+    coordinateSpaceLabel(value) {
+      if (value === 'world') return 'ワールド'
+      if (value === 'dolly_local') return 'Dolly Local'
+      return '未保存'
+    },
+    async saveCurrentCameraPoseToView(view) {
+      if (!view?.id) return
+      if (!api?.SaveCurrentCameraPoseToView) {
+        this.error = '現在Pose保存APIが利用できません。'
+        return
+      }
+      this.error = ''
+      try {
+        const updated = await api.SaveCurrentCameraPoseToView(view.id)
+        if (updated?.autoCapture) {
+          this.state.config.autoCapture = updated.autoCapture
+        } else if (updated?.views) {
+          this.state.config.autoCapture.views = updated.views
+        } else if (updated?.id) {
+          Object.assign(view, updated)
+        }
+        this.toast = '現在Poseを保存しました'
+        setTimeout(() => {
+          this.toast = ''
+        }, 1800)
+      } catch (err) {
+        this.error = String(err)
+      }
+    },
+    async addCurrentCameraPoseAsView() {
+      if (!api?.AddCurrentCameraPoseAsView) {
+        this.error = '現在Pose追加APIが利用できません。'
+        return
+      }
+      this.error = ''
+      try {
+        const updated = await api.AddCurrentCameraPoseAsView()
+        if (updated?.autoCapture) {
+          this.state.config.autoCapture = updated.autoCapture
+        } else if (updated?.views) {
+          this.state.config.autoCapture.views = updated.views
+        } else if (updated?.id) {
+          this.autoCaptureSettings.views.push(this.newAutoCaptureView(updated))
+        }
+        this.normalizeAutoCaptureViewOrders()
+        this.toast = '現在Poseから構図を追加しました'
+        setTimeout(() => {
+          this.toast = ''
+        }, 1800)
+      } catch (err) {
+        this.error = String(err)
+      }
+    },
     async checkForUpdate() {
       if (!api?.CheckForUpdate || this.updateSettings.checkEnabled === false) {
         this.updateInfo = { available: false, currentVersion: '', currentReleaseTime: '', latestVersion: '', latestReleasePublished: '', url: '' }
@@ -1147,8 +1287,56 @@ createApp({
             <div class="settings-explainer">
               <strong>VRChatのUser CameraをOSCで操作し、指定間隔で写真を撮影する機能です。</strong>
               <p>VRChat側でOSCを有効にし、Photo方式ではVRChat内でUser Cameraを表示した状態で使います。写真保存先を監視し、撮影された画像を検出してサイドカーJSONやDiscord投稿に同席ユーザー情報を紐づけます。</p>
-              <p>まず自動撮影スケジュールを有効にし、OSCホストと送信ポート、VRChat写真の保存先、output_log監視を確認してください。構図設定が未調整の場合は、現在のUser Camera位置から順番に撮影します。</p>
+              <p>まずVRChat内でUser Cameraを構図ごとに配置し、「現在Poseを保存」で正面、背後、斜めなどの構図をキャリブレーションしてください。未キャリブレーションの構図は撮影に使われません。</p>
+              <p>v0.1.8では撮影時の解像度変更は行わず、VRChat側の現在のカメラ解像度設定で保存します。</p>
             </div>
+            <section class="auto-capture-views" aria-label="構図プリセット">
+              <div class="auto-capture-views-header">
+                <div>
+                  <h4>構図プリセット</h4>
+                  <p>有効な構図を上から順番に撮影します。</p>
+                </div>
+                <div class="button-row">
+                  <button type="button" @click="addCurrentCameraPoseAsView">現在Poseから追加</button>
+                </div>
+              </div>
+              <div v-if="autoCaptureViews.length" class="view-list">
+                <article v-for="(cameraView, index) in autoCaptureViews" :key="cameraView.id" class="view-card">
+                  <div class="view-card-main">
+                    <label class="switch compact-switch" :title="cameraView.enabled ? '有効' : '無効'">
+                      <input type="checkbox" v-model="cameraView.enabled" />
+                      <span></span>
+                    </label>
+                    <div class="view-fields">
+                      <label>
+                        <small>構図名</small>
+                        <input v-model.trim="cameraView.name" placeholder="構図名" />
+                      </label>
+                      <div class="view-meta">
+                        <span :class="['status-pill', cameraView.calibrated ? 'ok' : 'muted']">{{ cameraView.calibrated ? 'キャリブレーション済み' : '未キャリブレーション' }}</span>
+                        <span class="status-pill">{{ coordinateSpaceLabel(cameraView.coordinateSpace) }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="pose-grid">
+                    <label><small>位置 X</small><input type="number" step="0.001" v-model.number="cameraView.pose.position.x" /></label>
+                    <label><small>位置 Y</small><input type="number" step="0.001" v-model.number="cameraView.pose.position.y" /></label>
+                    <label><small>位置 Z</small><input type="number" step="0.001" v-model.number="cameraView.pose.position.z" /></label>
+                    <label><small>回転 X</small><input type="number" step="0.001" v-model.number="cameraView.pose.rotation.x" /></label>
+                    <label><small>回転 Y</small><input type="number" step="0.001" v-model.number="cameraView.pose.rotation.y" /></label>
+                    <label><small>回転 Z</small><input type="number" step="0.001" v-model.number="cameraView.pose.rotation.z" /></label>
+                  </div>
+                  <div class="view-actions">
+                    <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, -1)" :disabled="index === 0">↑</button>
+                    <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, 1)" :disabled="index === autoCaptureViews.length - 1">↓</button>
+                    <button type="button" class="secondary" @click="saveCurrentCameraPoseToView(cameraView)">現在Poseを保存</button>
+                    <button type="button" class="secondary" @click="duplicateAutoCaptureView(cameraView)">複製</button>
+                    <button type="button" class="secondary danger-button" @click="deleteAutoCaptureView(cameraView)">削除</button>
+                  </div>
+                </article>
+              </div>
+              <p v-else class="empty">構図プリセットがありません。</p>
+            </section>
             <div class="setting-row">
               <div><strong>自動撮影スケジュール</strong><p>一定間隔でVRChatカメラ撮影を実行します。</p></div>
               <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.schedule.enabled" /><span></span></label>
@@ -1194,16 +1382,13 @@ createApp({
               </label>
             </div>
             <div class="setting-row">
-              <div><strong>撮影方式</strong><p>VRChat写真保存またはStream Cameraからの保存を選びます。</p></div>
+              <div><strong>撮影方式</strong><p>v0.1.8ではVRChat標準のPhoto方式で撮影します。</p></div>
               <label>
-                <select v-model="autoCaptureSettings.capture.mode">
-                  <option value="photo">Photo</option>
-                  <option value="stream">Stream</option>
-                </select>
+                <input value="Photo" disabled />
               </label>
             </div>
             <div class="setting-row">
-              <div><strong>出力先フォルダ</strong><p>Stream方式の保存先です。Photo方式ではVRChat写真フォルダを検出します。</p></div>
+              <div><strong>自動撮影管理フォルダ</strong><p>v0.1.8のPhoto方式ではVRChat写真フォルダを検出し、関連ファイルを画像と同じ場所へ保存します。</p></div>
               <label>
                 <input v-model="autoCaptureSettings.output.directory" placeholder="%USERPROFILE%/Pictures/VRC-AutoCapture" />
               </label>

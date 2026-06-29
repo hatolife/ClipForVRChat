@@ -13,13 +13,12 @@ VRChat内のUser Cameraを外部から制御し、登録した構図を一定間
 - 「自動撮影」タブからOSC、スケジュール、撮影方式、出力、Discord投稿方針を設定できる。
 - 初期値では自動撮影はOFFで、明示的にONにした場合のみ動作する。
 - Sequential + Photo方式で有効な構図を順番に適用し、`/usercamera/Capture` を送信できる。
-- Spout/StreamとDolly Multiは未実装でも、設定値とフォールバック方針が保持される。
+- v0.1.8では実装済みのPhoto方式のみを設定画面に出し、未実装のStream/SpoutやDolly Multiを選択肢として出さない。
 - 撮影画像に対応するsidecar JSONが作成され、Batch ID、Shot ID、構図、撮影方式、ユーザースナップショットが保存される。
 - 既存のVRChat写真自動処理、スクリーンショット自動処理、手動画像処理が壊れない。
 
 ## 実装メモ
 
 - v0.1.8 RCではSequential + Photo方式を実装対象とする。
-- Stream/Spout、Camera Dolly Multi、解像度一時変更は将来対応として残す。
-- 初期構図は未キャリブレーションのテンプレートとして作成し、手動編集されたworld poseのみOSCへ送る。
-
+- Stream/Spout、Camera Dolly Multiはv0.1.8の設定画面には出さない。解像度一時変更はIssue 118として断念を明示する。
+- 初期構図は未キャリブレーションのテンプレートとして作成し、VRChatから受信した現在Poseを保存してキャリブレーション済みになった構図のみOSCへ送る。

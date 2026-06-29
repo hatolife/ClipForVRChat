@@ -1,7 +1,9 @@
 package appcore
 
 import (
+	"encoding/binary"
 	"encoding/json"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -55,6 +57,18 @@ func TestAutoCapturePhotoDirectoryUsesAutoPhotoSetting(t *testing.T) {
 	}
 }
 
+func TestEnabledCameraViewsRequiresCalibratedWorldPose(t *testing.T) {
+	views := []CameraViewConfig{
+		{ID: "template", Enabled: true, CoordinateSpace: "template_relative", Calibrated: false, SortOrder: 1},
+		{ID: "disabled", Enabled: false, CoordinateSpace: "world", Calibrated: true, SortOrder: 2},
+		{ID: "world", Enabled: true, CoordinateSpace: "world", Calibrated: true, SortOrder: 3},
+	}
+	got := enabledCameraViews(views)
+	if len(got) != 1 || got[0].ID != "world" {
+		t.Fatalf("enabled views = %+v, want only calibrated world view", got)
+	}
+}
+
 func TestAppendOSCStringPadsToFourBytes(t *testing.T) {
 	got := appendOSCString(nil, "/x")
 	if len(got)%4 != 0 {
@@ -71,6 +85,24 @@ func TestBuildOSCButtonPacketUsesBoolTypeTag(t *testing.T) {
 	want = appendOSCString(want, ",T")
 	if string(got) != string(want) {
 		t.Fatalf("button packet = %v, want %v", got, want)
+	}
+}
+
+func TestParseOSCPose(t *testing.T) {
+	packet := buildOSCPacket("/usercamera/Pose", ",ffffff", func(buf []byte) []byte {
+		for _, value := range []float32{1.25, 2.5, -3.75, 10, 20, 30} {
+			var raw [4]byte
+			binary.BigEndian.PutUint32(raw[:], math.Float32bits(value))
+			buf = append(buf, raw[:]...)
+		}
+		return buf
+	})
+	pose, ok := ParseOSCPose(packet)
+	if !ok {
+		t.Fatal("ParseOSCPose failed")
+	}
+	if pose.Position.X != 1.25 || pose.Position.Y != 2.5 || pose.Position.Z != -3.75 || pose.Rotation.X != 10 || pose.Rotation.Y != 20 || pose.Rotation.Z != 30 {
+		t.Fatalf("pose = %+v", pose)
 	}
 }
 
@@ -103,7 +135,8 @@ func TestParseVRChatPresenceLog(t *testing.T) {
 	log := "" +
 		"2026.06.29 12:00:00 Log - OnPlayerJoined displayName: Alice usr_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\n" +
 		"2026.06.29 12:01:00 Log - OnPlayerJoined displayName: Bob usr_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb\n" +
-		"2026.06.29 12:02:00 Log - OnPlayerLeft displayName: Bob usr_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb\n"
+		"2026.06.29 12:02:00 Log - OnPlayerLeft displayName: Bob usr_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb\n" +
+		"2026.06.29 12:03:00 Debug      -  [Behaviour] OnPlayerJoined はとぽ_ (usr_dc4f8eca-e074-443a-b271-21ef533c9c3e)\n"
 	if err := os.WriteFile(path, []byte(log), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -111,12 +144,16 @@ func TestParseVRChatPresenceLog(t *testing.T) {
 	if !ok {
 		t.Fatal("parse failed")
 	}
-	if len(users) != 1 {
-		t.Fatalf("users = %d, want 1: %+v", len(users), users)
+	if len(users) != 2 {
+		t.Fatalf("users = %d, want 2: %+v", len(users), users)
 	}
 	user := users["usr_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"]
 	if user.DisplayName != "Alice" || user.Confidence != "confirmed" {
 		t.Fatalf("unexpected user: %+v", user)
+	}
+	vrcUser := users["usr_dc4f8eca-e074-443a-b271-21ef533c9c3e"]
+	if vrcUser.DisplayName != "はとぽ_" || vrcUser.Confidence != "confirmed" {
+		t.Fatalf("unexpected VRChat user: %+v", vrcUser)
 	}
 }
 

@@ -373,9 +373,7 @@ func (c *AutoCaptureConfig) Normalize() {
 	if c.Schedule.MaxBatches < 0 {
 		c.Schedule.MaxBatches = 0
 	}
-	switch c.Capture.Mode {
-	case "photo", "stream":
-	default:
+	if c.Capture.Mode != "photo" {
 		c.Capture.Mode = "photo"
 	}
 	switch c.Capture.ConcurrentMode {
@@ -485,7 +483,7 @@ func DefaultAutoCaptureDirectory() string {
 
 func DefaultVRChatLogDirectory() string {
 	if localAppData := os.Getenv("LOCALAPPDATA"); localAppData != "" {
-		return filepath.Join(localAppData, "Low", "VRChat", "VRChat")
+		return filepath.Join(filepath.Dir(localAppData), "LocalLow", "VRChat", "VRChat")
 	}
 	if userProfile := os.Getenv("USERPROFILE"); userProfile != "" {
 		return filepath.Join(userProfile, "AppData", "LocalLow", "VRChat", "VRChat")
