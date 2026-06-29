@@ -70,8 +70,24 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.logStartupLocked()
 	if a.state.Mode == appcore.ModeResults {
-		a.restartCameraPoseReceiverLocked(a.state.Config)
 		a.restartAutoPhotoWatcher(a.state.Config)
+	}
+}
+
+func (a *App) shutdown(ctx context.Context) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.stopBackgroundTasksLocked()
+}
+
+func (a *App) stopBackgroundTasksLocked() {
+	if a.autoCancel != nil {
+		a.autoCancel()
+		a.autoCancel = nil
+	}
+	if a.oscCancel != nil {
+		a.oscCancel()
+		a.oscCancel = nil
 	}
 }
 

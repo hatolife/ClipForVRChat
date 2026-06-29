@@ -7,4 +7,4 @@
 - [x] output_logから同席ユーザーを取得し、sidecar JSONとDiscord投稿へ紐づける
 - [x] 解像度一時変更はv0.1.8で断念することをUI/Issueで明示する
 - [x] Go/frontendテストとローカルビルドを確認する
-- [ ] release/v0.1.8へ取り込み、次RCタグをpushしてCIを確認する
+- [x] release/v0.1.8へ取り込み、次RCタグをpushしてCIを確認する
