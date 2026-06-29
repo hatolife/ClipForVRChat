@@ -74,6 +74,29 @@ func TestBuildOSCButtonPacketUsesBoolTypeTag(t *testing.T) {
 	}
 }
 
+func TestNewPhotoCandidatesSortsByModTimeAndFiltersOldFiles(t *testing.T) {
+	base := time.Date(2026, 6, 30, 4, 28, 0, 0, time.Local)
+	files := map[string]time.Time{
+		"old-before-map.png": base.Add(5 * time.Second),
+		"old-time.png":       base.Add(-1 * time.Second),
+		"newer.png":          base.Add(20 * time.Second),
+		"new.png":            base.Add(10 * time.Second),
+	}
+	before := map[string]time.Time{
+		"old-before-map.png": base.Add(5 * time.Second),
+	}
+	got := newPhotoCandidates(files, before, base)
+	want := []string{"newer.png", "new.png"}
+	if len(got) != len(want) {
+		t.Fatalf("candidates = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("candidates = %v, want %v", got, want)
+		}
+	}
+}
+
 func TestParseVRChatPresenceLog(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "output_log_2026-06-29_12-00-00.txt")
