@@ -376,6 +376,25 @@ button:disabled {
   margin-top: 16px;
 }
 
+.settings-explainer {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid #cfdce8;
+  border-radius: 8px;
+  background: #f7fafc;
+}
+
+.settings-explainer strong {
+  color: #17212b;
+}
+
+.settings-explainer p {
+  margin: 0;
+  color: #526170;
+  line-height: 1.6;
+}
+
 label {
   display: grid;
   gap: 7px;
