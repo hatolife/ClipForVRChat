@@ -65,7 +65,9 @@ func (a *App) startup(ctx context.Context) {
 	defer a.mu.Unlock()
 	a.ctx = ctx
 	a.logStartupLocked()
-	a.restartAutoPhotoWatcher(a.state.Config)
+	if a.state.Mode == appcore.ModeResults {
+		a.restartAutoPhotoWatcher(a.state.Config)
+	}
 }
 
 func (a *App) GetInitialState() appcore.UIState {
