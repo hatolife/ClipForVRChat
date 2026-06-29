@@ -40,6 +40,14 @@ type AutoCaptureRunner struct {
 	Handler func(AutoCaptureEvent)
 }
 
+type CameraPoseSnapshot struct {
+	Pose       CameraPoseConfig `json:"pose"`
+	UpdatedAt  string           `json:"updatedAt"`
+	AgeMS      int64            `json:"ageMs"`
+	Fresh      bool             `json:"fresh"`
+	Configured bool             `json:"configured"`
+}
+
 func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 	cfg := r.Config
 	cfg.Normalize()
@@ -60,11 +68,11 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 	}
 	views := enabledCameraViews(ac.Views)
 	if len(views) == 0 {
-		diagAutoCapture(logPath, "run_once reject: enabled_views=0 total_views=%d", len(ac.Views))
-		return nil, fmt.Errorf("有効な自動撮影構図がありません")
+		diagAutoCapture(logPath, "run_once reject: calibrated_enabled_views=0 total_views=%d", len(ac.Views))
+		return nil, fmt.Errorf("撮影に使える構図がありません。VRChat内でUser Cameraを配置し、自動撮影タブで現在Poseを各構図へ保存してください。")
 	}
 	batchID := newBatchID(time.Now())
-	users, confidence := SnapshotVRChatPresence(ac.Presence.OutputLogDirectory)
+	users, confidence, presenceLogPath := SnapshotVRChatPresenceWithSource(ac.Presence.OutputLogDirectory)
 	if !ac.Presence.WatchOutputLog {
 		users = nil
 		confidence = "unknown"
@@ -74,7 +82,7 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 	}
 	photoDir := autoCapturePhotoDirectory(cfg)
 	before := scanAutoCapturePhotoFiles(photoDir, ac.Output.Directory)
-	diagAutoCapture(logPath, "run_once prepared: batch_id=%q views=%d total_views=%d users=%d users_confidence=%q watch_output_log=%t output_log_dir=%q photo_dir=%q output_dir=%q before_files=%d before_latest=%s",
+	diagAutoCapture(logPath, "run_once prepared: batch_id=%q views=%d total_views=%d users=%d users_confidence=%q watch_output_log=%t output_log_dir=%q output_log_path=%q photo_dir=%q output_dir=%q before_files=%d before_latest=%s",
 		batchID,
 		len(views),
 		len(ac.Views),
@@ -82,6 +90,7 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 		confidence,
 		ac.Presence.WatchOutputLog,
 		ac.Presence.OutputLogDirectory,
+		presenceLogPath,
 		photoDir,
 		ac.Output.Directory,
 		len(before),
@@ -294,13 +303,18 @@ func WriteAutoCaptureSidecar(imagePath string, sidecar AutoCaptureSidecar) error
 }
 
 func SnapshotVRChatPresence(logDir string) ([]PresenceUser, string) {
+	users, confidence, _ := SnapshotVRChatPresenceWithSource(logDir)
+	return users, confidence
+}
+
+func SnapshotVRChatPresenceWithSource(logDir string) ([]PresenceUser, string, string) {
 	path := latestVRChatOutputLog(logDir)
 	if path == "" {
-		return nil, "unknown"
+		return nil, "unknown", ""
 	}
 	users, ok := parseVRChatPresenceLog(path)
 	if !ok {
-		return nil, "unknown"
+		return nil, "unknown", path
 	}
 	out := make([]PresenceUser, 0, len(users))
 	for _, user := range users {
@@ -309,7 +323,7 @@ func SnapshotVRChatPresence(logDir string) ([]PresenceUser, string) {
 	sort.Slice(out, func(i, j int) bool {
 		return strings.ToLower(out[i].DisplayName) < strings.ToLower(out[j].DisplayName)
 	})
-	return out, "partial"
+	return out, "partial", path
 }
 
 func presenceUsersWithoutIDs(users []PresenceUser) []PresenceUser {
@@ -370,11 +384,14 @@ func uploadAutoCaptureDiscord(webhookURL string, imagePath string, content strin
 }
 
 func latestVRChatOutputLog(dir string) string {
-	if strings.TrimSpace(dir) == "" {
-		dir = DefaultVRChatLogDirectory()
+	matches := make([]string, 0)
+	for _, candidate := range vrchatLogDirectoryCandidates(dir) {
+		found, err := filepath.Glob(filepath.Join(candidate, "output_log_*.txt"))
+		if err == nil {
+			matches = append(matches, found...)
+		}
 	}
-	matches, err := filepath.Glob(filepath.Join(dir, "output_log_*.txt"))
-	if err != nil || len(matches) == 0 {
+	if len(matches) == 0 {
 		return ""
 	}
 	sort.Slice(matches, func(i, j int) bool {
@@ -389,11 +406,41 @@ func latestVRChatOutputLog(dir string) string {
 }
 
 var (
-	usrIDPattern = regexp.MustCompile(`usr_[0-9a-fA-F-]{36}`)
-	joinPattern  = regexp.MustCompile(`(?i)(?:OnPlayerJoined|Joining|joined).*?((?:usr_[0-9a-fA-F-]{36})|$)`)
-	leavePattern = regexp.MustCompile(`(?i)(?:OnPlayerLeft|Leaving|left).*?((?:usr_[0-9a-fA-F-]{36})|$)`)
-	namePattern  = regexp.MustCompile(`\b(?:displayName|userName|name)[:=]\s*"?([^",\]]+)`)
+	usrIDPattern           = regexp.MustCompile(`usr_[0-9a-fA-F-]{36}`)
+	joinPattern            = regexp.MustCompile(`(?i)(?:OnPlayerJoined|Joining|joined).*?((?:usr_[0-9a-fA-F-]{36})|$)`)
+	leavePattern           = regexp.MustCompile(`(?i)(?:OnPlayerLeft|Leaving|left).*?((?:usr_[0-9a-fA-F-]{36})|$)`)
+	namePattern            = regexp.MustCompile(`\b(?:displayName|userName|name)[:=]\s*"?([^",\]]+)`)
+	playerEventNamePattern = regexp.MustCompile(`(?i)OnPlayer(?:Joined|Left)\s+(.+?)\s+\(usr_[0-9a-fA-F-]{36}\)`)
 )
+
+func vrchatLogDirectoryCandidates(dir string) []string {
+	dir = strings.Trim(strings.TrimSpace(dir), `"`)
+	if dir == "" {
+		dir = DefaultVRChatLogDirectory()
+	}
+	candidates := []string{}
+	add := func(value string) {
+		value = strings.Trim(strings.TrimSpace(value), `"`)
+		if value == "" {
+			return
+		}
+		cleaned := filepath.Clean(value)
+		for _, existing := range candidates {
+			if strings.EqualFold(existing, cleaned) {
+				return
+			}
+		}
+		candidates = append(candidates, cleaned)
+	}
+	add(dir)
+	normalized := strings.ReplaceAll(filepath.ToSlash(dir), "/Local/Low/", "/LocalLow/")
+	add(filepath.FromSlash(normalized))
+	if userProfile := os.Getenv("USERPROFILE"); userProfile != "" {
+		add(filepath.Join(userProfile, "AppData", "LocalLow", "VRChat", "VRChat"))
+	}
+	add(DefaultVRChatLogDirectory())
+	return candidates
+}
 
 func parseVRChatPresenceLog(path string) (map[string]PresenceUser, bool) {
 	data, err := os.ReadFile(path) // #nosec G304 -- VRChat output log path is configured by the local user.
@@ -430,6 +477,9 @@ func parseVRChatPresenceLog(path string) (map[string]PresenceUser, bool) {
 }
 
 func extractPresenceName(line string) string {
+	if match := playerEventNamePattern.FindStringSubmatch(line); len(match) == 2 {
+		return strings.TrimSpace(match[1])
+	}
 	if match := namePattern.FindStringSubmatch(line); len(match) == 2 {
 		name := strings.TrimSpace(match[1])
 		if idx := strings.Index(name, " usr_"); idx >= 0 {
@@ -467,7 +517,7 @@ func extractLogTime(line string) string {
 func enabledCameraViews(views []CameraViewConfig) []CameraViewConfig {
 	out := make([]CameraViewConfig, 0, len(views))
 	for _, view := range views {
-		if view.Enabled {
+		if view.Enabled && view.Calibrated && view.CoordinateSpace != "template_relative" {
 			out = append(out, view)
 		}
 	}
@@ -674,6 +724,59 @@ func sendOptionalBool(client oscClient, address string, value *bool) int {
 	return 0
 }
 
+func ParseOSCPacket(packet []byte) (string, string, []byte, bool) {
+	address, next, ok := readOSCString(packet, 0)
+	if !ok {
+		return "", "", nil, false
+	}
+	typeTags, next, ok := readOSCString(packet, next)
+	if !ok {
+		return "", "", nil, false
+	}
+	return address, typeTags, packet[next:], true
+}
+
+func ParseOSCPose(packet []byte) (CameraPoseConfig, bool) {
+	address, typeTags, payload, ok := ParseOSCPacket(packet)
+	if !ok || address != "/usercamera/Pose" {
+		return CameraPoseConfig{}, false
+	}
+	typeTags = strings.TrimPrefix(typeTags, ",")
+	if len(typeTags) < 6 {
+		return CameraPoseConfig{}, false
+	}
+	values := make([]float32, 0, 6)
+	offset := 0
+	for _, tag := range typeTags {
+		if len(values) == 6 {
+			break
+		}
+		switch tag {
+		case 'f':
+			if offset+4 > len(payload) {
+				return CameraPoseConfig{}, false
+			}
+			values = append(values, math.Float32frombits(binary.BigEndian.Uint32(payload[offset:offset+4])))
+			offset += 4
+		case 'i':
+			if offset+4 > len(payload) {
+				return CameraPoseConfig{}, false
+			}
+			values = append(values, float32(int32(binary.BigEndian.Uint32(payload[offset:offset+4]))))
+			offset += 4
+		default:
+			return CameraPoseConfig{}, false
+		}
+	}
+	if len(values) != 6 {
+		return CameraPoseConfig{}, false
+	}
+	return CameraPoseConfig{
+		Position: CameraVector3Config{X: float64(values[0]), Y: float64(values[1]), Z: float64(values[2])},
+		Rotation: CameraVector3Config{X: float64(values[3]), Y: float64(values[4]), Z: float64(values[5])},
+	}, true
+}
+
 type oscClient struct {
 	host string
 	port int
@@ -743,6 +846,27 @@ func buildOSCPacket(address string, typeTags string, appendArgs func([]byte) []b
 	packet := appendOSCString(nil, address)
 	packet = appendOSCString(packet, typeTags)
 	return appendArgs(packet)
+}
+
+func readOSCString(packet []byte, offset int) (string, int, bool) {
+	if offset < 0 || offset >= len(packet) {
+		return "", 0, false
+	}
+	end := offset
+	for end < len(packet) && packet[end] != 0 {
+		end++
+	}
+	if end >= len(packet) {
+		return "", 0, false
+	}
+	next := end + 1
+	for next%4 != 0 {
+		next++
+	}
+	if next > len(packet) {
+		return "", 0, false
+	}
+	return string(packet[offset:end]), next, true
 }
 
 func appendOSCString(buf []byte, value string) []byte {
