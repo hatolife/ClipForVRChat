@@ -47,6 +47,14 @@ func TestAutoCaptureConfigNormalize(t *testing.T) {
 	}
 }
 
+func TestAutoCapturePhotoDirectoryUsesAutoPhotoSetting(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.AutoPhoto.PhotoDirectory = filepath.Join("C:", "VRChat", "Photos")
+	if got := autoCapturePhotoDirectory(cfg); got != cfg.AutoPhoto.PhotoDirectory {
+		t.Fatalf("photo dir = %q, want %q", got, cfg.AutoPhoto.PhotoDirectory)
+	}
+}
+
 func TestAppendOSCStringPadsToFourBytes(t *testing.T) {
 	got := appendOSCString(nil, "/x")
 	if len(got)%4 != 0 {
@@ -54,6 +62,15 @@ func TestAppendOSCStringPadsToFourBytes(t *testing.T) {
 	}
 	if string(got[:2]) != "/x" || got[2] != 0 {
 		t.Fatalf("unexpected OSC string bytes: %v", got)
+	}
+}
+
+func TestBuildOSCActionPacketUsesEmptyTypeTag(t *testing.T) {
+	got := buildOSCPacket("/usercamera/Capture", ",", func(buf []byte) []byte { return buf })
+	want := appendOSCString(nil, "/usercamera/Capture")
+	want = appendOSCString(want, ",")
+	if string(got) != string(want) {
+		t.Fatalf("action packet = %v, want %v", got, want)
 	}
 }
 
