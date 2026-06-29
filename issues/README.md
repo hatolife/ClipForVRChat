@@ -116,6 +116,7 @@
 | 109 | [Release workflow のタグ名取り扱いを安全化する](109-harden-release-tag-handling.md) | 完了 | `v0.1.8` | タグ名を検証し、シェルコマンドへ環境変数経由で渡してRelease workflowのコマンド注入を防ぐ。 |
 | 110 | [VRChat自動構図撮影](110-vrc-auto-composition-capture.md) | 要確認 | `v0.1.8` | OSCでUser Cameraを制御し、構図ごとの自動撮影とsidecar JSON保存を実装する。 |
 | 111 | [VRChat output logからの同席ユーザー保持](111-vrc-output-log-presence-users.md) | 要確認 | `v0.1.8` | output_log監視で撮影時点の同席ユーザー情報を保持し、画像メタデータやDiscord投稿へ紐づける。 |
+| 112 | [自動撮影でVRChat写真が保存されない](112-fix-auto-capture-action-osc.md) | 要確認 | `v0.1.8` | User CameraのCapture/CloseをAction OSCとして送信し、写真保存されない問題を修正する。 |
 
 ## 状態の意味
 

@@ -1198,7 +1198,7 @@ createApp({
               </label>
             </div>
             <div class="setting-row">
-              <div><strong>出力先フォルダ</strong><p>自動撮影した画像の保存先です。</p></div>
+              <div><strong>出力先フォルダ</strong><p>Stream方式の保存先です。Photo方式ではVRChat写真フォルダを検出します。</p></div>
               <label>
                 <input v-model="autoCaptureSettings.output.directory" placeholder="%USERPROFILE%/Pictures/VRC-AutoCapture" />
               </label>

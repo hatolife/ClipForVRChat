@@ -60,10 +60,8 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 	if !ac.Presence.IncludeUserIDsInSidecar {
 		users = presenceUsersWithoutIDs(users)
 	}
-	before := scanPhotoFiles(ac.Output.Directory)
-	if len(before) == 0 && strings.TrimSpace(ac.Output.Directory) != "" {
-		before = scanPhotoFiles(DefaultVRChatPhotoDirectory())
-	}
+	photoDir := autoCapturePhotoDirectory(cfg)
+	before := scanAutoCapturePhotoFiles(photoDir, ac.Output.Directory)
 	client := oscClient{host: ac.OSC.Host, port: ac.OSC.SendPort}
 	if err := client.open(); err != nil {
 		return nil, err
@@ -72,13 +70,16 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 	if err := client.sendInt("/usercamera/Mode", 1); err != nil {
 		return nil, err
 	}
+	if !sleepContext(ctx, 800*time.Millisecond) {
+		return nil, ctx.Err()
+	}
 	results := make([]Result, 0, len(views))
 	for i, view := range views {
 		if err := ctx.Err(); err != nil {
 			return results, err
 		}
 		shotID := fmt.Sprintf("%s-%02d", batchID, i+1)
-		result := r.capturePhotoShot(ctx, client, batchID, shotID, i+1, view, before, users, confidence)
+		result := r.capturePhotoShot(ctx, client, batchID, shotID, i+1, view, photoDir, before, users, confidence)
 		results = append(results, result)
 		r.emit(AutoCaptureEvent{BatchID: batchID, ShotID: shotID, Path: result.SourcePath, Error: result.Error, Message: result.Name})
 		if result.SourcePath != "" {
@@ -86,12 +87,12 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 		}
 	}
 	if ac.Capture.CloseCameraAfterBatch {
-		_ = client.sendBool("/usercamera/Close", true)
+		_ = client.sendAction("/usercamera/Close")
 	}
 	return results, nil
 }
 
-func (r AutoCaptureRunner) capturePhotoShot(ctx context.Context, client oscClient, batchID string, shotID string, index int, view CameraViewConfig, before map[string]time.Time, users []PresenceUser, confidence string) Result {
+func (r AutoCaptureRunner) capturePhotoShot(ctx context.Context, client oscClient, batchID string, shotID string, index int, view CameraViewConfig, photoDir string, before map[string]time.Time, users []PresenceUser, confidence string) Result {
 	cfg := r.Config.AutoCapture
 	name := view.Name
 	if name == "" {
@@ -119,16 +120,15 @@ func (r AutoCaptureRunner) capturePhotoShot(ctx context.Context, client oscClien
 	if !sleepContext(ctx, settle) {
 		return Result{Name: name, Error: "自動撮影が中断されました。"}
 	}
-	if err := client.sendBool("/usercamera/Capture", true); err != nil {
+	if err := client.sendAction("/usercamera/Capture"); err != nil {
 		return Result{Name: name, Error: err.Error()}
 	}
 	if !sleepContext(ctx, time.Duration(cfg.Capture.ButtonReleaseDelayMS)*time.Millisecond) {
 		return Result{Name: name, Error: "自動撮影が中断されました。"}
 	}
-	_ = client.sendBool("/usercamera/Capture", false)
-	photoPath := waitForNewPhoto(ctx, cfg.Output.Directory, before, 15*time.Second)
+	photoPath := waitForNewPhoto(ctx, photoDir, before, 15*time.Second)
 	if photoPath == "" {
-		photoPath = waitForNewPhoto(ctx, DefaultVRChatPhotoDirectory(), before, 2*time.Second)
+		photoPath = waitForNewPhoto(ctx, cfg.Output.Directory, before, 2*time.Second)
 	}
 	if photoPath == "" {
 		return Result{Name: name, Error: "撮影後のVRChat写真ファイルを検出できませんでした。写真保存先設定を確認してください。"}
@@ -420,6 +420,22 @@ func waitForNewPhoto(ctx context.Context, dir string, before map[string]time.Tim
 	return ""
 }
 
+func scanAutoCapturePhotoFiles(photoDir string, outputDir string) map[string]time.Time {
+	files := scanPhotoFiles(photoDir)
+	for path, modTime := range scanPhotoFiles(outputDir) {
+		files[path] = modTime
+	}
+	return files
+}
+
+func autoCapturePhotoDirectory(cfg Config) string {
+	photoDir := strings.TrimSpace(cfg.AutoPhoto.PhotoDirectory)
+	if photoDir == "" {
+		return DefaultVRChatPhotoDirectory()
+	}
+	return photoDir
+}
+
 func newBatchID(t time.Time) string {
 	return "batch-" + t.Format("20060102-150405")
 }
@@ -516,15 +532,22 @@ func (c oscClient) sendBool(address string, value bool) error {
 	return c.send(address, tag, func(buf []byte) []byte { return buf })
 }
 
+func (c oscClient) sendAction(address string) error {
+	return c.send(address, ",", func(buf []byte) []byte { return buf })
+}
+
 func (c oscClient) send(address string, typeTags string, appendArgs func([]byte) []byte) error {
 	if c.conn == nil {
 		return fmt.Errorf("OSC接続が開かれていません")
 	}
+	_, err := c.conn.Write(buildOSCPacket(address, typeTags, appendArgs))
+	return err
+}
+
+func buildOSCPacket(address string, typeTags string, appendArgs func([]byte) []byte) []byte {
 	packet := appendOSCString(nil, address)
 	packet = appendOSCString(packet, typeTags)
-	packet = appendArgs(packet)
-	_, err := c.conn.Write(packet)
-	return err
+	return appendArgs(packet)
 }
 
 func appendOSCString(buf []byte, value string) []byte {
