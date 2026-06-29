@@ -193,12 +193,13 @@ func (r AutoCaptureRunner) capturePhotoShot(ctx context.Context, client oscClien
 		return Result{Name: name, Error: "自動撮影が中断されました。"}
 	}
 	diagAutoCapture(logPath, "shot settle complete: view_id=%q", view.ID)
+	captureNotBefore := time.Now().Add(-1 * time.Second)
 	if err := sendCameraButton(ctx, client, "/usercamera/Capture", cfg.Capture.ButtonReleaseDelayMS, logPath, view.ID); err != nil {
 		return Result{Name: name, Error: err.Error()}
 	}
-	photoPath := waitForNewPhoto(ctx, photoDir, before, 15*time.Second, logPath)
+	photoPath := waitForNewPhoto(ctx, photoDir, before, 30*time.Second, captureNotBefore, logPath)
 	if photoPath == "" {
-		photoPath = waitForNewPhoto(ctx, cfg.Output.Directory, before, 2*time.Second, logPath)
+		photoPath = waitForNewPhoto(ctx, cfg.Output.Directory, before, 3*time.Second, captureNotBefore, logPath)
 	}
 	if photoPath == "" {
 		diagAutoCapture(logPath, "shot photo detection failed: view_id=%q photo_dir=%q output_dir=%q before_files=%d before_latest=%s", view.ID, photoDir, cfg.Output.Directory, len(before), photoFileSummary(before))
@@ -476,47 +477,61 @@ func enabledCameraViews(views []CameraViewConfig) []CameraViewConfig {
 	return out
 }
 
-func waitForNewPhoto(ctx context.Context, dir string, before map[string]time.Time, timeout time.Duration, logPath string) string {
+func waitForNewPhoto(ctx context.Context, dir string, before map[string]time.Time, timeout time.Duration, notBefore time.Time, logPath string) string {
 	if strings.TrimSpace(dir) == "" {
 		diagAutoCapture(logPath, "photo wait skipped: dir_empty=true timeout_ms=%d", timeout.Milliseconds())
 		return ""
 	}
 	initial, status := scanPhotoFilesWithStatus(dir)
-	diagAutoCapture(logPath, "photo wait begin: dir=%q timeout_ms=%d before_files=%d current_files=%d current_latest=%s scan_error=%q limit_reached=%t",
+	diagAutoCapture(logPath, "photo wait begin: dir=%q timeout_ms=%d not_before=%s before_files=%d current_files=%d current_latest=%s new_candidates=%d scan_error=%q limit_reached=%t",
 		dir,
 		timeout.Milliseconds(),
+		notBefore.Format(time.RFC3339Nano),
 		len(before),
 		len(initial),
 		photoFileSummary(initial),
+		len(newPhotoCandidates(initial, before, notBefore)),
 		status.Error,
 		status.LimitReached,
 	)
 	deadline := time.Now().Add(timeout)
+	var latestCandidate string
 	for time.Now().Before(deadline) {
 		current := scanPhotoFiles(dir)
-		paths := sortedPhotoPaths(current)
-		for i := len(paths) - 1; i >= 0; i-- {
-			path := paths[i]
-			if _, ok := before[path]; ok {
-				continue
-			}
+		paths := newPhotoCandidates(current, before, notBefore)
+		if len(paths) > 0 {
+			latestCandidate = paths[0]
+		}
+		for _, path := range paths {
 			if fileLooksStable(path) {
-				diagAutoCapture(logPath, "photo wait found: dir=%q path=%q current_files=%d", dir, path, len(current))
+				diagAutoCapture(logPath, "photo wait found: dir=%q path=%q current_files=%d new_candidates=%d reason=%q", dir, path, len(current), len(paths), "stable")
 				return path
 			}
 		}
 		if !sleepContext(ctx, 500*time.Millisecond) {
-			diagAutoCapture(logPath, "photo wait cancelled: dir=%q err=%v current_files=%d current_latest=%s", dir, ctx.Err(), len(current), photoFileSummary(current))
+			diagAutoCapture(logPath, "photo wait cancelled: dir=%q err=%v current_files=%d current_latest=%s new_candidates=%d latest_candidate=%q", dir, ctx.Err(), len(current), photoFileSummary(current), len(paths), latestCandidate)
 			return ""
 		}
 	}
 	current, status := scanPhotoFilesWithStatus(dir)
-	diagAutoCapture(logPath, "photo wait timeout: dir=%q timeout_ms=%d before_files=%d current_files=%d current_latest=%s scan_error=%q limit_reached=%t",
+	paths := newPhotoCandidates(current, before, notBefore)
+	if len(paths) > 0 {
+		for _, path := range paths {
+			if fileHasContent(path) {
+				diagAutoCapture(logPath, "photo wait found: dir=%q path=%q current_files=%d new_candidates=%d reason=%q", dir, path, len(current), len(paths), "timeout_candidate")
+				return path
+			}
+		}
+	}
+	diagAutoCapture(logPath, "photo wait timeout: dir=%q timeout_ms=%d not_before=%s before_files=%d current_files=%d current_latest=%s new_candidates=%d latest_candidate=%q scan_error=%q limit_reached=%t",
 		dir,
 		timeout.Milliseconds(),
+		notBefore.Format(time.RFC3339Nano),
 		len(before),
 		len(current),
 		photoFileSummary(current),
+		len(paths),
+		latestCandidate,
 		status.Error,
 		status.LimitReached,
 	)
@@ -532,12 +547,52 @@ func scanAutoCapturePhotoFiles(photoDir string, outputDir string) map[string]tim
 }
 
 func photoFileSummary(files map[string]time.Time) string {
-	paths := sortedPhotoPaths(files)
+	paths := photoPathsByModTimeDesc(files)
 	if len(paths) == 0 {
 		return "none"
 	}
-	path := paths[len(paths)-1]
+	path := paths[0]
 	return fmt.Sprintf("%q@%s", path, files[path].Format(time.RFC3339))
+}
+
+func newPhotoCandidates(files map[string]time.Time, before map[string]time.Time, notBefore time.Time) []string {
+	paths := make([]string, 0)
+	for path, modTime := range files {
+		if _, ok := before[path]; ok {
+			continue
+		}
+		if !notBefore.IsZero() && modTime.Before(notBefore) {
+			continue
+		}
+		paths = append(paths, path)
+	}
+	sort.SliceStable(paths, func(i, j int) bool {
+		left := files[paths[i]]
+		right := files[paths[j]]
+		if left.Equal(right) {
+			return paths[i] > paths[j]
+		}
+		return left.After(right)
+	})
+	return paths
+}
+
+func photoPathsByModTimeDesc(files map[string]time.Time) []string {
+	paths := sortedPhotoPaths(files)
+	sort.SliceStable(paths, func(i, j int) bool {
+		left := files[paths[i]]
+		right := files[paths[j]]
+		if left.Equal(right) {
+			return paths[i] > paths[j]
+		}
+		return left.After(right)
+	})
+	return paths
+}
+
+func fileHasContent(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.Size() > 0
 }
 
 func autoCapturePhotoDirectory(cfg Config) string {

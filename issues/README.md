@@ -120,6 +120,7 @@
 | 113 | [自動撮影の診断ログを詳細化する](113-add-auto-capture-diagnostics.md) | 要確認 | `v0.1.8` | 自動撮影のスケジューラ、OSC送信、写真検出状況を診断ログで追跡できるようにする。 |
 | 114 | [自動撮影タブに機能説明を追加する](114-explain-auto-capture-settings-tab.md) | 要確認 | `v0.1.8` | 自動撮影タブの先頭に機能概要と使い方の説明枠を追加する。 |
 | 115 | [自動撮影のCapture送信とCloseタイミングを調整する](115-fix-auto-capture-button-action-and-close.md) | 要確認 | `v0.1.8` | Capture/Closeを押下・解放OSCとして送信し、全失敗時にカメラを閉じないようにする。 |
+| 116 | [自動撮影の写真検出ずれとカメラ未表示時の案内を改善する](116-fix-auto-capture-photo-detection-and-camera-open-note.md) | 要確認 | `v0.1.8` | 遅れて保存された写真の検出ずれを防ぎ、Photo方式でUser Camera表示が必要なことを案内する。 |
 
 ## 状態の意味
 
