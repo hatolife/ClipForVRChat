@@ -41,6 +41,7 @@ header {
 h1,
 h2,
 h3,
+h4,
 p,
 dl,
 dd {
@@ -59,6 +60,11 @@ h2 {
 
 h3 {
   font-size: 15px;
+  line-height: 1.35;
+}
+
+h4 {
+  font-size: 14px;
   line-height: 1.35;
 }
 
@@ -508,6 +514,136 @@ small {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
+}
+
+.auto-capture-views {
+  display: grid;
+  gap: 12px;
+  padding: 14px 0;
+  border-top: 1px solid #e6ecf2;
+  border-bottom: 1px solid #e6ecf2;
+}
+
+.auto-capture-views-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.auto-capture-views-header p {
+  margin-top: 4px;
+  color: #5b6875;
+  line-height: 1.5;
+}
+
+.view-list {
+  display: grid;
+  gap: 10px;
+}
+
+.view-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #d6dee7;
+  border-radius: 8px;
+  background: #f9fbfd;
+}
+
+.view-card-main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.compact-switch {
+  justify-self: start;
+}
+
+.view-fields {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.view-meta,
+.view-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.view-edit-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  color: #455361;
+}
+
+.checkbox-row input {
+  width: auto;
+}
+
+.status-pill {
+  width: fit-content;
+  padding: 4px 7px;
+  border: 1px solid #cfd8e2;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #526170;
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.status-pill.ok {
+  border-color: #b9d7c2;
+  background: #edf8f0;
+  color: #28633a;
+}
+
+.status-pill.muted {
+  border-color: #d9cdb7;
+  background: #fff7e8;
+  color: #76531a;
+}
+
+.pose-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.pose-grid label {
+  min-width: 0;
+  gap: 4px;
+}
+
+.pose-grid input {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+  padding: 7px 8px;
+}
+
+.view-actions {
+  justify-content: flex-end;
+}
+
+.view-actions button {
+  padding: 7px 10px;
 }
 
 .footer-actions {
@@ -1207,12 +1343,26 @@ small {
   .setting-row,
   .license-list,
   .help-grid,
+  .auto-capture-views-header,
+  .view-fields,
   .history-toolbar {
     grid-template-columns: 1fr;
   }
 
   .switch {
     justify-self: start;
+  }
+
+  .auto-capture-views-header {
+    display: grid;
+  }
+
+  .pose-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .view-actions {
+    justify-content: flex-start;
   }
 
   .history-toolbar {
