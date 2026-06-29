@@ -101,8 +101,9 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 		return nil, err
 	}
 	diagAutoCapture(logPath, "osc send success: address=%q value=%d", "/usercamera/Mode", 1)
-	diagAutoCapture(logPath, "camera mode wait begin: duration_ms=%d", 800)
-	if !sleepContext(ctx, 800*time.Millisecond) {
+	modeWait := 2500 * time.Millisecond
+	diagAutoCapture(logPath, "camera mode wait begin: duration_ms=%d", modeWait.Milliseconds())
+	if !sleepContext(ctx, modeWait) {
 		diagAutoCapture(logPath, "camera mode wait cancelled: err=%v", ctx.Err())
 		return nil, ctx.Err()
 	}
@@ -122,13 +123,18 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 			before[result.SourcePath] = time.Now()
 		}
 	}
-	if ac.Capture.CloseCameraAfterBatch {
-		diagAutoCapture(logPath, "osc send begin: address=%q", "/usercamera/Close")
-		if err := client.sendAction("/usercamera/Close"); err != nil {
-			diagAutoCapture(logPath, "osc send error: address=%q err=%v", "/usercamera/Close", err)
-		} else {
-			diagAutoCapture(logPath, "osc send success: address=%q", "/usercamera/Close")
+	successCount := 0
+	for _, result := range results {
+		if result.SourcePath != "" {
+			successCount++
 		}
+	}
+	if ac.Capture.CloseCameraAfterBatch && successCount > 0 {
+		if err := sendCameraButton(ctx, client, "/usercamera/Close", ac.Capture.ButtonReleaseDelayMS, logPath, "batch_close"); err != nil {
+			diagAutoCapture(logPath, "camera close failed: err=%v", err)
+		}
+	} else if ac.Capture.CloseCameraAfterBatch {
+		diagAutoCapture(logPath, "camera close skipped: reason=%q successful_shots=%d", "no_successful_shots", successCount)
 	} else {
 		diagAutoCapture(logPath, "camera close skipped: close_after_batch=false")
 	}
@@ -187,18 +193,9 @@ func (r AutoCaptureRunner) capturePhotoShot(ctx context.Context, client oscClien
 		return Result{Name: name, Error: "自動撮影が中断されました。"}
 	}
 	diagAutoCapture(logPath, "shot settle complete: view_id=%q", view.ID)
-	diagAutoCapture(logPath, "osc send begin: address=%q view_id=%q", "/usercamera/Capture", view.ID)
-	if err := client.sendAction("/usercamera/Capture"); err != nil {
-		diagAutoCapture(logPath, "osc send error: address=%q view_id=%q err=%v", "/usercamera/Capture", view.ID, err)
+	if err := sendCameraButton(ctx, client, "/usercamera/Capture", cfg.Capture.ButtonReleaseDelayMS, logPath, view.ID); err != nil {
 		return Result{Name: name, Error: err.Error()}
 	}
-	diagAutoCapture(logPath, "osc send success: address=%q view_id=%q", "/usercamera/Capture", view.ID)
-	diagAutoCapture(logPath, "button_release wait begin: view_id=%q duration_ms=%d", view.ID, cfg.Capture.ButtonReleaseDelayMS)
-	if !sleepContext(ctx, time.Duration(cfg.Capture.ButtonReleaseDelayMS)*time.Millisecond) {
-		diagAutoCapture(logPath, "button_release wait cancelled: view_id=%q err=%v", view.ID, ctx.Err())
-		return Result{Name: name, Error: "自動撮影が中断されました。"}
-	}
-	diagAutoCapture(logPath, "button_release wait complete: view_id=%q", view.ID)
 	photoPath := waitForNewPhoto(ctx, photoDir, before, 15*time.Second, logPath)
 	if photoPath == "" {
 		photoPath = waitForNewPhoto(ctx, cfg.Output.Directory, before, 2*time.Second, logPath)
@@ -582,6 +579,30 @@ func diagAutoCapture(path string, format string, args ...any) {
 	AppendDiagnosticLog(path, "auto-capture "+format, args...)
 }
 
+func sendCameraButton(ctx context.Context, client oscClient, address string, releaseDelayMS int, logPath string, detail string) error {
+	if releaseDelayMS < 1 {
+		releaseDelayMS = 1
+	}
+	diagAutoCapture(logPath, "osc button press begin: address=%q detail=%q", address, detail)
+	if err := client.sendBool(address, true); err != nil {
+		diagAutoCapture(logPath, "osc button press error: address=%q detail=%q err=%v", address, detail, err)
+		return err
+	}
+	diagAutoCapture(logPath, "osc button press success: address=%q detail=%q", address, detail)
+	diagAutoCapture(logPath, "button_release wait begin: address=%q detail=%q duration_ms=%d", address, detail, releaseDelayMS)
+	if !sleepContext(ctx, time.Duration(releaseDelayMS)*time.Millisecond) {
+		diagAutoCapture(logPath, "button_release wait cancelled: address=%q detail=%q err=%v", address, detail, ctx.Err())
+		return ctx.Err()
+	}
+	diagAutoCapture(logPath, "osc button release begin: address=%q detail=%q", address, detail)
+	if err := client.sendBool(address, false); err != nil {
+		diagAutoCapture(logPath, "osc button release error: address=%q detail=%q err=%v", address, detail, err)
+		return err
+	}
+	diagAutoCapture(logPath, "osc button release success: address=%q detail=%q", address, detail)
+	return nil
+}
+
 func sendOptionalFloat(client oscClient, address string, value *float64) int {
 	if value != nil {
 		_ = client.sendFloat(address, float32(*value))
@@ -653,10 +674,6 @@ func (c oscClient) sendBool(address string, value bool) error {
 		tag = ",T"
 	}
 	return c.send(address, tag, func(buf []byte) []byte { return buf })
-}
-
-func (c oscClient) sendAction(address string) error {
-	return c.send(address, ",", func(buf []byte) []byte { return buf })
 }
 
 func (c oscClient) send(address string, typeTags string, appendArgs func([]byte) []byte) error {

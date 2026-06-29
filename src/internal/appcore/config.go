@@ -220,8 +220,8 @@ func DefaultAutoCaptureConfig() AutoCaptureConfig {
 			MultiBackend:          "dolly_multi",
 			FallbackToSequential:  true,
 			CloseCameraAfterBatch: true,
-			SettleDelayMS:         500,
-			ButtonReleaseDelayMS:  100,
+			SettleDelayMS:         1500,
+			ButtonReleaseDelayMS:  200,
 		},
 		Output: AutoCaptureOutputConfig{
 			Directory:        DefaultAutoCaptureDirectory(),
@@ -392,11 +392,11 @@ func (c *AutoCaptureConfig) Normalize() {
 	if c.Capture.MultiBackend == "" {
 		c.Capture.MultiBackend = "dolly_multi"
 	}
-	if c.Capture.SettleDelayMS < 0 {
-		c.Capture.SettleDelayMS = 0
+	if c.Capture.SettleDelayMS < 1500 {
+		c.Capture.SettleDelayMS = 1500
 	}
-	if c.Capture.ButtonReleaseDelayMS <= 0 {
-		c.Capture.ButtonReleaseDelayMS = 100
+	if c.Capture.ButtonReleaseDelayMS < 200 {
+		c.Capture.ButtonReleaseDelayMS = 200
 	}
 	c.Output.Directory = strings.Trim(strings.TrimSpace(c.Output.Directory), `"`)
 	if c.Output.Directory == "" {
@@ -445,8 +445,8 @@ func (v *CameraViewConfig) Normalize(index int) {
 	default:
 		v.CoordinateSpace = "template_relative"
 	}
-	if v.SettleDelayMS < 0 {
-		v.SettleDelayMS = 0
+	if v.SettleDelayMS < 1500 {
+		v.SettleDelayMS = 1500
 	}
 	if v.CaptureDelayMS < 0 {
 		v.CaptureDelayMS = 0
@@ -511,7 +511,7 @@ func defaultCameraView(id string, name string, order int) CameraViewConfig {
 		Enabled:         true,
 		SortOrder:       order,
 		CoordinateSpace: "template_relative",
-		SettleDelayMS:   500,
+		SettleDelayMS:   1500,
 		CaptureDelayMS:  0,
 		Calibrated:      false,
 	}
