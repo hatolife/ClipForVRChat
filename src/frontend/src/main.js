@@ -122,9 +122,24 @@ createApp({
     updateSettings() {
       return this.state.config?.update || { checkEnabled: true, notificationEnabled: true }
     },
+    autoCaptureSettings() {
+      if (!this.state.config) return {}
+      if (!this.state.config.autoCapture) {
+        this.state.config.autoCapture = {}
+      }
+      const autoCapture = this.state.config.autoCapture
+      autoCapture.schedule ||= {}
+      autoCapture.osc ||= {}
+      autoCapture.capture ||= {}
+      autoCapture.output ||= {}
+      autoCapture.presence ||= {}
+      autoCapture.discord ||= {}
+      return autoCapture
+    },
     settingsTabs() {
       return [
         { id: 'feature', label: '機能' },
+        { id: 'autoCapture', label: '自動撮影' },
         { id: 'process', label: '処理' },
         { id: 'webhook', label: 'Discord投稿' },
         { id: 'update', label: '更新' }
@@ -1124,6 +1139,99 @@ createApp({
             <div class="setting-row">
               <div><strong>QRコードURL検出</strong><p>画像内のQRコードからURLを取得します。取得したURLはDiscord本文と結果画面に表示します。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.output.detectQrCodeUrls" /><span></span></label>
+            </div>
+          </section>
+
+          <section v-if="settingsTab === 'autoCapture'" class="settings-group" role="tabpanel">
+            <h3>自動撮影</h3>
+            <div class="setting-row">
+              <div><strong>自動撮影スケジュール</strong><p>一定間隔でVRChatカメラ撮影を実行します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.schedule.enabled" /><span></span></label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.schedule.enabled }">
+              <div><strong>撮影間隔</strong><p>1回の撮影開始から次の撮影開始までの秒数です。</p></div>
+              <label>
+                <input type="number" min="1" step="1" v-model.number="autoCaptureSettings.schedule.captureIntervalSec" :disabled="!autoCaptureSettings.schedule.enabled" />
+              </label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.schedule.enabled }">
+              <div><strong>初回待機時間</strong><p>自動撮影開始後、最初の撮影まで待つ秒数です。</p></div>
+              <label>
+                <input type="number" min="0" step="1" v-model.number="autoCaptureSettings.schedule.initialDelaySec" :disabled="!autoCaptureSettings.schedule.enabled" />
+              </label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.schedule.enabled }">
+              <div><strong>開始時に撮影</strong><p>自動撮影を開始した直後に1回撮影します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.schedule.captureOnStart" :disabled="!autoCaptureSettings.schedule.enabled" /><span></span></label>
+            </div>
+            <div class="setting-row">
+              <div><strong>OSCホスト</strong><p>VRChat OSCへ接続するホストです。</p></div>
+              <label>
+                <input v-model="autoCaptureSettings.osc.vrcHost" placeholder="127.0.0.1" />
+              </label>
+            </div>
+            <div class="setting-row">
+              <div><strong>OSC送信ポート</strong><p>外部アプリからVRChatへ送るUDPポートです。</p></div>
+              <label>
+                <input type="number" min="1" max="65535" step="1" v-model.number="autoCaptureSettings.osc.vrcInPort" />
+              </label>
+            </div>
+            <div class="setting-row">
+              <div><strong>OSC受信ポート</strong><p>VRChatから外部アプリへ届くUDPポートです。</p></div>
+              <label>
+                <input type="number" min="1" max="65535" step="1" v-model.number="autoCaptureSettings.osc.appOutPort" />
+              </label>
+            </div>
+            <div class="setting-row">
+              <div><strong>Pose鮮度</strong><p>現在のカメラ位置として扱う最大秒数です。</p></div>
+              <label>
+                <input type="number" min="1" step="1" v-model.number="autoCaptureSettings.osc.poseFreshnessSec" />
+              </label>
+            </div>
+            <div class="setting-row">
+              <div><strong>撮影方式</strong><p>VRChat写真保存またはStream Cameraからの保存を選びます。</p></div>
+              <label>
+                <select v-model="autoCaptureSettings.capture.mode">
+                  <option value="photo">Photo</option>
+                  <option value="stream">Stream</option>
+                </select>
+              </label>
+            </div>
+            <div class="setting-row">
+              <div><strong>出力先フォルダ</strong><p>自動撮影した画像の保存先です。</p></div>
+              <label>
+                <input v-model="autoCaptureSettings.output.directory" placeholder="%USERPROFILE%/Pictures/VRC-AutoCapture" />
+              </label>
+            </div>
+            <div class="setting-row">
+              <div><strong>サイドカーJSON</strong><p>撮影情報を画像と同じ場所にJSONとして保存します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.output.writeSidecarJson" /><span></span></label>
+            </div>
+            <div class="setting-row">
+              <div><strong>VRChat output log監視</strong><p>output_logから同じインスタンスのユーザー情報を取得します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.presence.watchOutputLog" /><span></span></label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.output.writeSidecarJson }">
+              <div><strong>サイドカーJSONにユーザーIDを含める</strong><p>取得できたユーザーIDを撮影情報に保存します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.presence.includeUserIdsInSidecar" :disabled="!autoCaptureSettings.output.writeSidecarJson" /><span></span></label>
+            </div>
+            <div class="setting-row">
+              <div><strong>Discordに表示名を含める</strong><p>自動撮影のDiscord本文に参加者の表示名を含めます。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.presence.includeDisplayNamesInDiscord" /><span></span></label>
+            </div>
+            <div class="setting-row">
+              <div><strong>DiscordにユーザーIDを含める</strong><p>自動撮影のDiscord本文に参加者のユーザーIDを含めます。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.presence.includeUserIdsInDiscord" /><span></span></label>
+            </div>
+            <div class="setting-row">
+              <div><strong>Discord自動投稿</strong><p>自動撮影した画像をDiscord Webhookへ投稿します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.discord.enabled" /><span></span></label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.discord.enabled }">
+              <div><strong>自動撮影用Webhook URL</strong><p>自動撮影の投稿先Webhook URLです。</p></div>
+              <label>
+                <input type="password" v-model="autoCaptureSettings.discord.webhookUrl" placeholder="https://discord.com/api/webhooks/..." :disabled="!autoCaptureSettings.discord.enabled" />
+              </label>
             </div>
           </section>
 
