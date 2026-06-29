@@ -1,5 +1,29 @@
 # Release Notes
 
+## v0.1.8
+
+### 更新内容
+
+- 設定画面に「自動撮影」タブを追加し、OSC、撮影間隔、撮影方式、出力、Presence、Discord投稿設定をまとめました。
+- VRChat User CameraへOSCでPhoto撮影指示を送り、有効な初期構図を順番に撮影する自動撮影MVPを追加しました。
+- VRChat output logから同じインスタンスにいるユーザー情報を推定し、撮影画像に対応するsidecar JSONへ保存するようにしました。
+- 自動撮影した画像を既存の結果/履歴画面で扱えるようにし、設定で有効化した場合はDiscord Webhookへ投稿できるようにしました。
+
+### 既知の制限
+
+- v0.1.8 RC時点ではPhoto方式が対象です。Stream/Spout、Camera Dolly Multi、解像度一時変更は将来対応です。
+- output log由来のユーザー一覧は、アプリ起動前から同じインスタンスにいたユーザーを完全に復元できない場合があります。
+
+### ダウンロード
+
+- プログラムのダウンロード: [ClipForVRChat-v0.1.8-windows-amd64.zip](https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.8/ClipForVRChat-v0.1.8-windows-amd64.zip)
+- 署名確認用ファイル: [ClipForVRChat-v0.1.8-windows-amd64.exe.asc](https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.8/ClipForVRChat-v0.1.8-windows-amd64.exe.asc)
+- 署名確認用公開鍵: https://keys.openpgp.org/search?q=release-signing@hato.life
+
+### 比較
+
+https://github.com/hatolife/ClipForVRChat/compare/v0.1.7...v0.1.8
+
 ## v0.1.7
 
 ### 更新内容

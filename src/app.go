@@ -673,7 +673,7 @@ func (a *App) restartAutoPhotoWatcher(cfg appcore.Config) {
 		a.autoCancel()
 		a.autoCancel = nil
 	}
-	if a.ctx == nil || (!cfg.AutoPhoto.Enabled && !cfg.ScreenshotAutoPost.Enabled) {
+	if a.ctx == nil || (!cfg.AutoPhoto.Enabled && !cfg.ScreenshotAutoPost.Enabled && !cfg.AutoCapture.Schedule.Enabled) {
 		return
 	}
 	ctx, cancel := context.WithCancel(a.ctx)
@@ -719,5 +719,79 @@ func (a *App) restartAutoPhotoWatcher(cfg appcore.Config) {
 			Handler:    handler,
 		}
 		go watcher.Run(ctx)
+	}
+	if cfg.AutoCapture.Schedule.Enabled {
+		go a.runAutoCaptureScheduler(ctx, cfg)
+	}
+}
+
+func (a *App) runAutoCaptureScheduler(ctx context.Context, cfg appcore.Config) {
+	ac := cfg.AutoCapture
+	if ac.Schedule.InitialDelaySec > 0 {
+		if !sleepWithContext(ctx, time.Duration(ac.Schedule.InitialDelaySec)*time.Second) {
+			return
+		}
+	}
+	if ac.Schedule.CaptureOnStart {
+		a.runAutoCaptureBatch(ctx, cfg)
+	}
+	interval := time.Duration(ac.Schedule.CaptureIntervalSec) * time.Second
+	if interval <= 0 {
+		interval = 5 * time.Minute
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	batches := 0
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if ac.Schedule.MaxBatches > 0 && batches >= ac.Schedule.MaxBatches {
+				return
+			}
+			a.runAutoCaptureBatch(ctx, cfg)
+			batches++
+		}
+	}
+}
+
+func (a *App) runAutoCaptureBatch(ctx context.Context, cfg appcore.Config) {
+	runner := appcore.AutoCaptureRunner{
+		Config: cfg,
+		Handler: func(event appcore.AutoCaptureEvent) {
+			emitWailsEvent(a.ctx, "auto-capture:result", event)
+		},
+	}
+	results, err := runner.RunOnce(ctx)
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err != nil {
+		result := appcore.Result{Name: "自動撮影", Error: err.Error()}
+		a.state.Results = append([]appcore.Result{result}, a.state.Results...)
+		a.state.Mode = appcore.ModeResults
+		emitWailsEvent(a.ctx, "auto-photo:result", appcore.AutoPhotoEvent{Result: result, Error: result.Error})
+		return
+	}
+	if len(results) > 0 {
+		a.state.Results = append(results, a.state.Results...)
+		if history, historyErr := appcore.AddResultsToHistory(appcore.HistoryPath(a.configPath), results); historyErr == nil {
+			a.state.History = history
+		}
+		for _, result := range results {
+			emitWailsEvent(a.ctx, "auto-photo:result", appcore.AutoPhotoEvent{Path: result.SourcePath, Result: result, Error: result.Error})
+		}
+	}
+	a.state.Mode = appcore.ModeResults
+}
+
+func sleepWithContext(ctx context.Context, d time.Duration) bool {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
 	}
 }
