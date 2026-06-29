@@ -20,6 +20,10 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      draft: ${{ steps.version.outputs.draft }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
 
     steps:
       - name: Checkout
@@ -80,9 +84,15 @@ jobs:
       - name: Prepare version
         id: version
         shell: pwsh
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ github.sha }}
         run: |
-          $tagName = "${{ github.ref_name }}"
-          $shortSha = "${{ github.sha }}".Substring(0, 7)
+          $tagName = $env:REF_NAME
+          if ($tagName -notmatch '^v[0-9A-Za-z][0-9A-Za-z._-]*$') {
+            throw "Unsupported release tag name: $tagName"
+          }
+          $shortSha = $env:COMMIT_SHA.Substring(0, 7)
           $releaseTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
           $isStable = $tagName -match '^v\d+\.\d+\.\d+$'
           $isReleaseCandidate = $tagName -match '^v\d+\.\d+\.\d+-rc\d+$'
@@ -97,14 +107,21 @@ jobs:
 
       - name: Prepare Windows version info
         shell: pwsh
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.version }}
+          RELEASE_REVISION: ${{ steps.version.outputs.revision }}
         run: |
-          node scripts/write-wails-info.mjs "${{ steps.version.outputs.version }}" src/wails.json
-          node scripts/write-wails-windows-info.mjs "${{ steps.version.outputs.version }}" "${{ steps.version.outputs.revision }}" src/build/windows/info.json
+          node scripts/write-wails-info.mjs $env:RELEASE_TAG src/wails.json
+          node scripts/write-wails-windows-info.mjs $env:RELEASE_TAG $env:RELEASE_REVISION src/build/windows/info.json
 
       - name: Build application
         working-directory: src
         shell: pwsh
-        run: wails build -ldflags "-X main.version=${{ steps.version.outputs.version }} -X main.revision=${{ steps.version.outputs.revision }} -X main.releaseTime=${{ steps.version.outputs.release_time }} -X main.buildChannel=release"
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.version }}
+          RELEASE_REVISION: ${{ steps.version.outputs.revision }}
+          RELEASE_TIME: ${{ steps.version.outputs.release_time }}
+        run: wails build -ldflags "-X main.version=$env:RELEASE_TAG -X main.revision=$env:RELEASE_REVISION -X main.releaseTime=$env:RELEASE_TIME -X main.buildChannel=release"
 
       - name: Prepare package directory
         shell: pwsh
@@ -138,25 +155,25 @@ jobs:
           printf '%s' "$RELEASE_GPG_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
             --local-user "$RELEASE_GPG_FINGERPRINT" \
             --armor --detach-sign \
-            --output "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.exe.asc" \
+            --output "dist/ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.exe.asc" \
             "dist/ClipForVRChat/ClipForVRChat.exe"
           gpg --batch --verify \
-            "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.exe.asc" \
+            "dist/ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.exe.asc" \
             "dist/ClipForVRChat/ClipForVRChat.exe"
 
       - name: Package executable
         shell: pwsh
         run: |
-          Compress-Archive -Path "dist/ClipForVRChat/*" -DestinationPath "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip" -Force
-          Get-FileHash "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip" -Algorithm SHA256 |
-            ForEach-Object { "$($_.Hash.ToLower())  ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip" } |
-            Set-Content "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip.sha256"
+          Compress-Archive -Path "dist/ClipForVRChat/*" -DestinationPath "dist/ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.zip" -Force
+          Get-FileHash "dist/ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.zip" -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.zip" } |
+            Set-Content "dist/ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.zip.sha256"
 
       - name: Write build metadata
         shell: pwsh
         run: |
           $metadata = [ordered]@{
-            tag = "${{ github.ref_name }}"
+            tag = "${{ steps.version.outputs.version }}"
             commit = "${{ github.sha }}"
             appVersion = "${{ steps.version.outputs.app_version }}"
             version = "${{ steps.version.outputs.version }}"
@@ -166,7 +183,7 @@ jobs:
             nodeVersion = "${{ env.NODE_VERSION }}"
             wailsVersion = "${{ env.WAILS_VERSION }}"
           }
-          $metadata | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 "dist/ClipForVRChat-${{ github.ref_name }}-build-metadata.json"
+          $metadata | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 "dist/ClipForVRChat-${{ steps.version.outputs.version }}-build-metadata.json"
 
       - name: Validate release assets
         shell: pwsh
@@ -181,7 +198,7 @@ jobs:
           }
           $zipCheckDir = Join-Path $env:RUNNER_TEMP "release-zip-check"
           Remove-Item -Recurse -Force $zipCheckDir -ErrorAction SilentlyContinue
-          Expand-Archive "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip" -DestinationPath $zipCheckDir
+          Expand-Archive "dist/ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.zip" -DestinationPath $zipCheckDir
           $unexpectedZipFiles = Get-ChildItem $zipCheckDir -Recurse -File | Where-Object {
             $_.Name -like "*release-signing-public-key.asc" -or $_.Extension -eq ".asc"
           }
@@ -190,10 +207,10 @@ jobs:
             throw "Unexpected files were found in release zip"
           }
           $required = @(
-            "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip",
-            "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip.sha256",
-            "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.exe.asc",
-            "dist/ClipForVRChat-${{ github.ref_name }}-build-metadata.json",
+            "dist/ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.zip",
+            "dist/ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.zip.sha256",
+            "dist/ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.exe.asc",
+            "dist/ClipForVRChat-${{ steps.version.outputs.version }}-build-metadata.json",
             "dist/ClipForVRChat/Release-signing-public-key.url"
           )
           foreach ($path in $required) {
@@ -204,21 +221,21 @@ jobs:
 
       - name: Prepare release notes
         if: steps.version.outputs.draft == 'false'
-        run: node scripts/extract-release-notes.mjs "${{ github.ref_name }}" RELEASE_NOTES.md dist/release-body.md --fallback-rc-notes
+        run: node scripts/extract-release-notes.mjs "${{ steps.version.outputs.version }}" RELEASE_NOTES.md dist/release-body.md --fallback-rc-notes
 
       - name: Prepare draft release notes
         if: steps.version.outputs.draft == 'true'
-        run: node scripts/extract-release-notes.mjs "${{ github.ref_name }}" RELEASE_NOTES.md dist/release-body.md --fallback-draft-notes
+        run: node scripts/extract-release-notes.mjs "${{ steps.version.outputs.version }}" RELEASE_NOTES.md dist/release-body.md --fallback-draft-notes
 
       - name: Upload release assets artifact
         uses: actions/upload-artifact@v6
         with:
-          name: release-assets-${{ github.ref_name }}
+          name: release-assets-${{ steps.version.outputs.version }}
           path: |
-            dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip
-            dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip.sha256
-            dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.exe.asc
-            dist/ClipForVRChat-${{ github.ref_name }}-build-metadata.json
+            dist/ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.zip
+            dist/ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.zip.sha256
+            dist/ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.exe.asc
+            dist/ClipForVRChat-${{ steps.version.outputs.version }}-build-metadata.json
             dist/release-body.md
 
   release:
@@ -232,14 +249,16 @@ jobs:
       - name: Download release assets artifact
         uses: actions/download-artifact@v7
         with:
-          name: release-assets-${{ github.ref_name }}
+          name: release-assets-${{ needs.build.outputs.version }}
           path: dist
 
       - name: Prepare version
         id: version
         shell: bash
+        env:
+          REF_NAME: ${{ needs.build.outputs.version }}
         run: |
-          tag_name="${{ github.ref_name }}"
+          tag_name="$REF_NAME"
           if [[ "$tag_name" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ || "$tag_name" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc[0-9]+$ ]]; then
             draft=false
           else
@@ -260,7 +279,7 @@ jobs:
           prerelease: ${{ steps.version.outputs.prerelease }}
           body_path: dist/release-body.md
           files: |
-            dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip
-            dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip.sha256
-            dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.exe.asc
-            dist/ClipForVRChat-${{ github.ref_name }}-build-metadata.json
+            dist/ClipForVRChat-${{ needs.build.outputs.version }}-windows-amd64.zip
+            dist/ClipForVRChat-${{ needs.build.outputs.version }}-windows-amd64.zip.sha256
+            dist/ClipForVRChat-${{ needs.build.outputs.version }}-windows-amd64.exe.asc
+            dist/ClipForVRChat-${{ needs.build.outputs.version }}-build-metadata.json
