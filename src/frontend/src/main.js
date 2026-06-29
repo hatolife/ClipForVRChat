@@ -852,6 +852,14 @@ createApp({
       if (value === 'dolly_local') return 'Dolly Local'
       return '未保存'
     },
+    syncAutoCaptureConfig(updated) {
+      if (updated?.autoCapture) {
+        this.state.config.autoCapture = updated.autoCapture
+      } else if (updated?.views) {
+        this.state.config.autoCapture.views = updated.views
+      }
+      this.normalizeAutoCaptureViewOrders()
+    },
     async saveCurrentCameraPoseToView(view) {
       if (!view?.id) return
       if (!api?.SaveCurrentCameraPoseToView) {
@@ -861,11 +869,8 @@ createApp({
       this.error = ''
       try {
         const updated = await api.SaveCurrentCameraPoseToView(view.id)
-        if (updated?.autoCapture) {
-          this.state.config.autoCapture = updated.autoCapture
-        } else if (updated?.views) {
-          this.state.config.autoCapture.views = updated.views
-        } else if (updated?.id) {
+        this.syncAutoCaptureConfig(updated)
+        if (updated?.id) {
           Object.assign(view, updated)
         }
         this.toast = '現在Poseを保存しました'
@@ -884,15 +889,46 @@ createApp({
       this.error = ''
       try {
         const updated = await api.AddCurrentCameraPoseAsView()
-        if (updated?.autoCapture) {
-          this.state.config.autoCapture = updated.autoCapture
-        } else if (updated?.views) {
-          this.state.config.autoCapture.views = updated.views
-        } else if (updated?.id) {
+        this.syncAutoCaptureConfig(updated)
+        if (updated?.id) {
           this.autoCaptureSettings.views.push(this.newAutoCaptureView(updated))
         }
-        this.normalizeAutoCaptureViewOrders()
         this.toast = '現在Poseから構図を追加しました'
+        setTimeout(() => {
+          this.toast = ''
+        }, 1800)
+      } catch (err) {
+        this.error = String(err)
+      }
+    },
+    async resetCameraPoseToDefault(view) {
+      if (!view?.id) return
+      if (!api?.ResetCameraPoseToDefault) {
+        this.error = '初期PoseリセットAPIが利用できません。'
+        return
+      }
+      this.error = ''
+      try {
+        const updated = await api.ResetCameraPoseToDefault(view.id)
+        this.syncAutoCaptureConfig(updated)
+        this.toast = '初期Poseへ戻しました'
+        setTimeout(() => {
+          this.toast = ''
+        }, 1800)
+      } catch (err) {
+        this.error = String(err)
+      }
+    },
+    async resetCameraViewsToDefaults() {
+      if (!api?.ResetCameraViewsToDefaults) {
+        this.error = '初期構図リセットAPIが利用できません。'
+        return
+      }
+      this.error = ''
+      try {
+        const updated = await api.ResetCameraViewsToDefaults()
+        this.syncAutoCaptureConfig(updated)
+        this.toast = '初期構図へ戻しました'
         setTimeout(() => {
           this.toast = ''
         }, 1800)
@@ -1287,23 +1323,24 @@ createApp({
             <div class="settings-explainer">
               <strong>VRChatのUser CameraをOSCで操作し、指定間隔で写真を撮影する機能です。</strong>
               <p>VRChat側でOSCを有効にし、Photo方式ではVRChat内でUser Cameraを表示した状態で使います。写真保存先を監視し、撮影された画像を検出してサイドカーJSONやDiscord投稿に同席ユーザー情報を紐づけます。</p>
-              <p>まずVRChat内でUser Cameraを構図ごとに配置し、「現在Poseを保存」で正面、背後、斜めなどの構図をキャリブレーションしてください。未キャリブレーションの構図は撮影に使われません。</p>
+              <p>正面、背後、斜めの初期構図にはPoseと拡大率が入っています。必要に応じてVRChat内でUser Cameraを配置し、「現在Poseを保存」で構図を上書きしてください。</p>
               <p>v0.1.8では撮影時の解像度変更は行わず、VRChat側の現在のカメラ解像度設定で保存します。</p>
             </div>
             <section class="auto-capture-views" aria-label="構図プリセット">
               <div class="auto-capture-views-header">
                 <div>
                   <h4>構図プリセット</h4>
-                  <p>有効な構図を上から順番に撮影します。</p>
+                  <p>「撮影する」がONの構図を上から順番に撮影します。</p>
                 </div>
                 <div class="button-row">
                   <button type="button" @click="addCurrentCameraPoseAsView">現在Poseから追加</button>
+                  <button type="button" class="secondary" @click="resetCameraViewsToDefaults">初期3構図に戻す</button>
                 </div>
               </div>
               <div v-if="autoCaptureViews.length" class="view-list">
                 <article v-for="(cameraView, index) in autoCaptureViews" :key="cameraView.id" class="view-card">
                   <div class="view-card-main">
-                    <label class="switch compact-switch" :title="cameraView.enabled ? '有効' : '無効'">
+                    <label class="switch compact-switch" :title="cameraView.enabled ? '撮影する' : '撮影しない'">
                       <input type="checkbox" v-model="cameraView.enabled" />
                       <span></span>
                     </label>
@@ -1313,6 +1350,7 @@ createApp({
                         <input v-model.trim="cameraView.name" placeholder="構図名" />
                       </label>
                       <div class="view-meta">
+                        <span :class="['status-pill', cameraView.enabled ? 'ok' : 'muted']">{{ cameraView.enabled ? '撮影する' : '撮影しない' }}</span>
                         <span :class="['status-pill', cameraView.calibrated ? 'ok' : 'muted']">{{ cameraView.calibrated ? 'キャリブレーション済み' : '未キャリブレーション' }}</span>
                         <span class="status-pill">{{ coordinateSpaceLabel(cameraView.coordinateSpace) }}</span>
                       </div>
@@ -1325,11 +1363,13 @@ createApp({
                     <label><small>回転 X</small><input type="number" step="0.001" v-model.number="cameraView.pose.rotation.x" /></label>
                     <label><small>回転 Y</small><input type="number" step="0.001" v-model.number="cameraView.pose.rotation.y" /></label>
                     <label><small>回転 Z</small><input type="number" step="0.001" v-model.number="cameraView.pose.rotation.z" /></label>
+                    <label><small>拡大率</small><input type="number" min="0.1" max="10" step="0.01" v-model.number="cameraView.zoom" /></label>
                   </div>
                   <div class="view-actions">
                     <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, -1)" :disabled="index === 0">↑</button>
                     <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, 1)" :disabled="index === autoCaptureViews.length - 1">↓</button>
                     <button type="button" class="secondary" @click="saveCurrentCameraPoseToView(cameraView)">現在Poseを保存</button>
+                    <button type="button" class="secondary" @click="resetCameraPoseToDefault(cameraView)">初期Poseへ戻す</button>
                     <button type="button" class="secondary" @click="duplicateAutoCaptureView(cameraView)">複製</button>
                     <button type="button" class="secondary danger-button" @click="deleteAutoCaptureView(cameraView)">削除</button>
                   </div>
