@@ -113,6 +113,7 @@
 | 106 | [Release NotesのダウンロードURLをMarkdownリンクにする](106-release-notes-download-links.md) | 完了 | `v0.1.7` | Release本文のダウンロード欄でファイル名をリンクテキストとして表示する。 |
 | 107 | [Git Flow運用をAGENTS.mdへ明文化する](107-update-git-flow-agents.md) | 完了 | `v0.1.7` | `develop` 基準の通常開発と `master` 基準のリリースブランチ運用を明文化する。 |
 | 108 | [Discord投稿ONで通常投稿用Webhook URLが空欄の場合に保存時警告を出す](108-warn-empty-discord-webhook-on-save.md) | 完了 | `v0.1.7` | Discord投稿ONで通常投稿用Webhook URLが空欄の場合、保存後も画面上部に警告を表示する。 |
+| 109 | [Release workflow のタグ名取り扱いを安全化する](109-harden-release-tag-handling.md) | 完了 | 未定 | タグ名を検証し、シェルコマンドへ環境変数経由で渡してRelease workflowのコマンド注入を防ぐ。 |
 
 ## 状態の意味
 
