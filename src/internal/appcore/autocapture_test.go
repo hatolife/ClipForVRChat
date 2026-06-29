@@ -65,12 +65,12 @@ func TestAppendOSCStringPadsToFourBytes(t *testing.T) {
 	}
 }
 
-func TestBuildOSCActionPacketUsesEmptyTypeTag(t *testing.T) {
-	got := buildOSCPacket("/usercamera/Capture", ",", func(buf []byte) []byte { return buf })
+func TestBuildOSCButtonPacketUsesBoolTypeTag(t *testing.T) {
+	got := buildOSCPacket("/usercamera/Capture", ",T", func(buf []byte) []byte { return buf })
 	want := appendOSCString(nil, "/usercamera/Capture")
-	want = appendOSCString(want, ",")
+	want = appendOSCString(want, ",T")
 	if string(got) != string(want) {
-		t.Fatalf("action packet = %v, want %v", got, want)
+		t.Fatalf("button packet = %v, want %v", got, want)
 	}
 }
 
