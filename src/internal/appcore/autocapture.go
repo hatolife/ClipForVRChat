@@ -44,11 +44,23 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 	cfg := r.Config
 	cfg.Normalize()
 	ac := cfg.AutoCapture
+	logPath := cfg.DiagnosticLogPath
+	diagAutoCapture(logPath, "run_once begin: mode=%q schedule_enabled=%t capture_on_start=%t interval_sec=%d close_after_batch=%t button_release_ms=%d settle_ms=%d",
+		ac.Capture.Mode,
+		ac.Schedule.Enabled,
+		ac.Schedule.CaptureOnStart,
+		ac.Schedule.CaptureIntervalSec,
+		ac.Capture.CloseCameraAfterBatch,
+		ac.Capture.ButtonReleaseDelayMS,
+		ac.Capture.SettleDelayMS,
+	)
 	if ac.Capture.Mode != "photo" {
+		diagAutoCapture(logPath, "run_once reject: unsupported_mode=%q", ac.Capture.Mode)
 		return nil, fmt.Errorf("v0.1.8ではPhoto方式のみ実装済みです")
 	}
 	views := enabledCameraViews(ac.Views)
 	if len(views) == 0 {
+		diagAutoCapture(logPath, "run_once reject: enabled_views=0 total_views=%d", len(ac.Views))
 		return nil, fmt.Errorf("有効な自動撮影構図がありません")
 	}
 	batchID := newBatchID(time.Now())
@@ -62,79 +74,141 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 	}
 	photoDir := autoCapturePhotoDirectory(cfg)
 	before := scanAutoCapturePhotoFiles(photoDir, ac.Output.Directory)
+	diagAutoCapture(logPath, "run_once prepared: batch_id=%q views=%d total_views=%d users=%d users_confidence=%q watch_output_log=%t output_log_dir=%q photo_dir=%q output_dir=%q before_files=%d before_latest=%s",
+		batchID,
+		len(views),
+		len(ac.Views),
+		len(users),
+		confidence,
+		ac.Presence.WatchOutputLog,
+		ac.Presence.OutputLogDirectory,
+		photoDir,
+		ac.Output.Directory,
+		len(before),
+		photoFileSummary(before),
+	)
 	client := oscClient{host: ac.OSC.Host, port: ac.OSC.SendPort}
+	diagAutoCapture(logPath, "osc open begin: target=%s:%d", ac.OSC.Host, ac.OSC.SendPort)
 	if err := client.open(); err != nil {
+		diagAutoCapture(logPath, "osc open error: target=%s:%d err=%v", ac.OSC.Host, ac.OSC.SendPort, err)
 		return nil, err
 	}
 	defer client.close()
+	diagAutoCapture(logPath, "osc open success: target=%s:%d", ac.OSC.Host, ac.OSC.SendPort)
+	diagAutoCapture(logPath, "osc send begin: address=%q value=%d", "/usercamera/Mode", 1)
 	if err := client.sendInt("/usercamera/Mode", 1); err != nil {
+		diagAutoCapture(logPath, "osc send error: address=%q err=%v", "/usercamera/Mode", err)
 		return nil, err
 	}
+	diagAutoCapture(logPath, "osc send success: address=%q value=%d", "/usercamera/Mode", 1)
+	diagAutoCapture(logPath, "camera mode wait begin: duration_ms=%d", 800)
 	if !sleepContext(ctx, 800*time.Millisecond) {
+		diagAutoCapture(logPath, "camera mode wait cancelled: err=%v", ctx.Err())
 		return nil, ctx.Err()
 	}
+	diagAutoCapture(logPath, "camera mode wait complete")
 	results := make([]Result, 0, len(views))
 	for i, view := range views {
 		if err := ctx.Err(); err != nil {
+			diagAutoCapture(logPath, "run_once cancelled before shot: index=%d err=%v", i+1, err)
 			return results, err
 		}
 		shotID := fmt.Sprintf("%s-%02d", batchID, i+1)
 		result := r.capturePhotoShot(ctx, client, batchID, shotID, i+1, view, photoDir, before, users, confidence)
 		results = append(results, result)
+		diagAutoCapture(logPath, "shot result: batch_id=%q shot_id=%q source_path=%q error=%q", batchID, shotID, result.SourcePath, result.Error)
 		r.emit(AutoCaptureEvent{BatchID: batchID, ShotID: shotID, Path: result.SourcePath, Error: result.Error, Message: result.Name})
 		if result.SourcePath != "" {
 			before[result.SourcePath] = time.Now()
 		}
 	}
 	if ac.Capture.CloseCameraAfterBatch {
-		_ = client.sendAction("/usercamera/Close")
+		diagAutoCapture(logPath, "osc send begin: address=%q", "/usercamera/Close")
+		if err := client.sendAction("/usercamera/Close"); err != nil {
+			diagAutoCapture(logPath, "osc send error: address=%q err=%v", "/usercamera/Close", err)
+		} else {
+			diagAutoCapture(logPath, "osc send success: address=%q", "/usercamera/Close")
+		}
+	} else {
+		diagAutoCapture(logPath, "camera close skipped: close_after_batch=false")
 	}
+	diagAutoCapture(logPath, "run_once complete: batch_id=%q results=%d", batchID, len(results))
 	return results, nil
 }
 
 func (r AutoCaptureRunner) capturePhotoShot(ctx context.Context, client oscClient, batchID string, shotID string, index int, view CameraViewConfig, photoDir string, before map[string]time.Time, users []PresenceUser, confidence string) Result {
 	cfg := r.Config.AutoCapture
+	logPath := r.Config.DiagnosticLogPath
 	name := view.Name
 	if name == "" {
 		name = view.ID
 	}
+	diagAutoCapture(logPath, "shot begin: batch_id=%q shot_id=%q index=%d view_id=%q view_name=%q coordinate_space=%q calibrated=%t settle_ms=%d capture_delay_ms=%d",
+		batchID,
+		shotID,
+		index,
+		view.ID,
+		name,
+		view.CoordinateSpace,
+		view.Calibrated,
+		view.SettleDelayMS,
+		view.CaptureDelayMS,
+	)
 	if view.CoordinateSpace == "world" || view.Calibrated {
-		_ = client.sendFloats("/usercamera/Pose", []float32{
+		diagAutoCapture(logPath, "osc send begin: address=%q view_id=%q", "/usercamera/Pose", view.ID)
+		if err := client.sendFloats("/usercamera/Pose", []float32{
 			float32(view.Pose.Position.X), float32(view.Pose.Position.Y), float32(view.Pose.Position.Z),
 			float32(view.Pose.Rotation.X), float32(view.Pose.Rotation.Y), float32(view.Pose.Rotation.Z),
-		})
+		}); err != nil {
+			diagAutoCapture(logPath, "osc send error: address=%q view_id=%q err=%v", "/usercamera/Pose", view.ID, err)
+		} else {
+			diagAutoCapture(logPath, "osc send success: address=%q view_id=%q", "/usercamera/Pose", view.ID)
+		}
+	} else {
+		diagAutoCapture(logPath, "pose skipped: view_id=%q coordinate_space=%q calibrated=%t", view.ID, view.CoordinateSpace, view.Calibrated)
 	}
-	sendOptionalFloat(client, "/usercamera/Zoom", view.Zoom)
-	sendOptionalFloat(client, "/usercamera/Exposure", view.Exposure)
-	sendOptionalFloat(client, "/usercamera/FocalDistance", view.FocalDistance)
-	sendOptionalFloat(client, "/usercamera/Aperture", view.Aperture)
-	sendOptionalBool(client, "/usercamera/LookAtMe", view.LookAtMe)
-	sendOptionalBool(client, "/usercamera/ShowUIInCamera", view.ShowUIInCamera)
-	sendOptionalBool(client, "/usercamera/LocalPlayer", view.LocalPlayer)
-	sendOptionalBool(client, "/usercamera/RemotePlayer", view.RemotePlayer)
-	sendOptionalBool(client, "/usercamera/Environment", view.Environment)
+	sentOptions := sendOptionalFloat(client, "/usercamera/Zoom", view.Zoom) +
+		sendOptionalFloat(client, "/usercamera/Exposure", view.Exposure) +
+		sendOptionalFloat(client, "/usercamera/FocalDistance", view.FocalDistance) +
+		sendOptionalFloat(client, "/usercamera/Aperture", view.Aperture) +
+		sendOptionalBool(client, "/usercamera/LookAtMe", view.LookAtMe) +
+		sendOptionalBool(client, "/usercamera/ShowUIInCamera", view.ShowUIInCamera) +
+		sendOptionalBool(client, "/usercamera/LocalPlayer", view.LocalPlayer) +
+		sendOptionalBool(client, "/usercamera/RemotePlayer", view.RemotePlayer) +
+		sendOptionalBool(client, "/usercamera/Environment", view.Environment)
+	diagAutoCapture(logPath, "shot optional_params sent: view_id=%q count=%d", view.ID, sentOptions)
 	settle := time.Duration(cfg.Capture.SettleDelayMS) * time.Millisecond
 	if view.SettleDelayMS > 0 {
 		settle = time.Duration(view.SettleDelayMS) * time.Millisecond
 	}
+	diagAutoCapture(logPath, "shot settle begin: view_id=%q duration_ms=%d", view.ID, settle.Milliseconds())
 	if !sleepContext(ctx, settle) {
+		diagAutoCapture(logPath, "shot settle cancelled: view_id=%q err=%v", view.ID, ctx.Err())
 		return Result{Name: name, Error: "自動撮影が中断されました。"}
 	}
+	diagAutoCapture(logPath, "shot settle complete: view_id=%q", view.ID)
+	diagAutoCapture(logPath, "osc send begin: address=%q view_id=%q", "/usercamera/Capture", view.ID)
 	if err := client.sendAction("/usercamera/Capture"); err != nil {
+		diagAutoCapture(logPath, "osc send error: address=%q view_id=%q err=%v", "/usercamera/Capture", view.ID, err)
 		return Result{Name: name, Error: err.Error()}
 	}
+	diagAutoCapture(logPath, "osc send success: address=%q view_id=%q", "/usercamera/Capture", view.ID)
+	diagAutoCapture(logPath, "button_release wait begin: view_id=%q duration_ms=%d", view.ID, cfg.Capture.ButtonReleaseDelayMS)
 	if !sleepContext(ctx, time.Duration(cfg.Capture.ButtonReleaseDelayMS)*time.Millisecond) {
+		diagAutoCapture(logPath, "button_release wait cancelled: view_id=%q err=%v", view.ID, ctx.Err())
 		return Result{Name: name, Error: "自動撮影が中断されました。"}
 	}
-	photoPath := waitForNewPhoto(ctx, photoDir, before, 15*time.Second)
+	diagAutoCapture(logPath, "button_release wait complete: view_id=%q", view.ID)
+	photoPath := waitForNewPhoto(ctx, photoDir, before, 15*time.Second, logPath)
 	if photoPath == "" {
-		photoPath = waitForNewPhoto(ctx, cfg.Output.Directory, before, 2*time.Second)
+		photoPath = waitForNewPhoto(ctx, cfg.Output.Directory, before, 2*time.Second, logPath)
 	}
 	if photoPath == "" {
+		diagAutoCapture(logPath, "shot photo detection failed: view_id=%q photo_dir=%q output_dir=%q before_files=%d before_latest=%s", view.ID, photoDir, cfg.Output.Directory, len(before), photoFileSummary(before))
 		return Result{Name: name, Error: "撮影後のVRChat写真ファイルを検出できませんでした。写真保存先設定を確認してください。"}
 	}
 	if cfg.Output.WriteSidecarJSON {
-		_ = WriteAutoCaptureSidecar(photoPath, AutoCaptureSidecar{
+		if err := WriteAutoCaptureSidecar(photoPath, AutoCaptureSidecar{
 			SchemaVersion:   1,
 			BatchID:         batchID,
 			ShotID:          shotID,
@@ -147,7 +221,13 @@ func (r AutoCaptureRunner) capturePhotoShot(ctx context.Context, client oscClien
 				UsersConfidence: confidence,
 			},
 			Users: users,
-		})
+		}); err != nil {
+			diagAutoCapture(logPath, "sidecar write error: image=%q err=%v", photoPath, err)
+		} else {
+			diagAutoCapture(logPath, "sidecar write success: image=%q users=%d", photoPath, len(users))
+		}
+	} else {
+		diagAutoCapture(logPath, "sidecar write skipped: disabled image=%q", photoPath)
 	}
 	result := Result{SourcePath: photoPath, OutputPath: photoPath, Name: filepath.Base(photoPath)}
 	if cfg.Discord.Enabled {
@@ -155,11 +235,14 @@ func (r AutoCaptureRunner) capturePhotoShot(ctx context.Context, client oscClien
 		if strings.TrimSpace(webhook) == "" {
 			webhook = r.Config.Discord.WebhookURL
 		}
+		diagAutoCapture(logPath, "discord upload begin: image=%q webhook_configured=%t users=%d", photoPath, strings.TrimSpace(webhook) != "", len(users))
 		uploaded, err := uploadAutoCaptureDiscord(webhook, photoPath, autoCaptureDiscordContent(cfg, view, users))
 		if err != nil {
+			diagAutoCapture(logPath, "discord upload error: image=%q err=%v", photoPath, err)
 			result.Error = err.Error()
 			return result
 		}
+		diagAutoCapture(logPath, "discord upload success: image=%q message_id=%q", photoPath, uploaded.MessageID)
 		result.URL = uploaded.URL
 		result.DiscordMessageID = uploaded.MessageID
 		result.DiscordWebhookID = uploaded.WebhookID
@@ -396,10 +479,21 @@ func enabledCameraViews(views []CameraViewConfig) []CameraViewConfig {
 	return out
 }
 
-func waitForNewPhoto(ctx context.Context, dir string, before map[string]time.Time, timeout time.Duration) string {
+func waitForNewPhoto(ctx context.Context, dir string, before map[string]time.Time, timeout time.Duration, logPath string) string {
 	if strings.TrimSpace(dir) == "" {
+		diagAutoCapture(logPath, "photo wait skipped: dir_empty=true timeout_ms=%d", timeout.Milliseconds())
 		return ""
 	}
+	initial, status := scanPhotoFilesWithStatus(dir)
+	diagAutoCapture(logPath, "photo wait begin: dir=%q timeout_ms=%d before_files=%d current_files=%d current_latest=%s scan_error=%q limit_reached=%t",
+		dir,
+		timeout.Milliseconds(),
+		len(before),
+		len(initial),
+		photoFileSummary(initial),
+		status.Error,
+		status.LimitReached,
+	)
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		current := scanPhotoFiles(dir)
@@ -410,13 +504,25 @@ func waitForNewPhoto(ctx context.Context, dir string, before map[string]time.Tim
 				continue
 			}
 			if fileLooksStable(path) {
+				diagAutoCapture(logPath, "photo wait found: dir=%q path=%q current_files=%d", dir, path, len(current))
 				return path
 			}
 		}
 		if !sleepContext(ctx, 500*time.Millisecond) {
+			diagAutoCapture(logPath, "photo wait cancelled: dir=%q err=%v current_files=%d current_latest=%s", dir, ctx.Err(), len(current), photoFileSummary(current))
 			return ""
 		}
 	}
+	current, status := scanPhotoFilesWithStatus(dir)
+	diagAutoCapture(logPath, "photo wait timeout: dir=%q timeout_ms=%d before_files=%d current_files=%d current_latest=%s scan_error=%q limit_reached=%t",
+		dir,
+		timeout.Milliseconds(),
+		len(before),
+		len(current),
+		photoFileSummary(current),
+		status.Error,
+		status.LimitReached,
+	)
 	return ""
 }
 
@@ -426,6 +532,15 @@ func scanAutoCapturePhotoFiles(photoDir string, outputDir string) map[string]tim
 		files[path] = modTime
 	}
 	return files
+}
+
+func photoFileSummary(files map[string]time.Time) string {
+	paths := sortedPhotoPaths(files)
+	if len(paths) == 0 {
+		return "none"
+	}
+	path := paths[len(paths)-1]
+	return fmt.Sprintf("%q@%s", path, files[path].Format(time.RFC3339))
 }
 
 func autoCapturePhotoDirectory(cfg Config) string {
@@ -463,16 +578,24 @@ func sleepContext(ctx context.Context, d time.Duration) bool {
 	}
 }
 
-func sendOptionalFloat(client oscClient, address string, value *float64) {
-	if value != nil {
-		_ = client.sendFloat(address, float32(*value))
-	}
+func diagAutoCapture(path string, format string, args ...any) {
+	AppendDiagnosticLog(path, "auto-capture "+format, args...)
 }
 
-func sendOptionalBool(client oscClient, address string, value *bool) {
+func sendOptionalFloat(client oscClient, address string, value *float64) int {
+	if value != nil {
+		_ = client.sendFloat(address, float32(*value))
+		return 1
+	}
+	return 0
+}
+
+func sendOptionalBool(client oscClient, address string, value *bool) int {
 	if value != nil {
 		_ = client.sendBool(address, *value)
+		return 1
 	}
+	return 0
 }
 
 type oscClient struct {

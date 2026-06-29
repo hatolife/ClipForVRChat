@@ -17,6 +17,7 @@ type configLogSummary struct {
 	Output             appcore.OutputConfig               `json:"output"`
 	Discord            webhookConfigLogSummary            `json:"discord"`
 	AutoPhoto          autoPhotoConfigLogSummary          `json:"autoPhoto"`
+	AutoCapture        autoCaptureConfigLogSummary        `json:"autoCapture"`
 	ScreenshotAutoPost screenshotAutoPostConfigLogSummary `json:"screenshotAutoPost"`
 	Update             appcore.UpdateConfig               `json:"update"`
 }
@@ -48,6 +49,33 @@ type screenshotAutoPostConfigLogSummary struct {
 	ScreenshotDirectory string `json:"screenshotDirectory"`
 	WebhookConfigured   bool   `json:"webhookConfigured"`
 	ScanIntervalSeconds int    `json:"scanIntervalSeconds"`
+}
+
+type autoCaptureConfigLogSummary struct {
+	Schedule        appcore.AutoCaptureScheduleConfig `json:"schedule"`
+	Capture         appcore.AutoCaptureCaptureConfig  `json:"capture"`
+	OSC             appcore.AutoCaptureOSCConfig      `json:"osc"`
+	Output          autoCaptureOutputLogSummary       `json:"output"`
+	Presence        appcore.AutoCapturePresenceConfig `json:"presence"`
+	Discord         autoCaptureDiscordLogSummary      `json:"discord"`
+	ViewCount       int                               `json:"viewCount"`
+	EnabledViews    int                               `json:"enabledViews"`
+	CalibratedViews int                               `json:"calibratedViews"`
+}
+
+type autoCaptureOutputLogSummary struct {
+	Directory           string `json:"directory"`
+	ImageFormat         string `json:"imageFormat"`
+	WriteSidecarJSON    bool   `json:"writeSidecarJson"`
+	WriteEXIF           bool   `json:"writeExif"`
+	WriteUserListToEXIF bool   `json:"writeUserListToExif"`
+}
+
+type autoCaptureDiscordLogSummary struct {
+	Enabled           bool   `json:"enabled"`
+	WebhookConfigured bool   `json:"webhookConfigured"`
+	PostMode          string `json:"postMode"`
+	IncludeImages     bool   `json:"includeImages"`
 }
 
 func (a *App) logStartupLocked() {
@@ -100,6 +128,7 @@ func configSummaryForLog(cfg appcore.Config) string {
 			WebhookConfigured:   strings.TrimSpace(cfg.AutoPhoto.WebhookURL) != "",
 			ScanIntervalSeconds: cfg.AutoPhoto.ScanIntervalSeconds,
 		},
+		AutoCapture: autoCaptureSummaryForLog(cfg.AutoCapture),
 		ScreenshotAutoPost: screenshotAutoPostConfigLogSummary{
 			Enabled:             cfg.ScreenshotAutoPost.Enabled,
 			ScreenshotDirectory: cfg.ScreenshotAutoPost.ScreenshotDirectory,
@@ -113,6 +142,41 @@ func configSummaryForLog(cfg appcore.Config) string {
 		return fmt.Sprintf("%+v", summary)
 	}
 	return string(data)
+}
+
+func autoCaptureSummaryForLog(cfg appcore.AutoCaptureConfig) autoCaptureConfigLogSummary {
+	enabledViews := 0
+	calibratedViews := 0
+	for _, view := range cfg.Views {
+		if view.Enabled {
+			enabledViews++
+		}
+		if view.Calibrated {
+			calibratedViews++
+		}
+	}
+	return autoCaptureConfigLogSummary{
+		Schedule: cfg.Schedule,
+		Capture:  cfg.Capture,
+		OSC:      cfg.OSC,
+		Output: autoCaptureOutputLogSummary{
+			Directory:           cfg.Output.Directory,
+			ImageFormat:         cfg.Output.ImageFormat,
+			WriteSidecarJSON:    cfg.Output.WriteSidecarJSON,
+			WriteEXIF:           cfg.Output.WriteEXIF,
+			WriteUserListToEXIF: cfg.Output.WriteUserListToEXIF,
+		},
+		Presence: cfg.Presence,
+		Discord: autoCaptureDiscordLogSummary{
+			Enabled:           cfg.Discord.Enabled,
+			WebhookConfigured: strings.TrimSpace(cfg.Discord.WebhookURL) != "",
+			PostMode:          cfg.Discord.PostMode,
+			IncludeImages:     cfg.Discord.IncludeImages,
+		},
+		ViewCount:       len(cfg.Views),
+		EnabledViews:    enabledViews,
+		CalibratedViews: calibratedViews,
+	}
 }
 
 func fileSHA256(path string) (string, error) {
