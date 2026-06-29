@@ -159,11 +159,7 @@ func TestAppStartupStartsAutoPhotoWatcherWithoutDiscordUpload(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	app.startup(ctx)
-	defer func() {
-		if app.autoCancel != nil {
-			app.autoCancel()
-		}
-	}()
+	defer app.shutdown(context.Background())
 
 	if app.autoCancel == nil {
 		t.Fatal("auto photo watcher was not started")
@@ -183,9 +179,9 @@ func TestAppStartupDoesNotStartAutoPhotoWatcherWhileReviewingSettings(t *testing
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	app.startup(ctx)
+	defer app.shutdown(context.Background())
 
 	if app.autoCancel != nil {
-		app.autoCancel()
 		t.Fatal("auto photo watcher started while imported settings were only open for review")
 	}
 }
