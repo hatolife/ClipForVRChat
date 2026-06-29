@@ -21,8 +21,11 @@ func TestDefaultAutoCaptureConfig(t *testing.T) {
 	if len(cfg.AutoCapture.Views) != 3 {
 		t.Fatalf("default views = %d, want 3", len(cfg.AutoCapture.Views))
 	}
-	if cfg.AutoCapture.Views[0].ID != "front" || cfg.AutoCapture.Views[0].Calibrated {
+	if cfg.AutoCapture.Views[0].ID != "front" || cfg.AutoCapture.Views[0].Calibrated || cfg.AutoCapture.Views[0].Zoom == nil {
 		t.Fatalf("unexpected first view: %+v", cfg.AutoCapture.Views[0])
+	}
+	if cfg.AutoCapture.Views[0].CoordinateSpace != "world" || cfg.AutoCapture.Views[0].Pose.Position.Z == 0 {
+		t.Fatalf("default front view pose was not initialized: %+v", cfg.AutoCapture.Views[0])
 	}
 }
 
@@ -49,6 +52,18 @@ func TestAutoCaptureConfigNormalize(t *testing.T) {
 	}
 }
 
+func TestAutoCaptureConfigNormalizeMigratesDefaultTemplateViews(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.AutoCapture.Views = []CameraViewConfig{
+		{ID: "front", Name: "正面", Enabled: true, CoordinateSpace: "template_relative"},
+	}
+	cfg.Normalize()
+	view := cfg.AutoCapture.Views[0]
+	if view.CoordinateSpace != "world" || view.Pose.Position.Z == 0 || view.Zoom == nil {
+		t.Fatalf("default template view was not migrated: %+v", view)
+	}
+}
+
 func TestAutoCapturePhotoDirectoryUsesAutoPhotoSetting(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.AutoPhoto.PhotoDirectory = filepath.Join("C:", "VRChat", "Photos")
@@ -57,15 +72,15 @@ func TestAutoCapturePhotoDirectoryUsesAutoPhotoSetting(t *testing.T) {
 	}
 }
 
-func TestEnabledCameraViewsRequiresCalibratedWorldPose(t *testing.T) {
+func TestEnabledCameraViewsUsesEnabledToggleOnly(t *testing.T) {
 	views := []CameraViewConfig{
 		{ID: "template", Enabled: true, CoordinateSpace: "template_relative", Calibrated: false, SortOrder: 1},
 		{ID: "disabled", Enabled: false, CoordinateSpace: "world", Calibrated: true, SortOrder: 2},
 		{ID: "world", Enabled: true, CoordinateSpace: "world", Calibrated: true, SortOrder: 3},
 	}
 	got := enabledCameraViews(views)
-	if len(got) != 1 || got[0].ID != "world" {
-		t.Fatalf("enabled views = %+v, want only calibrated world view", got)
+	if len(got) != 2 || got[0].ID != "template" || got[1].ID != "world" {
+		t.Fatalf("enabled views = %+v, want enabled views regardless of calibration", got)
 	}
 }
 
@@ -169,7 +184,7 @@ func TestWriteAutoCaptureSidecar(t *testing.T) {
 		CapturedAtLocal: time.Now().Format(time.RFC3339),
 		CapturedAtUTC:   time.Now().UTC().Format(time.RFC3339),
 		CaptureMode:     "photo",
-		View:            defaultCameraView("front", "正面", 0),
+		View:            DefaultCameraViews()[0],
 		VRChat:          AutoCaptureVRChatMetadata{UsersSource: "output_log", UsersConfidence: "partial"},
 		Users:           []PresenceUser{{DisplayName: "Alice", UserID: "usr_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", Status: "present"}},
 	}

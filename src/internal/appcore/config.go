@@ -160,6 +160,11 @@ type CameraVector3Config struct {
 	Z float64 `json:"z"`
 }
 
+func (p CameraPoseConfig) isZero() bool {
+	return p.Position.X == 0 && p.Position.Y == 0 && p.Position.Z == 0 &&
+		p.Rotation.X == 0 && p.Rotation.Y == 0 && p.Rotation.Z == 0
+}
+
 func DefaultConfig() Config {
 	return Config{
 		Image: ImageConfig{
@@ -423,6 +428,15 @@ func (c *AutoCaptureConfig) Normalize() {
 	}
 	for i := range c.Views {
 		c.Views[i].Normalize(i)
+		if defaultView, ok := DefaultCameraViewByID(c.Views[i].ID); ok && !c.Views[i].Calibrated {
+			if c.Views[i].CoordinateSpace == "template_relative" || c.Views[i].Pose.isZero() {
+				c.Views[i].CoordinateSpace = defaultView.CoordinateSpace
+				c.Views[i].Pose = defaultView.Pose
+			}
+			if c.Views[i].Zoom == nil {
+				c.Views[i].Zoom = defaultView.Zoom
+			}
+		}
 	}
 }
 
@@ -441,7 +455,7 @@ func (v *CameraViewConfig) Normalize(index int) {
 	switch v.CoordinateSpace {
 	case "world", "dolly_local", "template_relative":
 	default:
-		v.CoordinateSpace = "template_relative"
+		v.CoordinateSpace = "world"
 	}
 	if v.SettleDelayMS < 1500 {
 		v.SettleDelayMS = 1500
@@ -496,21 +510,49 @@ func DefaultVRChatLogDirectory() string {
 
 func defaultCameraViews() []CameraViewConfig {
 	return []CameraViewConfig{
-		defaultCameraView("front", "正面", 0),
-		defaultCameraView("back", "背後", 1),
-		defaultCameraView("diagonal", "斜め", 2),
+		defaultCameraView("front", "正面", 0, CameraPoseConfig{
+			Position: CameraVector3Config{X: 0, Y: 1.45, Z: 1.25},
+			Rotation: CameraVector3Config{X: 0, Y: 180, Z: 0},
+		}, 1.0),
+		defaultCameraView("back", "背後", 1, CameraPoseConfig{
+			Position: CameraVector3Config{X: 0, Y: 1.45, Z: -1.25},
+			Rotation: CameraVector3Config{X: 0, Y: 0, Z: 0},
+		}, 1.0),
+		defaultCameraView("diagonal", "斜め", 2, CameraPoseConfig{
+			Position: CameraVector3Config{X: 0.9, Y: 1.55, Z: 1.1},
+			Rotation: CameraVector3Config{X: 0, Y: -140, Z: 0},
+		}, 1.0),
 	}
 }
 
-func defaultCameraView(id string, name string, order int) CameraViewConfig {
+func DefaultCameraViewByID(id string) (CameraViewConfig, bool) {
+	for _, view := range defaultCameraViews() {
+		if view.ID == id {
+			return view, true
+		}
+	}
+	return CameraViewConfig{}, false
+}
+
+func DefaultCameraViews() []CameraViewConfig {
+	return defaultCameraViews()
+}
+
+func defaultCameraView(id string, name string, order int, pose CameraPoseConfig, zoom float64) CameraViewConfig {
 	return CameraViewConfig{
 		ID:              id,
 		Name:            name,
 		Enabled:         true,
 		SortOrder:       order,
-		CoordinateSpace: "template_relative",
+		CoordinateSpace: "world",
+		Pose:            pose,
+		Zoom:            float64ConfigPtr(zoom),
 		SettleDelayMS:   1500,
 		CaptureDelayMS:  0,
 		Calibrated:      false,
 	}
+}
+
+func float64ConfigPtr(value float64) *float64 {
+	return &value
 }
