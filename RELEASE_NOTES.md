@@ -8,6 +8,7 @@
 - VRChat User CameraへOSCでPhoto撮影指示を送り、有効な初期構図を順番に撮影する自動撮影MVPを追加しました。
 - VRChat output logから同じインスタンスにいるユーザー情報を推定し、撮影画像に対応するsidecar JSONへ保存するようにしました。
 - 自動撮影した画像を既存の結果/履歴画面で扱えるようにし、設定で有効化した場合はDiscord Webhookへ投稿できるようにしました。
+- RC確認で見つかった、VRChat写真が保存されない問題に対して、Capture/CloseをUser CameraのAction OSCとして送るよう修正しました。
 
 ### 既知の制限
 
