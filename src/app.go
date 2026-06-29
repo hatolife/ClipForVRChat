@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -37,6 +38,9 @@ type App struct {
 	configPath string
 	state      appcore.UIState
 	autoCancel context.CancelFunc
+	oscCancel  context.CancelFunc
+	latestPose appcore.CameraPoseConfig
+	poseAt     time.Time
 	mu         sync.Mutex
 }
 
@@ -66,6 +70,7 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.logStartupLocked()
 	if a.state.Mode == appcore.ModeResults {
+		a.restartCameraPoseReceiverLocked(a.state.Config)
 		a.restartAutoPhotoWatcher(a.state.Config)
 	}
 }
@@ -355,6 +360,82 @@ func (a *App) saveConfigLocked(cfg appcore.Config) error {
 	a.state.Mode = appcore.ModeResults
 	a.state.Message = ""
 	a.state.Results = nil
+	a.restartCameraPoseReceiverLocked(cfg)
+	a.restartAutoPhotoWatcher(cfg)
+	return nil
+}
+
+func (a *App) GetLatestCameraPose() appcore.CameraPoseSnapshot {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.latestCameraPoseLocked(a.state.Config)
+}
+
+func (a *App) SaveCurrentCameraPoseToView(viewID string) (appcore.Config, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	cfg := a.state.Config
+	cfg.Normalize()
+	pose, err := a.freshCameraPoseLocked(cfg)
+	if err != nil {
+		return cfg, err
+	}
+	viewID = strings.TrimSpace(viewID)
+	found := false
+	for i := range cfg.AutoCapture.Views {
+		if cfg.AutoCapture.Views[i].ID != viewID {
+			continue
+		}
+		cfg.AutoCapture.Views[i].Pose = pose
+		cfg.AutoCapture.Views[i].CoordinateSpace = "world"
+		cfg.AutoCapture.Views[i].Calibrated = true
+		found = true
+		break
+	}
+	if !found {
+		return cfg, fmt.Errorf("構図が見つかりません: %s", viewID)
+	}
+	if err := a.saveAutoCaptureConfigFromSettingsLocked(cfg); err != nil {
+		return cfg, err
+	}
+	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "auto-capture pose saved to view=%q", viewID)
+	return a.state.Config, nil
+}
+
+func (a *App) AddCurrentCameraPoseAsView() (appcore.Config, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	cfg := a.state.Config
+	cfg.Normalize()
+	pose, err := a.freshCameraPoseLocked(cfg)
+	if err != nil {
+		return cfg, err
+	}
+	id := newCameraViewID(cfg.AutoCapture.Views)
+	cfg.AutoCapture.Views = append(cfg.AutoCapture.Views, appcore.CameraViewConfig{
+		ID:              id,
+		Name:            fmt.Sprintf("構図 %d", len(cfg.AutoCapture.Views)+1),
+		Enabled:         true,
+		SortOrder:       nextCameraViewSortOrder(cfg.AutoCapture.Views),
+		CoordinateSpace: "world",
+		Pose:            pose,
+		SettleDelayMS:   cfg.AutoCapture.Capture.SettleDelayMS,
+		Calibrated:      true,
+	})
+	if err := a.saveAutoCaptureConfigFromSettingsLocked(cfg); err != nil {
+		return cfg, err
+	}
+	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "auto-capture pose saved as new view=%q", id)
+	return a.state.Config, nil
+}
+
+func (a *App) saveAutoCaptureConfigFromSettingsLocked(cfg appcore.Config) error {
+	if err := appcore.SaveConfig(a.configPath, cfg); err != nil {
+		return err
+	}
+	a.state.Config = cfg
+	a.state.ConfigPath = a.configPath
+	a.restartCameraPoseReceiverLocked(cfg)
 	a.restartAutoPhotoWatcher(cfg)
 	return nil
 }
@@ -389,6 +470,7 @@ func (a *App) OpenSettings(path string) (appcore.UIState, error) {
 	a.state.Results = nil
 	a.state.PendingPaths = nil
 	a.state.ProcessOnSave = false
+	a.restartCameraPoseReceiverLocked(cfg)
 	return a.state, nil
 }
 
@@ -858,4 +940,120 @@ func sleepWithContext(ctx context.Context, d time.Duration) bool {
 	case <-timer.C:
 		return true
 	}
+}
+
+func (a *App) restartCameraPoseReceiverLocked(cfg appcore.Config) {
+	cfg.Normalize()
+	logPath := appcore.DiagnosticLogPath(a.configPath)
+	if a.oscCancel != nil {
+		a.oscCancel()
+		a.oscCancel = nil
+	}
+	if a.ctx == nil {
+		return
+	}
+	host := strings.TrimSpace(cfg.AutoCapture.OSC.Host)
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	port := cfg.AutoCapture.OSC.ReceivePort
+	if port <= 0 || port > 65535 {
+		port = 9001
+	}
+	ctx, cancel := context.WithCancel(a.ctx)
+	a.oscCancel = cancel
+	go a.runCameraPoseReceiver(ctx, host, port, logPath)
+}
+
+func (a *App) runCameraPoseReceiver(ctx context.Context, host string, port int, logPath string) {
+	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", host, port))
+	if err != nil {
+		appcore.AppendDiagnosticLog(logPath, "auto-capture pose receiver resolve error: %v", err)
+		return
+	}
+	conn, err := net.ListenUDP("udp", addr)
+	if err != nil {
+		appcore.AppendDiagnosticLog(logPath, "auto-capture pose receiver listen error: addr=%s err=%v", addr.String(), err)
+		return
+	}
+	defer conn.Close()
+	appcore.AppendDiagnosticLog(logPath, "auto-capture pose receiver start: addr=%s", addr.String())
+	go func() {
+		<-ctx.Done()
+		_ = conn.Close()
+	}()
+	buf := make([]byte, 2048)
+	for {
+		n, _, err := conn.ReadFromUDP(buf)
+		if err != nil {
+			if ctx.Err() != nil {
+				appcore.AppendDiagnosticLog(logPath, "auto-capture pose receiver stop: err=%v", ctx.Err())
+				return
+			}
+			appcore.AppendDiagnosticLog(logPath, "auto-capture pose receiver read error: %v", err)
+			continue
+		}
+		pose, ok := appcore.ParseOSCPose(buf[:n])
+		if !ok {
+			continue
+		}
+		a.mu.Lock()
+		a.latestPose = pose
+		a.poseAt = time.Now()
+		a.mu.Unlock()
+		appcore.AppendDiagnosticLog(logPath, "auto-capture pose received: x=%.3f y=%.3f z=%.3f rx=%.3f ry=%.3f rz=%.3f", pose.Position.X, pose.Position.Y, pose.Position.Z, pose.Rotation.X, pose.Rotation.Y, pose.Rotation.Z)
+	}
+}
+
+func (a *App) latestCameraPoseLocked(cfg appcore.Config) appcore.CameraPoseSnapshot {
+	cfg.Normalize()
+	if a.poseAt.IsZero() {
+		return appcore.CameraPoseSnapshot{Configured: true, Fresh: false}
+	}
+	age := time.Since(a.poseAt)
+	freshness := time.Duration(cfg.AutoCapture.OSC.PoseFreshnessSec) * time.Second
+	if freshness <= 0 {
+		freshness = 3 * time.Second
+	}
+	return appcore.CameraPoseSnapshot{
+		Pose:       a.latestPose,
+		UpdatedAt:  a.poseAt.Format(time.RFC3339Nano),
+		AgeMS:      age.Milliseconds(),
+		Fresh:      age <= freshness,
+		Configured: true,
+	}
+}
+
+func (a *App) freshCameraPoseLocked(cfg appcore.Config) (appcore.CameraPoseConfig, error) {
+	snapshot := a.latestCameraPoseLocked(cfg)
+	if snapshot.UpdatedAt == "" {
+		return appcore.CameraPoseConfig{}, fmt.Errorf("VRChatからUser Camera Poseをまだ受信していません。VRChatのOSCを有効にし、User Cameraを表示して少し動かしてください。")
+	}
+	if !snapshot.Fresh {
+		return appcore.CameraPoseConfig{}, fmt.Errorf("User Camera Poseが古いです。VRChat内でUser Cameraを少し動かしてから保存してください。")
+	}
+	return snapshot.Pose, nil
+}
+
+func newCameraViewID(views []appcore.CameraViewConfig) string {
+	seen := map[string]bool{}
+	for _, view := range views {
+		seen[view.ID] = true
+	}
+	for i := len(views) + 1; ; i++ {
+		id := fmt.Sprintf("view-%d", i)
+		if !seen[id] {
+			return id
+		}
+	}
+}
+
+func nextCameraViewSortOrder(views []appcore.CameraViewConfig) int {
+	maxOrder := 0
+	for _, view := range views {
+		if view.SortOrder > maxOrder {
+			maxOrder = view.SortOrder
+		}
+	}
+	return maxOrder + 10
 }
