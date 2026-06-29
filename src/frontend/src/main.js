@@ -1146,8 +1146,8 @@ createApp({
             <h3>自動撮影</h3>
             <div class="settings-explainer">
               <strong>VRChatのUser CameraをOSCで操作し、指定間隔で写真を撮影する機能です。</strong>
-              <p>VRChat側でOSCを有効にした状態で使います。Photo方式ではVRChatの写真保存先を監視し、撮影された画像を検出してサイドカーJSONやDiscord投稿に同席ユーザー情報を紐づけます。</p>
-              <p>まず自動撮影スケジュールを有効にし、OSCホストと送信ポート、VRChat写真の保存先、output_log監視を確認してください。構図設定が未調整の場合は既定の順番で撮影します。</p>
+              <p>VRChat側でOSCを有効にし、Photo方式ではVRChat内でUser Cameraを表示した状態で使います。写真保存先を監視し、撮影された画像を検出してサイドカーJSONやDiscord投稿に同席ユーザー情報を紐づけます。</p>
+              <p>まず自動撮影スケジュールを有効にし、OSCホストと送信ポート、VRChat写真の保存先、output_log監視を確認してください。構図設定が未調整の場合は、現在のUser Camera位置から順番に撮影します。</p>
             </div>
             <div class="setting-row">
               <div><strong>自動撮影スケジュール</strong><p>一定間隔でVRChatカメラ撮影を実行します。</p></div>
