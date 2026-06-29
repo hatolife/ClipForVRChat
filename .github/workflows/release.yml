@@ -294,13 +294,30 @@ jobs:
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
 
       - name: Create release
-        uses: softprops/action-gh-release@v3
-        with:
-          draft: ${{ steps.version.outputs.draft }}
-          prerelease: ${{ steps.version.outputs.prerelease }}
-          body_path: dist/release-body.md
-          files: |
-            dist/${{ needs.build.outputs.asset_prefix }}-windows-amd64.zip
-            dist/${{ needs.build.outputs.asset_prefix }}-windows-amd64.zip.sha256
-            dist/${{ needs.build.outputs.asset_prefix }}-windows-amd64.exe.asc
-            dist/${{ needs.build.outputs.asset_prefix }}-build-metadata.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+          DRAFT: ${{ steps.version.outputs.draft }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          args=(
+            --title "$TAG_NAME"
+            --notes-file dist/release-body.md
+          )
+          if [[ "$DRAFT" == "true" ]]; then
+            args+=(--draft)
+          fi
+          if [[ "$PRERELEASE" == "true" ]]; then
+            args+=(--prerelease)
+          fi
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release edit "$TAG_NAME" "${args[@]}"
+          else
+            gh release create "$TAG_NAME" "${args[@]}"
+          fi
+          gh release upload "$TAG_NAME" --clobber \
+            "dist/ClipForVRChat-${TAG_NAME}-windows-amd64.zip" \
+            "dist/ClipForVRChat-${TAG_NAME}-windows-amd64.zip.sha256" \
+            "dist/ClipForVRChat-${TAG_NAME}-windows-amd64.exe.asc" \
+            "dist/ClipForVRChat-${TAG_NAME}-build-metadata.json"
