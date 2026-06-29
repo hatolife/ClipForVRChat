@@ -117,6 +117,8 @@
 | 110 | [VRChat自動構図撮影](110-vrc-auto-composition-capture.md) | 要確認 | `v0.1.8` | OSCでUser Cameraを制御し、構図ごとの自動撮影とsidecar JSON保存を実装する。 |
 | 111 | [VRChat output logからの同席ユーザー保持](111-vrc-output-log-presence-users.md) | 要確認 | `v0.1.8` | output_log監視で撮影時点の同席ユーザー情報を保持し、画像メタデータやDiscord投稿へ紐づける。 |
 | 112 | [自動撮影でVRChat写真が保存されない](112-fix-auto-capture-action-osc.md) | 要確認 | `v0.1.8` | User CameraのCapture/CloseをAction OSCとして送信し、写真保存されない問題を修正する。 |
+| 113 | [自動撮影の診断ログを詳細化する](113-add-auto-capture-diagnostics.md) | 要確認 | `v0.1.8` | 自動撮影のスケジューラ、OSC送信、写真検出状況を診断ログで追跡できるようにする。 |
+| 114 | [自動撮影タブに機能説明を追加する](114-explain-auto-capture-settings-tab.md) | 要確認 | `v0.1.8` | 自動撮影タブの先頭に機能概要と使い方の説明枠を追加する。 |
 
 ## 状態の意味
 
