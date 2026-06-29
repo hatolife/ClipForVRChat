@@ -428,6 +428,7 @@ func (a *App) AddCurrentCameraPoseAsView() (appcore.Config, error) {
 		return cfg, err
 	}
 	id := newCameraViewID(cfg.AutoCapture.Views)
+	zoom := 1.0
 	cfg.AutoCapture.Views = append(cfg.AutoCapture.Views, appcore.CameraViewConfig{
 		ID:              id,
 		Name:            fmt.Sprintf("構図 %d", len(cfg.AutoCapture.Views)+1),
@@ -435,6 +436,7 @@ func (a *App) AddCurrentCameraPoseAsView() (appcore.Config, error) {
 		SortOrder:       nextCameraViewSortOrder(cfg.AutoCapture.Views),
 		CoordinateSpace: "world",
 		Pose:            pose,
+		Zoom:            &zoom,
 		SettleDelayMS:   cfg.AutoCapture.Capture.SettleDelayMS,
 		Calibrated:      true,
 	})
@@ -442,6 +444,51 @@ func (a *App) AddCurrentCameraPoseAsView() (appcore.Config, error) {
 		return cfg, err
 	}
 	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "auto-capture pose saved as new view=%q", id)
+	return a.state.Config, nil
+}
+
+func (a *App) ResetCameraPoseToDefault(viewID string) (appcore.Config, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	cfg := a.state.Config
+	cfg.Normalize()
+	viewID = strings.TrimSpace(viewID)
+	defaultView, ok := appcore.DefaultCameraViewByID(viewID)
+	if !ok {
+		return cfg, fmt.Errorf("初期Poseが定義されていない構図です: %s", viewID)
+	}
+	found := false
+	for i := range cfg.AutoCapture.Views {
+		if cfg.AutoCapture.Views[i].ID != viewID {
+			continue
+		}
+		cfg.AutoCapture.Views[i].Pose = defaultView.Pose
+		cfg.AutoCapture.Views[i].Zoom = defaultView.Zoom
+		cfg.AutoCapture.Views[i].CoordinateSpace = defaultView.CoordinateSpace
+		cfg.AutoCapture.Views[i].Calibrated = false
+		found = true
+		break
+	}
+	if !found {
+		return cfg, fmt.Errorf("構図が見つかりません: %s", viewID)
+	}
+	if err := a.saveAutoCaptureConfigFromSettingsLocked(cfg); err != nil {
+		return cfg, err
+	}
+	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "auto-capture pose reset to default view=%q", viewID)
+	return a.state.Config, nil
+}
+
+func (a *App) ResetCameraViewsToDefaults() (appcore.Config, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	cfg := a.state.Config
+	cfg.Normalize()
+	cfg.AutoCapture.Views = appcore.DefaultCameraViews()
+	if err := a.saveAutoCaptureConfigFromSettingsLocked(cfg); err != nil {
+		return cfg, err
+	}
+	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "auto-capture views reset to defaults")
 	return a.state.Config, nil
 }
 

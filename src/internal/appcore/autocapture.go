@@ -68,8 +68,8 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 	}
 	views := enabledCameraViews(ac.Views)
 	if len(views) == 0 {
-		diagAutoCapture(logPath, "run_once reject: calibrated_enabled_views=0 total_views=%d", len(ac.Views))
-		return nil, fmt.Errorf("撮影に使える構図がありません。VRChat内でUser Cameraを配置し、自動撮影タブで現在Poseを各構図へ保存してください。")
+		diagAutoCapture(logPath, "run_once reject: enabled_views=0 total_views=%d", len(ac.Views))
+		return nil, fmt.Errorf("撮影ONの構図がありません。自動撮影タブで撮影する構図を1つ以上ONにしてください。")
 	}
 	batchID := newBatchID(time.Now())
 	users, confidence, presenceLogPath := SnapshotVRChatPresenceWithSource(ac.Presence.OutputLogDirectory)
@@ -169,18 +169,14 @@ func (r AutoCaptureRunner) capturePhotoShot(ctx context.Context, client oscClien
 		view.SettleDelayMS,
 		view.CaptureDelayMS,
 	)
-	if view.CoordinateSpace == "world" || view.Calibrated {
-		diagAutoCapture(logPath, "osc send begin: address=%q view_id=%q", "/usercamera/Pose", view.ID)
-		if err := client.sendFloats("/usercamera/Pose", []float32{
-			float32(view.Pose.Position.X), float32(view.Pose.Position.Y), float32(view.Pose.Position.Z),
-			float32(view.Pose.Rotation.X), float32(view.Pose.Rotation.Y), float32(view.Pose.Rotation.Z),
-		}); err != nil {
-			diagAutoCapture(logPath, "osc send error: address=%q view_id=%q err=%v", "/usercamera/Pose", view.ID, err)
-		} else {
-			diagAutoCapture(logPath, "osc send success: address=%q view_id=%q", "/usercamera/Pose", view.ID)
-		}
+	diagAutoCapture(logPath, "osc send begin: address=%q view_id=%q", "/usercamera/Pose", view.ID)
+	if err := client.sendFloats("/usercamera/Pose", []float32{
+		float32(view.Pose.Position.X), float32(view.Pose.Position.Y), float32(view.Pose.Position.Z),
+		float32(view.Pose.Rotation.X), float32(view.Pose.Rotation.Y), float32(view.Pose.Rotation.Z),
+	}); err != nil {
+		diagAutoCapture(logPath, "osc send error: address=%q view_id=%q err=%v", "/usercamera/Pose", view.ID, err)
 	} else {
-		diagAutoCapture(logPath, "pose skipped: view_id=%q coordinate_space=%q calibrated=%t", view.ID, view.CoordinateSpace, view.Calibrated)
+		diagAutoCapture(logPath, "osc send success: address=%q view_id=%q", "/usercamera/Pose", view.ID)
 	}
 	sentOptions := sendOptionalFloat(client, "/usercamera/Zoom", view.Zoom) +
 		sendOptionalFloat(client, "/usercamera/Exposure", view.Exposure) +
@@ -517,7 +513,7 @@ func extractLogTime(line string) string {
 func enabledCameraViews(views []CameraViewConfig) []CameraViewConfig {
 	out := make([]CameraViewConfig, 0, len(views))
 	for _, view := range views {
-		if view.Enabled && view.Calibrated && view.CoordinateSpace != "template_relative" {
+		if view.Enabled {
 			out = append(out, view)
 		}
 	}
