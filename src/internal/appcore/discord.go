@@ -28,6 +28,15 @@ type DiscordUpload struct {
 	Token     string
 }
 
+type discordAllowedMentions struct {
+	Parse []string `json:"parse"`
+}
+
+type discordWebhookPayload struct {
+	Content         string                 `json:"content"`
+	AllowedMentions discordAllowedMentions `json:"allowed_mentions"`
+}
+
 func UploadDiscord(webhookURL string, filename string, encoded EncodedImage) (DiscordUpload, error) {
 	return UploadDiscordWithContent(webhookURL, filename, encoded, "")
 }
@@ -51,9 +60,7 @@ func UploadDiscordWithContent(webhookURL string, filename string, encoded Encode
 	if _, err := part.Write(encoded.Data); err != nil {
 		return uploaded, err
 	}
-	payload, err := json.Marshal(struct {
-		Content string `json:"content"`
-	}{Content: truncateDiscordContent(content)})
+	payload, err := discordPayloadJSON(content)
 	if err != nil {
 		return uploaded, err
 	}
@@ -103,6 +110,15 @@ func UploadDiscordWithContent(webhookURL string, filename string, encoded Encode
 	}
 	uploaded.Token = token
 	return uploaded, nil
+}
+
+func discordPayloadJSON(content string) ([]byte, error) {
+	return json.Marshal(discordWebhookPayload{
+		Content: truncateDiscordContent(content),
+		AllowedMentions: discordAllowedMentions{
+			Parse: []string{},
+		},
+	})
 }
 
 func truncateDiscordContent(content string) string {

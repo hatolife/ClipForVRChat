@@ -156,17 +156,17 @@
 | 149 | [自動撮影multi/Camera Dolly設定を実装または削除する](149-implement-or-remove-autocapture-multi-camera-settings.md) | 要対応 | `v0.1.8` | 保存/正規化されるmulti撮影設定を実装するか、未実装設定として隠す。 |
 | 150 | [自動撮影スケジュールの重複実行制御を接続する](150-connect-autocapture-scheduler-overlap-controls.md) | 要対応 | `v0.1.8` | `skipIfPreviousBatchRunning` と `maxBatches` を実際のスケジューラ挙動へ反映する。 |
 | 151 | [自動撮影DiscordのpostMode/includeImagesを実装または削除する](151-implement-or-remove-autocapture-discord-post-options.md) | 要対応 | `v0.1.8` | `postMode` と `includeImages` が常にShot画像投稿になる未接続状態を解消する。 |
-| 152 | [構図ごとのcaptureDelayMsを撮影待機へ反映する](152-apply-per-view-capture-delay.md) | 要対応 | `v0.1.8` | 構図ごとの撮影直前待機設定をPhoto/Stream両方の撮影処理へ接続する。 |
+| 152 | [構図ごとのcaptureDelayMsを撮影待機へ反映する](152-apply-per-view-capture-delay.md) | 完了 | `v0.1.8` | 構図ごとの撮影直前待機設定をPhoto/Stream両方の撮影処理へ接続する。 |
 | 153 | [自動撮影の出力形式/ファイル名テンプレートを設定画面へ出す](153-expose-autocapture-output-format-and-filename-template.md) | 要対応 | `v0.1.8` | `imageFormat` と `filenameTemplate` を自動撮影タブから設定できるようにする。 |
-| 154 | [DiscordユーザーID出力をsidecar JSON設定から独立させる](154-decouple-autocapture-discord-user-id-from-sidecar-user-id.md) | 要対応 | `v0.1.8` | sidecar/Discord/EXIFのユーザーID出力制御を出力先ごとに独立させる。 |
+| 154 | [DiscordユーザーID出力をsidecar JSON設定から独立させる](154-decouple-autocapture-discord-user-id-from-sidecar-user-id.md) | 完了 | `v0.1.8` | sidecar/Discord/EXIFのユーザーID出力制御を出力先ごとに独立させる。 |
 | 155 | [sidecar JSONの履歴・削除ライフサイクルを定義する](155-define-sidecar-json-lifecycle-with-history-delete.md) | 要対応 | `v0.1.8` | 画像削除や履歴削除時にsidecar JSONをどう扱うか仕様化し実装へ接続する。 |
 | 156 | [Wails公開APIとフロント呼び出しの同期チェックを追加する](156-add-wails-api-surface-check.md) | 要対応 | `v0.1.8` | フロントが呼ぶWails APIとGo公開メソッドの不一致をCI/検証で検出する。 |
 | 157 | [v0.1.8自動撮影とRelease成果物仕様をREADME/SPECへ反映する](157-sync-v018-autocapture-docs-and-specs.md) | 要対応 | `v0.1.8` | README/設定仕様/SPECをv0.1.8自動撮影の実装済み範囲と制約に同期する。 |
 | 158 | [自動撮影sidecarのworld/instance metadataを取得または削除する](158-populate-or-remove-autocapture-world-instance-metadata.md) | 要対応 | `v0.1.8` | sidecarに存在するworld/instance metadataフィールドを実データへ接続するかschemaから外す。 |
-| 159 | [Discord投稿でallowed_mentionsを無効化する](159-disable-discord-allowed-mentions.md) | 要対応 | `v0.1.8` | Webhook投稿payloadで意図しないメンションを防ぐ。 |
+| 159 | [Discord投稿でallowed_mentionsを無効化する](159-disable-discord-allowed-mentions.md) | 完了 | `v0.1.8` | Webhook投稿payloadで意図しないメンションを防ぐ。 |
 | 160 | [自動撮影ローカルDB要件を実装または仕様から外す](160-decide-autocapture-local-database-requirement.md) | 要対応 | `v0.1.8` | SQLite/ローカルDB要件と現行sidecar/history方式の差分を解消する。 |
 | 161 | [OSCQueryによるVRChat OSC検出を実装または延期明示する](161-implement-or-defer-oscquery-discovery.md) | 要対応 | `v0.1.8` | OSCQuery未実装の扱いを決め、実装または手動設定のみの仕様へ整理する。 |
-| 162 | [自動撮影間隔のUI最小値をNormalizeと一致させる](162-align-autocapture-interval-ui-validation.md) | 要対応 | `v0.1.8` | 撮影間隔UIの最小値とNormalizeの丸め値を一致させる。 |
+| 162 | [自動撮影間隔のUI最小値をNormalizeと一致させる](162-align-autocapture-interval-ui-validation.md) | 完了 | `v0.1.8` | 撮影間隔UIの最小値とNormalizeの丸め値を一致させる。 |
 | 163 | [自動撮影テスト結果を設定画面に表示する](163-show-autocapture-test-results-in-settings.md) | 要対応 | `v0.1.8` | 構図ごとのテスト撮影成功/失敗結果を設定画面上で確認できるようにする。 |
 
 ## 状態の意味
