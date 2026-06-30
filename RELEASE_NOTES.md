@@ -9,10 +9,11 @@
 - VRChat output logから同じインスタンスにいるユーザー情報を推定し、撮影画像に対応するsidecar JSONへ保存するようにしました。
 - 自動撮影した画像を既存の結果/履歴画面で扱えるようにし、設定で有効化した場合はDiscord Webhookへ投稿できるようにしました。
 - RC確認で見つかった、VRChat写真が保存されない問題に対して、Capture/CloseをUser CameraのAction OSCとして送るよう修正し、Stream方式ではffmpegで映像から静止画を切り出せるようにしました。
+- Stream方式ではVRChat OSCのStream Cameraモードを開くよう修正し、設定画面からffmpegの確認と `winget install ffmpeg` による導入を行えるようにしました。
 
 ### 既知の制限
 
-- v0.1.8のStream方式は外部ffmpegを使います。Spout2直接受信、Camera Dolly Multi、解像度一時変更は将来対応です。
+- v0.1.8のStream方式は外部ffmpegを使います。初期入力は確認用のデスクトップ全体取得です。Spout2直接受信、Camera Dolly Multi、解像度一時変更は将来対応です。
 - output log由来のユーザー一覧は、アプリ起動前から同じインスタンスにいたユーザーを完全に復元できない場合があります。
 
 ### ダウンロード

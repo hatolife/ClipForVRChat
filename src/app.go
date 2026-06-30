@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -55,6 +56,13 @@ type OSSLicense struct {
 	License   string `json:"license"`
 	Copyright string `json:"copyright"`
 	URL       string `json:"url"`
+}
+
+type FFmpegStatus struct {
+	Available bool   `json:"available"`
+	Path      string `json:"path"`
+	Version   string `json:"version"`
+	Message   string `json:"message"`
 }
 
 func NewApp(configPath string, initial appcore.UIState) *App {
@@ -490,6 +498,89 @@ func (a *App) ResetCameraViewsToDefaults() (appcore.Config, error) {
 	}
 	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "auto-capture views reset to defaults")
 	return a.state.Config, nil
+}
+
+func (a *App) CheckFFmpeg(ffmpegPath string) FFmpegStatus {
+	logPath := appcore.DiagnosticLogPath(a.configPath)
+	resolved, err := appcore.ResolveFFmpegPath(ffmpegPath)
+	if err != nil {
+		appcore.AppendDiagnosticLog(logPath, "ffmpeg check missing: path=%q err=%v", ffmpegPath, err)
+		return FFmpegStatus{
+			Available: false,
+			Message:   "ffmpegがインストールされていないかPATHにありません。Stream方式を使うにはffmpegをインストールするか、ffmpeg.exeのパスを指定してください。",
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, resolved, "-version") // #nosec G204 -- user-configured local ffmpeg path used for availability check.
+	output, runErr := cmd.CombinedOutput()
+	if ctx.Err() == context.DeadlineExceeded {
+		appcore.AppendDiagnosticLog(logPath, "ffmpeg check timeout: path=%q resolved=%q", ffmpegPath, resolved)
+		return FFmpegStatus{Available: false, Path: resolved, Message: "ffmpeg -versionがタイムアウトしました。ffmpegパスを確認してください。"}
+	}
+	if runErr != nil {
+		appcore.AppendDiagnosticLog(logPath, "ffmpeg check error: path=%q resolved=%q err=%v output=%q", ffmpegPath, resolved, runErr, strings.TrimSpace(string(output)))
+		return FFmpegStatus{Available: false, Path: resolved, Message: "ffmpegは見つかりましたが実行できませんでした: " + runErr.Error()}
+	}
+	version := firstNonEmptyLine(string(output))
+	appcore.AppendDiagnosticLog(logPath, "ffmpeg check success: path=%q resolved=%q version=%q", ffmpegPath, resolved, version)
+	return FFmpegStatus{
+		Available: true,
+		Path:      resolved,
+		Version:   version,
+		Message:   "ffmpegを利用できます。",
+	}
+}
+
+func (a *App) InstallFFmpegWithWinget() FFmpegStatus {
+	logPath := appcore.DiagnosticLogPath(a.configPath)
+	if _, err := exec.LookPath("winget"); err != nil {
+		appcore.AppendDiagnosticLog(logPath, "ffmpeg install skipped: winget_missing err=%v", err)
+		return FFmpegStatus{Available: false, Message: "wingetが見つかりません。Microsoft Storeのアプリ インストーラーを更新するか、手動でffmpegをインストールしてください。"}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	appcore.AppendDiagnosticLog(logPath, "ffmpeg install begin: command=%q", "winget install ffmpeg")
+	cmd := exec.CommandContext(ctx, "winget", "install", "ffmpeg") // #nosec G204 -- fixed installer command requested by user.
+	output, err := cmd.CombinedOutput()
+	trimmed := strings.TrimSpace(string(output))
+	if len(trimmed) > 1000 {
+		trimmed = trimmed[len(trimmed)-1000:]
+	}
+	if ctx.Err() == context.DeadlineExceeded {
+		appcore.AppendDiagnosticLog(logPath, "ffmpeg install timeout: output=%q", trimmed)
+		return FFmpegStatus{Available: false, Message: "winget install ffmpegがタイムアウトしました。PowerShellで同じコマンドを確認してください。"}
+	}
+	if err != nil {
+		appcore.AppendDiagnosticLog(logPath, "ffmpeg install error: err=%v output=%q", err, trimmed)
+		return FFmpegStatus{Available: false, Message: "winget install ffmpegに失敗しました: " + err.Error() + installOutputSuffix(trimmed)}
+	}
+	appcore.AppendDiagnosticLog(logPath, "ffmpeg install success: output=%q", trimmed)
+	status := a.CheckFFmpeg("ffmpeg")
+	if status.Available {
+		status.Message = "ffmpegをインストールし、利用可能なことを確認しました。"
+		return status
+	}
+	status.Message = "winget install ffmpegは完了しましたが、現在のアプリからffmpegを見つけられません。アプリを再起動するか、ffmpeg.exeのパスを指定してください。"
+	return status
+}
+
+func firstNonEmptyLine(value string) string {
+	for _, line := range strings.Split(value, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			return line
+		}
+	}
+	return ""
+}
+
+func installOutputSuffix(output string) string {
+	output = strings.TrimSpace(output)
+	if output == "" {
+		return ""
+	}
+	return " / " + output
 }
 
 func (a *App) TestAutoCaptureView(viewID string) ([]appcore.Result, error) {

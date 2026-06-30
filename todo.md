@@ -1,11 +1,11 @@
 # Current Todo
 
-- [x] 自動撮影のローカル視点/Stream方式Issueを作成する
-- [x] 初期構図をユーザー基準の相対視点として扱う
-- [x] 構図ごとのテスト撮影ボタンを追加する
-- [x] 自動撮影失敗だけの結果を履歴に出さない
-- [x] 自動撮影エラー表示を具体化する
-- [x] Pose鮮度と出力フォルダのUI文言を修正する
-- [x] Stream方式の実装方針を確定し、可能な実装を入れる
-- [x] Go/frontendテストとローカルビルドを確認する
-- [x] release/v0.1.8へ取り込み、次RCタグをpushしてCIを確認する
+- [x] rc9実機ログからffmpeg/Stream問題を確認する
+- [x] ffmpeg確認・導入導線のIssueを作成する
+- [x] ffmpeg存在確認APIを実装する
+- [x] winget install ffmpeg実行APIを実装する
+- [x] 自動撮影タブに状態表示とボタンを追加する
+- [x] Stream方式でVRChat Stream Cameraモードを開くよう修正する
+- [x] ffmpeg未検出時の撮影エラーを分かりやすくする
+- [x] Go/frontendテストを確認する
+- [ ] release/v0.1.8へ取り込み、次RCタグをpushしてCIを確認する
