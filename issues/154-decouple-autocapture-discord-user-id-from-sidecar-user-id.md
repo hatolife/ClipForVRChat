@@ -12,9 +12,14 @@ sidecar JSON、Discord本文、EXIF/埋め込みメタデータのユーザーID
 
 ## 受け入れ条件
 
-- Presenceの元snapshotはユーザーIDを保持したまま扱い、出力先ごとにマスクしたコピーを作る。
-- `IncludeUserIDsInSidecar=false` でも `IncludeUserIDsInDiscord=true` ならDiscord本文にはユーザーIDが入る。
-- `IncludeUserIDsInDiscord=false` ならsidecar設定に関係なくDiscord本文にはユーザーIDが入らない。
-- EXIF/埋め込みメタデータ実装時も、専用設定に従ってユーザーIDを制御できる構造にする。
-- 出力先ごとのユーザーID有無を単体テストで確認する。
-- UI文言で、各トグルがどの出力先に効くかを明確にする。
+- [x] Presenceの元snapshotはユーザーIDを保持したまま扱い、出力先ごとにマスクしたコピーを作る。
+- [x] `IncludeUserIDsInSidecar=false` でも `IncludeUserIDsInDiscord=true` ならDiscord本文にはユーザーIDが入る。
+- [x] `IncludeUserIDsInDiscord=false` ならsidecar設定に関係なくDiscord本文にはユーザーIDが入らない。
+- [x] EXIF/埋め込みメタデータ実装時も、専用設定に従ってユーザーIDを制御できる構造にする。
+- [x] 出力先ごとのユーザーID有無を単体テストで確認する。
+- [x] UI文言で、各トグルがどの出力先に効くかを明確にする。
+
+## 対応内容
+
+- Presence snapshotの元データはユーザーIDを保持し、sidecar JSON用だけ設定に応じてユーザーIDを除去するようにした。
+- Discord本文はDiscord用設定を独立して参照するため、sidecar JSON設定に影響されない。

@@ -1479,9 +1479,9 @@ createApp({
               <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.schedule.enabled" /><span></span></label>
             </div>
             <div class="setting-row" :class="{ disabled: !autoCaptureSettings.schedule.enabled }">
-              <div><strong>撮影間隔</strong><p>1回の撮影開始から次の撮影開始までの秒数です。</p></div>
+              <div><strong>撮影間隔</strong><p>1回の撮影開始から次の撮影開始までの秒数です。最小10秒です。</p></div>
               <label>
-                <input type="number" min="1" step="1" v-model.number="autoCaptureSettings.schedule.captureIntervalSec" :disabled="!autoCaptureSettings.schedule.enabled" />
+                <input type="number" min="10" step="1" v-model.number="autoCaptureSettings.schedule.captureIntervalSec" :disabled="!autoCaptureSettings.schedule.enabled" />
               </label>
             </div>
             <div class="setting-row" :class="{ disabled: !autoCaptureSettings.schedule.enabled }">

@@ -13,8 +13,13 @@ Discord Webhook投稿では、既定で全メンションを無効化する。
 
 ## 受け入れ条件
 
-- Discord投稿payloadに `allowed_mentions: { "parse": [] }` を含める。
-- 通常画像投稿、VRChat写真自動投稿、スクリーンショット自動投稿、自動撮影Discord投稿の全経路で適用される。
-- payloadの単体テストで `allowed_mentions` が入ることを確認する。
-- 既存の画像添付、QRコードURL本文、同席ユーザー本文を壊さない。
-- READMEまたは仕様に、メンションを無効化して投稿することを記載する。
+- [x] Discord投稿payloadに `allowed_mentions: { "parse": [] }` を含める。
+- [x] 通常画像投稿、VRChat写真自動投稿、スクリーンショット自動投稿、自動撮影Discord投稿の全経路で適用される。
+- [x] payloadの単体テストで `allowed_mentions` が入ることを確認する。
+- [x] 既存の画像添付、QRコードURL本文、同席ユーザー本文を壊さない。
+- [x] READMEまたは仕様に、メンションを無効化して投稿することを記載する。
+
+## 対応内容
+
+- Discord Webhook payload生成を共通化し、全投稿経路で `allowed_mentions.parse=[]` を含めるようにした。
+- READMEに、Discord投稿時はメンションを無効化することを追記した。

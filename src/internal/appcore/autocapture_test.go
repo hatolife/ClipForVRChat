@@ -1,6 +1,7 @@
 package appcore
 
 import (
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"math"
@@ -287,5 +288,70 @@ func TestWriteAutoCaptureSidecar(t *testing.T) {
 	}
 	if got.Files.ImagePath != imagePath || got.Files.SHA256 == "" || len(got.Users) != 1 {
 		t.Fatalf("unexpected sidecar: %+v", got)
+	}
+}
+
+func TestAutoCaptureUserIDOutputsAreIndependent(t *testing.T) {
+	users := []PresenceUser{{
+		DisplayName: "Alice",
+		UserID:      "usr_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+		Status:      "present",
+		Confidence:  "confirmed",
+	}}
+	cfg := DefaultAutoCaptureConfig()
+	cfg.Presence.IncludeUserIDsInSidecar = false
+	cfg.Presence.IncludeUserIDsInDiscord = true
+	cfg.Presence.IncludeDisplayNamesInDiscord = true
+	sidecarUsers := autoCaptureSidecarUsers(cfg, users)
+	if len(sidecarUsers) != 1 || sidecarUsers[0].UserID != "" {
+		t.Fatalf("sidecar users = %+v, want user ID removed", sidecarUsers)
+	}
+	content := autoCaptureDiscordContent(cfg, cfg.Views[0], users)
+	if !strings.Contains(content, "usr_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa") {
+		t.Fatalf("discord content = %q, want user ID", content)
+	}
+
+	cfg.Presence.IncludeUserIDsInSidecar = true
+	cfg.Presence.IncludeUserIDsInDiscord = false
+	sidecarUsers = autoCaptureSidecarUsers(cfg, users)
+	if sidecarUsers[0].UserID == "" {
+		t.Fatalf("sidecar users = %+v, want user ID preserved", sidecarUsers)
+	}
+	content = autoCaptureDiscordContent(cfg, cfg.Views[0], users)
+	if strings.Contains(content, "usr_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa") {
+		t.Fatalf("discord content = %q, want user ID omitted", content)
+	}
+}
+
+func TestWaitCaptureDelayCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	runner := AutoCaptureRunner{Config: Config{DiagnosticLogPath: ""}}
+	view := DefaultCameraViews()[0]
+	view.CaptureDelayMS = 1000
+	if runner.waitCaptureDelay(ctx, view, view.Name) {
+		t.Fatal("waitCaptureDelay should report cancellation")
+	}
+}
+
+func TestWaitCaptureDelayPositiveWaits(t *testing.T) {
+	runner := AutoCaptureRunner{Config: Config{DiagnosticLogPath: ""}}
+	view := DefaultCameraViews()[0]
+	view.CaptureDelayMS = 5
+	start := time.Now()
+	if !runner.waitCaptureDelay(context.Background(), view, view.Name) {
+		t.Fatal("waitCaptureDelay should succeed")
+	}
+	if elapsed := time.Since(start); elapsed < 5*time.Millisecond {
+		t.Fatalf("waitCaptureDelay elapsed = %s, want at least 5ms", elapsed)
+	}
+}
+
+func TestWaitCaptureDelayZero(t *testing.T) {
+	runner := AutoCaptureRunner{Config: Config{DiagnosticLogPath: ""}}
+	view := DefaultCameraViews()[0]
+	view.CaptureDelayMS = 0
+	if !runner.waitCaptureDelay(context.Background(), view, view.Name) {
+		t.Fatal("waitCaptureDelay should succeed without waiting when delay is zero")
 	}
 }

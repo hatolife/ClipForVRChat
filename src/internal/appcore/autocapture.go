@@ -163,16 +163,15 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 		users = nil
 		confidence = "unknown"
 	}
-	if !ac.Presence.IncludeUserIDsInSidecar {
-		users = presenceUsersWithoutIDs(users)
-	}
+	sidecarUsers := autoCaptureSidecarUsers(ac, users)
 	photoDir := autoCapturePhotoDirectory(cfg)
 	before := scanAutoCapturePhotoFiles(photoDir, ac.Output.Directory)
-	diagAutoCapture(logPath, "run_once prepared: batch_id=%q views=%d total_views=%d users=%d users_confidence=%q watch_output_log=%t output_log_dir=%q output_log_path=%q photo_dir=%q output_dir=%q before_files=%d before_latest=%s",
+	diagAutoCapture(logPath, "run_once prepared: batch_id=%q views=%d total_views=%d users=%d sidecar_users=%d users_confidence=%q watch_output_log=%t output_log_dir=%q output_log_path=%q photo_dir=%q output_dir=%q before_files=%d before_latest=%s",
 		batchID,
 		len(views),
 		len(ac.Views),
 		len(users),
+		len(sidecarUsers),
 		confidence,
 		ac.Presence.WatchOutputLog,
 		ac.Presence.OutputLogDirectory,
@@ -233,9 +232,9 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 		shotID := fmt.Sprintf("%s-%02d", batchID, i+1)
 		var result Result
 		if ac.Capture.Mode == "stream" {
-			result = r.captureStreamShot(ctx, client, batchID, shotID, i+1, view, users, confidence)
+			result = r.captureStreamShot(ctx, client, batchID, shotID, i+1, view, sidecarUsers, users, confidence)
 		} else {
-			result = r.capturePhotoShot(ctx, client, batchID, shotID, i+1, view, photoDir, before, users, confidence)
+			result = r.capturePhotoShot(ctx, client, batchID, shotID, i+1, view, photoDir, before, sidecarUsers, users, confidence)
 		}
 		results = append(results, result)
 		diagAutoCapture(logPath, "shot result: batch_id=%q shot_id=%q source_path=%q error=%q", batchID, shotID, result.SourcePath, result.Error)
@@ -271,7 +270,7 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 	return results, nil
 }
 
-func (r AutoCaptureRunner) capturePhotoShot(ctx context.Context, client oscClient, batchID string, shotID string, index int, view CameraViewConfig, photoDir string, before map[string]time.Time, users []PresenceUser, confidence string) Result {
+func (r AutoCaptureRunner) capturePhotoShot(ctx context.Context, client oscClient, batchID string, shotID string, index int, view CameraViewConfig, photoDir string, before map[string]time.Time, sidecarUsers []PresenceUser, discordUsers []PresenceUser, confidence string) Result {
 	cfg := r.Config.AutoCapture
 	logPath := r.Config.DiagnosticLogPath
 	name := view.Name
@@ -310,6 +309,9 @@ func (r AutoCaptureRunner) capturePhotoShot(ctx context.Context, client oscClien
 		return Result{Name: name, Error: "自動撮影が中断されました。"}
 	}
 	diagAutoCapture(logPath, "shot settle complete: view_id=%q", view.ID)
+	if !r.waitCaptureDelay(ctx, view, name) {
+		return Result{Name: name, Error: "自動撮影が中断されました。"}
+	}
 	captureNotBefore := time.Now().Add(-1 * time.Second)
 	if err := sendCameraButton(ctx, client, "/usercamera/Capture", cfg.Capture.ButtonReleaseDelayMS, logPath, view.ID); err != nil {
 		return Result{Name: name, Error: err.Error()}
@@ -322,7 +324,7 @@ func (r AutoCaptureRunner) capturePhotoShot(ctx context.Context, client oscClien
 		diagAutoCapture(logPath, "shot photo detection failed: view_id=%q photo_dir=%q output_dir=%q before_files=%d before_latest=%s", view.ID, photoDir, cfg.Output.Directory, len(before), photoFileSummary(before))
 		return Result{Name: name, Error: "撮影後のVRChat写真ファイルを検出できませんでした。Photo方式ではUser Cameraが表示され、VRChatの写真保存先が正しい必要があります。Stream方式を使う場合はffmpeg入力設定を確認してください。"}
 	}
-	return r.finalizeAutoCaptureImage(photoPath, batchID, shotID, view, users, confidence)
+	return r.finalizeAutoCaptureImage(photoPath, batchID, shotID, view, sidecarUsers, discordUsers, confidence)
 }
 
 func (r AutoCaptureRunner) applyCameraView(client oscClient, view CameraViewConfig) {
@@ -338,7 +340,7 @@ func (r AutoCaptureRunner) applyCameraView(client oscClient, view CameraViewConf
 	}
 }
 
-func (r AutoCaptureRunner) captureStreamShot(ctx context.Context, client oscClient, batchID string, shotID string, index int, view CameraViewConfig, users []PresenceUser, confidence string) Result {
+func (r AutoCaptureRunner) captureStreamShot(ctx context.Context, client oscClient, batchID string, shotID string, index int, view CameraViewConfig, sidecarUsers []PresenceUser, discordUsers []PresenceUser, confidence string) Result {
 	cfg := r.Config.AutoCapture
 	logPath := r.Config.DiagnosticLogPath
 	name := view.Name
@@ -367,6 +369,9 @@ func (r AutoCaptureRunner) captureStreamShot(ctx context.Context, client oscClie
 		return Result{Name: name, Error: "自動撮影が中断されました。"}
 	}
 	diagAutoCapture(logPath, "shot settle complete: view_id=%q", view.ID)
+	if !r.waitCaptureDelay(ctx, view, name) {
+		return Result{Name: name, Error: "自動撮影が中断されました。"}
+	}
 	outputPath, err := autoCaptureOutputPath(cfg, batchID, shotID, index, view)
 	if err != nil {
 		diagAutoCapture(logPath, "stream output path error: view_id=%q err=%v", view.ID, err)
@@ -376,10 +381,25 @@ func (r AutoCaptureRunner) captureStreamShot(ctx context.Context, client oscClie
 		diagAutoCapture(logPath, "stream capture failed: view_id=%q output=%q err=%v", view.ID, outputPath, err)
 		return Result{Name: name, Error: err.Error()}
 	}
-	return r.finalizeAutoCaptureImage(outputPath, batchID, shotID, view, users, confidence)
+	return r.finalizeAutoCaptureImage(outputPath, batchID, shotID, view, sidecarUsers, discordUsers, confidence)
 }
 
-func (r AutoCaptureRunner) finalizeAutoCaptureImage(photoPath string, batchID string, shotID string, view CameraViewConfig, users []PresenceUser, confidence string) Result {
+func (r AutoCaptureRunner) waitCaptureDelay(ctx context.Context, view CameraViewConfig, name string) bool {
+	delay := time.Duration(view.CaptureDelayMS) * time.Millisecond
+	if delay <= 0 {
+		return true
+	}
+	logPath := r.Config.DiagnosticLogPath
+	diagAutoCapture(logPath, "shot capture_delay begin: view_id=%q duration_ms=%d", view.ID, delay.Milliseconds())
+	if !sleepContext(ctx, delay) {
+		diagAutoCapture(logPath, "shot capture_delay cancelled: view_id=%q view_name=%q err=%v", view.ID, name, ctx.Err())
+		return false
+	}
+	diagAutoCapture(logPath, "shot capture_delay complete: view_id=%q", view.ID)
+	return true
+}
+
+func (r AutoCaptureRunner) finalizeAutoCaptureImage(photoPath string, batchID string, shotID string, view CameraViewConfig, sidecarUsers []PresenceUser, discordUsers []PresenceUser, confidence string) Result {
 	cfg := r.Config.AutoCapture
 	logPath := r.Config.DiagnosticLogPath
 	if cfg.Output.WriteSidecarJSON {
@@ -395,11 +415,11 @@ func (r AutoCaptureRunner) finalizeAutoCaptureImage(photoPath string, batchID st
 				UsersSource:     "output_log",
 				UsersConfidence: confidence,
 			},
-			Users: users,
+			Users: sidecarUsers,
 		}); err != nil {
 			diagAutoCapture(logPath, "sidecar write error: image=%q err=%v", photoPath, err)
 		} else {
-			diagAutoCapture(logPath, "sidecar write success: image=%q users=%d", photoPath, len(users))
+			diagAutoCapture(logPath, "sidecar write success: image=%q users=%d", photoPath, len(sidecarUsers))
 		}
 	} else {
 		diagAutoCapture(logPath, "sidecar write skipped: disabled image=%q", photoPath)
@@ -410,8 +430,8 @@ func (r AutoCaptureRunner) finalizeAutoCaptureImage(photoPath string, batchID st
 		if strings.TrimSpace(webhook) == "" {
 			webhook = r.Config.Discord.WebhookURL
 		}
-		diagAutoCapture(logPath, "discord upload begin: image=%q webhook_configured=%t users=%d", photoPath, strings.TrimSpace(webhook) != "", len(users))
-		uploaded, err := uploadAutoCaptureDiscord(webhook, photoPath, autoCaptureDiscordContent(cfg, view, users))
+		diagAutoCapture(logPath, "discord upload begin: image=%q webhook_configured=%t users=%d", photoPath, strings.TrimSpace(webhook) != "", len(discordUsers))
+		uploaded, err := uploadAutoCaptureDiscord(webhook, photoPath, autoCaptureDiscordContent(cfg, view, discordUsers))
 		if err != nil {
 			diagAutoCapture(logPath, "discord upload error: image=%q err=%v", photoPath, err)
 			result.Error = err.Error()
@@ -747,6 +767,13 @@ func presenceUsersWithoutIDs(users []PresenceUser) []PresenceUser {
 		}
 	}
 	return out
+}
+
+func autoCaptureSidecarUsers(cfg AutoCaptureConfig, users []PresenceUser) []PresenceUser {
+	if cfg.Presence.IncludeUserIDsInSidecar {
+		return users
+	}
+	return presenceUsersWithoutIDs(users)
 }
 
 func autoCaptureDiscordContent(cfg AutoCaptureConfig, view CameraViewConfig, users []PresenceUser) string {

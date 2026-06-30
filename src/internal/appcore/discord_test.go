@@ -1,6 +1,7 @@
 package appcore
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -117,5 +118,30 @@ func TestDiscordWebhookSetupMessage(t *testing.T) {
 	msg := discordWebhookSetupMessage("Discord Webhook URLが未設定です。")
 	if !strings.Contains(msg, "再度コピー") || !strings.Contains(msg, "自動投稿用Webhook URL") {
 		t.Fatalf("unexpected setup message: %q", msg)
+	}
+}
+
+func TestDiscordPayloadDisablesAllowedMentions(t *testing.T) {
+	data, err := discordPayloadJSON("@everyone hello")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var payload struct {
+		Content         string `json:"content"`
+		AllowedMentions struct {
+			Parse []string `json:"parse"`
+		} `json:"allowed_mentions"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Content != "@everyone hello" {
+		t.Fatalf("content = %q", payload.Content)
+	}
+	if payload.AllowedMentions.Parse == nil {
+		t.Fatal("allowed_mentions.parse should be present")
+	}
+	if len(payload.AllowedMentions.Parse) != 0 {
+		t.Fatalf("allowed_mentions.parse = %+v, want empty", payload.AllowedMentions.Parse)
 	}
 }
