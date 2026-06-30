@@ -132,6 +132,14 @@
 | 125 | [構図ごとに現在Pose追加とカメラ移動ボタンを配置する](125-add-per-view-pose-add-and-move-camera.md) | 要確認 | `v0.1.8` | 構図カード内に現在Pose追加と設定Poseへのカメラ移動ボタンを追加する。 |
 | 126 | [自動撮影OSCの押下状態を解除するデバッグボタンを追加する](126-add-auto-capture-osc-recovery-button.md) | 要確認 | `v0.1.8` | User Camera関連OSCをfalse/Offへ戻すデバッグボタンを追加する。 |
 | 127 | [v0.1.8最小要件のtodoを再整理する](127-restate-v018-minimum-requirements-todo.md) | 完了 | `v0.1.8` | v0.1.8の最小要件を大項目/小項目でtodoへ再整理する。 |
+| 128 | [VRChat Stream Camera/Spout映像そのものを保存する方式を調査する](128-investigate-vrchat-stream-camera-spout-capture.md) | 完了 | `v0.1.8` | Stream Camera/Spout出力を直接受信して静止画保存する方式を調査し、実装issueへ分割する。 |
+| 129 | [Spout受信ヘルパーを追加する](129-add-spout-capture-helper.md) | 要対応 | `v0.1.8` | Windows同梱のSpout受信ヘルパーでsender列挙と1フレームPNG保存を行う。 |
+| 130 | [Spout sender設定と診断UIを追加する](130-add-spout-sender-settings-and-diagnostics.md) | 要対応 | `v0.1.8` | 自動撮影タブからSpout helper確認、sender一覧取得、sender選択/自動選択を設定できるようにする。 |
+| 131 | [自動撮影Stream方式をSpoutヘルパーへ統合する](131-integrate-spout-helper-into-auto-capture.md) | 要対応 | `v0.1.8` | Stream方式でFFmpeg画面キャプチャではなくSpoutヘルパーから画像を取得する。 |
+| 132 | [Spout取得画像とメタデータを検証する](132-validate-spout-capture-output-and-metadata.md) | 要対応 | `v0.1.8` | Spout取得画像の有効性とsender情報を検証し、sidecar/Discordへ紐づける。 |
+| 133 | [Stream方式UIとドキュメントをSpout前提へ更新する](133-update-auto-capture-stream-ui-and-docs-for-spout.md) | 要対応 | `v0.1.8` | 自動撮影タブとドキュメントからFFmpeg主経路の誤解をなくし、Stream Camera(Spout)前提にする。 |
+| 134 | [CI/ReleaseでSpoutヘルパーをビルド/同梱する](134-package-spout-helper-in-ci-release.md) | 要対応 | `v0.1.8` | Windows CI/ReleaseでSpoutヘルパーと必要DLL/ライセンスをビルド・同梱・検証する。 |
+| 135 | [Stream Camera/Spout方式の実機確認手順を整備する](135-add-spout-stream-camera-verification-guide.md) | 要対応 | `v0.1.8` | RC実機確認でStream Camera映像そのものを保存できているか確認する手順を作る。 |
 
 ## 状態の意味
 
