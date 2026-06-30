@@ -8,4 +8,4 @@
 - [x] Stream方式でVRChat Stream Cameraモードを開くよう修正する
 - [x] ffmpeg未検出時の撮影エラーを分かりやすくする
 - [x] Go/frontendテストを確認する
-- [ ] release/v0.1.8へ取り込み、次RCタグをpushしてCIを確認する
+- [x] release/v0.1.8へ取り込み、次RCタグをpushしてCIを確認する
