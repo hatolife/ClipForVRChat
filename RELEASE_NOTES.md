@@ -10,7 +10,9 @@
 - 自動撮影した画像を既存の結果/履歴画面で扱えるようにし、設定で有効化した場合はDiscord Webhookへ投稿できるようにしました。
 - RC確認で見つかった、VRChat写真が保存されない問題に対して、Capture/CloseをUser CameraのAction OSCとして送るよう修正し、Stream方式ではffmpegで映像から静止画を切り出せるようにしました。
 - Stream方式ではVRChat OSCのStream Cameraモードを開くよう修正し、設定画面からffmpegの確認と `winget install ffmpeg` による導入を行えるようにしました。
-- Stream方式のffmpeg初期入力をVRChatウィンドウ取得に変更し、旧RCのデスクトップ全体取得設定は自動移行するようにしました。
+- Stream方式のffmpeg初期入力をVRChatウィンドウ範囲の切り出しに変更し、旧RCのデスクトップ全体取得やtitle直接取得の設定は自動移行するようにしました。
+- 構図カード内に「現在Poseから追加」と「このPoseへカメラ移動」を追加し、設定済みPoseをゲーム内カメラへ送れるようにしました。
+- User Camera関連OSCをfalse/Offへ戻す「カメラOSCをリセット」ボタンを自動撮影タブに追加しました。
 
 ### 既知の制限
 
