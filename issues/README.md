@@ -115,7 +115,7 @@
 | 108 | [Discord投稿ONで通常投稿用Webhook URLが空欄の場合に保存時警告を出す](108-warn-empty-discord-webhook-on-save.md) | 完了 | `v0.1.7` | Discord投稿ONで通常投稿用Webhook URLが空欄の場合、保存後も画面上部に警告を表示する。 |
 | 109 | [Release workflow のタグ名取り扱いを安全化する](109-harden-release-tag-handling.md) | 完了 | `v0.1.8` | タグ名を検証し、シェルコマンドへ環境変数経由で渡してRelease workflowのコマンド注入を防ぐ。 |
 | 110 | [VRChat自動構図撮影](110-vrc-auto-composition-capture.md) | 要確認 | `v0.1.8` | OSCでUser Cameraを制御し、構図ごとの自動撮影とsidecar JSON保存を実装する。 |
-| 111 | [VRChat output logからの同席ユーザー保持](111-vrc-output-log-presence-users.md) | 要確認 | `v0.1.8` | output_log監視で撮影時点の同席ユーザー情報を保持し、画像メタデータやDiscord投稿へ紐づける。 |
+| 111 | [VRChat output logからの同席ユーザー保持](111-vrc-output-log-presence-users.md) | 要対応 | `v0.1.8` | output_log監視で撮影時点の同席ユーザー情報を保持し、画像メタデータやDiscord投稿へ紐づける。 |
 | 112 | [自動撮影でVRChat写真が保存されない](112-fix-auto-capture-action-osc.md) | 要確認 | `v0.1.8` | User CameraのCapture/CloseをAction OSCとして送信し、写真保存されない問題を修正する。 |
 | 113 | [自動撮影の診断ログを詳細化する](113-add-auto-capture-diagnostics.md) | 要確認 | `v0.1.8` | 自動撮影のスケジューラ、OSC送信、写真検出状況を診断ログで追跡できるようにする。 |
 | 114 | [自動撮影タブに機能説明を追加する](114-explain-auto-capture-settings-tab.md) | 要確認 | `v0.1.8` | 自動撮影タブの先頭に機能概要と使い方の説明枠を追加する。 |
@@ -152,6 +152,22 @@
 | 145 | [自動撮影保存処理へEXIF/PNGメタデータ書き込みを統合する](145-integrate-exif-presence-metadata.md) | 要対応 | `v0.1.8` | `finalizeAutoCaptureImage` に埋め込みメタデータ書き込みを接続し、sidecar/Discordと整合させる。 |
 | 146 | [EXIF/埋め込みメタデータ設定とプライバシー説明をUIへ出す](146-expose-exif-privacy-settings.md) | 要対応 | `v0.1.8` | 自動撮影タブで埋め込みメタデータとユーザーID埋め込みを設定できるようにする。 |
 | 147 | [埋め込みメタデータの読み戻し/Discord投稿後/実機検証を整備する](147-verify-embedded-metadata-output.md) | 要対応 | `v0.1.8` | PNG/JPEG読み戻し、Discord投稿後、ユーザー数過多時のメタデータ検証手順を整備する。 |
+| 148 | [未実装/ダミー/簡易実装を洗い出す](148-audit-incomplete-dummy-implementations.md) | 完了 | `v0.1.8` | 既存コードの未実装、仮実装、設定だけ存在する項目を洗い出して個別issueへ分割する。 |
+| 149 | [自動撮影multi/Camera Dolly設定を実装または削除する](149-implement-or-remove-autocapture-multi-camera-settings.md) | 要対応 | `v0.1.8` | 保存/正規化されるmulti撮影設定を実装するか、未実装設定として隠す。 |
+| 150 | [自動撮影スケジュールの重複実行制御を接続する](150-connect-autocapture-scheduler-overlap-controls.md) | 要対応 | `v0.1.8` | `skipIfPreviousBatchRunning` と `maxBatches` を実際のスケジューラ挙動へ反映する。 |
+| 151 | [自動撮影DiscordのpostMode/includeImagesを実装または削除する](151-implement-or-remove-autocapture-discord-post-options.md) | 要対応 | `v0.1.8` | `postMode` と `includeImages` が常にShot画像投稿になる未接続状態を解消する。 |
+| 152 | [構図ごとのcaptureDelayMsを撮影待機へ反映する](152-apply-per-view-capture-delay.md) | 要対応 | `v0.1.8` | 構図ごとの撮影直前待機設定をPhoto/Stream両方の撮影処理へ接続する。 |
+| 153 | [自動撮影の出力形式/ファイル名テンプレートを設定画面へ出す](153-expose-autocapture-output-format-and-filename-template.md) | 要対応 | `v0.1.8` | `imageFormat` と `filenameTemplate` を自動撮影タブから設定できるようにする。 |
+| 154 | [DiscordユーザーID出力をsidecar JSON設定から独立させる](154-decouple-autocapture-discord-user-id-from-sidecar-user-id.md) | 要対応 | `v0.1.8` | sidecar/Discord/EXIFのユーザーID出力制御を出力先ごとに独立させる。 |
+| 155 | [sidecar JSONの履歴・削除ライフサイクルを定義する](155-define-sidecar-json-lifecycle-with-history-delete.md) | 要対応 | `v0.1.8` | 画像削除や履歴削除時にsidecar JSONをどう扱うか仕様化し実装へ接続する。 |
+| 156 | [Wails公開APIとフロント呼び出しの同期チェックを追加する](156-add-wails-api-surface-check.md) | 要対応 | `v0.1.8` | フロントが呼ぶWails APIとGo公開メソッドの不一致をCI/検証で検出する。 |
+| 157 | [v0.1.8自動撮影とRelease成果物仕様をREADME/SPECへ反映する](157-sync-v018-autocapture-docs-and-specs.md) | 要対応 | `v0.1.8` | README/設定仕様/SPECをv0.1.8自動撮影の実装済み範囲と制約に同期する。 |
+| 158 | [自動撮影sidecarのworld/instance metadataを取得または削除する](158-populate-or-remove-autocapture-world-instance-metadata.md) | 要対応 | `v0.1.8` | sidecarに存在するworld/instance metadataフィールドを実データへ接続するかschemaから外す。 |
+| 159 | [Discord投稿でallowed_mentionsを無効化する](159-disable-discord-allowed-mentions.md) | 要対応 | `v0.1.8` | Webhook投稿payloadで意図しないメンションを防ぐ。 |
+| 160 | [自動撮影ローカルDB要件を実装または仕様から外す](160-decide-autocapture-local-database-requirement.md) | 要対応 | `v0.1.8` | SQLite/ローカルDB要件と現行sidecar/history方式の差分を解消する。 |
+| 161 | [OSCQueryによるVRChat OSC検出を実装または延期明示する](161-implement-or-defer-oscquery-discovery.md) | 要対応 | `v0.1.8` | OSCQuery未実装の扱いを決め、実装または手動設定のみの仕様へ整理する。 |
+| 162 | [自動撮影間隔のUI最小値をNormalizeと一致させる](162-align-autocapture-interval-ui-validation.md) | 要対応 | `v0.1.8` | 撮影間隔UIの最小値とNormalizeの丸め値を一致させる。 |
+| 163 | [自動撮影テスト結果を設定画面に表示する](163-show-autocapture-test-results-in-settings.md) | 要対応 | `v0.1.8` | 構図ごとのテスト撮影成功/失敗結果を設定画面上で確認できるようにする。 |
 
 ## 状態の意味
 
