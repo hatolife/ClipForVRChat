@@ -23,7 +23,7 @@ func TestDefaultAutoCaptureConfig(t *testing.T) {
 	if len(cfg.AutoCapture.Views) != 3 {
 		t.Fatalf("default views = %d, want 3", len(cfg.AutoCapture.Views))
 	}
-	if cfg.AutoCapture.Capture.Mode != "stream" || cfg.AutoCapture.Stream.FFmpegPath == "" {
+	if cfg.AutoCapture.Capture.Mode != "stream" || cfg.AutoCapture.Stream.SpoutHelperPath == "" || !cfg.AutoCapture.Stream.SpoutAutoSelect {
 		t.Fatalf("unexpected stream defaults: capture=%+v stream=%+v", cfg.AutoCapture.Capture, cfg.AutoCapture.Stream)
 	}
 	if cfg.AutoCapture.Views[0].ID != "front" || cfg.AutoCapture.Views[0].Calibrated || cfg.AutoCapture.Views[0].Zoom == nil {
@@ -55,23 +55,18 @@ func TestAutoCaptureConfigNormalize(t *testing.T) {
 	if len(cfg.AutoCapture.Views) != 3 {
 		t.Fatalf("default views = %d, want 3", len(cfg.AutoCapture.Views))
 	}
-	if cfg.AutoCapture.Stream.FFmpegPath != "ffmpeg" || cfg.AutoCapture.Stream.CaptureTimeoutMS != 10000 {
+	if cfg.AutoCapture.Stream.SpoutHelperPath != "spout-capture.exe" || !cfg.AutoCapture.Stream.SpoutAutoSelect || cfg.AutoCapture.Stream.CaptureTimeoutMS != 10000 {
 		t.Fatalf("stream normalize failed: %+v", cfg.AutoCapture.Stream)
-	}
-	if cfg.AutoCapture.Stream.InputArgs != DefaultAutoCaptureFFmpegInputArgs() ||
-		!strings.Contains(cfg.AutoCapture.Stream.InputArgs, "{window_x}") ||
-		!strings.Contains(cfg.AutoCapture.Stream.InputArgs, "{window_width}") {
-		t.Fatalf("stream input args = %q, want VRChat window default", cfg.AutoCapture.Stream.InputArgs)
 	}
 }
 
-func TestAutoCaptureConfigNormalizeMigratesOldDesktopFFmpegInput(t *testing.T) {
+func TestAutoCaptureConfigNormalizeMigratesOldDesktopFFmpegInputToLegacy(t *testing.T) {
 	for _, oldArgs := range []string{oldDesktopFFmpegInputArgs, oldTitleFFmpegInputArgs} {
 		cfg := DefaultConfig()
-		cfg.AutoCapture.Stream.InputArgs = oldArgs
+		cfg.AutoCapture.Stream.LegacyInputArgs = oldArgs
 		cfg.Normalize()
-		if cfg.AutoCapture.Stream.InputArgs != DefaultAutoCaptureFFmpegInputArgs() {
-			t.Fatalf("stream input args = %q, want %q", cfg.AutoCapture.Stream.InputArgs, DefaultAutoCaptureFFmpegInputArgs())
+		if cfg.AutoCapture.Stream.LegacyInputArgs != DefaultAutoCaptureFFmpegInputArgs() {
+			t.Fatalf("legacy stream input args = %q, want %q", cfg.AutoCapture.Stream.LegacyInputArgs, DefaultAutoCaptureFFmpegInputArgs())
 		}
 	}
 }
@@ -96,6 +91,13 @@ func TestResolveFFmpegPathRejectsMissingPath(t *testing.T) {
 	_, err := ResolveFFmpegPath(filepath.Join(t.TempDir(), "missing-ffmpeg.exe"))
 	if err == nil || !strings.Contains(err.Error(), "ffmpegがインストールされていないかPATHにありません") {
 		t.Fatalf("err = %v, want missing ffmpeg message", err)
+	}
+}
+
+func TestResolveSpoutHelperPathRejectsMissingPath(t *testing.T) {
+	_, err := ResolveSpoutHelperPath(filepath.Join(t.TempDir(), "missing-spout-capture.exe"))
+	if err == nil || !strings.Contains(err.Error(), "Spout helperが見つかりません") {
+		t.Fatalf("err = %v, want missing spout helper message", err)
 	}
 }
 
@@ -320,6 +322,17 @@ func TestAutoCaptureUserIDOutputsAreIndependent(t *testing.T) {
 	content = autoCaptureDiscordContent(cfg, cfg.Views[0], users)
 	if strings.Contains(content, "usr_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa") {
 		t.Fatalf("discord content = %q, want user ID omitted", content)
+	}
+}
+
+func TestParseVRChatWorldMetadata(t *testing.T) {
+	logText := `
+2026.06.30 20:00:00 Log - Joining wrld_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:12345~region(jp)
+2026.06.30 21:00:00 Log - Joining wrld_ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee:67890~region(us)
+`
+	meta := parseVRChatWorldMetadata(logText)
+	if meta.WorldID != "wrld_ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee" || meta.InstanceID != "67890~region" {
+		t.Fatalf("meta = %+v", meta)
 	}
 }
 

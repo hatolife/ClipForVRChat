@@ -17,3 +17,7 @@ v0.1.8で実装しない場合は、手動設定のみ対応であることをUI
 - `/usercamera/Pose`、`/usercamera/Mode`、`/usercamera/Streaming` など自動撮影に必要なendpointの存在を診断できる。
 - 実装しない場合は、自動撮影タブとREADME/SPECに「OSCホスト/ポートは手動設定」と明記する。
 - OSCQuery未対応環境でも既存の手動OSC設定が壊れない。
+
+## 対応内容
+
+- v0.1.8実装に合わせて対応済み。詳細は `feat/v0.1.8-resolve-issues` の実装、README、SPEC、RELEASE_NOTESを参照。

@@ -18,3 +18,7 @@
 - `WriteEXIF` がOFFの場合、下位設定が無効化され、保存時に矛盾したconfigにならない。
 - 診断表示に、埋め込みメタデータ設定、ユーザーID埋め込み設定、最終書き込み結果を出す。
 - UI文言は「EXIFだけ」ではなく、PNGでは `eXIf` / `iTXt` を使う可能性が伝わる表現にする。
+
+## 対応内容
+
+- v0.1.8実装に合わせて対応済み。詳細は `feat/v0.1.8-resolve-issues` の実装、README、SPEC、RELEASE_NOTESを参照。

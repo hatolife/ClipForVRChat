@@ -88,7 +88,9 @@ func MoveUserCameraToView(ctx context.Context, cfg Config, viewID string) error 
 		return ctx.Err()
 	}
 	runner := AutoCaptureRunner{Config: cfg}
-	runner.applyCameraView(client, view)
+	if err := runner.applyCameraView(client, view); err != nil {
+		return err
+	}
 	sentOptions := sendOptionalFloat(client, "/usercamera/Zoom", view.Zoom) +
 		sendOptionalFloat(client, "/usercamera/Exposure", view.Exposure) +
 		sendOptionalFloat(client, "/usercamera/FocalDistance", view.FocalDistance) +
@@ -159,9 +161,11 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 	}
 	batchID := newBatchID(time.Now())
 	users, confidence, presenceLogPath := SnapshotVRChatPresenceWithSource(ac.Presence.OutputLogDirectory)
+	world := SnapshotVRChatWorld(ac.Presence.OutputLogDirectory)
 	if !ac.Presence.WatchOutputLog {
 		users = nil
 		confidence = "unknown"
+		world = AutoCaptureVRChatMetadata{}
 	}
 	sidecarUsers := autoCaptureSidecarUsers(ac, users)
 	photoDir := autoCapturePhotoDirectory(cfg)
@@ -232,9 +236,9 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 		shotID := fmt.Sprintf("%s-%02d", batchID, i+1)
 		var result Result
 		if ac.Capture.Mode == "stream" {
-			result = r.captureStreamShot(ctx, client, batchID, shotID, i+1, view, sidecarUsers, users, confidence)
+			result = r.captureStreamShot(ctx, client, batchID, shotID, i+1, view, sidecarUsers, users, confidence, world)
 		} else {
-			result = r.capturePhotoShot(ctx, client, batchID, shotID, i+1, view, photoDir, before, sidecarUsers, users, confidence)
+			result = r.capturePhotoShot(ctx, client, batchID, shotID, i+1, view, photoDir, before, sidecarUsers, users, confidence, world)
 		}
 		results = append(results, result)
 		diagAutoCapture(logPath, "shot result: batch_id=%q shot_id=%q source_path=%q error=%q", batchID, shotID, result.SourcePath, result.Error)
@@ -270,7 +274,7 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 	return results, nil
 }
 
-func (r AutoCaptureRunner) capturePhotoShot(ctx context.Context, client oscClient, batchID string, shotID string, index int, view CameraViewConfig, photoDir string, before map[string]time.Time, sidecarUsers []PresenceUser, discordUsers []PresenceUser, confidence string) Result {
+func (r AutoCaptureRunner) capturePhotoShot(ctx context.Context, client oscClient, batchID string, shotID string, index int, view CameraViewConfig, photoDir string, before map[string]time.Time, sidecarUsers []PresenceUser, discordUsers []PresenceUser, confidence string, world AutoCaptureVRChatMetadata) Result {
 	cfg := r.Config.AutoCapture
 	logPath := r.Config.DiagnosticLogPath
 	name := view.Name
@@ -288,7 +292,9 @@ func (r AutoCaptureRunner) capturePhotoShot(ctx context.Context, client oscClien
 		view.SettleDelayMS,
 		view.CaptureDelayMS,
 	)
-	r.applyCameraView(client, view)
+	if err := r.applyCameraView(client, view); err != nil {
+		return Result{Name: name, Error: err.Error()}
+	}
 	sentOptions := sendOptionalFloat(client, "/usercamera/Zoom", view.Zoom) +
 		sendOptionalFloat(client, "/usercamera/Exposure", view.Exposure) +
 		sendOptionalFloat(client, "/usercamera/FocalDistance", view.FocalDistance) +
@@ -324,23 +330,30 @@ func (r AutoCaptureRunner) capturePhotoShot(ctx context.Context, client oscClien
 		diagAutoCapture(logPath, "shot photo detection failed: view_id=%q photo_dir=%q output_dir=%q before_files=%d before_latest=%s", view.ID, photoDir, cfg.Output.Directory, len(before), photoFileSummary(before))
 		return Result{Name: name, Error: "撮影後のVRChat写真ファイルを検出できませんでした。Photo方式ではUser Cameraが表示され、VRChatの写真保存先が正しい必要があります。Stream方式を使う場合はffmpeg入力設定を確認してください。"}
 	}
-	return r.finalizeAutoCaptureImage(photoPath, batchID, shotID, view, sidecarUsers, discordUsers, confidence)
+	return r.finalizeAutoCaptureImage(photoPath, batchID, shotID, view, sidecarUsers, discordUsers, confidence, world, SpoutCaptureResult{})
 }
 
-func (r AutoCaptureRunner) applyCameraView(client oscClient, view CameraViewConfig) {
+func (r AutoCaptureRunner) applyCameraView(client oscClient, view CameraViewConfig) error {
 	logPath := r.Config.DiagnosticLogPath
+	pose, err := ResolveCameraViewPose(r.Config.AutoCapture, view)
+	if err != nil {
+		diagAutoCapture(logPath, "camera pose resolve error: view_id=%q coordinate_space=%q err=%v", view.ID, view.CoordinateSpace, err)
+		return err
+	}
 	diagAutoCapture(logPath, "osc send begin: address=%q view_id=%q", "/usercamera/Pose", view.ID)
 	if err := client.sendFloats("/usercamera/Pose", []float32{
-		float32(view.Pose.Position.X), float32(view.Pose.Position.Y), float32(view.Pose.Position.Z),
-		float32(view.Pose.Rotation.X), float32(view.Pose.Rotation.Y), float32(view.Pose.Rotation.Z),
+		float32(pose.Position.X), float32(pose.Position.Y), float32(pose.Position.Z),
+		float32(pose.Rotation.X), float32(pose.Rotation.Y), float32(pose.Rotation.Z),
 	}); err != nil {
 		diagAutoCapture(logPath, "osc send error: address=%q view_id=%q err=%v", "/usercamera/Pose", view.ID, err)
+		return err
 	} else {
-		diagAutoCapture(logPath, "osc send success: address=%q view_id=%q", "/usercamera/Pose", view.ID)
+		diagAutoCapture(logPath, "osc send success: address=%q view_id=%q coordinate_space=%q resolved_pose=%+v", "/usercamera/Pose", view.ID, view.CoordinateSpace, pose)
 	}
+	return nil
 }
 
-func (r AutoCaptureRunner) captureStreamShot(ctx context.Context, client oscClient, batchID string, shotID string, index int, view CameraViewConfig, sidecarUsers []PresenceUser, discordUsers []PresenceUser, confidence string) Result {
+func (r AutoCaptureRunner) captureStreamShot(ctx context.Context, client oscClient, batchID string, shotID string, index int, view CameraViewConfig, sidecarUsers []PresenceUser, discordUsers []PresenceUser, confidence string, world AutoCaptureVRChatMetadata) Result {
 	cfg := r.Config.AutoCapture
 	logPath := r.Config.DiagnosticLogPath
 	name := view.Name
@@ -348,7 +361,9 @@ func (r AutoCaptureRunner) captureStreamShot(ctx context.Context, client oscClie
 		name = view.ID
 	}
 	diagAutoCapture(logPath, "stream shot begin: batch_id=%q shot_id=%q index=%d view_id=%q view_name=%q", batchID, shotID, index, view.ID, name)
-	r.applyCameraView(client, view)
+	if err := r.applyCameraView(client, view); err != nil {
+		return Result{Name: name, Error: err.Error()}
+	}
 	sentOptions := sendOptionalFloat(client, "/usercamera/Zoom", view.Zoom) +
 		sendOptionalFloat(client, "/usercamera/Exposure", view.Exposure) +
 		sendOptionalFloat(client, "/usercamera/FocalDistance", view.FocalDistance) +
@@ -377,11 +392,24 @@ func (r AutoCaptureRunner) captureStreamShot(ctx context.Context, client oscClie
 		diagAutoCapture(logPath, "stream output path error: view_id=%q err=%v", view.ID, err)
 		return Result{Name: name, Error: err.Error()}
 	}
-	if err := captureStreamFrameWithFFmpeg(ctx, cfg.Stream, outputPath, logPath); err != nil {
-		diagAutoCapture(logPath, "stream capture failed: view_id=%q output=%q err=%v", view.ID, outputPath, err)
+	capturePath := outputPath
+	if strings.EqualFold(filepath.Ext(outputPath), ".jpg") || strings.EqualFold(filepath.Ext(outputPath), ".jpeg") {
+		capturePath = outputPath + ".spout.png"
+	}
+	streamInfo, err := captureStreamFrameWithSpout(ctx, cfg.Stream, capturePath, logPath)
+	if err != nil {
+		diagAutoCapture(logPath, "stream capture failed: view_id=%q output=%q capture_path=%q err=%v", view.ID, outputPath, capturePath, err)
 		return Result{Name: name, Error: err.Error()}
 	}
-	return r.finalizeAutoCaptureImage(outputPath, batchID, shotID, view, sidecarUsers, discordUsers, confidence)
+	if capturePath != outputPath {
+		if err := convertAutoCaptureImage(capturePath, outputPath, cfg.Output.ImageFormat); err != nil {
+			diagAutoCapture(logPath, "stream convert failed: view_id=%q capture_path=%q output=%q err=%v", view.ID, capturePath, outputPath, err)
+			return Result{Name: name, Error: err.Error()}
+		}
+		_ = os.Remove(capturePath)
+		diagAutoCapture(logPath, "stream convert success: view_id=%q capture_path=%q output=%q format=%q", view.ID, capturePath, outputPath, cfg.Output.ImageFormat)
+	}
+	return r.finalizeAutoCaptureImage(outputPath, batchID, shotID, view, sidecarUsers, discordUsers, confidence, world, streamInfo)
 }
 
 func (r AutoCaptureRunner) waitCaptureDelay(ctx context.Context, view CameraViewConfig, name string) bool {
@@ -399,9 +427,17 @@ func (r AutoCaptureRunner) waitCaptureDelay(ctx context.Context, view CameraView
 	return true
 }
 
-func (r AutoCaptureRunner) finalizeAutoCaptureImage(photoPath string, batchID string, shotID string, view CameraViewConfig, sidecarUsers []PresenceUser, discordUsers []PresenceUser, confidence string) Result {
+func (r AutoCaptureRunner) finalizeAutoCaptureImage(photoPath string, batchID string, shotID string, view CameraViewConfig, sidecarUsers []PresenceUser, discordUsers []PresenceUser, confidence string, world AutoCaptureVRChatMetadata, streamInfo SpoutCaptureResult) Result {
 	cfg := r.Config.AutoCapture
 	logPath := r.Config.DiagnosticLogPath
+	if cfg.Output.WriteEXIF {
+		metadata := BuildAutoCaptureEmbeddedMetadata(cfg, batchID, shotID, view, discordUsers, confidence, streamInfo)
+		if err := WriteAutoCaptureEmbeddedMetadata(photoPath, metadata); err != nil {
+			diagAutoCapture(logPath, "embedded metadata write error: image=%q err=%v", photoPath, err)
+			return Result{Name: view.Name, SourcePath: photoPath, Error: err.Error()}
+		}
+		diagAutoCapture(logPath, "embedded metadata write success: image=%q users=%d include_ids=%t", photoPath, len(metadata.Users), cfg.Output.WriteUserIDsToEXIF)
+	}
 	if cfg.Output.WriteSidecarJSON {
 		if err := WriteAutoCaptureSidecar(photoPath, AutoCaptureSidecar{
 			SchemaVersion:   1,
@@ -411,11 +447,9 @@ func (r AutoCaptureRunner) finalizeAutoCaptureImage(photoPath string, batchID st
 			CapturedAtUTC:   time.Now().UTC().Format(time.RFC3339),
 			CaptureMode:     cfg.Capture.Mode,
 			View:            view,
-			VRChat: AutoCaptureVRChatMetadata{
-				UsersSource:     "output_log",
-				UsersConfidence: confidence,
-			},
-			Users: sidecarUsers,
+			Stream:          autoCaptureStreamMetadata(streamInfo),
+			VRChat:          autoCaptureVRChatMetadata(world, confidence),
+			Users:           sidecarUsers,
 		}); err != nil {
 			diagAutoCapture(logPath, "sidecar write error: image=%q err=%v", photoPath, err)
 		} else {
@@ -431,7 +465,14 @@ func (r AutoCaptureRunner) finalizeAutoCaptureImage(photoPath string, batchID st
 			webhook = r.Config.Discord.WebhookURL
 		}
 		diagAutoCapture(logPath, "discord upload begin: image=%q webhook_configured=%t users=%d", photoPath, strings.TrimSpace(webhook) != "", len(discordUsers))
-		uploaded, err := uploadAutoCaptureDiscord(webhook, photoPath, autoCaptureDiscordContent(cfg, view, discordUsers))
+		content := autoCaptureDiscordContent(cfg, view, discordUsers)
+		var uploaded DiscordUpload
+		var err error
+		if cfg.Discord.IncludeImages {
+			uploaded, err = uploadAutoCaptureDiscord(webhook, photoPath, content)
+		} else {
+			uploaded, err = PostDiscordContent(webhook, content)
+		}
 		if err != nil {
 			diagAutoCapture(logPath, "discord upload error: image=%q err=%v", photoPath, err)
 			result.Error = err.Error()
@@ -453,23 +494,33 @@ func (r AutoCaptureRunner) emit(event AutoCaptureEvent) {
 }
 
 type AutoCaptureSidecar struct {
-	SchemaVersion   int                       `json:"schema_version"`
-	BatchID         string                    `json:"batch_id"`
-	ShotID          string                    `json:"shot_id"`
-	CapturedAtLocal string                    `json:"captured_at_local"`
-	CapturedAtUTC   string                    `json:"captured_at_utc"`
-	CaptureMode     string                    `json:"capture_mode"`
-	View            CameraViewConfig          `json:"view"`
-	VRChat          AutoCaptureVRChatMetadata `json:"vrchat"`
-	Users           []PresenceUser            `json:"users"`
-	Files           AutoCaptureFileMetadata   `json:"files"`
+	SchemaVersion   int                        `json:"schema_version"`
+	BatchID         string                     `json:"batch_id"`
+	ShotID          string                     `json:"shot_id"`
+	CapturedAtLocal string                     `json:"captured_at_local"`
+	CapturedAtUTC   string                     `json:"captured_at_utc"`
+	CaptureMode     string                     `json:"capture_mode"`
+	View            CameraViewConfig           `json:"view"`
+	Stream          *AutoCaptureStreamMetadata `json:"stream,omitempty"`
+	VRChat          AutoCaptureVRChatMetadata  `json:"vrchat"`
+	Users           []PresenceUser             `json:"users"`
+	Files           AutoCaptureFileMetadata    `json:"files"`
+}
+
+type AutoCaptureStreamMetadata struct {
+	Backend    string `json:"backend"`
+	SenderName string `json:"sender_name,omitempty"`
+	Width      int    `json:"width,omitempty"`
+	Height     int    `json:"height,omitempty"`
+	Frame      int64  `json:"frame,omitempty"`
+	CapturedAt string `json:"captured_at,omitempty"`
 }
 
 type AutoCaptureVRChatMetadata struct {
 	WorldID         string `json:"world_id,omitempty"`
 	InstanceID      string `json:"instance_id,omitempty"`
-	UsersSource     string `json:"users_source"`
-	UsersConfidence string `json:"users_confidence"`
+	UsersSource     string `json:"users_source,omitempty"`
+	UsersConfidence string `json:"users_confidence,omitempty"`
 }
 
 type AutoCaptureFileMetadata struct {
@@ -534,13 +585,13 @@ func captureStreamFrameWithFFmpeg(ctx context.Context, cfg AutoCaptureStreamConf
 	if timeout <= 0 {
 		timeout = 10 * time.Second
 	}
-	if _, err := ResolveFFmpegPath(cfg.FFmpegPath); err != nil {
-		diagAutoCapture(logPath, "stream ffmpeg missing: path=%q err=%v", cfg.FFmpegPath, err)
+	if _, err := ResolveFFmpegPath(cfg.LegacyFFmpegPath); err != nil {
+		diagAutoCapture(logPath, "stream ffmpeg missing: path=%q err=%v", cfg.LegacyFFmpegPath, err)
 		return err
 	}
 	commandCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	args, err := splitCommandLine(cfg.InputArgs)
+	args, err := splitCommandLine(cfg.LegacyInputArgs)
 	if err != nil {
 		return fmt.Errorf("ffmpeg入力引数を解釈できません: %w", err)
 	}
@@ -559,8 +610,8 @@ func captureStreamFrameWithFFmpeg(ctx context.Context, cfg AutoCaptureStreamConf
 		args = append([]string{"-y"}, args...)
 		args = append(args, "-frames:v", "1", outputPath)
 	}
-	diagAutoCapture(logPath, "stream ffmpeg begin: path=%q args=%q output=%q timeout_ms=%d", cfg.FFmpegPath, strings.Join(args, " "), outputPath, timeout.Milliseconds())
-	cmd := exec.CommandContext(commandCtx, cfg.FFmpegPath, args...) // #nosec G204 -- user-configured local ffmpeg command for capture source.
+	diagAutoCapture(logPath, "stream ffmpeg begin: path=%q args=%q output=%q timeout_ms=%d", cfg.LegacyFFmpegPath, strings.Join(args, " "), outputPath, timeout.Milliseconds())
+	cmd := exec.CommandContext(commandCtx, cfg.LegacyFFmpegPath, args...) // #nosec G204 -- user-configured local ffmpeg command for capture source.
 	output, err := cmd.CombinedOutput()
 	if commandCtx.Err() == context.DeadlineExceeded {
 		return fmt.Errorf("ffmpegによるStream切り出しがタイムアウトしました。ffmpegパス、入力引数、Stream Cameraの表示状態を確認してください。")
@@ -757,6 +808,33 @@ func SnapshotVRChatPresenceWithSource(logDir string) ([]PresenceUser, string, st
 	return out, "partial", path
 }
 
+func SnapshotVRChatWorld(logDir string) AutoCaptureVRChatMetadata {
+	path := latestVRChatOutputLog(logDir)
+	if path == "" {
+		return AutoCaptureVRChatMetadata{}
+	}
+	data, err := os.ReadFile(path) // #nosec G304 -- VRChat output log path is user configured.
+	if err != nil {
+		return AutoCaptureVRChatMetadata{}
+	}
+	return parseVRChatWorldMetadata(string(data))
+}
+
+func parseVRChatWorldMetadata(logText string) AutoCaptureVRChatMetadata {
+	worldRe := regexp.MustCompile(`wrld_[0-9A-Za-z-]+(?::[0-9A-Za-z~._:-]+)?`)
+	matches := worldRe.FindAllString(logText, -1)
+	if len(matches) == 0 {
+		return AutoCaptureVRChatMetadata{}
+	}
+	last := matches[len(matches)-1]
+	parts := strings.SplitN(last, ":", 2)
+	meta := AutoCaptureVRChatMetadata{WorldID: parts[0]}
+	if len(parts) == 2 {
+		meta.InstanceID = parts[1]
+	}
+	return meta
+}
+
 func presenceUsersWithoutIDs(users []PresenceUser) []PresenceUser {
 	out := make([]PresenceUser, len(users))
 	copy(out, users)
@@ -774,6 +852,12 @@ func autoCaptureSidecarUsers(cfg AutoCaptureConfig, users []PresenceUser) []Pres
 		return users
 	}
 	return presenceUsersWithoutIDs(users)
+}
+
+func autoCaptureVRChatMetadata(world AutoCaptureVRChatMetadata, confidence string) AutoCaptureVRChatMetadata {
+	world.UsersSource = "output_log"
+	world.UsersConfidence = confidence
+	return world
 }
 
 func autoCaptureDiscordContent(cfg AutoCaptureConfig, view CameraViewConfig, users []PresenceUser) string {
@@ -819,6 +903,35 @@ func uploadAutoCaptureDiscord(webhookURL string, imagePath string, content strin
 		ext = ".png"
 	}
 	return UploadDiscordWithContent(webhookURL, filepath.Base(imagePath), EncodedImage{Extension: ext, Mime: mime, Data: data}, content)
+}
+
+func autoCaptureStreamMetadata(result SpoutCaptureResult) *AutoCaptureStreamMetadata {
+	if strings.TrimSpace(result.SenderName) == "" && result.Width == 0 && result.Height == 0 && result.Frame == 0 {
+		return nil
+	}
+	return &AutoCaptureStreamMetadata{
+		Backend:    "spout",
+		SenderName: result.SenderName,
+		Width:      result.Width,
+		Height:     result.Height,
+		Frame:      result.Frame,
+		CapturedAt: result.CapturedAt,
+	}
+}
+
+func convertAutoCaptureImage(sourcePath string, outputPath string, outputFormat string) error {
+	img, _, err := DecodeImageFile(sourcePath)
+	if err != nil {
+		return err
+	}
+	encoded, err := EncodeImage(img, outputFormat, 92)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+		return err
+	}
+	return WritePrivateFile(outputPath, encoded.Data)
 }
 
 func latestVRChatOutputLog(dir string) string {

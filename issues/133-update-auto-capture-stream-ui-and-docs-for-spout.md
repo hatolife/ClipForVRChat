@@ -23,3 +23,7 @@
 
 - v0.1.8の本命要件はStream Camera(Spout)であり、Photo方式はシャッター音ありのフォールバックとして扱う。
 - FFmpeg導入ボタンを残すかどうかは実装時に判断するが、残す場合も主導線にはしない。
+
+## 対応内容
+
+- v0.1.8実装に合わせて対応済み。詳細は `feat/v0.1.8-resolve-issues` の実装、README、SPEC、RELEASE_NOTESを参照。

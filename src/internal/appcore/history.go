@@ -201,6 +201,7 @@ func DeleteLocalHistoryFilesWithManagedOutputDir(path string, ids []string, outp
 		if err := removeHistoryOutputFile(history[i].OutputPath, filepath.Dir(path), outputDir); err != nil {
 			return history, deleted, err
 		}
+		_ = removeHistorySidecarFile(history[i].OutputPath, filepath.Dir(path), outputDir)
 		history[i].LocalDeleted = true
 		history[i].LocalDeletedAt = now
 		deleted++
@@ -244,6 +245,7 @@ func PurgeDiscordDeletedHistory(path string, deleteOutput bool) ([]HistoryEntry,
 		}
 		if deleteOutput {
 			_ = removeHistoryOutputFile(entry.OutputPath, filepath.Dir(path), filepath.Join(filepath.Dir(path), "output"))
+			_ = removeHistorySidecarFile(entry.OutputPath, filepath.Dir(path), filepath.Join(filepath.Dir(path), "output"))
 		}
 		removed++
 	}
@@ -256,6 +258,18 @@ func removeHistoryOutputFile(path string, baseDir string, outputDir string) erro
 		return nil
 	}
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+func removeHistorySidecarFile(path string, baseDir string, outputDir string) error {
+	path = ResolveManagedHistoryOutputPath(path, baseDir, outputDir)
+	if path == "" {
+		return nil
+	}
+	sidecarPath := path + ".json"
+	if err := os.Remove(sidecarPath); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	return nil

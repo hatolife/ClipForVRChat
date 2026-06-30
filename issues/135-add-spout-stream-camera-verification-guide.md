@@ -23,3 +23,7 @@ v0.1.8 RCを実機確認するときに、Stream Camera(Spout)映像そのもの
 
 - 実装完了後にREADMEまたは専用 `docs/` 配下へ手順化する。
 - 受け入れ条件は、ユーザーがRCで確認する最小要件と対応させる。
+
+## 対応内容
+
+- v0.1.8実装に合わせて対応済み。詳細は `feat/v0.1.8-resolve-issues` の実装、README、SPEC、RELEASE_NOTESを参照。

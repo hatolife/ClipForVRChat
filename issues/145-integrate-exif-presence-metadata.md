@@ -18,3 +18,7 @@
 - Photo方式でVRChat写真ファイルへ直接追記する場合の注意をログに残し、元ファイル改変を仕様として明記する。
 - Stream/Spout方式の出力画像にも同じ処理を適用する。
 - 埋め込み失敗時は画像保存、sidecar JSON、Discord投稿を可能な限り継続し、結果と診断ログへ理由を出す。
+
+## 対応内容
+
+- v0.1.8実装に合わせて対応済み。詳細は `feat/v0.1.8-resolve-issues` の実装、README、SPEC、RELEASE_NOTESを参照。

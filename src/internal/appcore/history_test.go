@@ -223,6 +223,31 @@ func TestDeleteLocalHistoryFilesResolvesRelativePathFromHistoryDirectory(t *test
 	}
 }
 
+func TestDeleteLocalHistoryFilesDeletesSidecar(t *testing.T) {
+	dir := t.TempDir()
+	outputDir := filepath.Join(dir, "output")
+	if err := os.MkdirAll(outputDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(outputDir, "out.png")
+	if err := os.WriteFile(output, []byte("image"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(output+".json", []byte("{}"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "history.json")
+	if err := SaveHistory(path, []HistoryEntry{{ID: "delete", OutputPath: "output/out.png"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := DeleteLocalHistoryFilesWithManagedOutputDir(path, []string{"delete"}, outputDir); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(output + ".json"); !os.IsNotExist(err) {
+		t.Fatalf("sidecar file should be removed, stat err = %v", err)
+	}
+}
+
 func TestLoadHistoryResolvesRelativeLocalExistsFromHistoryDirectory(t *testing.T) {
 	dir := t.TempDir()
 	outputDir := filepath.Join(dir, "output")

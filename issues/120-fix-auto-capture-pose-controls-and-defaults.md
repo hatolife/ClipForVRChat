@@ -19,3 +19,7 @@
 - 構図を初期Poseへ戻すボタンを自動撮影タブから実行できる。
 - 「現在Poseから追加」「現在Poseを保存」が生成済みWails APIで呼び出せる。
 - 既存の自動撮影、Discord投稿、sidecar JSON、通常画像処理を壊さない。
+
+## 対応内容
+
+- v0.1.8実装に合わせて対応済み。詳細は `feat/v0.1.8-resolve-issues` の実装、README、SPEC、RELEASE_NOTESを参照。

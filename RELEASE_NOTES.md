@@ -5,19 +5,19 @@
 ### 更新内容
 
 - 設定画面に「自動撮影」タブを追加し、OSC、撮影間隔、撮影方式、出力、Presence、Discord投稿設定をまとめました。
-- VRChat User CameraへOSCで構図を送り、Stream(ffmpeg)方式またはPhoto方式で有効な初期構図を順番に撮影する自動撮影MVPを追加しました。
-- VRChat output logから同じインスタンスにいるユーザー情報を推定し、撮影画像に対応するsidecar JSONへ保存するようにしました。
-- 自動撮影した画像を既存の結果/履歴画面で扱えるようにし、設定で有効化した場合はDiscord Webhookへ投稿できるようにしました。
-- RC確認で見つかった、VRChat写真が保存されない問題に対して、Capture/CloseをUser CameraのAction OSCとして送るよう修正し、Stream方式ではffmpegで映像から静止画を切り出せるようにしました。
-- Stream方式ではVRChat OSCのStream Cameraモードを開くよう修正し、設定画面からffmpegの確認と `winget install ffmpeg` による導入を行えるようにしました。
-- Stream方式のffmpeg初期入力をVRChatウィンドウ範囲の切り出しに変更し、旧RCのデスクトップ全体取得やtitle直接取得の設定は自動移行するようにしました。
+- VRChat User CameraへOSCで構図を送り、Stream Camera(Spout)方式またはPhoto方式で有効な構図を順番に撮影する自動撮影機能を追加しました。
+- Stream方式では同梱の `spout-capture.exe` がVRChat Stream CameraのSpout senderから1フレームをPNGとして受信し、必要に応じてJPGへ変換して保存します。
+- VRChat output logから同じインスタンスにいるユーザー情報、world ID、instance IDを推定し、撮影画像に対応するsidecar JSONへ保存するようにしました。
+- 自動撮影画像へPNG iTXtまたはJPEG EXIF APP1で撮影メタデータを埋め込めるようにしました。ユーザーID埋め込みは設定で独立して制御できます。
+- 自動撮影した画像を既存の結果/履歴画面で扱えるようにし、設定で有効化した場合はDiscord Webhookへ投稿できるようにしました。画像添付なしの本文のみ投稿にも対応しました。
 - 構図カード内に「現在Poseから追加」と「このPoseへカメラ移動」を追加し、設定済みPoseをゲーム内カメラへ送れるようにしました。
 - User Camera関連OSCをfalse/Offへ戻す「カメラOSCをリセット」ボタンを自動撮影タブに追加しました。
 
 ### 既知の制限
 
-- v0.1.8のStream方式は外部ffmpegを使います。Spout2直接受信、Camera Dolly Multi、解像度一時変更は将来対応です。
-- output log由来のユーザー一覧は、アプリ起動前から同じインスタンスにいたユーザーを完全に復元できない場合があります。
+- player_local構図は標準OSCだけでプレイヤーrootを自動取得できないため、手動で保存したプレイヤー基準Poseを使います。
+- output log由来のユーザー一覧やworld/instance情報は、VRChatログの内容によって取得できない場合があります。
+- Camera Dolly Multi、解像度一時変更、SQLiteローカルDB、OSCQuery自動検出はv0.1.8の対象外です。v0.1.8ではsidecar JSONと履歴JSONを正本/索引として扱います。
 
 ### ダウンロード
 
