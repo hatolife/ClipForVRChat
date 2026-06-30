@@ -75,6 +75,13 @@ func TestSplitCommandLine(t *testing.T) {
 	}
 }
 
+func TestResolveFFmpegPathRejectsMissingPath(t *testing.T) {
+	_, err := ResolveFFmpegPath(filepath.Join(t.TempDir(), "missing-ffmpeg.exe"))
+	if err == nil || !strings.Contains(err.Error(), "ffmpegがインストールされていないかPATHにありません") {
+		t.Fatalf("err = %v, want missing ffmpeg message", err)
+	}
+}
+
 func TestAutoCaptureOutputPath(t *testing.T) {
 	cfg := DefaultConfig().AutoCapture
 	cfg.Output.Directory = t.TempDir()

@@ -36,7 +36,10 @@ createApp({
       historyDragStart: { x: 0, y: 0 },
       historyDragCurrent: { x: 0, y: 0 },
       historyDragBaseIds: [],
-      diagnosticGenerating: false
+      diagnosticGenerating: false,
+      ffmpegStatus: null,
+      ffmpegChecking: false,
+      ffmpegInstalling: false
     }
   },
   computed: {
@@ -960,6 +963,40 @@ createApp({
         this.toast = ''
       }
     },
+    async checkFFmpeg() {
+      if (!api?.CheckFFmpeg) {
+        this.error = 'ffmpeg確認APIが利用できません。'
+        return
+      }
+      this.error = ''
+      this.ffmpegChecking = true
+      try {
+        this.ffmpegStatus = await api.CheckFFmpeg(this.autoCaptureSettings.stream.ffmpegPath || 'ffmpeg')
+      } catch (err) {
+        this.error = String(err)
+      } finally {
+        this.ffmpegChecking = false
+      }
+    },
+    async installFFmpeg() {
+      if (!api?.InstallFFmpegWithWinget) {
+        this.error = 'ffmpegインストールAPIが利用できません。'
+        return
+      }
+      this.error = ''
+      this.ffmpegInstalling = true
+      this.ffmpegStatus = { available: false, message: 'winget install ffmpegを実行しています。完了まで待ってください。' }
+      try {
+        this.ffmpegStatus = await api.InstallFFmpegWithWinget()
+        if (this.ffmpegStatus?.available) {
+          this.autoCaptureSettings.stream.ffmpegPath = 'ffmpeg'
+        }
+      } catch (err) {
+        this.error = String(err)
+      } finally {
+        this.ffmpegInstalling = false
+      }
+    },
     async checkForUpdate() {
       if (!api?.CheckForUpdate || this.updateSettings.checkEnabled === false) {
         this.updateInfo = { available: false, currentVersion: '', currentReleaseTime: '', latestVersion: '', latestReleasePublished: '', url: '' }
@@ -1457,12 +1494,21 @@ createApp({
             </div>
             <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
               <div><strong>ffmpegパス</strong><p>Stream方式で静止画を切り出すffmpeg.exeのパスです。PATHにある場合はffmpegのままで使えます。</p></div>
-              <label>
-                <input v-model="autoCaptureSettings.stream.ffmpegPath" :disabled="autoCaptureSettings.capture.mode !== 'stream'" placeholder="ffmpeg" />
-              </label>
+              <div class="settings-control-stack">
+                <input v-model="autoCaptureSettings.stream.ffmpegPath" :disabled="autoCaptureSettings.capture.mode !== 'stream' || ffmpegInstalling" placeholder="ffmpeg" />
+                <div class="inline-actions">
+                  <button type="button" class="secondary" @click="checkFFmpeg" :disabled="autoCaptureSettings.capture.mode !== 'stream' || ffmpegChecking || ffmpegInstalling">{{ ffmpegChecking ? '確認中' : 'ffmpeg確認' }}</button>
+                  <button type="button" class="secondary" @click="installFFmpeg" :disabled="autoCaptureSettings.capture.mode !== 'stream' || ffmpegInstalling">{{ ffmpegInstalling ? 'インストール中' : 'ffmpegをインストール' }}</button>
+                </div>
+                <p v-if="ffmpegStatus" :class="['setting-note', ffmpegStatus.available ? 'ok' : 'warning']">
+                  {{ ffmpegStatus.message }}
+                  <span v-if="ffmpegStatus.version"> {{ ffmpegStatus.version }}</span>
+                  <span v-if="ffmpegStatus.path"> / {{ ffmpegStatus.path }}</span>
+                </p>
+              </div>
             </div>
             <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
-              <div><strong>ffmpeg入力引数</strong><p>Stream Cameraを取得するための入力指定です。例: 画面全体なら -f gdigrab -framerate 30 -i desktop。</p></div>
+              <div><strong>ffmpeg入力引数</strong><p>ffmpegの入力指定です。初期値は確認用のデスクトップ全体取得です。VRChat Stream Cameraだけを取得する場合は、環境に合う入力指定へ変更してください。</p></div>
               <label>
                 <input v-model="autoCaptureSettings.stream.inputArgs" :disabled="autoCaptureSettings.capture.mode !== 'stream'" placeholder="-f gdigrab -framerate 30 -i desktop" />
               </label>
