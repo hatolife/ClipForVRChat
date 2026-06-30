@@ -57,6 +57,18 @@ func TestAutoCaptureConfigNormalize(t *testing.T) {
 	if cfg.AutoCapture.Stream.FFmpegPath != "ffmpeg" || cfg.AutoCapture.Stream.CaptureTimeoutMS != 10000 {
 		t.Fatalf("stream normalize failed: %+v", cfg.AutoCapture.Stream)
 	}
+	if cfg.AutoCapture.Stream.InputArgs != DefaultAutoCaptureFFmpegInputArgs() || strings.Contains(cfg.AutoCapture.Stream.InputArgs, "desktop") {
+		t.Fatalf("stream input args = %q, want VRChat window default", cfg.AutoCapture.Stream.InputArgs)
+	}
+}
+
+func TestAutoCaptureConfigNormalizeMigratesOldDesktopFFmpegInput(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.AutoCapture.Stream.InputArgs = oldDesktopFFmpegInputArgs
+	cfg.Normalize()
+	if cfg.AutoCapture.Stream.InputArgs != DefaultAutoCaptureFFmpegInputArgs() {
+		t.Fatalf("stream input args = %q, want %q", cfg.AutoCapture.Stream.InputArgs, DefaultAutoCaptureFFmpegInputArgs())
+	}
 }
 
 func TestSplitCommandLine(t *testing.T) {
