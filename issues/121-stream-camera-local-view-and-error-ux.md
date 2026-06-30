@@ -24,3 +24,7 @@ Stream方式はダミーではなく、実際にVRChat Stream Cameraの映像か
 - 「自動撮影管理フォルダ」はStream方式の切り出し保存先として分かる説明と初期値に変更する。
 - Stream方式を実装する。実装できない制約がある場合は、未実装のUIを出さず、具体的な技術的制約をIssueに記録する。
 - 既存のPhoto方式、sidecar JSON、Discord投稿、通常画像処理を壊さない。
+
+## 対応メモ
+
+- rc9実機確認で、Stream方式でも `/usercamera/Mode` にPhoto Camera相当の `1` を送っていたため、Stream方式では `2` を送るよう修正した。

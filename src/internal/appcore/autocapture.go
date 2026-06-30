@@ -105,12 +105,16 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 	}
 	defer client.close()
 	diagAutoCapture(logPath, "osc open success: target=%s:%d", ac.OSC.Host, ac.OSC.SendPort)
-	diagAutoCapture(logPath, "osc send begin: address=%q value=%d", "/usercamera/Mode", 1)
-	if err := client.sendInt("/usercamera/Mode", 1); err != nil {
+	cameraMode := 1
+	if ac.Capture.Mode == "stream" {
+		cameraMode = 2
+	}
+	diagAutoCapture(logPath, "osc send begin: address=%q value=%d capture_mode=%q", "/usercamera/Mode", cameraMode, ac.Capture.Mode)
+	if err := client.sendInt("/usercamera/Mode", int32(cameraMode)); err != nil {
 		diagAutoCapture(logPath, "osc send error: address=%q err=%v", "/usercamera/Mode", err)
 		return nil, err
 	}
-	diagAutoCapture(logPath, "osc send success: address=%q value=%d", "/usercamera/Mode", 1)
+	diagAutoCapture(logPath, "osc send success: address=%q value=%d capture_mode=%q", "/usercamera/Mode", cameraMode, ac.Capture.Mode)
 	modeWait := 2500 * time.Millisecond
 	diagAutoCapture(logPath, "camera mode wait begin: duration_ms=%d", modeWait.Milliseconds())
 	if !sleepContext(ctx, modeWait) {
@@ -425,6 +429,10 @@ func captureStreamFrameWithFFmpeg(ctx context.Context, cfg AutoCaptureStreamConf
 	if timeout <= 0 {
 		timeout = 10 * time.Second
 	}
+	if _, err := ResolveFFmpegPath(cfg.FFmpegPath); err != nil {
+		diagAutoCapture(logPath, "stream ffmpeg missing: path=%q err=%v", cfg.FFmpegPath, err)
+		return err
+	}
 	commandCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	args, err := splitCommandLine(cfg.InputArgs)
@@ -460,6 +468,28 @@ func captureStreamFrameWithFFmpeg(ctx context.Context, cfg AutoCaptureStreamConf
 	}
 	diagAutoCapture(logPath, "stream ffmpeg success: output=%q", outputPath)
 	return nil
+}
+
+func ResolveFFmpegPath(ffmpegPath string) (string, error) {
+	ffmpegPath = strings.Trim(strings.TrimSpace(ffmpegPath), `"`)
+	if ffmpegPath == "" {
+		ffmpegPath = "ffmpeg"
+	}
+	if strings.ContainsAny(ffmpegPath, `\/`) || filepath.IsAbs(ffmpegPath) {
+		info, err := os.Stat(ffmpegPath)
+		if err != nil {
+			return "", fmt.Errorf("ffmpegがインストールされていないかPATHにありません。ffmpegパスを確認するか、設定画面からffmpegをインストールしてください。")
+		}
+		if info.IsDir() {
+			return "", fmt.Errorf("ffmpegパスがフォルダを指しています。ffmpeg.exeのパスを指定してください。")
+		}
+		return ffmpegPath, nil
+	}
+	resolved, err := exec.LookPath(ffmpegPath)
+	if err != nil {
+		return "", fmt.Errorf("ffmpegがインストールされていないかPATHにありません。ffmpegパスを確認するか、設定画面からffmpegをインストールしてください。")
+	}
+	return resolved, nil
 }
 
 func splitCommandLine(input string) ([]string, error) {

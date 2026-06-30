@@ -675,6 +675,17 @@ func TestResultMessage(t *testing.T) {
 	}
 }
 
+func TestCheckFFmpegReportsMissingPath(t *testing.T) {
+	app := NewApp(filepath.Join(t.TempDir(), "config.json"), appcore.UIState{})
+	status := app.CheckFFmpeg(filepath.Join(t.TempDir(), "missing-ffmpeg.exe"))
+	if status.Available {
+		t.Fatalf("status = %+v, want unavailable", status)
+	}
+	if !strings.Contains(status.Message, "ffmpegがインストールされていないかPATHにありません") {
+		t.Fatalf("message = %q", status.Message)
+	}
+}
+
 func writeTextFile(t *testing.T, path string, text string) {
 	t.Helper()
 	if err := appcore.WritePrivateFile(path, []byte(text)); err != nil {
