@@ -30,4 +30,4 @@ v0.1.8-rc9のStream方式では `ffmpeg` を使用するが、設定画面で `f
 - `CheckFFmpeg` APIでPATHまたは指定パスの `ffmpeg` を解決し、`ffmpeg -version` の結果を表示するようにした。
 - `InstallFFmpegWithWinget` APIで `winget install ffmpeg` を実行し、成功/失敗を画面と診断ログへ返すようにした。
 - Stream撮影前に `ffmpeg` の存在確認を行い、未検出時は未インストールまたはPATH未設定として表示するようにした。
-- `ffmpeg入力引数` の説明で、初期値が確認用のデスクトップ全体取得であることを明示した。
+- `ffmpeg入力引数` の説明で、ffmpeg入力指定をユーザーが確認できるようにした。その後のRCで初期値はデスクトップ全体取得からVRChatウィンドウ範囲切り出しへ変更した。

@@ -57,17 +57,21 @@ func TestAutoCaptureConfigNormalize(t *testing.T) {
 	if cfg.AutoCapture.Stream.FFmpegPath != "ffmpeg" || cfg.AutoCapture.Stream.CaptureTimeoutMS != 10000 {
 		t.Fatalf("stream normalize failed: %+v", cfg.AutoCapture.Stream)
 	}
-	if cfg.AutoCapture.Stream.InputArgs != DefaultAutoCaptureFFmpegInputArgs() || strings.Contains(cfg.AutoCapture.Stream.InputArgs, "desktop") {
+	if cfg.AutoCapture.Stream.InputArgs != DefaultAutoCaptureFFmpegInputArgs() ||
+		!strings.Contains(cfg.AutoCapture.Stream.InputArgs, "{window_x}") ||
+		!strings.Contains(cfg.AutoCapture.Stream.InputArgs, "{window_width}") {
 		t.Fatalf("stream input args = %q, want VRChat window default", cfg.AutoCapture.Stream.InputArgs)
 	}
 }
 
 func TestAutoCaptureConfigNormalizeMigratesOldDesktopFFmpegInput(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.AutoCapture.Stream.InputArgs = oldDesktopFFmpegInputArgs
-	cfg.Normalize()
-	if cfg.AutoCapture.Stream.InputArgs != DefaultAutoCaptureFFmpegInputArgs() {
-		t.Fatalf("stream input args = %q, want %q", cfg.AutoCapture.Stream.InputArgs, DefaultAutoCaptureFFmpegInputArgs())
+	for _, oldArgs := range []string{oldDesktopFFmpegInputArgs, oldTitleFFmpegInputArgs} {
+		cfg := DefaultConfig()
+		cfg.AutoCapture.Stream.InputArgs = oldArgs
+		cfg.Normalize()
+		if cfg.AutoCapture.Stream.InputArgs != DefaultAutoCaptureFFmpegInputArgs() {
+			t.Fatalf("stream input args = %q, want %q", cfg.AutoCapture.Stream.InputArgs, DefaultAutoCaptureFFmpegInputArgs())
+		}
 	}
 }
 
@@ -91,6 +95,34 @@ func TestResolveFFmpegPathRejectsMissingPath(t *testing.T) {
 	_, err := ResolveFFmpegPath(filepath.Join(t.TempDir(), "missing-ffmpeg.exe"))
 	if err == nil || !strings.Contains(err.Error(), "ffmpegがインストールされていないかPATHにありません") {
 		t.Fatalf("err = %v, want missing ffmpeg message", err)
+	}
+}
+
+func TestExpandFFmpegInputPlaceholdersNoWindow(t *testing.T) {
+	args := []string{"-f", "gdigrab", "-i", "desktop"}
+	got, err := expandFFmpegInputPlaceholders(nil, args, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(got, " ") != strings.Join(args, " ") {
+		t.Fatalf("args = %#v, want %#v", got, args)
+	}
+}
+
+func TestMoveUserCameraToViewMissingView(t *testing.T) {
+	cfg := DefaultConfig()
+	err := MoveUserCameraToView(nil, cfg, "missing")
+	if err == nil || !strings.Contains(err.Error(), "構図が見つかりません") {
+		t.Fatalf("err = %v, want missing view error", err)
+	}
+}
+
+func TestResetUserCameraOSCRejectsBadPort(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.AutoCapture.OSC.Host = "bad host name"
+	err := ResetUserCameraOSC(nil, cfg)
+	if err == nil {
+		t.Fatal("expected OSC open error")
 	}
 }
 

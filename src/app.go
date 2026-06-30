@@ -500,6 +500,42 @@ func (a *App) ResetCameraViewsToDefaults() (appcore.Config, error) {
 	return a.state.Config, nil
 }
 
+func (a *App) MoveCameraToView(viewID string) error {
+	a.mu.Lock()
+	cfg := a.state.Config
+	cfg.Normalize()
+	cfg.DiagnosticLogPath = appcore.DiagnosticLogPath(a.configPath)
+	a.mu.Unlock()
+	if err := appcore.MoveUserCameraToView(context.Background(), cfg, viewID); err != nil {
+		a.mu.Lock()
+		a.state.Message = "カメラ移動に失敗しました: " + err.Error()
+		a.mu.Unlock()
+		return err
+	}
+	a.mu.Lock()
+	a.state.Message = "カメラを構図のPoseへ移動しました。"
+	a.mu.Unlock()
+	return nil
+}
+
+func (a *App) ResetCameraOSC() error {
+	a.mu.Lock()
+	cfg := a.state.Config
+	cfg.Normalize()
+	cfg.DiagnosticLogPath = appcore.DiagnosticLogPath(a.configPath)
+	a.mu.Unlock()
+	if err := appcore.ResetUserCameraOSC(context.Background(), cfg); err != nil {
+		a.mu.Lock()
+		a.state.Message = "カメラOSCリセットに失敗しました: " + err.Error()
+		a.mu.Unlock()
+		return err
+	}
+	a.mu.Lock()
+	a.state.Message = "カメラOSCをリセットしました。"
+	a.mu.Unlock()
+	return nil
+}
+
 func (a *App) CheckFFmpeg(ffmpegPath string) FFmpegStatus {
 	logPath := appcore.DiagnosticLogPath(a.configPath)
 	resolved, err := appcore.ResolveFFmpegPath(ffmpegPath)
