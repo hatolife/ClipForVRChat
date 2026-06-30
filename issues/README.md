@@ -123,8 +123,9 @@
 | 116 | [自動撮影の写真検出ずれとカメラ未表示時の案内を改善する](116-fix-auto-capture-photo-detection-and-camera-open-note.md) | 要確認 | `v0.1.8` | 遅れて保存された写真の検出ずれを防ぎ、Photo方式でUser Camera表示が必要なことを案内する。 |
 | 117 | [自動撮影の現在Pose保存と構図管理を実装する](117-implement-camera-pose-preset-calibration.md) | 要確認 | `v0.1.8` | VRChatから現在のUser Camera Poseを受信し、構図プリセットとして保存・管理できるようにする。 |
 | 118 | [自動撮影の解像度一時変更はv0.1.8で断念する](118-defer-auto-capture-resolution-control.md) | 要確認 | `v0.1.8` | v0.1.8ではVRChatの現在のカメラ解像度設定を使用し、未完成の解像度変更設定を出さない。 |
-| 119 | [未実装の自動撮影方式を設定画面から外す](119-remove-unimplemented-auto-capture-mode-options.md) | 要確認 | `v0.1.8` | 未実装のStream方式を設定画面から外し、Photo方式のみを表示する。 |
+| 119 | [未実装の自動撮影方式を設定画面から外す](119-remove-unimplemented-auto-capture-mode-options.md) | 要確認 | `v0.1.8` | 実装済みのStream(ffmpeg)方式とPhoto方式だけを表示し、未実装方式を設定画面から外す。 |
 | 120 | [自動撮影のPose操作と初期構図設定を修正する](120-fix-auto-capture-pose-controls-and-defaults.md) | 要対応 | `v0.1.8` | 初期Pose、拡大率、撮影トグル、現在Pose保存/追加APIを修正する。 |
+| 121 | [自動撮影をローカル視点基準とStream方式中心に修正する](121-stream-camera-local-view-and-error-ux.md) | 要対応 | `v0.1.8` | ローカル視点、テスト撮影、失敗表示、UI文言、Stream方式を修正する。 |
 
 ## 状態の意味
 

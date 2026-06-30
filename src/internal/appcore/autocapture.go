@@ -10,6 +10,7 @@ import (
 	"math"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -62,9 +63,9 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 		ac.Capture.ButtonReleaseDelayMS,
 		ac.Capture.SettleDelayMS,
 	)
-	if ac.Capture.Mode != "photo" {
+	if ac.Capture.Mode != "photo" && ac.Capture.Mode != "stream" {
 		diagAutoCapture(logPath, "run_once reject: unsupported_mode=%q", ac.Capture.Mode)
-		return nil, fmt.Errorf("v0.1.8ではPhoto方式のみ実装済みです")
+		return nil, fmt.Errorf("対応していない自動撮影方式です: %s", ac.Capture.Mode)
 	}
 	views := enabledCameraViews(ac.Views)
 	if len(views) == 0 {
@@ -117,6 +118,23 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 		return nil, ctx.Err()
 	}
 	diagAutoCapture(logPath, "camera mode wait complete")
+	if ac.Capture.Mode == "stream" {
+		diagAutoCapture(logPath, "osc button press begin: address=%q detail=%q", "/usercamera/Streaming", "stream_start")
+		if err := client.sendBool("/usercamera/Streaming", true); err != nil {
+			diagAutoCapture(logPath, "osc button press error: address=%q detail=%q err=%v", "/usercamera/Streaming", "stream_start", err)
+			return nil, err
+		}
+		diagAutoCapture(logPath, "osc button press success: address=%q detail=%q", "/usercamera/Streaming", "stream_start")
+		startDelay := time.Duration(ac.Stream.StartDelayMS) * time.Millisecond
+		if startDelay > 0 {
+			diagAutoCapture(logPath, "stream start wait begin: duration_ms=%d", startDelay.Milliseconds())
+			if !sleepContext(ctx, startDelay) {
+				diagAutoCapture(logPath, "stream start wait cancelled: err=%v", ctx.Err())
+				return nil, ctx.Err()
+			}
+			diagAutoCapture(logPath, "stream start wait complete")
+		}
+	}
 	results := make([]Result, 0, len(views))
 	for i, view := range views {
 		if err := ctx.Err(); err != nil {
@@ -124,7 +142,12 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 			return results, err
 		}
 		shotID := fmt.Sprintf("%s-%02d", batchID, i+1)
-		result := r.capturePhotoShot(ctx, client, batchID, shotID, i+1, view, photoDir, before, users, confidence)
+		var result Result
+		if ac.Capture.Mode == "stream" {
+			result = r.captureStreamShot(ctx, client, batchID, shotID, i+1, view, users, confidence)
+		} else {
+			result = r.capturePhotoShot(ctx, client, batchID, shotID, i+1, view, photoDir, before, users, confidence)
+		}
 		results = append(results, result)
 		diagAutoCapture(logPath, "shot result: batch_id=%q shot_id=%q source_path=%q error=%q", batchID, shotID, result.SourcePath, result.Error)
 		r.emit(AutoCaptureEvent{BatchID: batchID, ShotID: shotID, Path: result.SourcePath, Error: result.Error, Message: result.Name})
@@ -138,7 +161,15 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 			successCount++
 		}
 	}
-	if ac.Capture.CloseCameraAfterBatch && successCount > 0 {
+	if ac.Capture.CloseCameraAfterBatch && (successCount > 0 || ac.Capture.Mode == "stream") {
+		if ac.Capture.Mode == "stream" {
+			diagAutoCapture(logPath, "osc button release begin: address=%q detail=%q", "/usercamera/Streaming", "stream_stop")
+			if err := client.sendBool("/usercamera/Streaming", false); err != nil {
+				diagAutoCapture(logPath, "stream stop failed: err=%v", err)
+			} else {
+				diagAutoCapture(logPath, "osc button release success: address=%q detail=%q", "/usercamera/Streaming", "stream_stop")
+			}
+		}
 		if err := sendCameraButton(ctx, client, "/usercamera/Close", ac.Capture.ButtonReleaseDelayMS, logPath, "batch_close"); err != nil {
 			diagAutoCapture(logPath, "camera close failed: err=%v", err)
 		}
@@ -169,15 +200,7 @@ func (r AutoCaptureRunner) capturePhotoShot(ctx context.Context, client oscClien
 		view.SettleDelayMS,
 		view.CaptureDelayMS,
 	)
-	diagAutoCapture(logPath, "osc send begin: address=%q view_id=%q", "/usercamera/Pose", view.ID)
-	if err := client.sendFloats("/usercamera/Pose", []float32{
-		float32(view.Pose.Position.X), float32(view.Pose.Position.Y), float32(view.Pose.Position.Z),
-		float32(view.Pose.Rotation.X), float32(view.Pose.Rotation.Y), float32(view.Pose.Rotation.Z),
-	}); err != nil {
-		diagAutoCapture(logPath, "osc send error: address=%q view_id=%q err=%v", "/usercamera/Pose", view.ID, err)
-	} else {
-		diagAutoCapture(logPath, "osc send success: address=%q view_id=%q", "/usercamera/Pose", view.ID)
-	}
+	r.applyCameraView(client, view)
 	sentOptions := sendOptionalFloat(client, "/usercamera/Zoom", view.Zoom) +
 		sendOptionalFloat(client, "/usercamera/Exposure", view.Exposure) +
 		sendOptionalFloat(client, "/usercamera/FocalDistance", view.FocalDistance) +
@@ -208,8 +231,68 @@ func (r AutoCaptureRunner) capturePhotoShot(ctx context.Context, client oscClien
 	}
 	if photoPath == "" {
 		diagAutoCapture(logPath, "shot photo detection failed: view_id=%q photo_dir=%q output_dir=%q before_files=%d before_latest=%s", view.ID, photoDir, cfg.Output.Directory, len(before), photoFileSummary(before))
-		return Result{Name: name, Error: "撮影後のVRChat写真ファイルを検出できませんでした。写真保存先設定を確認してください。"}
+		return Result{Name: name, Error: "撮影後のVRChat写真ファイルを検出できませんでした。Photo方式ではUser Cameraが表示され、VRChatの写真保存先が正しい必要があります。Stream方式を使う場合はffmpeg入力設定を確認してください。"}
 	}
+	return r.finalizeAutoCaptureImage(photoPath, batchID, shotID, view, users, confidence)
+}
+
+func (r AutoCaptureRunner) applyCameraView(client oscClient, view CameraViewConfig) {
+	logPath := r.Config.DiagnosticLogPath
+	diagAutoCapture(logPath, "osc send begin: address=%q view_id=%q", "/usercamera/Pose", view.ID)
+	if err := client.sendFloats("/usercamera/Pose", []float32{
+		float32(view.Pose.Position.X), float32(view.Pose.Position.Y), float32(view.Pose.Position.Z),
+		float32(view.Pose.Rotation.X), float32(view.Pose.Rotation.Y), float32(view.Pose.Rotation.Z),
+	}); err != nil {
+		diagAutoCapture(logPath, "osc send error: address=%q view_id=%q err=%v", "/usercamera/Pose", view.ID, err)
+	} else {
+		diagAutoCapture(logPath, "osc send success: address=%q view_id=%q", "/usercamera/Pose", view.ID)
+	}
+}
+
+func (r AutoCaptureRunner) captureStreamShot(ctx context.Context, client oscClient, batchID string, shotID string, index int, view CameraViewConfig, users []PresenceUser, confidence string) Result {
+	cfg := r.Config.AutoCapture
+	logPath := r.Config.DiagnosticLogPath
+	name := view.Name
+	if name == "" {
+		name = view.ID
+	}
+	diagAutoCapture(logPath, "stream shot begin: batch_id=%q shot_id=%q index=%d view_id=%q view_name=%q", batchID, shotID, index, view.ID, name)
+	r.applyCameraView(client, view)
+	sentOptions := sendOptionalFloat(client, "/usercamera/Zoom", view.Zoom) +
+		sendOptionalFloat(client, "/usercamera/Exposure", view.Exposure) +
+		sendOptionalFloat(client, "/usercamera/FocalDistance", view.FocalDistance) +
+		sendOptionalFloat(client, "/usercamera/Aperture", view.Aperture) +
+		sendOptionalBool(client, "/usercamera/LookAtMe", view.LookAtMe) +
+		sendOptionalBool(client, "/usercamera/ShowUIInCamera", view.ShowUIInCamera) +
+		sendOptionalBool(client, "/usercamera/LocalPlayer", view.LocalPlayer) +
+		sendOptionalBool(client, "/usercamera/RemotePlayer", view.RemotePlayer) +
+		sendOptionalBool(client, "/usercamera/Environment", view.Environment)
+	diagAutoCapture(logPath, "shot optional_params sent: view_id=%q count=%d", view.ID, sentOptions)
+	settle := time.Duration(cfg.Capture.SettleDelayMS) * time.Millisecond
+	if view.SettleDelayMS > 0 {
+		settle = time.Duration(view.SettleDelayMS) * time.Millisecond
+	}
+	diagAutoCapture(logPath, "shot settle begin: view_id=%q duration_ms=%d", view.ID, settle.Milliseconds())
+	if !sleepContext(ctx, settle) {
+		diagAutoCapture(logPath, "shot settle cancelled: view_id=%q err=%v", view.ID, ctx.Err())
+		return Result{Name: name, Error: "自動撮影が中断されました。"}
+	}
+	diagAutoCapture(logPath, "shot settle complete: view_id=%q", view.ID)
+	outputPath, err := autoCaptureOutputPath(cfg, batchID, shotID, index, view)
+	if err != nil {
+		diagAutoCapture(logPath, "stream output path error: view_id=%q err=%v", view.ID, err)
+		return Result{Name: name, Error: err.Error()}
+	}
+	if err := captureStreamFrameWithFFmpeg(ctx, cfg.Stream, outputPath, logPath); err != nil {
+		diagAutoCapture(logPath, "stream capture failed: view_id=%q output=%q err=%v", view.ID, outputPath, err)
+		return Result{Name: name, Error: err.Error()}
+	}
+	return r.finalizeAutoCaptureImage(outputPath, batchID, shotID, view, users, confidence)
+}
+
+func (r AutoCaptureRunner) finalizeAutoCaptureImage(photoPath string, batchID string, shotID string, view CameraViewConfig, users []PresenceUser, confidence string) Result {
+	cfg := r.Config.AutoCapture
+	logPath := r.Config.DiagnosticLogPath
 	if cfg.Output.WriteSidecarJSON {
 		if err := WriteAutoCaptureSidecar(photoPath, AutoCaptureSidecar{
 			SchemaVersion:   1,
@@ -296,6 +379,142 @@ func WriteAutoCaptureSidecar(imagePath string, sidecar AutoCaptureSidecar) error
 		return err
 	}
 	return WritePrivateFile(imagePath+".json", append(data, '\n'))
+}
+
+func autoCaptureOutputPath(cfg AutoCaptureConfig, batchID string, shotID string, index int, view CameraViewConfig) (string, error) {
+	dir := strings.TrimSpace(cfg.Output.Directory)
+	if dir == "" {
+		dir = DefaultAutoCaptureDirectory()
+	}
+	if err := os.MkdirAll(dir, privateDirMode); err != nil {
+		return "", err
+	}
+	ext := strings.ToLower(strings.TrimPrefix(cfg.Output.ImageFormat, "."))
+	if ext == "jpeg" {
+		ext = "jpg"
+	}
+	if ext == "" {
+		ext = "png"
+	}
+	name := cfg.Output.FilenameTemplate
+	if strings.TrimSpace(name) == "" {
+		name = "{timestamp_local}_{batch_id}_{shot_index}_{view_name}_{mode}.{ext}"
+	}
+	replacements := map[string]string{
+		"{timestamp_local}": time.Now().Format("20060102_150405"),
+		"{batch_id}":        batchID,
+		"{shot_id}":         shotID,
+		"{shot_index}":      fmt.Sprintf("%02d", index),
+		"{view_id}":         safeFilenamePart(view.ID),
+		"{view_name}":       safeFilenamePart(view.Name),
+		"{mode}":            safeFilenamePart(cfg.Capture.Mode),
+		"{ext}":             ext,
+	}
+	for old, value := range replacements {
+		name = strings.ReplaceAll(name, old, value)
+	}
+	name = safeFilenamePart(name)
+	if filepath.Ext(name) == "" {
+		name += "." + ext
+	}
+	return filepath.Join(dir, name), nil
+}
+
+func captureStreamFrameWithFFmpeg(ctx context.Context, cfg AutoCaptureStreamConfig, outputPath string, logPath string) error {
+	timeout := time.Duration(cfg.CaptureTimeoutMS) * time.Millisecond
+	if timeout <= 0 {
+		timeout = 10 * time.Second
+	}
+	commandCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	args, err := splitCommandLine(cfg.InputArgs)
+	if err != nil {
+		return fmt.Errorf("ffmpeg入力引数を解釈できません: %w", err)
+	}
+	outputInserted := false
+	for i := range args {
+		if strings.Contains(args[i], "{output}") {
+			args[i] = strings.ReplaceAll(args[i], "{output}", outputPath)
+			outputInserted = true
+		}
+	}
+	if !outputInserted {
+		args = append([]string{"-y"}, args...)
+		args = append(args, "-frames:v", "1", outputPath)
+	}
+	diagAutoCapture(logPath, "stream ffmpeg begin: path=%q args=%q output=%q timeout_ms=%d", cfg.FFmpegPath, strings.Join(args, " "), outputPath, timeout.Milliseconds())
+	cmd := exec.CommandContext(commandCtx, cfg.FFmpegPath, args...) // #nosec G204 -- user-configured local ffmpeg command for capture source.
+	output, err := cmd.CombinedOutput()
+	if commandCtx.Err() == context.DeadlineExceeded {
+		return fmt.Errorf("ffmpegによるStream切り出しがタイムアウトしました。ffmpegパス、入力引数、Stream Cameraの表示状態を確認してください。")
+	}
+	if err != nil {
+		trimmed := strings.TrimSpace(string(output))
+		if len(trimmed) > 600 {
+			trimmed = trimmed[len(trimmed)-600:]
+		}
+		return fmt.Errorf("ffmpegによるStream切り出しに失敗しました: %v %s", err, trimmed)
+	}
+	if !fileHasContent(outputPath) {
+		return fmt.Errorf("ffmpegは終了しましたが画像が作成されませんでした。入力引数と出力先を確認してください。")
+	}
+	diagAutoCapture(logPath, "stream ffmpeg success: output=%q", outputPath)
+	return nil
+}
+
+func splitCommandLine(input string) ([]string, error) {
+	args := make([]string, 0)
+	var current strings.Builder
+	var quote rune
+	escaped := false
+	for _, r := range input {
+		switch {
+		case escaped:
+			current.WriteRune(r)
+			escaped = false
+		case r == '\\':
+			escaped = true
+		case quote != 0:
+			if r == quote {
+				quote = 0
+			} else {
+				current.WriteRune(r)
+			}
+		case r == '\'' || r == '"':
+			quote = r
+		case r == ' ' || r == '\t' || r == '\n' || r == '\r':
+			if current.Len() > 0 {
+				args = append(args, current.String())
+				current.Reset()
+			}
+		default:
+			current.WriteRune(r)
+		}
+	}
+	if escaped {
+		current.WriteRune('\\')
+	}
+	if quote != 0 {
+		return nil, fmt.Errorf("クォートが閉じられていません")
+	}
+	if current.Len() > 0 {
+		args = append(args, current.String())
+	}
+	return args, nil
+}
+
+func safeFilenamePart(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		value = "capture"
+	}
+	replacer := strings.NewReplacer("\\", "_", "/", "_", ":", "_", "*", "_", "?", "_", "\"", "_", "<", "_", ">", "_", "|", "_")
+	value = replacer.Replace(value)
+	value = strings.Trim(value, ". ")
+	if value == "" {
+		return "capture"
+	}
+	return value
 }
 
 func SnapshotVRChatPresence(logDir string) ([]PresenceUser, string) {
