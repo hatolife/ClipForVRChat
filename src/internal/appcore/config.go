@@ -13,6 +13,8 @@ const (
 	privateFileMode os.FileMode = 0600
 )
 
+const oldDesktopFFmpegInputArgs = "-f gdigrab -framerate 30 -i desktop"
+
 type Config struct {
 	Image              ImageConfig              `json:"image"`
 	Output             OutputConfig             `json:"output"`
@@ -238,7 +240,7 @@ func DefaultAutoCaptureConfig() AutoCaptureConfig {
 		},
 		Stream: AutoCaptureStreamConfig{
 			FFmpegPath:       "ffmpeg",
-			InputArgs:        "-f gdigrab -framerate 30 -i desktop",
+			InputArgs:        DefaultAutoCaptureFFmpegInputArgs(),
 			CaptureTimeoutMS: 10000,
 			StartDelayMS:     1000,
 		},
@@ -422,8 +424,8 @@ func (c *AutoCaptureConfig) Normalize() {
 		c.Stream.FFmpegPath = "ffmpeg"
 	}
 	c.Stream.InputArgs = strings.TrimSpace(c.Stream.InputArgs)
-	if c.Stream.InputArgs == "" {
-		c.Stream.InputArgs = "-f gdigrab -framerate 30 -i desktop"
+	if c.Stream.InputArgs == "" || c.Stream.InputArgs == oldDesktopFFmpegInputArgs {
+		c.Stream.InputArgs = DefaultAutoCaptureFFmpegInputArgs()
 	}
 	if c.Stream.CaptureTimeoutMS <= 0 {
 		c.Stream.CaptureTimeoutMS = 10000
@@ -532,6 +534,10 @@ func DefaultAutoCaptureDirectory() string {
 		return filepath.Join(home, "Pictures", "VRChat", "VRC-AutoCapture")
 	}
 	return ""
+}
+
+func DefaultAutoCaptureFFmpegInputArgs() string {
+	return "-f gdigrab -framerate 30 -i title=VRChat"
 }
 
 func DefaultVRChatLogDirectory() string {
