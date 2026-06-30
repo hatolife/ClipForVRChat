@@ -6,4 +6,4 @@
 - [x] 旧desktop初期値を既存configから自動移行する
 - [x] 設定画面の説明とplaceholderを更新する
 - [x] Go/frontendテストを確認する
-- [ ] release/v0.1.8へ取り込み、次RCタグをpushしてCIを確認する
+- [x] release/v0.1.8へ取り込み、次RCタグをpushしてCIを確認する
