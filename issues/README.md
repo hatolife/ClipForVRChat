@@ -131,6 +131,7 @@
 | 124 | [自動撮影Stream方式で白画像になるtitle取得を避ける](124-capture-vrchat-window-region-instead-of-title.md) | 要確認 | `v0.1.8` | VRChatウィンドウtitle直接取得ではなく画面上のウィンドウ範囲を切り出す。 |
 | 125 | [構図ごとに現在Pose追加とカメラ移動ボタンを配置する](125-add-per-view-pose-add-and-move-camera.md) | 要確認 | `v0.1.8` | 構図カード内に現在Pose追加と設定Poseへのカメラ移動ボタンを追加する。 |
 | 126 | [自動撮影OSCの押下状態を解除するデバッグボタンを追加する](126-add-auto-capture-osc-recovery-button.md) | 要確認 | `v0.1.8` | User Camera関連OSCをfalse/Offへ戻すデバッグボタンを追加する。 |
+| 127 | [v0.1.8最小要件のtodoを再整理する](127-restate-v018-minimum-requirements-todo.md) | 完了 | `v0.1.8` | v0.1.8の最小要件を大項目/小項目でtodoへ再整理する。 |
 
 ## 状態の意味
 
