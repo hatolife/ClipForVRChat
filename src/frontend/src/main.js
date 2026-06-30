@@ -1508,9 +1508,9 @@ createApp({
               </div>
             </div>
             <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
-              <div><strong>ffmpeg入力引数</strong><p>ffmpegの入力指定です。初期値は確認用のデスクトップ全体取得です。VRChat Stream Cameraだけを取得する場合は、環境に合う入力指定へ変更してください。</p></div>
+              <div><strong>ffmpeg入力引数</strong><p>ffmpegの入力指定です。初期値はVRChatウィンドウ取得です。デスクトップ全体を撮りたい場合だけ明示的に desktop を指定してください。</p></div>
               <label>
-                <input v-model="autoCaptureSettings.stream.inputArgs" :disabled="autoCaptureSettings.capture.mode !== 'stream'" placeholder="-f gdigrab -framerate 30 -i desktop" />
+                <input v-model="autoCaptureSettings.stream.inputArgs" :disabled="autoCaptureSettings.capture.mode !== 'stream'" placeholder="-f gdigrab -framerate 30 -i title=VRChat" />
               </label>
             </div>
             <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
