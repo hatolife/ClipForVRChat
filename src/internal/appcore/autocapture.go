@@ -49,6 +49,91 @@ type CameraPoseSnapshot struct {
 	Configured bool             `json:"configured"`
 }
 
+func MoveUserCameraToView(ctx context.Context, cfg Config, viewID string) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	cfg.Normalize()
+	ac := cfg.AutoCapture
+	viewID = strings.TrimSpace(viewID)
+	var view CameraViewConfig
+	found := false
+	for _, candidate := range ac.Views {
+		if candidate.ID == viewID {
+			view = candidate
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("構図が見つかりません: %s", viewID)
+	}
+	logPath := cfg.DiagnosticLogPath
+	client := oscClient{host: ac.OSC.Host, port: ac.OSC.SendPort}
+	diagAutoCapture(logPath, "move camera open begin: target=%s:%d view_id=%q", ac.OSC.Host, ac.OSC.SendPort, viewID)
+	if err := client.open(); err != nil {
+		diagAutoCapture(logPath, "move camera open error: target=%s:%d view_id=%q err=%v", ac.OSC.Host, ac.OSC.SendPort, viewID, err)
+		return err
+	}
+	defer client.close()
+	cameraMode := int32(1)
+	if ac.Capture.Mode == "stream" {
+		cameraMode = 2
+	}
+	if err := client.sendInt("/usercamera/Mode", cameraMode); err != nil {
+		diagAutoCapture(logPath, "move camera mode error: view_id=%q mode=%d err=%v", viewID, cameraMode, err)
+		return err
+	}
+	if !sleepContext(ctx, 500*time.Millisecond) {
+		return ctx.Err()
+	}
+	runner := AutoCaptureRunner{Config: cfg}
+	runner.applyCameraView(client, view)
+	sentOptions := sendOptionalFloat(client, "/usercamera/Zoom", view.Zoom) +
+		sendOptionalFloat(client, "/usercamera/Exposure", view.Exposure) +
+		sendOptionalFloat(client, "/usercamera/FocalDistance", view.FocalDistance) +
+		sendOptionalFloat(client, "/usercamera/Aperture", view.Aperture) +
+		sendOptionalBool(client, "/usercamera/LookAtMe", view.LookAtMe) +
+		sendOptionalBool(client, "/usercamera/ShowUIInCamera", view.ShowUIInCamera) +
+		sendOptionalBool(client, "/usercamera/LocalPlayer", view.LocalPlayer) +
+		sendOptionalBool(client, "/usercamera/RemotePlayer", view.RemotePlayer) +
+		sendOptionalBool(client, "/usercamera/Environment", view.Environment)
+	diagAutoCapture(logPath, "move camera complete: view_id=%q mode=%d optional_params=%d", viewID, cameraMode, sentOptions)
+	return nil
+}
+
+func ResetUserCameraOSC(ctx context.Context, cfg Config) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	cfg.Normalize()
+	ac := cfg.AutoCapture
+	logPath := cfg.DiagnosticLogPath
+	client := oscClient{host: ac.OSC.Host, port: ac.OSC.SendPort}
+	diagAutoCapture(logPath, "osc recovery open begin: target=%s:%d", ac.OSC.Host, ac.OSC.SendPort)
+	if err := client.open(); err != nil {
+		diagAutoCapture(logPath, "osc recovery open error: target=%s:%d err=%v", ac.OSC.Host, ac.OSC.SendPort, err)
+		return err
+	}
+	defer client.close()
+	for _, address := range []string{"/usercamera/Capture", "/usercamera/Close", "/usercamera/Streaming"} {
+		if err := client.sendBool(address, false); err != nil {
+			diagAutoCapture(logPath, "osc recovery bool error: address=%q err=%v", address, err)
+			return err
+		}
+		diagAutoCapture(logPath, "osc recovery bool success: address=%q value=false", address)
+		if !sleepContext(ctx, 100*time.Millisecond) {
+			return ctx.Err()
+		}
+	}
+	if err := client.sendInt("/usercamera/Mode", 0); err != nil {
+		diagAutoCapture(logPath, "osc recovery mode error: err=%v", err)
+		return err
+	}
+	diagAutoCapture(logPath, "osc recovery mode success: value=0")
+	return nil
+}
+
 func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 	cfg := r.Config
 	cfg.Normalize()
@@ -439,6 +524,10 @@ func captureStreamFrameWithFFmpeg(ctx context.Context, cfg AutoCaptureStreamConf
 	if err != nil {
 		return fmt.Errorf("ffmpeg入力引数を解釈できません: %w", err)
 	}
+	args, err = expandFFmpegInputPlaceholders(ctx, args, logPath)
+	if err != nil {
+		return err
+	}
 	outputInserted := false
 	for i := range args {
 		if strings.Contains(args[i], "{output}") {
@@ -468,6 +557,83 @@ func captureStreamFrameWithFFmpeg(ctx context.Context, cfg AutoCaptureStreamConf
 	}
 	diagAutoCapture(logPath, "stream ffmpeg success: output=%q", outputPath)
 	return nil
+}
+
+type windowRect struct {
+	X      int `json:"x"`
+	Y      int `json:"y"`
+	Width  int `json:"width"`
+	Height int `json:"height"`
+}
+
+func expandFFmpegInputPlaceholders(ctx context.Context, args []string, logPath string) ([]string, error) {
+	needsWindow := false
+	for _, arg := range args {
+		if strings.Contains(arg, "{window_") {
+			needsWindow = true
+			break
+		}
+	}
+	if !needsWindow {
+		return args, nil
+	}
+	rect, err := detectVRChatWindowRect(ctx, logPath)
+	if err != nil {
+		return nil, err
+	}
+	replacements := map[string]string{
+		"{window_x}":      fmt.Sprintf("%d", rect.X),
+		"{window_y}":      fmt.Sprintf("%d", rect.Y),
+		"{window_width}":  fmt.Sprintf("%d", rect.Width),
+		"{window_height}": fmt.Sprintf("%d", rect.Height),
+	}
+	out := make([]string, len(args))
+	for i, arg := range args {
+		for old, value := range replacements {
+			arg = strings.ReplaceAll(arg, old, value)
+		}
+		out[i] = arg
+	}
+	diagAutoCapture(logPath, "stream window rect resolved: x=%d y=%d width=%d height=%d", rect.X, rect.Y, rect.Width, rect.Height)
+	return out, nil
+}
+
+func detectVRChatWindowRect(ctx context.Context, logPath string) (windowRect, error) {
+	var rect windowRect
+	if strings.TrimSpace(os.Getenv("OS")) != "Windows_NT" && filepath.Separator != '\\' {
+		return rect, fmt.Errorf("VRChatウィンドウ範囲の自動取得はWindowsでのみ利用できます。ffmpeg入力引数を手動指定してください。")
+	}
+	commandCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	script := `$ErrorActionPreference='Stop'; Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public static class Win32Rect {
+  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
+  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
+}
+"@; $p = Get-Process VRChat -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1; if ($null -eq $p) { throw 'VRChatのウィンドウが見つかりません。VRChatを起動し、最小化を解除してください。' }; $r = New-Object Win32Rect+RECT; if (-not [Win32Rect]::GetWindowRect($p.MainWindowHandle, [ref]$r)) { throw 'VRChatウィンドウの位置を取得できません。' }; [pscustomobject]@{x=$r.Left;y=$r.Top;width=($r.Right-$r.Left);height=($r.Bottom-$r.Top)} | ConvertTo-Json -Compress`
+	cmd := exec.CommandContext(commandCtx, "powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script) // #nosec G204 -- fixed Windows window-rect query.
+	output, err := cmd.CombinedOutput()
+	if commandCtx.Err() == context.DeadlineExceeded {
+		return rect, fmt.Errorf("VRChatウィンドウ位置の取得がタイムアウトしました。VRChatが起動しているか確認してください。")
+	}
+	if err != nil {
+		trimmed := strings.TrimSpace(string(output))
+		diagAutoCapture(logPath, "stream window rect error: err=%v output=%q", err, trimmed)
+		if trimmed != "" {
+			return rect, fmt.Errorf("VRChatウィンドウ位置を取得できません: %s", trimmed)
+		}
+		return rect, fmt.Errorf("VRChatウィンドウ位置を取得できません: %v", err)
+	}
+	if err := json.Unmarshal(output, &rect); err != nil {
+		diagAutoCapture(logPath, "stream window rect parse error: err=%v output=%q", err, strings.TrimSpace(string(output)))
+		return rect, fmt.Errorf("VRChatウィンドウ位置の取得結果を解釈できません: %w", err)
+	}
+	if rect.Width <= 0 || rect.Height <= 0 {
+		return rect, fmt.Errorf("VRChatウィンドウサイズが不正です: %dx%d", rect.Width, rect.Height)
+	}
+	return rect, nil
 }
 
 func ResolveFFmpegPath(ffmpegPath string) (string, error) {

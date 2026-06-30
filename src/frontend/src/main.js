@@ -905,6 +905,39 @@ createApp({
         this.error = String(err)
       }
     },
+    async moveCameraToView(view) {
+      if (!view?.id) return
+      if (!api?.MoveCameraToView) {
+        this.error = 'カメラ移動APIが利用できません。'
+        return
+      }
+      this.error = ''
+      try {
+        await api.MoveCameraToView(view.id)
+        this.toast = 'カメラを構図のPoseへ移動しました'
+        setTimeout(() => {
+          this.toast = ''
+        }, 1800)
+      } catch (err) {
+        this.error = String(err)
+      }
+    },
+    async resetCameraOSC() {
+      if (!api?.ResetCameraOSC) {
+        this.error = 'カメラOSCリセットAPIが利用できません。'
+        return
+      }
+      this.error = ''
+      try {
+        await api.ResetCameraOSC()
+        this.toast = 'カメラOSCをリセットしました'
+        setTimeout(() => {
+          this.toast = ''
+        }, 1800)
+      } catch (err) {
+        this.error = String(err)
+      }
+    },
     async resetCameraPoseToDefault(view) {
       if (!view?.id) return
       if (!api?.ResetCameraPoseToDefault) {
@@ -1394,8 +1427,8 @@ createApp({
                   <p>「撮影する」がONの構図を上から順番に撮影します。</p>
                 </div>
                 <div class="button-row">
-                  <button type="button" @click="addCurrentCameraPoseAsView">現在Poseから追加</button>
                   <button type="button" class="secondary" @click="resetCameraViewsToDefaults">初期3構図に戻す</button>
+                  <button type="button" class="secondary" @click="resetCameraOSC">カメラOSCをリセット</button>
                 </div>
               </div>
               <div v-if="autoCaptureViews.length" class="view-list">
@@ -1429,7 +1462,9 @@ createApp({
                   <div class="view-actions">
                     <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, -1)" :disabled="index === 0">↑</button>
                     <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, 1)" :disabled="index === autoCaptureViews.length - 1">↓</button>
+                    <button type="button" class="secondary" @click="addCurrentCameraPoseAsView">現在Poseから追加</button>
                     <button type="button" class="secondary" @click="saveCurrentCameraPoseToView(cameraView)">現在Poseを保存</button>
+                    <button type="button" class="secondary" @click="moveCameraToView(cameraView)">このPoseへカメラ移動</button>
                     <button type="button" class="secondary" @click="testAutoCaptureView(cameraView)">テスト撮影</button>
                     <button type="button" class="secondary" @click="resetCameraPoseToDefault(cameraView)">初期Poseへ戻す</button>
                     <button type="button" class="secondary" @click="duplicateAutoCaptureView(cameraView)">複製</button>
@@ -1508,9 +1543,9 @@ createApp({
               </div>
             </div>
             <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
-              <div><strong>ffmpeg入力引数</strong><p>ffmpegの入力指定です。初期値はVRChatウィンドウ取得です。デスクトップ全体を撮りたい場合だけ明示的に desktop を指定してください。</p></div>
+              <div><strong>ffmpeg入力引数</strong><p>ffmpegの入力指定です。初期値はVRChatウィンドウの画面範囲だけを切り出します。デスクトップ全体を撮りたい場合だけ明示的に desktop を指定してください。</p></div>
               <label>
-                <input v-model="autoCaptureSettings.stream.inputArgs" :disabled="autoCaptureSettings.capture.mode !== 'stream'" placeholder="-f gdigrab -framerate 30 -i title=VRChat" />
+                <input v-model="autoCaptureSettings.stream.inputArgs" :disabled="autoCaptureSettings.capture.mode !== 'stream'" placeholder="-f gdigrab -framerate 30 -offset_x {window_x} -offset_y {window_y} -video_size {window_width}x{window_height} -i desktop" />
               </label>
             </div>
             <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
