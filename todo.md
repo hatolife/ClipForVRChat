@@ -1,11 +1,9 @@
 # Current Todo
 
-- [x] rc9実機ログからffmpeg/Stream問題を確認する
-- [x] ffmpeg確認・導入導線のIssueを作成する
-- [x] ffmpeg存在確認APIを実装する
-- [x] winget install ffmpeg実行APIを実装する
-- [x] 自動撮影タブに状態表示とボタンを追加する
-- [x] Stream方式でVRChat Stream Cameraモードを開くよう修正する
-- [x] ffmpeg未検出時の撮影エラーを分かりやすくする
+- [x] rc10実機結果からデスクトップ撮影継続を確認する
+- [x] デスクトップ全体撮影回避Issueを作成する
+- [x] ffmpeg入力引数の初期値をVRChatウィンドウ取得へ変更する
+- [x] 旧desktop初期値を既存configから自動移行する
+- [x] 設定画面の説明とplaceholderを更新する
 - [x] Go/frontendテストを確認する
-- [x] release/v0.1.8へ取り込み、次RCタグをpushしてCIを確認する
+- [ ] release/v0.1.8へ取り込み、次RCタグをpushしてCIを確認する
