@@ -131,6 +131,7 @@ createApp({
       autoCapture.schedule ||= {}
       autoCapture.osc ||= {}
       autoCapture.capture ||= {}
+      autoCapture.stream ||= {}
       autoCapture.output ||= {}
       autoCapture.presence ||= {}
       autoCapture.discord ||= {}
@@ -936,6 +937,29 @@ createApp({
         this.error = String(err)
       }
     },
+    async testAutoCaptureView(view) {
+      if (!view?.id) return
+      if (!api?.TestAutoCaptureView) {
+        this.error = 'テスト撮影APIが利用できません。'
+        return
+      }
+      this.error = ''
+      this.toast = 'テスト撮影中です'
+      try {
+        const results = await api.TestAutoCaptureView(view.id)
+        const firstError = (results || []).find((result) => result?.error)?.error
+        if (firstError) {
+          this.error = firstError
+        }
+        this.toast = 'テスト撮影を実行しました'
+        setTimeout(() => {
+          this.toast = ''
+        }, 1800)
+      } catch (err) {
+        this.error = String(err)
+        this.toast = ''
+      }
+    },
     async checkForUpdate() {
       if (!api?.CheckForUpdate || this.updateSettings.checkEnabled === false) {
         this.updateInfo = { available: false, currentVersion: '', currentReleaseTime: '', latestVersion: '', latestReleasePublished: '', url: '' }
@@ -1322,8 +1346,8 @@ createApp({
             <h3>自動撮影</h3>
             <div class="settings-explainer">
               <strong>VRChatのUser CameraをOSCで操作し、指定間隔で写真を撮影する機能です。</strong>
-              <p>VRChat側でOSCを有効にし、Photo方式ではVRChat内でUser Cameraを表示した状態で使います。写真保存先を監視し、撮影された画像を検出してサイドカーJSONやDiscord投稿に同席ユーザー情報を紐づけます。</p>
-              <p>正面、背後、斜めの初期構図にはPoseと拡大率が入っています。必要に応じてVRChat内でUser Cameraを配置し、「現在Poseを保存」で構図を上書きしてください。</p>
+              <p>VRChat側でOSCを有効にし、Stream方式ではVRChatのStream Camera映像をffmpegで静止画として切り出します。Photo方式はVRChat標準写真を使うフォールバックです。</p>
+              <p>正面、背後、斜めの初期構図にはプレーヤーを写す想定のPoseと拡大率が入っています。構図ごとのテスト撮影で見え方を確認できます。</p>
               <p>v0.1.8では撮影時の解像度変更は行わず、VRChat側の現在のカメラ解像度設定で保存します。</p>
             </div>
             <section class="auto-capture-views" aria-label="構図プリセット">
@@ -1369,6 +1393,7 @@ createApp({
                     <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, -1)" :disabled="index === 0">↑</button>
                     <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, 1)" :disabled="index === autoCaptureViews.length - 1">↓</button>
                     <button type="button" class="secondary" @click="saveCurrentCameraPoseToView(cameraView)">現在Poseを保存</button>
+                    <button type="button" class="secondary" @click="testAutoCaptureView(cameraView)">テスト撮影</button>
                     <button type="button" class="secondary" @click="resetCameraPoseToDefault(cameraView)">初期Poseへ戻す</button>
                     <button type="button" class="secondary" @click="duplicateAutoCaptureView(cameraView)">複製</button>
                     <button type="button" class="secondary danger-button" @click="deleteAutoCaptureView(cameraView)">削除</button>
@@ -1416,21 +1441,42 @@ createApp({
               </label>
             </div>
             <div class="setting-row">
-              <div><strong>Pose鮮度</strong><p>現在のカメラ位置として扱う最大秒数です。</p></div>
+              <div><strong>現在Pose保存の有効秒数</strong><p>「現在Poseを保存」を押した時に、何秒以内にVRChatから受信したPoseなら保存に使うかです。撮影間隔ではありません。</p></div>
               <label>
                 <input type="number" min="1" step="1" v-model.number="autoCaptureSettings.osc.poseFreshnessSec" />
               </label>
             </div>
             <div class="setting-row">
-              <div><strong>撮影方式</strong><p>v0.1.8ではVRChat標準のPhoto方式で撮影します。</p></div>
+              <div><strong>撮影方式</strong><p>Streamはffmpegで映像を静止画化します。PhotoはVRChat標準写真を使うためシャッター音が出ます。</p></div>
               <label>
-                <input value="Photo" disabled />
+                <select v-model="autoCaptureSettings.capture.mode">
+                  <option value="stream">Stream</option>
+                  <option value="photo">Photo</option>
+                </select>
+              </label>
+            </div>
+            <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
+              <div><strong>ffmpegパス</strong><p>Stream方式で静止画を切り出すffmpeg.exeのパスです。PATHにある場合はffmpegのままで使えます。</p></div>
+              <label>
+                <input v-model="autoCaptureSettings.stream.ffmpegPath" :disabled="autoCaptureSettings.capture.mode !== 'stream'" placeholder="ffmpeg" />
+              </label>
+            </div>
+            <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
+              <div><strong>ffmpeg入力引数</strong><p>Stream Cameraを取得するための入力指定です。例: 画面全体なら -f gdigrab -framerate 30 -i desktop。</p></div>
+              <label>
+                <input v-model="autoCaptureSettings.stream.inputArgs" :disabled="autoCaptureSettings.capture.mode !== 'stream'" placeholder="-f gdigrab -framerate 30 -i desktop" />
+              </label>
+            </div>
+            <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
+              <div><strong>Stream切り出しタイムアウト</strong><p>ffmpegが1枚の静止画を作成するまで待つ最大ミリ秒です。</p></div>
+              <label>
+                <input type="number" min="1000" max="60000" step="500" v-model.number="autoCaptureSettings.stream.captureTimeoutMs" :disabled="autoCaptureSettings.capture.mode !== 'stream'" />
               </label>
             </div>
             <div class="setting-row">
-              <div><strong>自動撮影管理フォルダ</strong><p>v0.1.8のPhoto方式ではVRChat写真フォルダを検出し、関連ファイルを画像と同じ場所へ保存します。</p></div>
+              <div><strong>Stream切り出し保存先</strong><p>Stream方式で切り出した画像の保存先です。Photo方式ではVRChat写真フォルダに保存された画像を使います。</p></div>
               <label>
-                <input v-model="autoCaptureSettings.output.directory" placeholder="%USERPROFILE%/Pictures/VRC-AutoCapture" />
+                <input v-model="autoCaptureSettings.output.directory" placeholder="%USERPROFILE%/Pictures/VRChat/VRC-AutoCapture" />
               </label>
             </div>
             <div class="setting-row">

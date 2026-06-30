@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -20,6 +21,9 @@ func TestDefaultAutoCaptureConfig(t *testing.T) {
 	}
 	if len(cfg.AutoCapture.Views) != 3 {
 		t.Fatalf("default views = %d, want 3", len(cfg.AutoCapture.Views))
+	}
+	if cfg.AutoCapture.Capture.Mode != "stream" || cfg.AutoCapture.Stream.FFmpegPath == "" {
+		t.Fatalf("unexpected stream defaults: capture=%+v stream=%+v", cfg.AutoCapture.Capture, cfg.AutoCapture.Stream)
 	}
 	if cfg.AutoCapture.Views[0].ID != "front" || cfg.AutoCapture.Views[0].Calibrated || cfg.AutoCapture.Views[0].Zoom == nil {
 		t.Fatalf("unexpected first view: %+v", cfg.AutoCapture.Views[0])
@@ -41,7 +45,7 @@ func TestAutoCaptureConfigNormalize(t *testing.T) {
 	if cfg.AutoCapture.Schedule.CaptureIntervalSec != 10 {
 		t.Fatalf("CaptureIntervalSec = %d, want 10", cfg.AutoCapture.Schedule.CaptureIntervalSec)
 	}
-	if cfg.AutoCapture.Capture.Mode != "photo" || cfg.AutoCapture.Capture.ConcurrentMode != "sequential" {
+	if cfg.AutoCapture.Capture.Mode != "stream" || cfg.AutoCapture.Capture.ConcurrentMode != "sequential" {
 		t.Fatalf("capture normalize failed: %+v", cfg.AutoCapture.Capture)
 	}
 	if cfg.AutoCapture.Capture.RequestedCameraCount != 4 {
@@ -49,6 +53,37 @@ func TestAutoCaptureConfigNormalize(t *testing.T) {
 	}
 	if len(cfg.AutoCapture.Views) != 3 {
 		t.Fatalf("default views = %d, want 3", len(cfg.AutoCapture.Views))
+	}
+	if cfg.AutoCapture.Stream.FFmpegPath != "ffmpeg" || cfg.AutoCapture.Stream.CaptureTimeoutMS != 10000 {
+		t.Fatalf("stream normalize failed: %+v", cfg.AutoCapture.Stream)
+	}
+}
+
+func TestSplitCommandLine(t *testing.T) {
+	got, err := splitCommandLine(`-f gdigrab -i "title=VRChat Window" -frames:v 1`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"-f", "gdigrab", "-i", "title=VRChat Window", "-frames:v", "1"}
+	if len(got) != len(want) {
+		t.Fatalf("args = %#v, want %#v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("args = %#v, want %#v", got, want)
+		}
+	}
+}
+
+func TestAutoCaptureOutputPath(t *testing.T) {
+	cfg := DefaultConfig().AutoCapture
+	cfg.Output.Directory = t.TempDir()
+	path, err := autoCaptureOutputPath(cfg, "batch-test", "shot-test", 2, CameraViewConfig{ID: "front", Name: "正面"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Dir(path) != cfg.Output.Directory || filepath.Ext(path) != ".png" || !strings.Contains(filepath.Base(path), "02") {
+		t.Fatalf("output path = %q", path)
 	}
 }
 

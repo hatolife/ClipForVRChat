@@ -13,12 +13,25 @@ VRChat内のUser Cameraを外部から制御し、登録した構図を一定間
 - 「自動撮影」タブからOSC、スケジュール、撮影方式、出力、Discord投稿方針を設定できる。
 - 初期値では自動撮影はOFFで、明示的にONにした場合のみ動作する。
 - Sequential + Photo方式で有効な構図を順番に適用し、`/usercamera/Capture` を送信できる。
-- v0.1.8では実装済みのPhoto方式のみを設定画面に出し、未実装のStream/SpoutやDolly Multiを選択肢として出さない。
+- v0.1.8ではStream方式をffmpeg外部実行で実装し、Photo方式はVRChat標準写真を使うフォールバックとして残す。
 - 撮影画像に対応するsidecar JSONが作成され、Batch ID、Shot ID、構図、撮影方式、ユーザースナップショットが保存される。
 - 既存のVRChat写真自動処理、スクリーンショット自動処理、手動画像処理が壊れない。
 
 ## 実装メモ
 
-- v0.1.8 RCではSequential + Photo方式を実装対象とする。
-- Stream/Spout、Camera Dolly Multiはv0.1.8の設定画面には出さない。解像度一時変更はIssue 118として断念を明示する。
+- v0.1.8 RCではSequential + Stream方式を主経路、Sequential + Photo方式をフォールバックとして実装対象とする。
+- Stream方式はffmpeg外部実行で1フレームを静止画化する。Spout2直接受信、Camera Dolly Multi、解像度一時変更はv0.1.8では出さない。
 - 初期構図は正面、背後、斜めの妥当なPoseと拡大率を持つ。撮影対象は構図ごとの「撮影する」トグルで決め、現在Pose保存は任意の上書き操作として扱う。
+
+## 2026-06-30 調査: v0.1.8 Stream/Spout方式
+
+### 問題
+自動撮影のStream/Spout方式について、現行のGo/Wails/Windowsリリース構成で最小実装経路が未確定。
+
+### 期待する挙動
+外部依存なしで可能な範囲、Spout2/Windows Graphics Capture/ffmpeg導入時の影響、v0.1.8で現実的な段階的実装案、触るべきファイルを整理する。
+
+### 受け入れ条件
+- 現行コードと設定構造を前提に実装可能性が整理されている。
+- 導入候補ごとのビルド・配布・運用影響が整理されている。
+- v0.1.8に入れるべき最小段階案と対象ファイルが明確になっている。
