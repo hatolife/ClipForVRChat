@@ -2,14 +2,14 @@
 
 ## 問題
 
-v0.1.8の実装はPhoto方式を対象としているが、設定画面にStream方式を選べる項目があり、未実装機能を使えるように見える。
+Spout2直接受信やCamera Dolly Multiなど、まだ実装していない方式を設定画面から選べると、実際に使える機能と誤解される。
 
 ## 期待する挙動
 
-設定画面には実際に動作するPhoto方式だけを表示し、未実装のStream/Spout設定をダミーとして出さない。
+設定画面には実際に動作するStream(ffmpeg)方式とPhoto方式だけを表示し、未実装のSpout2直接受信やCamera Dolly Multi設定をダミーとして出さない。
 
 ## 受け入れ条件
 
-- 自動撮影タブでStream方式を選択できない。
-- v0.1.8はPhoto方式で動作することが設定画面から分かる。
-- 既存configにStreamが残っていても正規化でPhotoへ戻る。
+- 自動撮影タブでStream(ffmpeg)方式とPhoto方式だけを選択できる。
+- Spout2直接受信やCamera Dolly Multiを選択できない。
+- 既存configに未対応方式が残っていても正規化でStreamへ戻る。

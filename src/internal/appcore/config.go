@@ -71,6 +71,7 @@ type AutoCaptureConfig struct {
 	OSC      AutoCaptureOSCConfig      `json:"osc"`
 	Schedule AutoCaptureScheduleConfig `json:"schedule"`
 	Capture  AutoCaptureCaptureConfig  `json:"capture"`
+	Stream   AutoCaptureStreamConfig   `json:"stream"`
 	Output   AutoCaptureOutputConfig   `json:"output"`
 	Presence AutoCapturePresenceConfig `json:"presence"`
 	Discord  AutoCaptureDiscordConfig  `json:"discord"`
@@ -102,6 +103,13 @@ type AutoCaptureCaptureConfig struct {
 	CloseCameraAfterBatch bool   `json:"closeCameraAfterBatch"`
 	SettleDelayMS         int    `json:"settleDelayMs"`
 	ButtonReleaseDelayMS  int    `json:"buttonReleaseDelayMs"`
+}
+
+type AutoCaptureStreamConfig struct {
+	FFmpegPath       string `json:"ffmpegPath"`
+	InputArgs        string `json:"inputArgs"`
+	CaptureTimeoutMS int    `json:"captureTimeoutMs"`
+	StartDelayMS     int    `json:"startDelayMs"`
 }
 
 type AutoCaptureOutputConfig struct {
@@ -219,7 +227,7 @@ func DefaultAutoCaptureConfig() AutoCaptureConfig {
 			CaptureOnStart:             false,
 		},
 		Capture: AutoCaptureCaptureConfig{
-			Mode:                  "photo",
+			Mode:                  "stream",
 			ConcurrentMode:        "sequential",
 			RequestedCameraCount:  1,
 			MultiBackend:          "dolly_multi",
@@ -227,6 +235,12 @@ func DefaultAutoCaptureConfig() AutoCaptureConfig {
 			CloseCameraAfterBatch: true,
 			SettleDelayMS:         1500,
 			ButtonReleaseDelayMS:  200,
+		},
+		Stream: AutoCaptureStreamConfig{
+			FFmpegPath:       "ffmpeg",
+			InputArgs:        "-f gdigrab -framerate 30 -i desktop",
+			CaptureTimeoutMS: 10000,
+			StartDelayMS:     1000,
 		},
 		Output: AutoCaptureOutputConfig{
 			Directory:        DefaultAutoCaptureDirectory(),
@@ -378,8 +392,10 @@ func (c *AutoCaptureConfig) Normalize() {
 	if c.Schedule.MaxBatches < 0 {
 		c.Schedule.MaxBatches = 0
 	}
-	if c.Capture.Mode != "photo" {
-		c.Capture.Mode = "photo"
+	switch c.Capture.Mode {
+	case "photo", "stream":
+	default:
+		c.Capture.Mode = "stream"
 	}
 	switch c.Capture.ConcurrentMode {
 	case "sequential", "multi":
@@ -400,6 +416,29 @@ func (c *AutoCaptureConfig) Normalize() {
 	}
 	if c.Capture.ButtonReleaseDelayMS < 200 {
 		c.Capture.ButtonReleaseDelayMS = 200
+	}
+	c.Stream.FFmpegPath = strings.Trim(strings.TrimSpace(c.Stream.FFmpegPath), `"`)
+	if c.Stream.FFmpegPath == "" {
+		c.Stream.FFmpegPath = "ffmpeg"
+	}
+	c.Stream.InputArgs = strings.TrimSpace(c.Stream.InputArgs)
+	if c.Stream.InputArgs == "" {
+		c.Stream.InputArgs = "-f gdigrab -framerate 30 -i desktop"
+	}
+	if c.Stream.CaptureTimeoutMS <= 0 {
+		c.Stream.CaptureTimeoutMS = 10000
+	}
+	if c.Stream.CaptureTimeoutMS < 1000 {
+		c.Stream.CaptureTimeoutMS = 1000
+	}
+	if c.Stream.CaptureTimeoutMS > 60000 {
+		c.Stream.CaptureTimeoutMS = 60000
+	}
+	if c.Stream.StartDelayMS < 0 {
+		c.Stream.StartDelayMS = 0
+	}
+	if c.Stream.StartDelayMS > 10000 {
+		c.Stream.StartDelayMS = 10000
 	}
 	c.Output.Directory = strings.Trim(strings.TrimSpace(c.Output.Directory), `"`)
 	if c.Output.Directory == "" {
@@ -487,10 +526,10 @@ func DefaultScreenshotsDirectory() string {
 
 func DefaultAutoCaptureDirectory() string {
 	if userProfile := os.Getenv("USERPROFILE"); userProfile != "" {
-		return filepath.Join(userProfile, "Pictures", "VRC-AutoCapture")
+		return filepath.Join(userProfile, "Pictures", "VRChat", "VRC-AutoCapture")
 	}
 	if home, err := os.UserHomeDir(); err == nil && home != "" {
-		return filepath.Join(home, "Pictures", "VRC-AutoCapture")
+		return filepath.Join(home, "Pictures", "VRChat", "VRC-AutoCapture")
 	}
 	return ""
 }
@@ -511,16 +550,16 @@ func DefaultVRChatLogDirectory() string {
 func defaultCameraViews() []CameraViewConfig {
 	return []CameraViewConfig{
 		defaultCameraView("front", "正面", 0, CameraPoseConfig{
-			Position: CameraVector3Config{X: 0, Y: 1.45, Z: 1.25},
+			Position: CameraVector3Config{X: 0, Y: 1.55, Z: 0.9},
 			Rotation: CameraVector3Config{X: 0, Y: 180, Z: 0},
 		}, 1.0),
 		defaultCameraView("back", "背後", 1, CameraPoseConfig{
-			Position: CameraVector3Config{X: 0, Y: 1.45, Z: -1.25},
-			Rotation: CameraVector3Config{X: 0, Y: 0, Z: 0},
+			Position: CameraVector3Config{X: 0, Y: 1.85, Z: -1.6},
+			Rotation: CameraVector3Config{X: 12, Y: 0, Z: 0},
 		}, 1.0),
 		defaultCameraView("diagonal", "斜め", 2, CameraPoseConfig{
-			Position: CameraVector3Config{X: 0.9, Y: 1.55, Z: 1.1},
-			Rotation: CameraVector3Config{X: 0, Y: -140, Z: 0},
+			Position: CameraVector3Config{X: 0.8, Y: 1.75, Z: 1.1},
+			Rotation: CameraVector3Config{X: 8, Y: -145, Z: 0},
 		}, 1.0),
 	}
 }
@@ -547,6 +586,10 @@ func defaultCameraView(id string, name string, order int, pose CameraPoseConfig,
 		CoordinateSpace: "world",
 		Pose:            pose,
 		Zoom:            float64ConfigPtr(zoom),
+		LookAtMe:        boolConfigPtr(true),
+		LocalPlayer:     boolConfigPtr(true),
+		RemotePlayer:    boolConfigPtr(false),
+		Environment:     boolConfigPtr(true),
 		SettleDelayMS:   1500,
 		CaptureDelayMS:  0,
 		Calibrated:      false,
@@ -554,5 +597,9 @@ func defaultCameraView(id string, name string, order int, pose CameraPoseConfig,
 }
 
 func float64ConfigPtr(value float64) *float64 {
+	return &value
+}
+
+func boolConfigPtr(value bool) *bool {
 	return &value
 }
