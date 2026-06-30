@@ -140,6 +140,18 @@
 | 133 | [Stream方式UIとドキュメントをSpout前提へ更新する](133-update-auto-capture-stream-ui-and-docs-for-spout.md) | 要対応 | `v0.1.8` | 自動撮影タブとドキュメントからFFmpeg主経路の誤解をなくし、Stream Camera(Spout)前提にする。 |
 | 134 | [CI/ReleaseでSpoutヘルパーをビルド/同梱する](134-package-spout-helper-in-ci-release.md) | 要対応 | `v0.1.8` | Windows CI/ReleaseでSpoutヘルパーと必要DLL/ライセンスをビルド・同梱・検証する。 |
 | 135 | [Stream Camera/Spout方式の実機確認手順を整備する](135-add-spout-stream-camera-verification-guide.md) | 要対応 | `v0.1.8` | RC実機確認でStream Camera映像そのものを保存できているか確認する手順を作る。 |
+| 136 | [プレイヤー中心ローカル座標系の仕様を確定する](136-investigate-player-local-camera-coordinate-spec.md) | 完了 | `v0.1.8` | 自動撮影構図をプレイヤー位置/向き基準のローカル座標として扱う仕様と実装方針を調査し、実装issueへ分割する。 |
+| 137 | [EXIFへ同席ユーザー情報を書き込む方式を調査する](137-investigate-exif-presence-user-metadata.md) | 完了 | `v0.1.8` | 自動撮影画像へ同席ユーザー情報をEXIF/XMP/PNGメタデータとして保持する方式を調査し、実装issueへ分割する。 |
+| 138 | [`player_local` 座標仕様を確定する](138-define-player-local-coordinate-spec.md) | 要対応 | `v0.1.8` | プレイヤー中心ローカル構図の原点、軸、回転、初期値、既存設定互換を定義する。 |
+| 139 | [ローカルプレイヤー基準Poseの取得可否を実機調査する](139-investigate-player-basis-source.md) | 要対応 | `v0.1.8` | 標準OSC/OSCQuery/ログ等からプレイヤー位置と向きを取得できるか確認する。 |
+| 140 | [`player_local` からUser Camera Poseへの変換処理を実装する](140-implement-player-local-pose-transform.md) | 要対応 | `v0.1.8` | プレイヤー基準Poseがある場合にローカル構図をワールドPoseへ変換する。 |
+| 141 | [自動撮影構図UIへ `player_local` を統合する](141-integrate-player-local-coordinate-ui.md) | 要対応 | `v0.1.8` | 構図設定、現在Pose保存/追加、リセット、移動、テスト撮影を座標系に対応させる。 |
+| 142 | [プレイヤー中心構図の実機確認手順を整備する](142-verify-player-local-camera-compositions.md) | 要対応 | `v0.1.8` | Desktop/VR/アバター差分を含めた正面・背後・斜め構図の確認手順を作る。 |
+| 143 | [自動撮影の埋め込みメタデータschemaを確定する](143-define-autocapture-embedded-metadata-schema.md) | 要対応 | `v0.1.8` | EXIF/PNGメタデータへ入れる撮影情報と同席ユーザー情報のschema、サイズ、プライバシー方針を決める。 |
+| 144 | [PNG/JPEGの埋め込みメタデータwriterを追加する](144-implement-image-metadata-writer.md) | 要対応 | `v0.1.8` | JPEG EXIF APP1、PNG eXIf/iTXtへ非破壊でメタデータを書き込むwriterを追加する。 |
+| 145 | [自動撮影保存処理へEXIF/PNGメタデータ書き込みを統合する](145-integrate-exif-presence-metadata.md) | 要対応 | `v0.1.8` | `finalizeAutoCaptureImage` に埋め込みメタデータ書き込みを接続し、sidecar/Discordと整合させる。 |
+| 146 | [EXIF/埋め込みメタデータ設定とプライバシー説明をUIへ出す](146-expose-exif-privacy-settings.md) | 要対応 | `v0.1.8` | 自動撮影タブで埋め込みメタデータとユーザーID埋め込みを設定できるようにする。 |
+| 147 | [埋め込みメタデータの読み戻し/Discord投稿後/実機検証を整備する](147-verify-embedded-metadata-output.md) | 要対応 | `v0.1.8` | PNG/JPEG読み戻し、Discord投稿後、ユーザー数過多時のメタデータ検証手順を整備する。 |
 
 ## 状態の意味
 
