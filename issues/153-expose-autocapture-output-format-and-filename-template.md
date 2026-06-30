@@ -19,3 +19,7 @@ Photo方式ではVRChat側の保存名を使うことが分かり、設定が適
 - Stream/Spout方式では設定した形式とテンプレートが保存ファイルに反映される。
 - Photo方式ではこの設定がVRChat標準写真のファイル名には反映されないことをUIで説明する。
 - `todo.md` とREADME/SPECの記述を実装状態に合わせる。
+
+## 対応内容
+
+- v0.1.8実装に合わせて対応済み。詳細は `feat/v0.1.8-resolve-issues` の実装、README、SPEC、RELEASE_NOTESを参照。

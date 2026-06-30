@@ -205,6 +205,7 @@ func (a *App) GetOSSLicenses() []OSSLicense {
 		{Name: "golang.design/x/clipboard", License: "MIT", Copyright: "Copyright (c) 2021 Changkun Ou", URL: "https://github.com/golang-design/clipboard"},
 		{Name: "golang.org/x/crypto", License: "BSD-3-Clause", Copyright: "Copyright (c) The Go Authors", URL: "https://cs.opensource.google/go/x/crypto"},
 		{Name: "golang.org/x/image", License: "BSD-3-Clause", Copyright: "Copyright (c) The Go Authors", URL: "https://cs.opensource.google/go/x/image"},
+		{Name: "Spout2", License: "BSD-2-Clause", Copyright: "Copyright (c) 2016-2025, Lynn Jarvis", URL: "https://github.com/leadedge/Spout2"},
 	}
 }
 
@@ -455,6 +456,25 @@ func (a *App) AddCurrentCameraPoseAsView() (appcore.Config, error) {
 	return a.state.Config, nil
 }
 
+func (a *App) SaveCurrentCameraPoseAsPlayerBasis() (appcore.Config, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	cfg := a.state.Config
+	cfg.Normalize()
+	pose, err := a.freshCameraPoseLocked(cfg)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.AutoCapture.PlayerLocal.BasisPose = pose
+	cfg.AutoCapture.PlayerLocal.Calibrated = true
+	cfg.AutoCapture.PlayerLocal.UpdatedAt = time.Now().Format(time.RFC3339)
+	if err := a.saveAutoCaptureConfigFromSettingsLocked(cfg); err != nil {
+		return cfg, err
+	}
+	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "auto-capture player_local basis saved")
+	return a.state.Config, nil
+}
+
 func (a *App) ResetCameraPoseToDefault(viewID string) (appcore.Config, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -534,6 +554,36 @@ func (a *App) ResetCameraOSC() error {
 	a.state.Message = "カメラOSCをリセットしました。"
 	a.mu.Unlock()
 	return nil
+}
+
+func (a *App) CheckSpoutHelper() appcore.SpoutHelperStatus {
+	a.mu.Lock()
+	cfg := a.state.Config
+	cfg.Normalize()
+	cfg.DiagnosticLogPath = appcore.DiagnosticLogPath(a.configPath)
+	a.mu.Unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return appcore.CheckSpoutHelper(ctx, cfg.AutoCapture.Stream, cfg.DiagnosticLogPath)
+}
+
+func (a *App) ListSpoutSenders() appcore.SpoutHelperStatus {
+	a.mu.Lock()
+	cfg := a.state.Config
+	cfg.Normalize()
+	cfg.DiagnosticLogPath = appcore.DiagnosticLogPath(a.configPath)
+	a.mu.Unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	result, err := appcore.ListSpoutSenders(ctx, cfg.AutoCapture.Stream, cfg.DiagnosticLogPath)
+	if err != nil {
+		return appcore.SpoutHelperStatus{Available: true, Message: err.Error(), Senders: result.Senders}
+	}
+	message := fmt.Sprintf("%d件のSpout senderを検出しました。", len(result.Senders))
+	if len(result.Senders) == 0 {
+		message = "Spout senderがありません。VRChatでStream Cameraを起動し、OSCでStreamingを有効にしてください。"
+	}
+	return appcore.SpoutHelperStatus{Available: true, Message: message, Senders: result.Senders}
 }
 
 func (a *App) CheckFFmpeg(ffmpegPath string) FFmpegStatus {
@@ -1096,17 +1146,23 @@ func (a *App) runAutoCaptureScheduler(ctx context.Context, cfg appcore.Config) {
 		}
 		appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler initial_delay complete")
 	}
+	batches := 0
 	if ac.Schedule.CaptureOnStart {
+		if ac.Schedule.MaxBatches > 0 && batches >= ac.Schedule.MaxBatches {
+			appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler skip: reason=%q batches=%d max_batches=%d", "max_batches_before_capture_on_start", batches, ac.Schedule.MaxBatches)
+			return
+		}
 		appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler trigger: reason=%q", "capture_on_start")
 		a.runAutoCaptureBatch(ctx, cfg)
+		batches++
 	}
 	interval := time.Duration(ac.Schedule.CaptureIntervalSec) * time.Second
 	if interval <= 0 {
 		interval = 5 * time.Minute
 	}
+	appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler overlap_policy: synchronous=true skip_if_previous_batch_running=%t", ac.Schedule.SkipIfPreviousBatchRunning)
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
-	batches := 0
 	for {
 		select {
 		case <-ctx.Done():

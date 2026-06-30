@@ -18,3 +18,7 @@ RC確認で、各構図がプレイヤー中心に追従しているか、実機
 - アバター身長差、座り、Cameraを閉じた状態からのStream起動、手動Camera表示中の撮影を確認項目に入れる。
 - 失敗時に必要なログ、config、sidecar、撮影画像を収集する手順を記載する。
 - 確認結果を `issues/110`、`issues/121`、`issues/136` 関連の判断に使える形にする。
+
+## 対応内容
+
+- v0.1.8実装に合わせて対応済み。詳細は `feat/v0.1.8-resolve-issues` の実装、README、SPEC、RELEASE_NOTESを参照。

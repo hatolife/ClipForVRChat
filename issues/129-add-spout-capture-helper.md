@@ -26,3 +26,7 @@ Windows専用の小さな `spout-capture.exe` を追加し、Spout2 SDKを使っ
 - `ReceiveImage` でCPU側ピクセルを受け取り、PNGエンコードして保存する。
 - PNG保存はWindows標準API、WIC、またはライセンス確認済みの小さいPNGライブラリを使う。
 - CLIはGo本体から呼びやすいよう、標準出力JSON、標準エラー診断、終了コードを固定する。
+
+## 対応内容
+
+- v0.1.8実装に合わせて対応済み。詳細は `feat/v0.1.8-resolve-issues` の実装、README、SPEC、RELEASE_NOTESを参照。

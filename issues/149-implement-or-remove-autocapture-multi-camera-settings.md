@@ -17,3 +17,7 @@ v0.1.8でmulti撮影を扱うなら、設定値に従って実カメラ数と撮
 - Multi実装を行う場合は、CapturePlanner相当で `C_eff` とpass数を計算し、テストを追加する。
 - Camera Dolly未対応環境では、設定に従ってSequentialへフォールバックし、その理由を診断ログに出す。
 - UI、README、SPEC、sidecar JSONが、実際に動く撮影方式と矛盾しない。
+
+## 対応内容
+
+- v0.1.8実装に合わせて対応済み。詳細は `feat/v0.1.8-resolve-issues` の実装、README、SPEC、RELEASE_NOTESを参照。

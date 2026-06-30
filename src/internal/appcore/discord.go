@@ -112,6 +112,34 @@ func UploadDiscordWithContent(webhookURL string, filename string, encoded Encode
 	return uploaded, nil
 }
 
+func PostDiscordContent(webhookURL string, content string) (DiscordUpload, error) {
+	var uploaded DiscordUpload
+	webhookID, token, postURL, err := ValidateDiscordWebhookURL(webhookURL)
+	if err != nil {
+		return uploaded, err
+	}
+	payload, err := discordPayloadJSON(content)
+	if err != nil {
+		return uploaded, err
+	}
+	resp, err := http.Post(postURL+"?wait=true", "application/json", bytes.NewReader(payload)) // #nosec G107 -- URL is validated by ValidateDiscordWebhookURL.
+	if err != nil {
+		return uploaded, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return uploaded, fmt.Errorf("Discord投稿に失敗しました: status %d", resp.StatusCode)
+	}
+	var body struct {
+		ID string `json:"id"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&body)
+	uploaded.MessageID = body.ID
+	uploaded.WebhookID = webhookID
+	uploaded.Token = token
+	return uploaded, nil
+}
+
 func discordPayloadJSON(content string) ([]byte, error) {
 	return json.Marshal(discordWebhookPayload{
 		Content: truncateDiscordContent(content),

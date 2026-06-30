@@ -16,3 +16,7 @@ v0.1.8-rc2 でもVRChat写真が保存されず、現在の診断ログでは自
 - OSC接続、Mode、Pose、Capture、Close の送信結果がログに出力される。
 - 撮影前後の写真フォルダ走査件数、検出対象フォルダ、検出成功/失敗理由がログに出力される。
 - Webhook URLなどの秘密情報は診断ログに出力されない。
+
+## 対応内容
+
+- v0.1.8実装に合わせて対応済み。Stream方式はSpout主経路へ置き換え、ffmpeg主導線は廃止。詳細はREADME/SPEC/RELEASE_NOTESを参照。

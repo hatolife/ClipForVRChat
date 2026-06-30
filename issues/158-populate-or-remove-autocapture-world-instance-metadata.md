@@ -18,3 +18,7 @@ VRChat output logなどからworld ID / instance IDを取得できる場合はsi
 - 空文字を「取得済みだが空」と誤解しないJSON表現にする。
 - world/instance IDが個人情報や参加導線になり得る点をプライバシー説明に含める。
 - ログ形式の揺れに対する単体テストを追加する。
+
+## 対応内容
+
+- v0.1.8実装に合わせて対応済み。詳細は `feat/v0.1.8-resolve-issues` の実装、README、SPEC、RELEASE_NOTESを参照。

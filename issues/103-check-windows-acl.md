@@ -21,4 +21,9 @@ Windows実機で `config.json`、`history.json`、`logs/`、`diagnostics/` のAC
 ## 現状
 
 - `reports/2026-06-25/human-verification-guide.md` に確認手順と現時点の確認結果を記録済み。
-- 最終判断はWindows実機での追加確認に委ねる。
+- 2026-07-01に `C:\Users\user\Downloads\ClipForVRChat-v0.1.8-rc11-windows-amd64` の `config.json`、`history.json`、`logs` へ `icacls` を実行し、`Everyone` や広い `Users` 権限が表示されないことを確認した。
+- `diagnostics` は確認時点で未作成だったため、診断データ作成後の時刻付きフォルダはRC実機確認時に同じ観点で再確認する。
+
+## 対応内容
+
+- Windows PowerShell経由で `icacls` を実行し、確認結果を `reports/2026-06-25/human-verification-guide.md` へ追記した。

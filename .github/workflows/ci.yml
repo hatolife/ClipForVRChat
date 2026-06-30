@@ -80,6 +80,21 @@ jobs:
         working-directory: src
         run: go run golang.org/x/vuln/cmd/govulncheck@${{ env.GOVULNCHECK_VERSION }} ./...
 
+      - name: Build Spout helper
+        shell: pwsh
+        run: |
+          cmake -S tools/spout-capture -B build/spout-capture -A x64 -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/spout-capture --config Release --target spout-capture
+
+      - name: Check Spout helper
+        shell: pwsh
+        run: |
+          $helper = Get-ChildItem build/spout-capture -Recurse -Filter spout-capture.exe | Select-Object -First 1
+          if (!$helper) {
+            throw "spout-capture.exe was not created"
+          }
+          & $helper.FullName --help
+
       - name: Add Go bin to PATH
         shell: pwsh
         run: '"$HOME/go/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append'

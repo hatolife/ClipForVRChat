@@ -132,6 +132,18 @@ icacls ClipForVRChat-diagnostics-20260625-150432\config.json
 icacls ClipForVRChat-diagnostics-20260625-150432\logs
 ```
 
+### 追加確認結果 2026-07-01
+
+確認対象:
+
+```text
+C:\Users\user\Downloads\ClipForVRChat-v0.1.8-rc11-windows-amd64
+```
+
+`config.json`、`history.json`、`logs` に対して `icacls` を実行し、いずれも `NT AUTHORITY\SYSTEM`、`BUILTIN\Administrators`、`9800X3D\user` のみが表示されることを確認しました。`Everyone` や広い `Users` 権限は表示されませんでした。
+
+`diagnostics` は確認時点で未作成でした。診断データ作成後の時刻付きフォルダについては、RC実機確認時に同じ観点で再確認します。
+
 ## 3. Windows実機でのGUI/CLI/Explorer確認
 
 ### 確認手順

@@ -18,3 +18,7 @@
 - 「初期ポーズにリセット」は、構図ごとに初期 `player_local` 値、ズーム、撮影トグルを復元する。
 - 構図カード内の表示文言から「Pose鮮度」のような意味が伝わりにくい表現をなくし、OSC受信値の有効期限として説明する。
 - sidecar JSONと診断ログに、送信したワールドPoseと元の `player_local` 設定を区別して残す。
+
+## 対応内容
+
+- v0.1.8実装に合わせて対応済み。詳細は `feat/v0.1.8-resolve-issues` の実装、README、SPEC、RELEASE_NOTESを参照。

@@ -73,14 +73,15 @@ type UpdateConfig struct {
 }
 
 type AutoCaptureConfig struct {
-	OSC      AutoCaptureOSCConfig      `json:"osc"`
-	Schedule AutoCaptureScheduleConfig `json:"schedule"`
-	Capture  AutoCaptureCaptureConfig  `json:"capture"`
-	Stream   AutoCaptureStreamConfig   `json:"stream"`
-	Output   AutoCaptureOutputConfig   `json:"output"`
-	Presence AutoCapturePresenceConfig `json:"presence"`
-	Discord  AutoCaptureDiscordConfig  `json:"discord"`
-	Views    []CameraViewConfig        `json:"views"`
+	OSC         AutoCaptureOSCConfig         `json:"osc"`
+	PlayerLocal AutoCapturePlayerLocalConfig `json:"playerLocal"`
+	Schedule    AutoCaptureScheduleConfig    `json:"schedule"`
+	Capture     AutoCaptureCaptureConfig     `json:"capture"`
+	Stream      AutoCaptureStreamConfig      `json:"stream"`
+	Output      AutoCaptureOutputConfig      `json:"output"`
+	Presence    AutoCapturePresenceConfig    `json:"presence"`
+	Discord     AutoCaptureDiscordConfig     `json:"discord"`
+	Views       []CameraViewConfig           `json:"views"`
 }
 
 type AutoCaptureOSCConfig struct {
@@ -88,6 +89,12 @@ type AutoCaptureOSCConfig struct {
 	SendPort         int    `json:"vrcInPort"`
 	ReceivePort      int    `json:"appOutPort"`
 	PoseFreshnessSec int    `json:"poseFreshnessSec"`
+}
+
+type AutoCapturePlayerLocalConfig struct {
+	BasisPose  CameraPoseConfig `json:"basisPose"`
+	Calibrated bool             `json:"calibrated"`
+	UpdatedAt  string           `json:"updatedAt,omitempty"`
 }
 
 type AutoCaptureScheduleConfig struct {
@@ -111,10 +118,13 @@ type AutoCaptureCaptureConfig struct {
 }
 
 type AutoCaptureStreamConfig struct {
-	FFmpegPath       string `json:"ffmpegPath"`
-	InputArgs        string `json:"inputArgs"`
+	SpoutHelperPath  string `json:"spoutHelperPath"`
+	SpoutSenderName  string `json:"spoutSenderName"`
+	SpoutAutoSelect  bool   `json:"spoutAutoSelect"`
 	CaptureTimeoutMS int    `json:"captureTimeoutMs"`
 	StartDelayMS     int    `json:"startDelayMs"`
+	LegacyFFmpegPath string `json:"legacyFfmpegPath,omitempty"`
+	LegacyInputArgs  string `json:"legacyInputArgs,omitempty"`
 }
 
 type AutoCaptureOutputConfig struct {
@@ -124,6 +134,7 @@ type AutoCaptureOutputConfig struct {
 	WriteSidecarJSON    bool   `json:"writeSidecarJson"`
 	WriteEXIF           bool   `json:"writeExif"`
 	WriteUserListToEXIF bool   `json:"writeUserListToExif"`
+	WriteUserIDsToEXIF  bool   `json:"writeUserIdsToExif"`
 }
 
 type AutoCapturePresenceConfig struct {
@@ -242,16 +253,18 @@ func DefaultAutoCaptureConfig() AutoCaptureConfig {
 			ButtonReleaseDelayMS:  200,
 		},
 		Stream: AutoCaptureStreamConfig{
-			FFmpegPath:       "ffmpeg",
-			InputArgs:        DefaultAutoCaptureFFmpegInputArgs(),
+			SpoutHelperPath:  "spout-capture.exe",
+			SpoutAutoSelect:  true,
 			CaptureTimeoutMS: 10000,
 			StartDelayMS:     1000,
 		},
 		Output: AutoCaptureOutputConfig{
-			Directory:        DefaultAutoCaptureDirectory(),
-			ImageFormat:      "png",
-			FilenameTemplate: "{timestamp_local}_{batch_id}_{shot_index}_{view_name}_{mode}.{ext}",
-			WriteSidecarJSON: true,
+			Directory:           DefaultAutoCaptureDirectory(),
+			ImageFormat:         "png",
+			FilenameTemplate:    "{timestamp_local}_{batch_id}_{shot_index}_{view_name}_{mode}.{ext}",
+			WriteSidecarJSON:    true,
+			WriteEXIF:           true,
+			WriteUserListToEXIF: true,
 		},
 		Presence: AutoCapturePresenceConfig{
 			WatchOutputLog:          true,
@@ -422,13 +435,21 @@ func (c *AutoCaptureConfig) Normalize() {
 	if c.Capture.ButtonReleaseDelayMS < 200 {
 		c.Capture.ButtonReleaseDelayMS = 200
 	}
-	c.Stream.FFmpegPath = strings.Trim(strings.TrimSpace(c.Stream.FFmpegPath), `"`)
-	if c.Stream.FFmpegPath == "" {
-		c.Stream.FFmpegPath = "ffmpeg"
+	c.Stream.SpoutHelperPath = strings.Trim(strings.TrimSpace(c.Stream.SpoutHelperPath), `"`)
+	if c.Stream.SpoutHelperPath == "" {
+		c.Stream.SpoutHelperPath = "spout-capture.exe"
 	}
-	c.Stream.InputArgs = strings.TrimSpace(c.Stream.InputArgs)
-	if c.Stream.InputArgs == "" || c.Stream.InputArgs == oldDesktopFFmpegInputArgs || c.Stream.InputArgs == oldTitleFFmpegInputArgs {
-		c.Stream.InputArgs = DefaultAutoCaptureFFmpegInputArgs()
+	c.Stream.SpoutSenderName = strings.TrimSpace(c.Stream.SpoutSenderName)
+	if c.Stream.SpoutSenderName == "" {
+		c.Stream.SpoutAutoSelect = true
+	}
+	c.Stream.LegacyFFmpegPath = strings.Trim(strings.TrimSpace(c.Stream.LegacyFFmpegPath), `"`)
+	if c.Stream.LegacyFFmpegPath == "" {
+		c.Stream.LegacyFFmpegPath = "ffmpeg"
+	}
+	c.Stream.LegacyInputArgs = strings.TrimSpace(c.Stream.LegacyInputArgs)
+	if c.Stream.LegacyInputArgs == oldDesktopFFmpegInputArgs || c.Stream.LegacyInputArgs == oldTitleFFmpegInputArgs {
+		c.Stream.LegacyInputArgs = DefaultAutoCaptureFFmpegInputArgs()
 	}
 	if c.Stream.CaptureTimeoutMS <= 0 {
 		c.Stream.CaptureTimeoutMS = 10000
@@ -457,16 +478,19 @@ func (c *AutoCaptureConfig) Normalize() {
 	if c.Output.FilenameTemplate == "" {
 		c.Output.FilenameTemplate = "{timestamp_local}_{batch_id}_{shot_index}_{view_name}_{mode}.{ext}"
 	}
+	if !c.Output.WriteEXIF {
+		c.Output.WriteUserListToEXIF = false
+		c.Output.WriteUserIDsToEXIF = false
+	}
+	if !c.Output.WriteUserListToEXIF {
+		c.Output.WriteUserIDsToEXIF = false
+	}
 	c.Presence.OutputLogDirectory = strings.Trim(strings.TrimSpace(c.Presence.OutputLogDirectory), `"`)
 	if c.Presence.OutputLogDirectory == "" {
 		c.Presence.OutputLogDirectory = DefaultVRChatLogDirectory()
 	}
 	c.Discord.WebhookURL = strings.Trim(strings.TrimSpace(c.Discord.WebhookURL), `"`)
-	switch c.Discord.PostMode {
-	case "shot", "batch":
-	default:
-		c.Discord.PostMode = "shot"
-	}
+	c.Discord.PostMode = "shot"
 	if len(c.Views) == 0 {
 		c.Views = defaultCameraViews()
 	}
@@ -497,7 +521,7 @@ func (v *CameraViewConfig) Normalize(index int) {
 		v.SortOrder = index
 	}
 	switch v.CoordinateSpace {
-	case "world", "dolly_local", "template_relative":
+	case "world", "player_local":
 	default:
 		v.CoordinateSpace = "world"
 	}

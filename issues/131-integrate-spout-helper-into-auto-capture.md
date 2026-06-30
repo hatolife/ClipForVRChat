@@ -26,3 +26,7 @@
 - FFmpeg経路は主経路から外す。
 - 互換目的で残す場合は、明示的なlegacy/debug fallbackとして扱い、Stream Camera直接取得の代替とは表示しない。
 - helperのstdout JSONをGo側で構造体として解析し、画像メタデータへ渡す。
+
+## 対応内容
+
+- v0.1.8実装に合わせて対応済み。詳細は `feat/v0.1.8-resolve-issues` の実装、README、SPEC、RELEASE_NOTESを参照。

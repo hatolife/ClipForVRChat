@@ -37,9 +37,10 @@ createApp({
       historyDragCurrent: { x: 0, y: 0 },
       historyDragBaseIds: [],
       diagnosticGenerating: false,
-      ffmpegStatus: null,
-      ffmpegChecking: false,
-      ffmpegInstalling: false
+      autoCaptureTestResults: {},
+      spoutStatus: null,
+      spoutChecking: false,
+      spoutSendersLoading: false
     }
   },
   computed: {
@@ -133,6 +134,7 @@ createApp({
       const autoCapture = this.state.config.autoCapture
       autoCapture.schedule ||= {}
       autoCapture.osc ||= {}
+      autoCapture.playerLocal ||= {}
       autoCapture.capture ||= {}
       autoCapture.stream ||= {}
       autoCapture.output ||= {}
@@ -853,7 +855,7 @@ createApp({
     },
     coordinateSpaceLabel(value) {
       if (value === 'world') return 'ワールド'
-      if (value === 'dolly_local') return 'Dolly Local'
+      if (value === 'player_local') return 'プレイヤー基準'
       return '未保存'
     },
     syncAutoCaptureConfig(updated) {
@@ -898,6 +900,23 @@ createApp({
           this.autoCaptureSettings.views.push(this.newAutoCaptureView(updated))
         }
         this.toast = '現在Poseから構図を追加しました'
+        setTimeout(() => {
+          this.toast = ''
+        }, 1800)
+      } catch (err) {
+        this.error = String(err)
+      }
+    },
+    async saveCurrentCameraPoseAsPlayerBasis() {
+      if (!api?.SaveCurrentCameraPoseAsPlayerBasis) {
+        this.error = 'プレイヤー基準Pose保存APIが利用できません。'
+        return
+      }
+      this.error = ''
+      try {
+        const updated = await api.SaveCurrentCameraPoseAsPlayerBasis()
+        this.syncAutoCaptureConfig(updated)
+        this.toast = 'プレイヤー基準Poseを保存しました'
         setTimeout(() => {
           this.toast = ''
         }, 1800)
@@ -984,6 +1003,7 @@ createApp({
       try {
         const results = await api.TestAutoCaptureView(view.id)
         const firstError = (results || []).find((result) => result?.error)?.error
+        this.autoCaptureTestResults[view.id] = firstError ? { ok: false, message: firstError } : { ok: true, message: 'テスト撮影に成功しました' }
         if (firstError) {
           this.error = firstError
         }
@@ -993,41 +1013,38 @@ createApp({
         }, 1800)
       } catch (err) {
         this.error = String(err)
+        this.autoCaptureTestResults[view.id] = { ok: false, message: String(err) }
         this.toast = ''
       }
     },
-    async checkFFmpeg() {
-      if (!api?.CheckFFmpeg) {
-        this.error = 'ffmpeg確認APIが利用できません。'
+    async checkSpoutHelper() {
+      if (!api?.CheckSpoutHelper) {
+        this.error = 'Spout helper確認APIが利用できません。'
         return
       }
       this.error = ''
-      this.ffmpegChecking = true
+      this.spoutChecking = true
       try {
-        this.ffmpegStatus = await api.CheckFFmpeg(this.autoCaptureSettings.stream.ffmpegPath || 'ffmpeg')
+        this.spoutStatus = await api.CheckSpoutHelper()
       } catch (err) {
         this.error = String(err)
       } finally {
-        this.ffmpegChecking = false
+        this.spoutChecking = false
       }
     },
-    async installFFmpeg() {
-      if (!api?.InstallFFmpegWithWinget) {
-        this.error = 'ffmpegインストールAPIが利用できません。'
+    async refreshSpoutSenders() {
+      if (!api?.ListSpoutSenders) {
+        this.error = 'Spout sender一覧APIが利用できません。'
         return
       }
       this.error = ''
-      this.ffmpegInstalling = true
-      this.ffmpegStatus = { available: false, message: 'winget install ffmpegを実行しています。完了まで待ってください。' }
+      this.spoutSendersLoading = true
       try {
-        this.ffmpegStatus = await api.InstallFFmpegWithWinget()
-        if (this.ffmpegStatus?.available) {
-          this.autoCaptureSettings.stream.ffmpegPath = 'ffmpeg'
-        }
+        this.spoutStatus = await api.ListSpoutSenders()
       } catch (err) {
         this.error = String(err)
       } finally {
-        this.ffmpegInstalling = false
+        this.spoutSendersLoading = false
       }
     },
     async checkForUpdate() {
@@ -1416,7 +1433,7 @@ createApp({
             <h3>自動撮影</h3>
             <div class="settings-explainer">
               <strong>VRChatのUser CameraをOSCで操作し、指定間隔で写真を撮影する機能です。</strong>
-              <p>VRChat側でOSCを有効にし、Stream方式ではVRChatのStream Camera映像をffmpegで静止画として切り出します。Photo方式はVRChat標準写真を使うフォールバックです。</p>
+              <p>VRChat側でOSCを有効にし、Stream方式ではVRChatのStream Camera(Spout)映像を直接受信して静止画として保存します。Photo方式はVRChat標準写真を使うフォールバックです。</p>
               <p>正面、背後、斜めの初期構図にはプレーヤーを写す想定のPoseと拡大率が入っています。構図ごとのテスト撮影で見え方を確認できます。</p>
               <p>v0.1.8では撮影時の解像度変更は行わず、VRChat側の現在のカメラ解像度設定で保存します。</p>
             </div>
@@ -1425,12 +1442,18 @@ createApp({
                 <div>
                   <h4>構図プリセット</h4>
                   <p>「撮影する」がONの構図を上から順番に撮影します。</p>
+                  <p>プレイヤー基準構図を使う場合は、基準にしたい位置でカメラPoseを受信してから基準Poseを保存してください。</p>
                 </div>
                 <div class="button-row">
+                  <button type="button" class="secondary" @click="saveCurrentCameraPoseAsPlayerBasis">現在Poseをプレイヤー基準に保存</button>
                   <button type="button" class="secondary" @click="resetCameraViewsToDefaults">初期3構図に戻す</button>
                   <button type="button" class="secondary" @click="resetCameraOSC">カメラOSCをリセット</button>
                 </div>
               </div>
+              <p class="setting-note" :class="autoCaptureSettings.playerLocal.calibrated ? 'ok' : 'warning'">
+                プレイヤー基準Pose: {{ autoCaptureSettings.playerLocal.calibrated ? '保存済み' : '未設定' }}
+                <span v-if="autoCaptureSettings.playerLocal.updatedAt"> / {{ autoCaptureSettings.playerLocal.updatedAt }}</span>
+              </p>
               <div v-if="autoCaptureViews.length" class="view-list">
                 <article v-for="(cameraView, index) in autoCaptureViews" :key="cameraView.id" class="view-card">
                   <div class="view-card-main">
@@ -1442,6 +1465,13 @@ createApp({
                       <label>
                         <small>構図名</small>
                         <input v-model.trim="cameraView.name" placeholder="構図名" />
+                      </label>
+                      <label>
+                        <small>座標系</small>
+                        <select v-model="cameraView.coordinateSpace">
+                          <option value="world">ワールド</option>
+                          <option value="player_local">プレイヤー基準</option>
+                        </select>
                       </label>
                       <div class="view-meta">
                         <span :class="['status-pill', cameraView.enabled ? 'ok' : 'muted']">{{ cameraView.enabled ? '撮影する' : '撮影しない' }}</span>
@@ -1470,6 +1500,9 @@ createApp({
                     <button type="button" class="secondary" @click="duplicateAutoCaptureView(cameraView)">複製</button>
                     <button type="button" class="secondary danger-button" @click="deleteAutoCaptureView(cameraView)">削除</button>
                   </div>
+                  <p v-if="autoCaptureTestResults[cameraView.id]" :class="['setting-note', autoCaptureTestResults[cameraView.id].ok ? 'ok' : 'warning']">
+                    {{ autoCaptureTestResults[cameraView.id].message }}
+                  </p>
                 </article>
               </div>
               <p v-else class="empty">構図プリセットがありません。</p>
@@ -1519,7 +1552,7 @@ createApp({
               </label>
             </div>
             <div class="setting-row">
-              <div><strong>撮影方式</strong><p>Streamはffmpegで映像を静止画化します。PhotoはVRChat標準写真を使うためシャッター音が出ます。</p></div>
+              <div><strong>撮影方式</strong><p>StreamはStream Camera(Spout)映像を保存します。PhotoはVRChat標準写真を使うためシャッター音が出ます。</p></div>
               <label>
                 <select v-model="autoCaptureSettings.capture.mode">
                   <option value="stream">Stream</option>
@@ -1528,41 +1561,77 @@ createApp({
               </label>
             </div>
             <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
-              <div><strong>ffmpegパス</strong><p>Stream方式で静止画を切り出すffmpeg.exeのパスです。PATHにある場合はffmpegのままで使えます。</p></div>
+              <div><strong>Spout helper</strong><p>Stream Camera(Spout)映像を受信する同梱ヘルパーです。通常は初期値のまま使います。</p></div>
               <div class="settings-control-stack">
-                <input v-model="autoCaptureSettings.stream.ffmpegPath" :disabled="autoCaptureSettings.capture.mode !== 'stream' || ffmpegInstalling" placeholder="ffmpeg" />
+                <input v-model="autoCaptureSettings.stream.spoutHelperPath" :disabled="autoCaptureSettings.capture.mode !== 'stream' || spoutChecking || spoutSendersLoading" placeholder="spout-capture.exe" />
                 <div class="inline-actions">
-                  <button type="button" class="secondary" @click="checkFFmpeg" :disabled="autoCaptureSettings.capture.mode !== 'stream' || ffmpegChecking || ffmpegInstalling">{{ ffmpegChecking ? '確認中' : 'ffmpeg確認' }}</button>
-                  <button type="button" class="secondary" @click="installFFmpeg" :disabled="autoCaptureSettings.capture.mode !== 'stream' || ffmpegInstalling">{{ ffmpegInstalling ? 'インストール中' : 'ffmpegをインストール' }}</button>
+                  <button type="button" class="secondary" @click="checkSpoutHelper" :disabled="autoCaptureSettings.capture.mode !== 'stream' || spoutChecking || spoutSendersLoading">{{ spoutChecking ? '確認中' : 'helper確認' }}</button>
+                  <button type="button" class="secondary" @click="refreshSpoutSenders" :disabled="autoCaptureSettings.capture.mode !== 'stream' || spoutChecking || spoutSendersLoading">{{ spoutSendersLoading ? '取得中' : 'sender一覧更新' }}</button>
                 </div>
-                <p v-if="ffmpegStatus" :class="['setting-note', ffmpegStatus.available ? 'ok' : 'warning']">
-                  {{ ffmpegStatus.message }}
-                  <span v-if="ffmpegStatus.version"> {{ ffmpegStatus.version }}</span>
-                  <span v-if="ffmpegStatus.path"> / {{ ffmpegStatus.path }}</span>
+                <p v-if="spoutStatus" :class="['setting-note', spoutStatus.available ? 'ok' : 'warning']">
+                  {{ spoutStatus.message }}
+                  <span v-if="spoutStatus.path"> / {{ spoutStatus.path }}</span>
                 </p>
               </div>
             </div>
             <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
-              <div><strong>ffmpeg入力引数</strong><p>ffmpegの入力指定です。初期値はVRChatウィンドウの画面範囲だけを切り出します。デスクトップ全体を撮りたい場合だけ明示的に desktop を指定してください。</p></div>
-              <label>
-                <input v-model="autoCaptureSettings.stream.inputArgs" :disabled="autoCaptureSettings.capture.mode !== 'stream'" placeholder="-f gdigrab -framerate 30 -offset_x {window_x} -offset_y {window_y} -video_size {window_width}x{window_height} -i desktop" />
-              </label>
+              <div><strong>Spout sender自動選択</strong><p>sender未指定時に単一senderまたはVRChatらしいsenderを自動選択します。複数候補で判断不能な場合は一覧から選択してください。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.stream.spoutAutoSelect" :disabled="autoCaptureSettings.capture.mode !== 'stream'" /><span></span></label>
+            </div>
+            <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' || autoCaptureSettings.stream.spoutAutoSelect }">
+              <div><strong>Spout sender名</strong><p>自動選択をOFFにした場合に使うsender名です。VRChatでStream Cameraを起動してから一覧更新してください。</p></div>
+              <div class="settings-control-stack">
+                <input v-model="autoCaptureSettings.stream.spoutSenderName" :disabled="autoCaptureSettings.capture.mode !== 'stream' || autoCaptureSettings.stream.spoutAutoSelect" list="spout-senders" placeholder="VRChat Stream Camera" />
+                <datalist id="spout-senders">
+                  <option v-for="sender in spoutStatus?.senders || []" :key="sender.name" :value="sender.name">{{ sender.name }}</option>
+                </datalist>
+                <p v-if="spoutStatus?.senders?.length" class="setting-note">
+                  検出: <span v-for="sender in spoutStatus.senders" :key="sender.name">{{ sender.name }} {{ sender.width && sender.height ? '(' + sender.width + 'x' + sender.height + ')' : '' }} </span>
+                </p>
+              </div>
             </div>
             <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
-              <div><strong>Stream切り出しタイムアウト</strong><p>ffmpegが1枚の静止画を作成するまで待つ最大ミリ秒です。</p></div>
+              <div><strong>Stream取得タイムアウト</strong><p>Spout helperが1枚のStream Cameraフレームを保存するまで待つ最大ミリ秒です。</p></div>
               <label>
                 <input type="number" min="1000" max="60000" step="500" v-model.number="autoCaptureSettings.stream.captureTimeoutMs" :disabled="autoCaptureSettings.capture.mode !== 'stream'" />
               </label>
             </div>
             <div class="setting-row">
-              <div><strong>Stream切り出し保存先</strong><p>Stream方式で切り出した画像の保存先です。Photo方式ではVRChat写真フォルダに保存された画像を使います。</p></div>
+              <div><strong>自動撮影保存先</strong><p>Stream方式で保存した画像と関連ファイルの保存先です。Photo方式ではVRChat写真フォルダに保存された画像を使います。</p></div>
               <label>
                 <input v-model="autoCaptureSettings.output.directory" placeholder="%USERPROFILE%/Pictures/VRChat/VRC-AutoCapture" />
               </label>
             </div>
             <div class="setting-row">
+              <div><strong>Stream保存形式</strong><p>Stream方式で保存する画像形式です。Spout helperはPNGで取得し、必要に応じて後続処理で扱います。</p></div>
+              <label>
+                <select v-model="autoCaptureSettings.output.imageFormat">
+                  <option value="png">PNG</option>
+                  <option value="jpg">JPG</option>
+                </select>
+              </label>
+            </div>
+            <div class="setting-row">
+              <div><strong>ファイル名テンプレート</strong><p>{timestamp_local}、{batch_id}、{shot_index}、{view_name}、{mode}、{ext} を使用できます。</p></div>
+              <label>
+                <input v-model="autoCaptureSettings.output.filenameTemplate" placeholder="{timestamp_local}_{batch_id}_{shot_index}_{view_name}_{mode}.{ext}" />
+              </label>
+            </div>
+            <div class="setting-row">
               <div><strong>サイドカーJSON</strong><p>撮影情報を画像と同じ場所にJSONとして保存します。</p></div>
               <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.output.writeSidecarJson" /><span></span></label>
+            </div>
+            <div class="setting-row">
+              <div><strong>画像埋め込みメタデータ</strong><p>PNG/JPEG画像内に自動撮影情報を埋め込みます。sidecar JSONと合わせて画像との紐づけ確認に使います。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.output.writeExif" /><span></span></label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.output.writeExif }">
+              <div><strong>同席ユーザー一覧を画像に埋め込む</strong><p>取得できた同席ユーザー表示名を画像メタデータに含めます。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.output.writeUserListToExif" :disabled="!autoCaptureSettings.output.writeExif" /><span></span></label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.output.writeExif || !autoCaptureSettings.output.writeUserListToExif }">
+              <div><strong>ユーザーIDを画像に埋め込む</strong><p>ユーザーIDは識別性が高いため、必要な場合だけONにしてください。sidecar/Discordの設定とは独立しています。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.output.writeUserIdsToExif" :disabled="!autoCaptureSettings.output.writeExif || !autoCaptureSettings.output.writeUserListToExif" /><span></span></label>
             </div>
             <div class="setting-row">
               <div><strong>VRChat output log監視</strong><p>output_logから同じインスタンスのユーザー情報を取得します。</p></div>
@@ -1589,6 +1658,10 @@ createApp({
               <label>
                 <input type="password" v-model="autoCaptureSettings.discord.webhookUrl" placeholder="https://discord.com/api/webhooks/..." :disabled="!autoCaptureSettings.discord.enabled" />
               </label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.discord.enabled }">
+              <div><strong>Discordに画像を添付する</strong><p>OFFの場合は撮影情報の本文だけを投稿します。画像はローカル保存先とsidecar JSONで保持します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.discord.includeImages" :disabled="!autoCaptureSettings.discord.enabled" /><span></span></label>
             </div>
           </section>
 

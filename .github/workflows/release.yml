@@ -62,6 +62,12 @@ jobs:
         working-directory: src
         run: go run golang.org/x/vuln/cmd/govulncheck@${{ env.GOVULNCHECK_VERSION }} ./...
 
+      - name: Build Spout helper
+        shell: pwsh
+        run: |
+          cmake -S tools/spout-capture -B build/spout-capture -A x64 -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/spout-capture --config Release --target spout-capture
+
       - name: Add Go bin to PATH
         shell: pwsh
         run: '"$HOME/go/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append'
@@ -133,8 +139,14 @@ jobs:
           New-Item -ItemType Directory -Force dist | Out-Null
           New-Item -ItemType Directory -Force "dist/ClipForVRChat" | Out-Null
           Copy-Item "src/build/bin/ClipForVRChat.exe" "dist/ClipForVRChat/"
+          $spoutHelper = Get-ChildItem "build/spout-capture" -Recurse -Filter "spout-capture.exe" | Select-Object -First 1
+          if (!$spoutHelper) {
+            throw "spout-capture.exe was not created"
+          }
+          Copy-Item $spoutHelper.FullName "dist/ClipForVRChat/"
           Copy-Item "README.md" "dist/ClipForVRChat/"
           Copy-Item "LICENSE" "dist/ClipForVRChat/"
+          Copy-Item "third_party/Spout2-LICENSE.txt" "dist/ClipForVRChat/"
           @(
             "[InternetShortcut]",
             "URL=https://keys.openpgp.org/search?q=release-signing@hato.life"
@@ -225,7 +237,9 @@ jobs:
             "dist/$env:ASSET_PREFIX-windows-amd64.zip.sha256",
             "dist/$env:ASSET_PREFIX-windows-amd64.exe.asc",
             "dist/$env:ASSET_PREFIX-build-metadata.json",
-            "dist/ClipForVRChat/Release-signing-public-key.url"
+            "dist/ClipForVRChat/Release-signing-public-key.url",
+            "dist/ClipForVRChat/spout-capture.exe",
+            "dist/ClipForVRChat/Spout2-LICENSE.txt"
           )
           foreach ($path in $required) {
             if (!(Test-Path $path)) {

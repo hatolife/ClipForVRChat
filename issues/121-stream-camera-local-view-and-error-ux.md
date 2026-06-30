@@ -28,3 +28,7 @@ Stream方式はダミーではなく、実際にVRChat Stream Cameraの映像か
 ## 対応メモ
 
 - rc9実機確認で、Stream方式でも `/usercamera/Mode` にPhoto Camera相当の `1` を送っていたため、Stream方式では `2` を送るよう修正した。
+
+## 対応内容
+
+- v0.1.8実装に合わせて対応済み。Stream方式はSpout主経路へ置き換え、ffmpeg主導線は廃止。詳細はREADME/SPEC/RELEASE_NOTESを参照。

@@ -18,3 +18,7 @@
 - 正面/背後/斜めの初期offset、注視点、ズーム初期値を具体値で決める。
 - `world` 既存設定との互換性と、未接続の `dolly_local` / `template_relative` の扱いを決める。
 - 仕様が `issues/136-investigate-player-local-camera-coordinate-spec.md` と実装issueから参照できる状態になっている。
+
+## 対応内容
+
+- v0.1.8実装に合わせて対応済み。詳細は `feat/v0.1.8-resolve-issues` の実装、README、SPEC、RELEASE_NOTESを参照。
