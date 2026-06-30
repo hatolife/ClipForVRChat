@@ -9,4 +9,4 @@
 - [x] 設定Poseへカメラ移動するAPIとボタンを追加する
 - [x] カメラOSCリセットAPIとデバッグボタンを追加する
 - [x] Go/frontendテストを確認する
-- [ ] release/v0.1.8へ取り込み、次RCタグをpushしてCIを確認する
+- [x] release/v0.1.8へ取り込み、次RCタグをpushしてCIを確認する
