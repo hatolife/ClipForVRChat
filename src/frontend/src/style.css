@@ -458,6 +458,30 @@ small {
   line-height: 1.55;
 }
 
+.settings-control-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.setting-note {
+  margin: 0;
+  font-size: 13px;
+}
+
+.setting-note.ok {
+  color: #28633a;
+}
+
+.setting-note.warning {
+  color: #9a4c00;
+}
+
 .setting-row.disabled {
   opacity: 0.58;
 }
