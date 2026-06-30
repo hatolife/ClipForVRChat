@@ -5,14 +5,14 @@
 ### 更新内容
 
 - 設定画面に「自動撮影」タブを追加し、OSC、撮影間隔、撮影方式、出力、Presence、Discord投稿設定をまとめました。
-- VRChat User CameraへOSCでPhoto撮影指示を送り、有効な初期構図を順番に撮影する自動撮影MVPを追加しました。
+- VRChat User CameraへOSCで構図を送り、Stream(ffmpeg)方式またはPhoto方式で有効な初期構図を順番に撮影する自動撮影MVPを追加しました。
 - VRChat output logから同じインスタンスにいるユーザー情報を推定し、撮影画像に対応するsidecar JSONへ保存するようにしました。
 - 自動撮影した画像を既存の結果/履歴画面で扱えるようにし、設定で有効化した場合はDiscord Webhookへ投稿できるようにしました。
-- RC確認で見つかった、VRChat写真が保存されない問題に対して、Capture/CloseをUser CameraのAction OSCとして送るよう修正しました。
+- RC確認で見つかった、VRChat写真が保存されない問題に対して、Capture/CloseをUser CameraのAction OSCとして送るよう修正し、Stream方式ではffmpegで映像から静止画を切り出せるようにしました。
 
 ### 既知の制限
 
-- v0.1.8 RC時点ではPhoto方式が対象です。Stream/Spout、Camera Dolly Multi、解像度一時変更は将来対応です。
+- v0.1.8のStream方式は外部ffmpegを使います。Spout2直接受信、Camera Dolly Multi、解像度一時変更は将来対応です。
 - output log由来のユーザー一覧は、アプリ起動前から同じインスタンスにいたユーザーを完全に復元できない場合があります。
 
 ### ダウンロード

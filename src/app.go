@@ -492,6 +492,49 @@ func (a *App) ResetCameraViewsToDefaults() (appcore.Config, error) {
 	return a.state.Config, nil
 }
 
+func (a *App) TestAutoCaptureView(viewID string) ([]appcore.Result, error) {
+	a.mu.Lock()
+	cfg := a.state.Config
+	cfg.Normalize()
+	viewID = strings.TrimSpace(viewID)
+	found := false
+	for i := range cfg.AutoCapture.Views {
+		if cfg.AutoCapture.Views[i].ID == viewID {
+			cfg.AutoCapture.Views[i].Enabled = true
+			found = true
+			continue
+		}
+		cfg.AutoCapture.Views[i].Enabled = false
+	}
+	if !found {
+		a.mu.Unlock()
+		return nil, fmt.Errorf("構図が見つかりません: %s", viewID)
+	}
+	cfg.AutoCapture.Schedule.Enabled = false
+	cfg.DiagnosticLogPath = appcore.DiagnosticLogPath(a.configPath)
+	a.mu.Unlock()
+
+	results, err := appcore.AutoCaptureRunner{Config: cfg}.RunOnce(context.Background())
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err != nil {
+		a.state.Message = "自動撮影テストに失敗しました: " + err.Error()
+		return results, err
+	}
+	visible := autoCaptureVisibleResults(results)
+	if len(visible) > 0 {
+		a.state.Results = append(visible, a.state.Results...)
+		if history, historyErr := appcore.AddResultsToHistory(appcore.HistoryPath(a.configPath), visible); historyErr == nil {
+			a.state.History = history
+		}
+		a.state.Message = fmt.Sprintf("自動撮影テストで%d件撮影しました。", len(visible))
+	} else {
+		a.state.Message = summarizeAutoCaptureErrors(results)
+	}
+	return results, nil
+}
+
 func (a *App) saveAutoCaptureConfigFromSettingsLocked(cfg appcore.Config) error {
 	if err := appcore.SaveConfig(a.configPath, cfg); err != nil {
 		return err
@@ -969,10 +1012,9 @@ func (a *App) runAutoCaptureBatch(ctx context.Context, cfg appcore.Config) {
 	defer a.mu.Unlock()
 	if err != nil {
 		appcore.AppendDiagnosticLog(logPath, "auto-capture batch error: %v", err)
-		result := appcore.Result{Name: "自動撮影", Error: err.Error()}
-		a.state.Results = append([]appcore.Result{result}, a.state.Results...)
+		a.state.Message = "自動処理でエラーが発生しました: " + err.Error()
 		a.state.Mode = appcore.ModeResults
-		emitWailsEvent(a.ctx, "auto-photo:result", appcore.AutoPhotoEvent{Result: result, Error: result.Error})
+		emitWailsEvent(a.ctx, "auto-photo:result", appcore.AutoPhotoEvent{Result: appcore.Result{Name: "自動撮影", Error: err.Error()}, Error: err.Error()})
 		return
 	}
 	errorCount := 0
@@ -982,16 +1024,42 @@ func (a *App) runAutoCaptureBatch(ctx context.Context, cfg appcore.Config) {
 		}
 	}
 	appcore.AppendDiagnosticLog(logPath, "auto-capture batch complete: results=%d errors=%d", len(results), errorCount)
-	if len(results) > 0 {
-		a.state.Results = append(results, a.state.Results...)
-		if history, historyErr := appcore.AddResultsToHistory(appcore.HistoryPath(a.configPath), results); historyErr == nil {
+	visible := autoCaptureVisibleResults(results)
+	if len(visible) > 0 {
+		a.state.Results = append(visible, a.state.Results...)
+		if history, historyErr := appcore.AddResultsToHistory(appcore.HistoryPath(a.configPath), visible); historyErr == nil {
 			a.state.History = history
 		}
+		a.state.Message = fmt.Sprintf("自動撮影で%d件撮影しました。", len(visible))
 		for _, result := range results {
 			emitWailsEvent(a.ctx, "auto-photo:result", appcore.AutoPhotoEvent{Path: result.SourcePath, Result: result, Error: result.Error})
 		}
+	} else if len(results) > 0 {
+		a.state.Message = summarizeAutoCaptureErrors(results)
 	}
 	a.state.Mode = appcore.ModeResults
+}
+
+func autoCaptureVisibleResults(results []appcore.Result) []appcore.Result {
+	visible := make([]appcore.Result, 0, len(results))
+	for _, result := range results {
+		if appcore.ResultHasUserVisibleWork(result) {
+			visible = append(visible, result)
+		}
+	}
+	return visible
+}
+
+func summarizeAutoCaptureErrors(results []appcore.Result) string {
+	if len(results) == 0 {
+		return "自動処理でエラーが発生しました: 撮影結果がありません。"
+	}
+	for _, result := range results {
+		if strings.TrimSpace(result.Error) != "" {
+			return "自動処理でエラーが発生しました: " + result.Error
+		}
+	}
+	return "自動処理でエラーが発生しました。"
 }
 
 func sleepWithContext(ctx context.Context, d time.Duration) bool {
