@@ -31,3 +31,30 @@
 ## 再監査メモ
 
 - 2026-07-01: [#164](164-audit-v018-completed-items.md) の再監査で未達が見つかったため、完了扱いを取り消して `要対応` に戻した。
+
+## 実装前調査メモ
+
+実装方針:
+
+- Photo方式の写真検出失敗メッセージに残っている `ffmpeg入力設定` を削除し、Photo方式とStream方式の確認先を分ける。
+- `CheckFFmpeg` / `InstallFFmpegWithWinget` は旧互換APIとして残してもよいが、自動撮影タブとREADME/SPECでは主導線に出さない。
+- README/SPEC/Release Notesは、実装完了後に [#157](157-sync-v018-autocapture-docs-and-specs.md) でまとめて同期する。
+
+対象ファイル:
+
+- `src/internal/appcore/autocapture.go`
+- `src/frontend/src/main.js`
+- `README.md`
+- `src/SPEC.md`
+- `RELEASE_NOTES.md`
+
+小タスク:
+
+- Photo失敗文言を「Photo方式ではUser Cameraが表示され、VRChat写真保存先が正しい必要があります。Stream方式ではSpout helper/sender設定を確認してください。」のように変更する。
+- `rg "ffmpeg入力設定|ffmpegでVRChat|gdigrab"` でユーザー向け文言に旧主経路が残っていないか確認する。
+- FFmpeg legacy関数は未使用ならコメントでlegacy/debug扱いを明示するか、別issueで削除対象にする。
+
+確認方法:
+
+- Photo失敗時の画面エラーにffmpegが出ない。
+- Stream設定領域にSpout helper/sender/start delayだけが主設定として表示される。

@@ -26,3 +26,34 @@ CIまたはローカル検証で、フロントエンドが呼び出すWails API
 ## 再監査メモ
 
 - 2026-07-01: [#164](164-audit-v018-completed-items.md) の再監査で未達が見つかったため、完了扱いを取り消して `要対応` に戻した。
+
+## 実装前調査メモ
+
+実装方針:
+
+- Wails生成物をgit管理しない方針は維持し、静的検査スクリプトでfrontendの `api.*` 呼び出しとGo `App` 公開メソッドを照合する。
+- Nodeスクリプト `scripts/check-wails-api-surface.mjs` を追加する。
+- CIではfrontend build前後どちらでもよいが、GoメソッドとJS参照の不一致を早く検出するため、`npm run build` と `go test ./...` の間に実行する。
+
+対象ファイル:
+
+- `scripts/check-wails-api-surface.mjs` 新設
+- `.github/workflows/ci.yml`
+- `src/frontend/package.json`
+- `src/app.go`
+- `src/frontend/src/main.js`
+
+小タスク:
+
+- `src/frontend/src/main.js` から `api.<Identifier>` を正規表現で抽出する。
+- `src/app.go` から `func (a *App) <ExportedName>(` を抽出する。
+- frontend参照に存在してGo公開メソッドに存在しないものがあれば失敗する。
+- 逆方向の未使用Goメソッドは失敗ではなく情報表示にする。
+- `api?.Foo`、`api.Foo` の両方を検出する。
+- `autoCapture` configの主要キーは型生成ではなく実データJSONとして扱っているため、このissueではAPI名検査を必須範囲にする。
+
+確認方法:
+
+- 存在しない `api.DoesNotExist` を一時的に追加するとスクリプトが失敗する。
+- 現状の `main.js` と `app.go` ではスクリプトが成功する。
+- Windows CIで同じ検査が走る。
