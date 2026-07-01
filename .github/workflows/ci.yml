@@ -104,6 +104,26 @@ jobs:
           & $helper.FullName --version
           & $helper.FullName --list-senders
 
+      - name: Stage embedded Spout helper
+        shell: pwsh
+        run: |
+          $helper = Get-ChildItem build/spout-capture -Recurse -Filter spout-capture.exe | Select-Object -First 1
+          if (!$helper) {
+            throw "spout-capture.exe was not created"
+          }
+          $spoutDll = Join-Path $helper.DirectoryName "SpoutLibrary.dll"
+          if (!(Test-Path $spoutDll)) {
+            throw "SpoutLibrary.dll was not copied next to spout-capture.exe"
+          }
+          $embedDir = "src/internal/appcore/embedded_spout_assets"
+          New-Item -ItemType Directory -Force $embedDir | Out-Null
+          Copy-Item $helper.FullName (Join-Path $embedDir "spout-capture.exe") -Force
+          Copy-Item $spoutDll (Join-Path $embedDir "SpoutLibrary.dll") -Force
+
+      - name: Test embedded Spout helper extraction
+        working-directory: src
+        run: go test -tags embeddedspout ./internal/appcore -run TestResolveEmbeddedSpoutHelperWithEmbeddedAssets -count=1
+
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
 
@@ -118,7 +138,7 @@ jobs:
           $releaseTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
           node ../scripts/write-wails-info.mjs "ci" wails.json
           node ../scripts/write-wails-windows-info.mjs "ci" $shortSha build/windows/info.json
-          wails build -ldflags "-X main.version=ci -X main.revision=$shortSha -X main.releaseTime=$releaseTime -X main.buildChannel=ci"
+          wails build -tags embeddedspout -ldflags "-X main.version=ci -X main.revision=$shortSha -X main.releaseTime=$releaseTime -X main.buildChannel=ci"
 
       - name: Check executable
         working-directory: src

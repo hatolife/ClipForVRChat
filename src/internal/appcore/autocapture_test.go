@@ -101,6 +101,21 @@ func TestResolveSpoutHelperPathRejectsMissingPath(t *testing.T) {
 	}
 }
 
+func TestResolveSpoutHelperPathUsesExplicitExistingPath(t *testing.T) {
+	dir := t.TempDir()
+	helper := filepath.Join(dir, "custom-spout-capture.exe")
+	if err := os.WriteFile(helper, []byte("helper"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ResolveSpoutHelperPath(helper)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != helper {
+		t.Fatalf("path = %q, want %q", got, helper)
+	}
+}
+
 func TestExpandFFmpegInputPlaceholdersNoWindow(t *testing.T) {
 	args := []string{"-f", "gdigrab", "-i", "desktop"}
 	got, err := expandFFmpegInputPlaceholders(nil, args, "")

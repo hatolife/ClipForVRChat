@@ -92,6 +92,7 @@ func TestSaveAndLoadConfigRoundTrip(t *testing.T) {
 	want.Image.OutputFormat = "jpg"
 	want.Image.MaxInputMB = 64
 	want.Output.ShowUI = "always"
+	want.AutoCapture.Stream.SpoutHelperPath = `C:\tools\spout-capture.exe`
 
 	if err := SaveConfig(path, want); err != nil {
 		t.Fatal(err)
@@ -105,8 +106,18 @@ func TestSaveAndLoadConfigRoundTrip(t *testing.T) {
 		got.Image.MaxInputMB != want.Image.MaxInputMB ||
 		got.Output.ShowUI != want.Output.ShowUI ||
 		got.Update.CheckEnabled != want.Update.CheckEnabled ||
-		got.Update.NotificationEnabled != want.Update.NotificationEnabled {
+		got.Update.NotificationEnabled != want.Update.NotificationEnabled ||
+		got.AutoCapture.Stream.SpoutHelperPath != want.AutoCapture.Stream.SpoutHelperPath {
 		t.Fatalf("loaded config mismatch: %+v", got)
+	}
+}
+
+func TestConfigNormalizeTrimsSpoutHelperPathWithoutResettingCustomPath(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.AutoCapture.Stream.SpoutHelperPath = ` "C:\tools\custom-spout-capture.exe" `
+	cfg.Normalize()
+	if cfg.AutoCapture.Stream.SpoutHelperPath != `C:\tools\custom-spout-capture.exe` {
+		t.Fatalf("SpoutHelperPath = %q", cfg.AutoCapture.Stream.SpoutHelperPath)
 	}
 }
 

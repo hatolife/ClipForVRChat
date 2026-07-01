@@ -99,6 +99,33 @@ jobs:
           cmake -S tools/spout-capture -B build/spout-capture -A x64 -DCMAKE_BUILD_TYPE=Release
           cmake --build build/spout-capture --config Release --target spout-capture
 
+      - name: Stage embedded Spout helper
+        id: spout
+        shell: pwsh
+        run: |
+          $spoutHelper = Get-ChildItem "build/spout-capture" -Recurse -Filter "spout-capture.exe" | Select-Object -First 1
+          if (!$spoutHelper) {
+            throw "spout-capture.exe was not created"
+          }
+          $spoutDll = Join-Path $spoutHelper.DirectoryName "SpoutLibrary.dll"
+          if (!(Test-Path $spoutDll)) {
+            throw "SpoutLibrary.dll was not copied next to spout-capture.exe"
+          }
+          $embedDir = "src/internal/appcore/embedded_spout_assets"
+          New-Item -ItemType Directory -Force $embedDir | Out-Null
+          Copy-Item $spoutHelper.FullName (Join-Path $embedDir "spout-capture.exe") -Force
+          Copy-Item $spoutDll (Join-Path $embedDir "SpoutLibrary.dll") -Force
+          $helperHash = (Get-FileHash (Join-Path $embedDir "spout-capture.exe") -Algorithm SHA256).Hash.ToLower()
+          $dllHash = (Get-FileHash (Join-Path $embedDir "SpoutLibrary.dll") -Algorithm SHA256).Hash.ToLower()
+          "helper_path=$($spoutHelper.FullName)" >> $env:GITHUB_OUTPUT
+          "dll_path=$spoutDll" >> $env:GITHUB_OUTPUT
+          "helper_sha256=$helperHash" >> $env:GITHUB_OUTPUT
+          "dll_sha256=$dllHash" >> $env:GITHUB_OUTPUT
+
+      - name: Test embedded Spout helper extraction
+        working-directory: src
+        run: go test -tags embeddedspout ./internal/appcore -run TestResolveEmbeddedSpoutHelperWithEmbeddedAssets -count=1
+
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
 
@@ -121,27 +148,24 @@ jobs:
           APP_VERSION: ${{ steps.version.outputs.version }}
           APP_REVISION: ${{ steps.version.outputs.revision }}
           APP_RELEASE_TIME: ${{ steps.version.outputs.release_time }}
-        run: wails build -ldflags "-X main.version=$env:APP_VERSION -X main.revision=$env:APP_REVISION -X main.releaseTime=$env:APP_RELEASE_TIME -X main.buildChannel=release"
+        run: wails build -tags embeddedspout -ldflags "-X main.version=$env:APP_VERSION -X main.revision=$env:APP_REVISION -X main.releaseTime=$env:APP_RELEASE_TIME -X main.buildChannel=release"
 
       - name: Prepare package directory
         shell: pwsh
+        env:
+          ASSET_PREFIX: ${{ steps.version.outputs.asset_prefix }}
+          SPOUT_HELPER_PATH: ${{ steps.spout.outputs.helper_path }}
+          SPOUT_DLL_PATH: ${{ steps.spout.outputs.dll_path }}
         run: |
           if (!(Test-Path "src/build/bin/ClipForVRChat.exe")) {
             throw "src/build/bin/ClipForVRChat.exe was not created"
           }
           New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item "src/build/bin/ClipForVRChat.exe" "dist/$env:ASSET_PREFIX-windows-amd64.exe" -Force
           New-Item -ItemType Directory -Force "dist/ClipForVRChat" | Out-Null
           Copy-Item "src/build/bin/ClipForVRChat.exe" "dist/ClipForVRChat/"
-          $spoutHelper = Get-ChildItem "build/spout-capture" -Recurse -Filter "spout-capture.exe" | Select-Object -First 1
-          if (!$spoutHelper) {
-            throw "spout-capture.exe was not created"
-          }
-          Copy-Item $spoutHelper.FullName "dist/ClipForVRChat/"
-          $spoutDll = Join-Path $spoutHelper.DirectoryName "SpoutLibrary.dll"
-          if (!(Test-Path $spoutDll)) {
-            throw "SpoutLibrary.dll was not copied next to spout-capture.exe"
-          }
-          Copy-Item $spoutDll "dist/ClipForVRChat/"
+          Copy-Item $env:SPOUT_HELPER_PATH "dist/ClipForVRChat/"
+          Copy-Item $env:SPOUT_DLL_PATH "dist/ClipForVRChat/"
           Copy-Item "README.md" "dist/ClipForVRChat/"
           Copy-Item "LICENSE" "dist/ClipForVRChat/"
           Copy-Item "third_party/Spout2-LICENSE.txt" "dist/ClipForVRChat/"
@@ -168,20 +192,23 @@ jobs:
             --local-user "$RELEASE_GPG_FINGERPRINT" \
             --armor --detach-sign \
             --output "dist/${ASSET_PREFIX}-windows-amd64.exe.asc" \
-            "dist/ClipForVRChat/ClipForVRChat.exe"
+            "dist/${ASSET_PREFIX}-windows-amd64.exe"
           gpg --batch --verify \
             "dist/${ASSET_PREFIX}-windows-amd64.exe.asc" \
-            "dist/ClipForVRChat/ClipForVRChat.exe"
+            "dist/${ASSET_PREFIX}-windows-amd64.exe"
 
       - name: Package executable
         shell: pwsh
         env:
           ASSET_PREFIX: ${{ steps.version.outputs.asset_prefix }}
         run: |
-          Compress-Archive -Path "dist/ClipForVRChat/*" -DestinationPath "dist/$env:ASSET_PREFIX-windows-amd64.zip" -Force
-          Get-FileHash "dist/$env:ASSET_PREFIX-windows-amd64.zip" -Algorithm SHA256 |
-            ForEach-Object { "$($_.Hash.ToLower())  $env:ASSET_PREFIX-windows-amd64.zip" } |
-            Set-Content "dist/$env:ASSET_PREFIX-windows-amd64.zip.sha256"
+          Get-FileHash "dist/$env:ASSET_PREFIX-windows-amd64.exe" -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $env:ASSET_PREFIX-windows-amd64.exe" } |
+            Set-Content "dist/$env:ASSET_PREFIX-windows-amd64.exe.sha256"
+          Compress-Archive -Path "dist/ClipForVRChat/*" -DestinationPath "dist/$env:ASSET_PREFIX-windows-amd64-separated.zip" -Force
+          Get-FileHash "dist/$env:ASSET_PREFIX-windows-amd64-separated.zip" -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $env:ASSET_PREFIX-windows-amd64-separated.zip" } |
+            Set-Content "dist/$env:ASSET_PREFIX-windows-amd64-separated.zip.sha256"
 
       - name: Write build metadata
         shell: pwsh
@@ -193,6 +220,8 @@ jobs:
           APP_REVISION: ${{ steps.version.outputs.revision }}
           APP_RELEASE_TIME: ${{ steps.version.outputs.release_time }}
           ASSET_PREFIX: ${{ steps.version.outputs.asset_prefix }}
+          SPOUT_HELPER_SHA256: ${{ steps.spout.outputs.helper_sha256 }}
+          SPOUT_DLL_SHA256: ${{ steps.spout.outputs.dll_sha256 }}
         run: |
           $metadata = [ordered]@{
             tag = $env:TAG_NAME
@@ -204,6 +233,13 @@ jobs:
             goVersion = "${{ env.GO_VERSION }}"
             nodeVersion = "${{ env.NODE_VERSION }}"
             wailsVersion = "${{ env.WAILS_VERSION }}"
+            spout = [ordered]@{
+              helper = "spout-capture.exe"
+              helperSha256 = $env:SPOUT_HELPER_SHA256
+              library = "SpoutLibrary.dll"
+              librarySha256 = $env:SPOUT_DLL_SHA256
+              source = "embedded in main exe and included in separated zip"
+            }
           }
           $metadata | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 "dist/$env:ASSET_PREFIX-build-metadata.json"
 
@@ -222,7 +258,7 @@ jobs:
           }
           $zipCheckDir = Join-Path $env:RUNNER_TEMP "release-zip-check"
           Remove-Item -Recurse -Force $zipCheckDir -ErrorAction SilentlyContinue
-          Expand-Archive "dist/$env:ASSET_PREFIX-windows-amd64.zip" -DestinationPath $zipCheckDir
+          Expand-Archive "dist/$env:ASSET_PREFIX-windows-amd64-separated.zip" -DestinationPath $zipCheckDir
           $unexpectedZipFiles = Get-ChildItem $zipCheckDir -Recurse -File | Where-Object {
             $_.Name -like "*release-signing-public-key.asc" -or $_.Extension -eq ".asc"
           }
@@ -234,9 +270,11 @@ jobs:
           & "dist/ClipForVRChat/spout-capture.exe" --version
           & "dist/ClipForVRChat/spout-capture.exe" --list-senders
           $required = @(
-            "dist/$env:ASSET_PREFIX-windows-amd64.zip",
-            "dist/$env:ASSET_PREFIX-windows-amd64.zip.sha256",
+            "dist/$env:ASSET_PREFIX-windows-amd64.exe",
+            "dist/$env:ASSET_PREFIX-windows-amd64.exe.sha256",
             "dist/$env:ASSET_PREFIX-windows-amd64.exe.asc",
+            "dist/$env:ASSET_PREFIX-windows-amd64-separated.zip",
+            "dist/$env:ASSET_PREFIX-windows-amd64-separated.zip.sha256",
             "dist/$env:ASSET_PREFIX-build-metadata.json",
             "dist/ClipForVRChat/ClipForVRChat.exe",
             "dist/ClipForVRChat/README.md",
@@ -265,6 +303,11 @@ jobs:
               throw "Required release zip file was not created: $name"
             }
           }
+          $exeHashLine = Get-Content "dist/$env:ASSET_PREFIX-windows-amd64.exe.sha256"
+          $exeHash = (Get-FileHash "dist/$env:ASSET_PREFIX-windows-amd64.exe" -Algorithm SHA256).Hash.ToLower()
+          if ($exeHashLine -ne "$exeHash  $env:ASSET_PREFIX-windows-amd64.exe") {
+            throw "main exe sha256 file does not match"
+          }
 
       - name: Prepare release notes
         if: steps.version.outputs.draft == 'false'
@@ -283,9 +326,11 @@ jobs:
         with:
           name: release-assets-${{ steps.version.outputs.asset_prefix }}
           path: |
-            dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64.zip
-            dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64.zip.sha256
+            dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64.exe
+            dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64.exe.sha256
             dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64.exe.asc
+            dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64-separated.zip
+            dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64-separated.zip.sha256
             dist/${{ steps.version.outputs.asset_prefix }}-build-metadata.json
             dist/release-body.md
 
@@ -328,7 +373,9 @@ jobs:
             gh release create "$TAG_NAME" "${args[@]}"
           fi
           gh release upload "$TAG_NAME" --clobber \
-            "dist/ClipForVRChat-${TAG_NAME}-windows-amd64.zip" \
-            "dist/ClipForVRChat-${TAG_NAME}-windows-amd64.zip.sha256" \
+            "dist/ClipForVRChat-${TAG_NAME}-windows-amd64.exe" \
+            "dist/ClipForVRChat-${TAG_NAME}-windows-amd64.exe.sha256" \
             "dist/ClipForVRChat-${TAG_NAME}-windows-amd64.exe.asc" \
+            "dist/ClipForVRChat-${TAG_NAME}-windows-amd64-separated.zip" \
+            "dist/ClipForVRChat-${TAG_NAME}-windows-amd64-separated.zip.sha256" \
             "dist/ClipForVRChat-${TAG_NAME}-build-metadata.json"

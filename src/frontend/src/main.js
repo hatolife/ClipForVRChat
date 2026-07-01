@@ -1330,17 +1330,17 @@ createApp({
         <section class="about-note">
           <h3>PGPで改竄確認できます</h3>
           <p>
-            GitHub Releasesでは、zipとは別に <code>ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc</code> 署名ファイルも配布しています。
+            GitHub Releasesでは、通常版exeとは別に <code>ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc</code> 署名ファイルも配布しています。
           </p>
           <p>
-            信頼済みfingerprintの公開鍵で検証した場合に限り、展開した <code>ClipForVRChat.exe</code> と署名の組み合わせを確認できます。
+            信頼済みfingerprintの公開鍵で検証した場合に限り、ダウンロードした通常版exeと署名の組み合わせを確認できます。
           </p>
           <ol>
             <li><button class="link-button inline" @click="openURL(releasesUrl)">GitHub Releases</button> で使いたいバージョンを開きます。</li>
-            <li>zipを展開し、確認したい <code>ClipForVRChat.exe</code> を用意します。</li>
+            <li>確認したい <code>ClipForVRChat-vX.Y.Z-windows-amd64.exe</code> を用意します。</li>
             <li>同じReleaseに別添付されている <code>.exe.asc</code> を、exeと同じフォルダに保存します。</li>
             <li><code>release-signing@hato.life</code> の公開鍵を取り込み、fingerprintが <code>BE40 AA8D 082F 493F 613B C072 21DC 3486 1B40 E77D</code> と一致することを、このアプリのREADMEや公式配布ページなどRelease assetとは別の信頼経路で確認します。</li>
-            <li>コマンドプロンプトやPowerShellで <code>gpg --verify ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc ClipForVRChat.exe</code> を実行します。</li>
+            <li>コマンドプロンプトやPowerShellで <code>gpg --verify ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc ClipForVRChat-vX.Y.Z-windows-amd64.exe</code> を実行します。</li>
             <li>信頼済みfingerprintの公開鍵で <code>Good signature</code> と表示された場合に限り、その鍵で署名されたexeとして確認できます。</li>
           </ol>
           <p>同じReleaseに同梱されたURLや公開鍵だけでは、公開鍵自体の真正性は確認できません。</p>
