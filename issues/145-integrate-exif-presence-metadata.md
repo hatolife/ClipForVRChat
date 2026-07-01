@@ -26,3 +26,33 @@
 ## 再監査メモ
 
 - 2026-07-01: [#164](164-audit-v018-completed-items.md) の再監査で未達が見つかったため、完了扱いを取り消して `要対応` に戻した。
+
+## 実装前調査メモ
+
+実装方針:
+
+- `finalizeAutoCaptureImage()` は埋め込みmetadata書き込み失敗時も、画像保存、sidecar JSON、Discord投稿、履歴追加を可能な限り継続する。
+- 現行の `Result.Error` に埋め込み失敗を入れると `AddResultsToHistory()` が履歴追加をスキップするため、警告は `Result.Warning` 追加、またはsidecarの `metadata_warnings` と診断ログに逃がす設計が必要。
+- sidecarには埋め込み成功/失敗状態を記録する。例: `embedded_metadata: { attempted, written, error }`。
+- Discord投稿は埋め込み後のローカル画像を添付する。ただしDiscord側が画像metadataを保持する保証はないため、Discord本文とsidecarを正本にする。
+
+対象ファイル:
+
+- `src/internal/appcore/autocapture.go`
+- `src/internal/appcore/types.go`
+- `src/internal/appcore/history.go`
+- `src/internal/appcore/metadata.go`
+- `src/internal/appcore/autocapture_test.go`
+
+小タスク:
+
+- `Result` / `HistoryEntry` に警告を持たせるか、sidecarだけに警告を持たせるかを決める。
+- `WriteAutoCaptureEmbeddedMetadata()` の unsupported形式は警告扱いにし、PNG/JPEGの破損など実際の書き込み失敗もsidecar/ログへ残して継続する。
+- sidecar SHA256は埋め込み後の画像に対して計算する。
+- Photo方式でVRChat写真へ直接追記するため、診断ログに元ファイル改変であることを出す。
+
+確認方法:
+
+- 埋め込み成功時、sidecar SHA256が画像と一致する。
+- 埋め込み失敗を人工的に起こしてもsidecar JSONと履歴が作られる。
+- Discord投稿ONでも、埋め込み失敗が投稿全体の失敗にならない。

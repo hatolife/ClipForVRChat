@@ -34,3 +34,31 @@
 ## 再監査メモ
 
 - 2026-07-01: [#164](164-audit-v018-completed-items.md) の再監査で未達が見つかったため、完了扱いを取り消して `要対応` に戻した。
+
+## 実装前調査メモ
+
+実装方針:
+
+- 現行のStream経路は `RunOnce()` で `/usercamera/Mode=2`、`/usercamera/Streaming=true` を送った後、`captureStreamFrameWithSpout()` を呼ぶ構造になっているため、この経路を維持する。
+- `captureStreamFrameWithSpout()` に処理時間計測を追加し、開始/成功/失敗/timeoutすべてで `duration_ms` を診断ログに残す。
+- helperのstdout JSONを構造体で解析し、sender情報、フレーム番号、取得時刻、候補一覧をsidecar/ログへ渡す。
+- context cancellation時は `exec.CommandContext` でプロセス終了させる現行設計を維持し、timeout時のログにhelper path、args、output path、sender、自動選択、durationを入れる。
+
+対象ファイル:
+
+- `src/internal/appcore/autocapture.go`
+- `src/internal/appcore/spout.go`
+- `src/internal/appcore/autocapture_test.go`
+
+小タスク:
+
+- `captureStreamFrameWithSpout()` の開始直後に `started := time.Now()` を置く。
+- helper実行失敗時に `trimmed stdout/stderr` と `duration_ms` をログへ出す。
+- 成功時に `duration_ms`、`result.OutputPath`、`senderName`、`width/height`、`frame` をログへ出す。
+- Stream方式のDiscord本文に `撮影方式: stream/spout` とsender名を含める処理は [#132](132-validate-spout-capture-output-and-metadata.md) 側で実装する。
+
+確認方法:
+
+- helper pathを存在しない値にして、画面エラーと診断ログにhelper path/原因が出る。
+- timeoutを短くして、プロセスが残らずtimeout理由が出る。
+- Stream方式成功時にPhotoの `/usercamera/Capture` が呼ばれない。

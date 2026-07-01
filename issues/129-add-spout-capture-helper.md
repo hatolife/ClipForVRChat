@@ -34,3 +34,36 @@ Windows専用の小さな `spout-capture.exe` を追加し、Spout2 SDKを使っ
 ## 再監査メモ
 
 - 2026-07-01: [#164](164-audit-v018-completed-items.md) の再監査で未達が見つかったため、完了扱いを取り消して `要対応` に戻した。
+
+## 実装前調査メモ
+
+実装方針:
+
+- `tools/spout-capture/main.cpp` のエラーJSONを拡張し、失敗時にも `senders` 配列を返せるようにする。
+- `choose_sender()` は単なる `std::string` 返却ではなく、選択結果、候補一覧、エラーコードを返す構造体へ変更する。
+- sender未指定時は以下の順に選択する。
+  - senderが0件なら `sender_not_found` と候補0件を返す。
+  - senderが1件ならそれを選ぶ。
+  - sender名に `vrchat` または `stream` を含む候補が1件だけならそれを選ぶ。
+  - 候補が複数または0件なら `sender_ambiguous` と候補一覧を返す。
+- `--sender` 指定時も、存在しないsenderをそのまま待ち続けず、sender一覧に存在しなければ `sender_not_found` と候補一覧を返す。
+- `--version` を追加し、UIのhelper確認で実行可否だけでなくバージョン/ビルド情報を表示できるようにする。
+
+対象ファイル:
+
+- `tools/spout-capture/main.cpp`
+- `src/internal/appcore/spout.go`
+- `.github/workflows/ci.yml`
+
+小タスク:
+
+- `SpoutSenderInfo` と同じJSON形でC++ helperも候補senderを出す。
+- Go側の `SpoutCaptureResult` に `Senders []SpoutSenderInfo` を追加する。
+- `captureStreamFrameWithSpout()` は helper失敗時に候補一覧を診断ログへ出す。
+- Windows CIで `spout-capture.exe --help` に加えて `--version` と `--list-senders` を実行する。
+
+確認方法:
+
+- senderが0件のWindows CI環境で `--list-senders` が `ok:true, senders:[]` を返す。
+- 複数senderの実機環境で自動選択不能時に候補名、解像度、hostPathがUI/ログに出る。
+- `spout-capture.exe --capture --sender 存在しない名前 ...` がtimeoutではなく候補一覧付きで失敗する。

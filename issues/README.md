@@ -169,6 +169,7 @@
 | 162 | [自動撮影間隔のUI最小値をNormalizeと一致させる](162-align-autocapture-interval-ui-validation.md) | 完了 | `v0.1.8` | 撮影間隔UIの最小値とNormalizeの丸め値を一致させる。 |
 | 163 | [自動撮影テスト結果を設定画面に表示する](163-show-autocapture-test-results-in-settings.md) | 要対応 | `v0.1.8` | 構図ごとのテスト撮影成功/失敗結果を設定画面上で確認できるようにする。 |
 | 164 | [v0.1.8完了扱い項目の再監査](164-audit-v018-completed-items.md) | 完了 | `v0.1.8` | 完了扱いのv0.1.8項目に不完全な実装や未確認項目が残っていないか確認する。 |
+| 165 | [v0.1.8未完了項目の実装前調査](165-plan-v018-incomplete-implementation.md) | 完了 | `v0.1.8` | 未完了項目を実装可能な粒度に調査し、各issueへ実装方針を追記する。 |
 
 ## 状態の意味
 
