@@ -34,6 +34,7 @@
 
 - [#121](121-stream-camera-local-view-and-error-ux.md)、[#129](129-add-spout-capture-helper.md)、[#130](130-add-spout-sender-settings-and-diagnostics.md)、[#131](131-integrate-spout-helper-into-auto-capture.md)、[#132](132-validate-spout-capture-output-and-metadata.md)、[#134](134-package-spout-helper-in-ci-release.md)、[#141](141-integrate-player-local-coordinate-ui.md) はWindows実機またはGitHub Actionsでの確認が必要なため `要確認` とした。
 - 2026-07-01: `v0.1.8-rc13` は修正前コミットでタグ作成・push済みだが、CI/Releaseが `SpoutLibrary_static.lib` リンク失敗で落ちた。`release/v0.1.8` は追加コミット `01db7b0` で修正し、CI run `28494855637` は成功した。公開済みタグを書き換えるには明示許可が必要なため、Release成果物は `v0.1.8-rc13` タグ再作成許可または次RCタグ作成待ち。
+- 2026-07-01: ユーザーから `rc13を作成` の明示指示を受けたため、既存の失敗済み `v0.1.8-rc13` タグを削除し、現在の `release/v0.1.8` HEADへ署名付きタグを付け直してRelease workflowを再実行する。
 
 ## 進行中メモ
 
