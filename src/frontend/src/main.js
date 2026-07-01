@@ -30,6 +30,7 @@ createApp({
       settingsBaseline: '',
       settingsTab: 'feature',
       pendingSettingsLeave: null,
+      pendingAutoPostConfirmation: null,
       pendingDropPaths: [],
       historyDragSelecting: false,
       historySelectionAdditive: false,
@@ -171,6 +172,34 @@ createApp({
     },
     shouldShowDiscordWebhookWarning() {
       return this.shouldWarnMissingPrimaryWebhook()
+    },
+    autoPostConfirmationItems() {
+      const config = this.state.config || {}
+      const items = []
+      const autoPhoto = config.autoPhoto || {}
+      const screenshot = config.screenshotAutoPost || {}
+      const output = config.output || {}
+      const discord = config.discord || {}
+      if (autoPhoto.enabled) {
+        const target = String(autoPhoto.webhookUrl || discord.webhookUrl || '').trim()
+        items.push({
+          label: 'VRChat写真自動処理',
+          detail: `監視フォルダ: ${autoPhoto.photoDirectory || '(未設定)'}`,
+          discord: output.uploadDiscord ? `Discord投稿: ON / 送信先: ${target ? this.maskWebhook(target) : '(未設定)'}` : 'Discord投稿: OFF'
+        })
+      }
+      if (screenshot.enabled) {
+        const target = String(screenshot.webhookUrl || discord.webhookUrl || '').trim()
+        items.push({
+          label: 'スクリーンショット自動処理',
+          detail: `監視フォルダ: ${screenshot.screenshotDirectory || '(未設定)'}`,
+          discord: output.uploadDiscord ? `Discord投稿: ON / 送信先: ${target ? this.maskWebhook(target) : '(未設定)'}` : 'Discord投稿: OFF'
+        })
+      }
+      return items
+    },
+    shouldConfirmAutoPostSettings() {
+      return this.autoPostConfirmationItems.length > 0
     }
   },
   async mounted() {
@@ -266,8 +295,13 @@ createApp({
         this.setView('main', 'after_settings')
       }
     },
-    async confirmSaveAndLeaveSettings() {
-      const action = this.pendingSettingsLeave || 'home'
+    async confirmSaveAndLeaveSettings(skipAutoPostConfirmation = false, overrideAction = '') {
+      const action = overrideAction || this.pendingSettingsLeave || 'home'
+      if (!skipAutoPostConfirmation && this.shouldConfirmAutoPostSettings) {
+        this.pendingSettingsLeave = null
+        this.requestAutoPostConfirmation(`leave:${action}`)
+        return
+      }
       this.pendingSettingsLeave = null
       this.saving = true
       this.saved = false
@@ -369,6 +403,33 @@ createApp({
     },
     shouldWarnMissingPrimaryWebhook(config = this.state.config) {
       return Boolean(config?.output?.uploadDiscord && !String(config?.discord?.webhookUrl || '').trim())
+    },
+    maskWebhook(value) {
+      const text = String(value || '').trim()
+      if (!text) return ''
+      const parts = text.split('/')
+      if (parts.length < 2) return '(設定済み)'
+      const id = parts[parts.length - 2] || ''
+      const token = parts[parts.length - 1] || ''
+      const shortToken = token.length > 8 ? `${token.slice(0, 4)}...${token.slice(-4)}` : '****'
+      return `${id}/${shortToken}`
+    },
+    requestAutoPostConfirmation(action) {
+      this.pendingAutoPostConfirmation = action
+      this.logUserAction('settings_confirmation_required', `auto_post ${action}`)
+    },
+    async confirmAutoPostSettings() {
+      const action = this.pendingAutoPostConfirmation || 'save'
+      this.pendingAutoPostConfirmation = null
+      if (action.startsWith('leave:')) {
+        await this.confirmSaveAndLeaveSettings(true, action.slice('leave:'.length) || 'home')
+        return
+      }
+      await this.saveSettings(true)
+    },
+    cancelAutoPostConfirmation() {
+      this.logUserAction('button_click', 'cancel_auto_post_confirmation')
+      this.pendingAutoPostConfirmation = null
     },
     openDiscordWebhookSettings() {
       this.logUserAction('button_click', 'open_discord_webhook_settings_from_banner')
@@ -1141,7 +1202,7 @@ createApp({
         this.error = String(err)
       }
     },
-    async saveSettings() {
+    async saveSettings(skipAutoPostConfirmation = false) {
       this.saving = true
       this.saved = false
       this.error = ''
@@ -1149,6 +1210,11 @@ createApp({
         this.sanitizeOutputDirectory()
         this.sanitizePhotoDirectory()
         this.sanitizeScreenshotDirectory()
+        if (!skipAutoPostConfirmation && this.shouldConfirmAutoPostSettings) {
+          this.saving = false
+          this.requestAutoPostConfirmation('save')
+          return
+        }
         if (this.state.processOnSave) {
           this.state = await api.SaveConfigAndProcess(this.state.config, this.state.pendingPaths || [])
           if (this.shouldWarnMissingPrimaryWebhook()) {
@@ -1267,16 +1333,17 @@ createApp({
             GitHub Releasesでは、zipとは別に <code>ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc</code> 署名ファイルも配布しています。
           </p>
           <p>
-            展開した <code>ClipForVRChat.exe</code> が改竄されていないことを確認できます。
+            信頼済みfingerprintの公開鍵で検証した場合に限り、展開した <code>ClipForVRChat.exe</code> と署名の組み合わせを確認できます。
           </p>
           <ol>
             <li><button class="link-button inline" @click="openURL(releasesUrl)">GitHub Releases</button> で使いたいバージョンを開きます。</li>
             <li>zipを展開し、確認したい <code>ClipForVRChat.exe</code> を用意します。</li>
             <li>同じReleaseに別添付されている <code>.exe.asc</code> を、exeと同じフォルダに保存します。</li>
-            <li>zip内の <code>Release-signing-public-key.url</code> から公式公開鍵を確認して取り込みます。</li>
+            <li><code>release-signing@hato.life</code> の公開鍵を取り込み、fingerprintが <code>BE40 AA8D 082F 493F 613B C072 21DC 3486 1B40 E77D</code> と一致することを、このアプリのREADMEや公式配布ページなどRelease assetとは別の信頼経路で確認します。</li>
             <li>コマンドプロンプトやPowerShellで <code>gpg --verify ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc ClipForVRChat.exe</code> を実行します。</li>
-            <li><code>Good signature</code> と表示されれば、公式配布のexeとして確認できています。</li>
+            <li>信頼済みfingerprintの公開鍵で <code>Good signature</code> と表示された場合に限り、その鍵で署名されたexeとして確認できます。</li>
           </ol>
+          <p>同じReleaseに同梱されたURLや公開鍵だけでは、公開鍵自体の真正性は確認できません。</p>
           <p>PGPがよく分からない場合は、公式の配布場所から直接ダウンロードしてください。</p>
           <ul>
             <li><button class="link-button inline" @click="openURL(latestReleaseUrl)">GitHub - https://github.com/hatolife/ClipForVRChat/releases/latest</button></li>
@@ -1426,7 +1493,7 @@ createApp({
             <p v-if="state.message" class="message" :class="{ warning: isError }">{{ state.message }}</p>
           </div>
           <div v-if="state.config" class="settings-title-actions">
-            <button @click="saveSettings" :disabled="saving">{{ saving ? '保存中' : '保存' }}</button>
+            <button @click="saveSettings()" :disabled="saving">{{ saving ? '保存中' : '保存' }}</button>
             <button class="secondary" @click="closeSettings">閉じる</button>
             <span v-if="saved" class="saved">保存しました</span>
           </div>
@@ -1893,9 +1960,29 @@ createApp({
           <p>変更した設定を保存してから移動しますか。保存しない場合、変更前の設定が維持されます。</p>
           <p v-if="error" class="error">{{ error }}</p>
           <div class="button-row dialog-actions">
-            <button @click="confirmSaveAndLeaveSettings" :disabled="saving">{{ saving ? '保存中' : '保存して移動' }}</button>
+            <button @click="confirmSaveAndLeaveSettings()" :disabled="saving">{{ saving ? '保存中' : '保存して移動' }}</button>
             <button class="secondary" @click="discardSettingsAndLeave" :disabled="saving">保存せずに移動</button>
             <button class="secondary" @click="cancelSettingsLeave" :disabled="saving">キャンセル</button>
+          </div>
+        </div>
+      </div>
+      <div v-if="pendingAutoPostConfirmation" class="modal-backdrop" role="dialog" aria-modal="true">
+        <div class="confirm-dialog">
+          <h2>自動処理の設定を確認してください</h2>
+          <p>保存すると、下記の自動処理が有効になり、条件に一致した画像が自動で処理されます。</p>
+          <ul class="confirmation-list">
+            <li v-for="item in autoPostConfirmationItems" :key="item.label">
+              <strong>{{ item.label }}</strong>
+              <span>{{ item.detail }}</span>
+              <span>{{ item.discord }}</span>
+            </li>
+          </ul>
+          <p>意図しない送信を避けるため、Discord投稿タブでWebhook URLと送信先を確認してから保存してください。</p>
+          <p v-if="error" class="error">{{ error }}</p>
+          <div class="button-row dialog-actions">
+            <button @click="confirmAutoPostSettings" :disabled="saving">{{ saving ? '保存中' : '確認して保存' }}</button>
+            <button class="secondary" @click="openDiscordWebhookSettings" :disabled="saving">Discord投稿設定を開く</button>
+            <button class="secondary" @click="cancelAutoPostConfirmation" :disabled="saving">キャンセル</button>
           </div>
         </div>
       </div>

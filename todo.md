@@ -1,8 +1,8 @@
-# v0.1.8-rc13 CI修正チェックリスト
+# Codex Security findings修正チェックリスト
 
-- [ ] Spout helperのWindows CIビルド失敗を修正する
-  - [x] `SpoutLibrary_static.lib` リンク失敗の原因をissueへ追記する
-  - [x] CMakeを上流Spout2の実ターゲットに合わせる
-  - [x] `SpoutLibrary.dll` をCI/Release同梱・検証対象にする
-  - [x] `release/v0.1.8` のGitHub Actions CI成功を確認する
-  - [ ] Release成果物を作成するタグ方針を決める
+- [x] finding CSVを現在HEADで分類・再検証する
+- [x] Release workflowのtag/ref injectionとWails cache trustを修正する
+- [x] 自動処理/Discord投稿の保存前確認を追加する
+- [x] PGP検証のtrust anchor説明を修正する
+- [x] 報告書に判定、修正、テスト、残リスクを記録する
+- [x] CI相当のローカル検証を実行する

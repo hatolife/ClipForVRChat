@@ -1321,6 +1321,30 @@ small {
   line-height: 1.65;
 }
 
+.confirmation-list {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.confirmation-list li {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  border: 1px solid #d6dee7;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.confirmation-list span {
+  color: #455361;
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .busy-backdrop {
   z-index: 45;
   background: rgba(23, 33, 43, 0.42);
