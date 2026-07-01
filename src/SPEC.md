@@ -685,6 +685,10 @@ Release asset には配布zipに加えて以下を添付します。
 - `ClipForVRChat-vX.Y.Z-windows-amd64.zip.sha256`
 - `ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc`
 
+PGP署名を検証する利用者向け説明では、Release assetに同梱または案内された公開鍵だけを信頼根拠にしません。
+`release-signing@hato.life` の公開鍵fingerprint `BE40 AA8D 082F 493F 613B C072 21DC 3486 1B40 E77D` を、READMEや公式配布ページなどRelease assetとは別の信頼経路で照合するよう案内します。
+`Good signature` は、信頼済みfingerprintの公開鍵で検証した場合に限り、その鍵で署名されたexeとして扱います。
+
 zipファイル名にはバージョンを含めます。
 
 例:

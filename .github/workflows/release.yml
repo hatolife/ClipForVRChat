@@ -5,6 +5,11 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag to build, for example v0.1.8-rc13"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -22,11 +27,37 @@ jobs:
     permissions:
       contents: read
     outputs:
+      tag_name: ${{ steps.version.outputs.version }}
       asset_prefix: ${{ steps.version.outputs.asset_prefix }}
+      draft: ${{ steps.version.outputs.draft }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      - name: Prepare version
+        id: version
+        shell: pwsh
+        env:
+          TAG_NAME: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag_name }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          $tagName = $env:TAG_NAME
+          if ($tagName -notmatch '^v\d+\.\d+\.\d+(-rc\d+)?$') {
+            throw "Release tag must match vX.Y.Z or vX.Y.Z-rcN: $tagName"
+          }
+          $shortSha = $env:COMMIT_SHA.Substring(0, 7)
+          $releaseTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+          $isReleaseCandidate = $tagName -match '^v\d+\.\d+\.\d+-rc\d+$'
+          $assetPrefix = "ClipForVRChat-$tagName"
+          "app_version=$tagName.$shortSha" >> $env:GITHUB_OUTPUT
+          "version=$tagName" >> $env:GITHUB_OUTPUT
+          "revision=$shortSha" >> $env:GITHUB_OUTPUT
+          "release_time=$releaseTime" >> $env:GITHUB_OUTPUT
+          "asset_prefix=$assetPrefix" >> $env:GITHUB_OUTPUT
+          "draft=false" >> $env:GITHUB_OUTPUT
+          "prerelease=$($isReleaseCandidate.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
 
       - name: Setup Go
         uses: actions/setup-go@v6
@@ -68,49 +99,11 @@ jobs:
           cmake -S tools/spout-capture -B build/spout-capture -A x64 -DCMAKE_BUILD_TYPE=Release
           cmake --build build/spout-capture --config Release --target spout-capture
 
-      - name: Add Go bin to PATH
-        shell: pwsh
-        run: '"$HOME/go/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append'
-
-      - name: Cache Wails CLI
-        id: cache-wails
-        uses: actions/cache@v6
-        with:
-          path: ~/go/bin/wails.exe
-          key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-wails-${{ env.WAILS_VERSION }}
-
       - name: Install Wails
-        if: steps.cache-wails.outputs.cache-hit != 'true'
         run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
 
       - name: Check Wails
         run: wails version
-
-      - name: Prepare version
-        id: version
-        shell: pwsh
-        env:
-          TAG_NAME: ${{ github.ref_name }}
-          COMMIT_SHA: ${{ github.sha }}
-        run: |
-          $tagName = $env:TAG_NAME
-          if ($tagName -notmatch '^v[0-9A-Za-z][0-9A-Za-z._-]*$') {
-            throw "Release tag contains unsupported characters: $tagName"
-          }
-          $shortSha = $env:COMMIT_SHA.Substring(0, 7)
-          $releaseTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-          $isStable = $tagName -match '^v\d+\.\d+\.\d+$'
-          $isReleaseCandidate = $tagName -match '^v\d+\.\d+\.\d+-rc\d+$'
-          $draft = if ($isStable -or $isReleaseCandidate) { "false" } else { "true" }
-          $prerelease = if ($isReleaseCandidate) { "true" } else { "false" }
-          $assetPrefix = "ClipForVRChat-$tagName"
-          "app_version=$tagName.$shortSha" >> $env:GITHUB_OUTPUT
-          "version=$tagName" >> $env:GITHUB_OUTPUT
-          "revision=$shortSha" >> $env:GITHUB_OUTPUT
-          "release_time=$releaseTime" >> $env:GITHUB_OUTPUT
-          "asset_prefix=$assetPrefix" >> $env:GITHUB_OUTPUT
-          "draft=$draft" >> $env:GITHUB_OUTPUT
-          "prerelease=$prerelease" >> $env:GITHUB_OUTPUT
 
       - name: Prepare Windows version info
         shell: pwsh
@@ -310,37 +303,13 @@ jobs:
           name: release-assets-${{ needs.build.outputs.asset_prefix }}
           path: dist
 
-      - name: Prepare version
-        id: version
-        shell: bash
-        env:
-          TAG_NAME: ${{ github.ref_name }}
-        run: |
-          tag_name="$TAG_NAME"
-          if [[ ! "$tag_name" =~ ^v[0-9A-Za-z][0-9A-Za-z._-]*$ ]]; then
-            echo "Release tag contains unsupported characters: $tag_name" >&2
-            exit 1
-          fi
-          if [[ "$tag_name" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ || "$tag_name" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc[0-9]+$ ]]; then
-            draft=false
-          else
-            draft=true
-          fi
-          if [[ "$tag_name" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc[0-9]+$ ]]; then
-            prerelease=true
-          else
-            prerelease=false
-          fi
-          echo "draft=$draft" >> "$GITHUB_OUTPUT"
-          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
-
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          TAG_NAME: ${{ github.ref_name }}
-          DRAFT: ${{ steps.version.outputs.draft }}
-          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+          TAG_NAME: ${{ needs.build.outputs.tag_name }}
+          DRAFT: ${{ needs.build.outputs.draft }}
+          PRERELEASE: ${{ needs.build.outputs.prerelease }}
         run: |
           set -euo pipefail
           args=(

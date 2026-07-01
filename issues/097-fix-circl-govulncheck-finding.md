@@ -12,7 +12,7 @@
 
 - `github.com/cloudflare/circl` が `v1.6.3` 以上、可能なら `v1.6.4` 以上へ更新されている。
 - `go test ./...` が成功する。
-- `go run golang.org/x/vuln/cmd/govulncheck@latest ./...` が成功する。
+- 固定バージョンの `govulncheck` が成功する。
 - 診断データ暗号化とzip引数暗号化が壊れていない。
 
 ## 対応内容

@@ -17,6 +17,11 @@
 - 公式配布場所を GitHub と BOOTH の箇条書きで表示する。
 - PGPが分からない場合は公式配布場所から直接ダウンロードするよう案内する。
 - PGP確認手順はzipではなく `ClipForVRChat.exe` と `ClipForVRChat.exe.asc` を対象にする。
-- 情報画面上にはRelease署名用公開鍵のfingerprintを表示しない。
+- 情報画面上でRelease署名用公開鍵のfingerprintを表示し、Release assetとは別の信頼経路で照合するよう案内する。
 - 連絡・要望はPGPとは別項目として表示する。
 - PGP説明と連絡・要望の文章は、長文を避けて段落分けする。
+
+## 2026-07-01 セキュリティ再検証メモ
+
+同じReleaseに含まれる公開鍵またはURLだけを信頼して `Good signature` を確認しても、公開鍵自体の真正性は確認できない。
+情報画面では `release-signing@hato.life` のfingerprint `BE40 AA8D 082F 493F 613B C072 21DC 3486 1B40 E77D` を表示し、READMEや公式配布ページなどRelease assetとは別の信頼経路で照合する説明へ更新する。
