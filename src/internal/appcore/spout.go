@@ -3,6 +3,9 @@ package appcore
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +20,13 @@ import (
 	"strings"
 	"time"
 )
+
+const (
+	spoutHelperFileName = "spout-capture.exe"
+	spoutLibraryDLLName = "SpoutLibrary.dll"
+)
+
+var spoutHelperCacheDirForTest string
 
 type SpoutSenderInfo struct {
 	Name     string `json:"name"`
@@ -75,8 +85,9 @@ type capturedImageStats struct {
 
 func ResolveSpoutHelperPath(helperPath string) (string, error) {
 	helperPath = strings.Trim(strings.TrimSpace(helperPath), `"`)
+	useEmbeddedFallback := helperPath == "" || helperPath == spoutHelperFileName
 	if helperPath == "" {
-		helperPath = "spout-capture.exe"
+		helperPath = spoutHelperFileName
 	}
 	if strings.ContainsAny(helperPath, `\/`) || filepath.IsAbs(helperPath) {
 		info, err := os.Stat(helperPath)
@@ -88,17 +99,121 @@ func ResolveSpoutHelperPath(helperPath string) (string, error) {
 		}
 		return helperPath, nil
 	}
-	if exe, err := os.Executable(); err == nil {
-		candidate := filepath.Join(filepath.Dir(exe), helperPath)
-		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
-			return candidate, nil
+	if candidate, ok := spoutHelperNextToExecutable(helperPath); ok {
+		return candidate, nil
+	}
+	if useEmbeddedFallback && embeddedSpoutHelperAvailable() {
+		embedded, err := resolveEmbeddedSpoutHelper()
+		if err != nil {
+			return "", err
 		}
+		return embedded, nil
 	}
 	resolved, err := exec.LookPath(helperPath)
 	if err != nil {
-		return "", fmt.Errorf("Spout helperが見つかりません。Release zipに含まれるspout-capture.exeをアプリと同じフォルダに置いてください")
+		return "", fmt.Errorf("Spout helperが見つかりません。単一exe版では埋め込みhelperを利用します。分離版zipを使う場合は%sをアプリと同じフォルダに置くか、設定でhelperパスを指定してください", spoutHelperFileName)
 	}
 	return resolved, nil
+}
+
+func spoutHelperNextToExecutable(helperPath string) (string, bool) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", false
+	}
+	candidate := filepath.Join(filepath.Dir(exe), helperPath)
+	if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+		return candidate, true
+	}
+	return "", false
+}
+
+func embeddedSpoutHelperAvailable() bool {
+	return embeddedSpoutAvailable && len(embeddedSpoutHelperEXE) > 0 && len(embeddedSpoutLibraryDLL) > 0
+}
+
+func resolveEmbeddedSpoutHelper() (string, error) {
+	dir, err := embeddedSpoutHelperDir(embeddedSpoutHelperEXE, embeddedSpoutLibraryDLL)
+	if err != nil {
+		return "", err
+	}
+	helperPath := filepath.Join(dir, spoutHelperFileName)
+	dllPath := filepath.Join(dir, spoutLibraryDLLName)
+	if err := ensureEmbeddedSpoutFile(helperPath, embeddedSpoutHelperEXE, true); err != nil {
+		return "", err
+	}
+	if err := ensureEmbeddedSpoutFile(dllPath, embeddedSpoutLibraryDLL, false); err != nil {
+		return "", err
+	}
+	return helperPath, nil
+}
+
+func embeddedSpoutHelperDir(helperData []byte, dllData []byte) (string, error) {
+	root := spoutHelperCacheRoot()
+	if root == "" {
+		return "", fmt.Errorf("埋め込みSpout helperの展開先を決定できません")
+	}
+	hasher := sha256.New()
+	writeEmbeddedSpoutHashPart(hasher, spoutHelperFileName, helperData)
+	writeEmbeddedSpoutHashPart(hasher, spoutLibraryDLLName, dllData)
+	sum := hasher.Sum(nil)
+	return filepath.Join(root, hex.EncodeToString(sum[:])[:16]), nil
+}
+
+func writeEmbeddedSpoutHashPart(hasher interface {
+	Write([]byte) (int, error)
+}, name string, data []byte) {
+	var size [8]byte
+	binary.LittleEndian.PutUint64(size[:], uint64(len(data)))
+	_, _ = hasher.Write([]byte(name))
+	_, _ = hasher.Write([]byte{0})
+	_, _ = hasher.Write(size[:])
+	_, _ = hasher.Write(data)
+}
+
+func spoutHelperCacheRoot() string {
+	if spoutHelperCacheDirForTest != "" {
+		return spoutHelperCacheDirForTest
+	}
+	if cacheDir, err := os.UserCacheDir(); err == nil && cacheDir != "" {
+		return filepath.Join(cacheDir, "ClipForVRChat", "spout-helper")
+	}
+	return filepath.Join(os.TempDir(), "ClipForVRChat", "spout-helper")
+}
+
+func ensureEmbeddedSpoutFile(path string, data []byte, executable bool) error {
+	if len(data) == 0 {
+		return fmt.Errorf("埋め込みSpout helper資産が空です: %s", filepath.Base(path))
+	}
+	expected := sha256.Sum256(data)
+	if existing, err := os.ReadFile(path); err == nil {
+		actual := sha256.Sum256(existing)
+		if actual == expected {
+			return nil
+		}
+	}
+	if err := os.MkdirAll(filepath.Dir(path), privateDirMode); err != nil {
+		return fmt.Errorf("埋め込みSpout helperの展開フォルダを作成できません: %w", err)
+	}
+	mode := privateFileMode
+	if executable {
+		mode = 0700
+	}
+	if err := os.WriteFile(path, data, mode); err != nil {
+		return fmt.Errorf("埋め込みSpout helperを展開できません: %w", err)
+	}
+	if err := os.Chmod(path, mode); err != nil {
+		return fmt.Errorf("埋め込みSpout helperの権限を設定できません: %w", err)
+	}
+	written, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("展開したSpout helperを検証できません: %w", err)
+	}
+	actual := sha256.Sum256(written)
+	if actual != expected {
+		return fmt.Errorf("展開したSpout helperのSHA-256が一致しません: %s", filepath.Base(path))
+	}
+	return nil
 }
 
 func CheckSpoutHelper(ctx context.Context, cfg AutoCaptureStreamConfig, logPath string) SpoutHelperStatus {

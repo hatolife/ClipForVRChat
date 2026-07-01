@@ -1,5 +1,7 @@
 # v0.1.8-rc13 作成チェックリスト
 
+- [x] Spout helper埋め込みによる単一exe配布を実装する
+- [x] Releaseで単一exe版と分離版zipを生成・検証する
 - [x] `ClipForVRChat.exe`、`spout-capture.exe`、`SpoutLibrary.dll` を単一exe配布へ戻せるか調査する
 - [x] C案採用前提で単一exe版と分離版をReleaseに併存できるか調査する
 - [x] Go以外への書き直しとOBS/VRChat Stream Cameraの方式を調査する

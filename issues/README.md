@@ -174,6 +174,7 @@
 | 167 | [Codex Security findingsを現在HEADで再検証し修正する](167-remediate-codex-security-findings-2026-07-01.md) | 完了 | `v0.1.8` | Codex Security findingsを現在HEADで再検証し、未修正または部分修正の問題だけを安全に修正する。 |
 | 169 | [Spout同梱バイナリの必要性と安全性説明を追加する](169-document-spout-binary-necessity-and-safety.md) | 完了 | `v0.1.8` | `spout-capture.exe` と `SpoutLibrary.dll` の必要性、安全性の根拠、利用者の確認観点をREADME/SPEC/Release Notesへ追記する。 |
 | 170 | [Spout同梱バイナリを単一exe配布に戻せるか調査する](170-investigate-single-exe-distribution-for-spout.md) | 完了 | 調査のみ | v0.1.8-rc13で増えた `spout-capture.exe` / `SpoutLibrary.dll` を利用者から見て単一exeへ寄せられるか調査した。 |
+| 171 | [Spout helperを本体exeへ埋め込み単一exe配布にする](171-embed-spout-helper-single-exe-release.md) | 要確認 | `v0.1.8` | C案採用に基づき、通常利用者向けReleaseを単一exe主導線へ戻し、分離版zipも検証用に残す。 |
 
 ## 状態の意味
 
