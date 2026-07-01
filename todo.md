@@ -1,7 +1,6 @@
 # v0.1.8-rc13 作成チェックリスト
 
-- [x] 既存 `v0.1.8-rc13` タグが旧コミットを指していることを確認する
-- [x] GitHub Release `v0.1.8-rc13` が未作成であることを確認する
-- [ ] 現在HEADに `v0.1.8-rc13` 署名付きタグを作成し直す
+- [x] `spout-capture.exe` と `SpoutLibrary.dll` の説明をREADME、Release Notes、仕様、実機確認手順へ追記する
+- [ ] `v0.1.8-rc13` 署名付きタグをMD更新後のHEADへ作成し直す
 - [ ] `v0.1.8-rc13` をpushする
 - [ ] CI/Release workflowの成功を確認する
