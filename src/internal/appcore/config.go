@@ -92,9 +92,21 @@ type AutoCaptureOSCConfig struct {
 }
 
 type AutoCapturePlayerLocalConfig struct {
-	BasisPose  CameraPoseConfig `json:"basisPose"`
-	Calibrated bool             `json:"calibrated"`
-	UpdatedAt  string           `json:"updatedAt,omitempty"`
+	BasisPose   CameraPoseConfig                      `json:"basisPose"`
+	BasisSource string                                `json:"basisSource,omitempty"`
+	AvatarOSC   AutoCapturePlayerLocalAvatarOSCConfig `json:"avatarOsc,omitempty"`
+	Calibrated  bool                                  `json:"calibrated"`
+	UpdatedAt   string                                `json:"updatedAt,omitempty"`
+}
+
+type AutoCapturePlayerLocalAvatarOSCConfig struct {
+	ParameterPrefix       string  `json:"parameterPrefix"`
+	PositionScale         float64 `json:"positionScale"`
+	InvertMagnitude       bool    `json:"invertMagnitude"`
+	PositiveFlagThreshold float64 `json:"positiveFlagThreshold"`
+	MaxAbsPosition        float64 `json:"maxAbsPosition"`
+	MaxAbsForward         float64 `json:"maxAbsForward"`
+	FreshnessSec          int     `json:"freshnessSec"`
 }
 
 type AutoCaptureScheduleConfig struct {
@@ -234,6 +246,10 @@ func DefaultAutoCaptureConfig() AutoCaptureConfig {
 			SendPort:         9000,
 			ReceivePort:      9001,
 			PoseFreshnessSec: 3,
+		},
+		PlayerLocal: AutoCapturePlayerLocalConfig{
+			BasisSource: PlayerLocalBasisSourceManual,
+			AvatarOSC:   defaultAutoCapturePlayerLocalAvatarOSCConfig(),
 		},
 		Schedule: AutoCaptureScheduleConfig{
 			Enabled:                    false,
@@ -395,6 +411,7 @@ func (c *AutoCaptureConfig) Normalize() {
 	if c.OSC.PoseFreshnessSec <= 0 {
 		c.OSC.PoseFreshnessSec = 3
 	}
+	c.PlayerLocal.Normalize()
 	if c.Schedule.CaptureIntervalSec <= 0 {
 		c.Schedule.CaptureIntervalSec = 300
 	}
@@ -506,6 +523,69 @@ func (c *AutoCaptureConfig) Normalize() {
 			}
 		}
 	}
+}
+
+const (
+	PlayerLocalBasisSourceManual    = "manual"
+	PlayerLocalBasisSourceAvatarOSC = "avatar_osc"
+)
+
+func (c *AutoCapturePlayerLocalConfig) Normalize() {
+	c.BasisSource = normalizePlayerLocalBasisSource(c.BasisSource)
+	c.AvatarOSC.Normalize()
+}
+
+func normalizePlayerLocalBasisSource(source string) string {
+	switch strings.ToLower(strings.TrimSpace(source)) {
+	case "", PlayerLocalBasisSourceManual:
+		return PlayerLocalBasisSourceManual
+	case PlayerLocalBasisSourceAvatarOSC:
+		return PlayerLocalBasisSourceAvatarOSC
+	default:
+		return PlayerLocalBasisSourceManual
+	}
+}
+
+func (c *AutoCapturePlayerLocalAvatarOSCConfig) Normalize() {
+	c.ParameterPrefix = strings.TrimSpace(strings.Trim(strings.TrimSpace(c.ParameterPrefix), `"`))
+	if c.ParameterPrefix == "" {
+		c.ParameterPrefix = "CFVRC/basis"
+	}
+	if c.PositionScale <= 0 {
+		c.PositionScale = 1000
+	}
+	if !isFiniteFloat64(c.PositionScale) {
+		c.PositionScale = 1000
+	}
+	if !isFiniteFloat64(c.PositiveFlagThreshold) {
+		c.PositiveFlagThreshold = 0
+	}
+	if c.MaxAbsPosition <= 0 || !isFiniteFloat64(c.MaxAbsPosition) {
+		c.MaxAbsPosition = 10000
+	}
+	if c.MaxAbsForward <= 0 || !isFiniteFloat64(c.MaxAbsForward) {
+		c.MaxAbsForward = 2000
+	}
+	if c.FreshnessSec <= 0 {
+		c.FreshnessSec = 3
+	}
+	if c.FreshnessSec > 60 {
+		c.FreshnessSec = 60
+	}
+}
+
+func defaultAutoCapturePlayerLocalAvatarOSCConfig() AutoCapturePlayerLocalAvatarOSCConfig {
+	cfg := AutoCapturePlayerLocalAvatarOSCConfig{
+		ParameterPrefix:       "CFVRC/basis",
+		PositionScale:         1000,
+		InvertMagnitude:       true,
+		PositiveFlagThreshold: 0,
+		MaxAbsPosition:        10000,
+		MaxAbsForward:         2000,
+		FreshnessSec:          3,
+	}
+	cfg.Normalize()
+	return cfg
 }
 
 func (v *CameraViewConfig) Normalize(index int) {

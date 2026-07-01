@@ -55,6 +55,7 @@ type autoCaptureConfigLogSummary struct {
 	Schedule        appcore.AutoCaptureScheduleConfig `json:"schedule"`
 	Capture         appcore.AutoCaptureCaptureConfig  `json:"capture"`
 	OSC             appcore.AutoCaptureOSCConfig      `json:"osc"`
+	PlayerLocal     autoCapturePlayerLocalLogSummary  `json:"playerLocal"`
 	Output          autoCaptureOutputLogSummary       `json:"output"`
 	Presence        appcore.AutoCapturePresenceConfig `json:"presence"`
 	Discord         autoCaptureDiscordLogSummary      `json:"discord"`
@@ -76,6 +77,12 @@ type autoCaptureDiscordLogSummary struct {
 	WebhookConfigured bool   `json:"webhookConfigured"`
 	PostMode          string `json:"postMode"`
 	IncludeImages     bool   `json:"includeImages"`
+}
+
+type autoCapturePlayerLocalLogSummary struct {
+	BasisSource string `json:"basisSource"`
+	Calibrated  bool   `json:"calibrated"`
+	UpdatedAt   string `json:"updatedAt,omitempty"`
 }
 
 func (a *App) logStartupLocked() {
@@ -159,6 +166,11 @@ func autoCaptureSummaryForLog(cfg appcore.AutoCaptureConfig) autoCaptureConfigLo
 		Schedule: cfg.Schedule,
 		Capture:  cfg.Capture,
 		OSC:      cfg.OSC,
+		PlayerLocal: autoCapturePlayerLocalLogSummary{
+			BasisSource: cfg.PlayerLocal.BasisSource,
+			Calibrated:  cfg.PlayerLocal.Calibrated,
+			UpdatedAt:   cfg.PlayerLocal.UpdatedAt,
+		},
 		Output: autoCaptureOutputLogSummary{
 			Directory:           cfg.Output.Directory,
 			ImageFormat:         cfg.Output.ImageFormat,

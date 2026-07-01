@@ -108,10 +108,20 @@ func TestBuildAutoCaptureEmbeddedMetadataMasksUserIDs(t *testing.T) {
 	cfg.Output.WriteEXIF = true
 	cfg.Output.WriteUserListToEXIF = true
 	cfg.Output.WriteUserIDsToEXIF = false
+	cfg.PlayerLocal.BasisSource = PlayerLocalBasisSourceAvatarOSC
+	cfg.PlayerLocal.Calibrated = true
+	cfg.PlayerLocal.UpdatedAt = "2026-07-02T12:00:00Z"
+	cfg.PlayerLocal.BasisPose = CameraPoseConfig{
+		Position: CameraVector3Config{X: 1, Y: 2, Z: 3},
+		Rotation: CameraVector3Config{Y: 45},
+	}
 	users := []PresenceUser{{DisplayName: "Alice", UserID: "usr_secret"}}
 	metadata := BuildAutoCaptureEmbeddedMetadata(cfg, "batch", "shot", cfg.Views[0], users, "confirmed", SpoutCaptureResult{})
 	if len(metadata.Users) != 1 || metadata.Users[0].UserID != "" {
 		t.Fatalf("metadata users = %+v, want user ID masked", metadata.Users)
+	}
+	if metadata.PlayerLocalBasisSource != PlayerLocalBasisSourceAvatarOSC || metadata.PlayerLocalBasisPose == nil || metadata.PlayerLocalBasisPose.Position.X != 1 {
+		t.Fatalf("player local basis metadata = source:%q pose:%+v", metadata.PlayerLocalBasisSource, metadata.PlayerLocalBasisPose)
 	}
 	cfg.Output.WriteUserIDsToEXIF = true
 	metadata = BuildAutoCaptureEmbeddedMetadata(cfg, "batch", "shot", cfg.Views[0], users, "confirmed", SpoutCaptureResult{})

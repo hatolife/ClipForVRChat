@@ -41,7 +41,9 @@ createApp({
       autoCaptureTestResults: {},
       spoutStatus: null,
       spoutChecking: false,
-      spoutSendersLoading: false
+      spoutSendersLoading: false,
+      avatarOscBasisStatus: null,
+      avatarOscStatusLoading: false
     }
   },
   computed: {
@@ -136,6 +138,8 @@ createApp({
       autoCapture.schedule ||= {}
       autoCapture.osc ||= {}
       autoCapture.playerLocal ||= {}
+      autoCapture.playerLocal.basisSource ||= 'manual'
+      autoCapture.playerLocal.avatarOsc ||= {}
       autoCapture.capture ||= {}
       autoCapture.stream ||= {}
       autoCapture.output ||= {}
@@ -224,6 +228,7 @@ createApp({
     })
     window.addEventListener('keydown', this.handleKeyDown)
     void this.checkForUpdate()
+    void this.refreshAvatarOSCBasisStatus(true)
   },
   unmounted() {
     window.removeEventListener('keydown', this.handleKeyDown)
@@ -389,6 +394,9 @@ createApp({
       try {
         this.state = await api.OpenSettings('')
         this.rememberSettingsBaseline()
+        if (this.settingsTab === 'autoCapture') {
+          void this.refreshAvatarOSCBasisStatus(true)
+        }
       } catch (err) {
         this.error = String(err)
       }
@@ -400,6 +408,9 @@ createApp({
     selectSettingsTab(tabId) {
       this.logUserAction('button_click', `settings_tab ${tabId}`)
       this.settingsTab = tabId
+      if (tabId === 'autoCapture') {
+        void this.refreshAvatarOSCBasisStatus(true)
+      }
     },
     shouldWarnMissingPrimaryWebhook(config = this.state.config) {
       return Boolean(config?.output?.uploadDiscord && !String(config?.discord?.webhookUrl || '').trim())
@@ -1142,6 +1153,92 @@ createApp({
         this.spoutSendersLoading = false
       }
     },
+    normalizeAvatarOSCBasisStatus(status) {
+      const pickNumber = (value) => (Number.isFinite(Number(value)) ? Number(value) : null)
+      const position = status?.position || status?.basisPose?.position || status?.pose?.position || null
+      const normalizedPosition = position && typeof position === 'object'
+        ? {
+            x: pickNumber(position.x),
+            y: pickNumber(position.y),
+            z: pickNumber(position.z)
+          }
+        : null
+      const yaw = pickNumber(status?.yaw ?? status?.rotationYaw ?? status?.basisPose?.rotation?.y)
+      return {
+        available: status?.available ?? status?.enabled ?? status?.receiving ?? false,
+        state: String(status?.state || status?.receiverState || status?.status || '').trim(),
+        lastReceivedAt: String(status?.lastReceivedAt || status?.lastReceived || status?.updatedAt || '').trim(),
+        position: normalizedPosition,
+        yaw,
+        error: String(status?.error || status?.diagnostic || '').trim(),
+        message: String(status?.message || '').trim(),
+        sourcePrefix: String(status?.sourcePrefix || status?.prefix || status?.parameterPrefix || '').trim()
+      }
+    },
+    avatarOSCBasisStatusClass() {
+      if (!this.avatarOscBasisStatus) return 'muted'
+      if (this.avatarOscBasisStatus.error) return 'warning'
+      if (this.avatarOscBasisStatus.available) return 'ok'
+      return 'muted'
+    },
+    avatarOSCBasisStatusLabel() {
+      const status = this.avatarOscBasisStatus
+      if (!status) return '未取得'
+      if (this.avatarOscStatusLoading) return '更新中'
+      if (status.error) return 'エラー'
+      if (status.available) return status.state || '受信中'
+      return status.state || status.message || '待機中'
+    },
+    formatAvatarOSCBasisPosition(status = this.avatarOscBasisStatus) {
+      if (!status?.position) return '未取得'
+      const parts = ['x', 'y', 'z'].map((axis) => {
+        const value = status.position[axis]
+        return Number.isFinite(Number(value)) ? `${axis}=${Number(value).toFixed(3)}` : `${axis}=-`
+      })
+      return parts.join(' / ')
+    },
+    formatAvatarOSCBasisYaw(status = this.avatarOscBasisStatus) {
+      if (!status) return '未取得'
+      return Number.isFinite(Number(status.yaw)) ? `${Number(status.yaw).toFixed(3)}°` : '未取得'
+    },
+    async refreshAvatarOSCBasisStatus(silent = false) {
+      if (!api?.GetAvatarOSCBasisStatus) {
+        this.avatarOscBasisStatus = {
+          available: false,
+          state: 'API未対応',
+          lastReceivedAt: '',
+          position: null,
+          yaw: null,
+          error: '',
+          message: 'GetAvatarOSCBasisStatus が利用できません。',
+          sourcePrefix: ''
+        }
+        return
+      }
+      if (!silent) {
+        this.error = ''
+      }
+      this.avatarOscStatusLoading = true
+      try {
+        this.avatarOscBasisStatus = this.normalizeAvatarOSCBasisStatus(await api.GetAvatarOSCBasisStatus())
+      } catch (err) {
+        this.avatarOscBasisStatus = {
+          available: false,
+          state: '取得失敗',
+          lastReceivedAt: '',
+          position: null,
+          yaw: null,
+          error: String(err),
+          message: 'avatar_osc basis status の取得に失敗しました。',
+          sourcePrefix: ''
+        }
+        if (!silent) {
+          this.error = String(err)
+        }
+      } finally {
+        this.avatarOscStatusLoading = false
+      }
+    },
     async checkForUpdate() {
       if (!api?.CheckForUpdate || this.updateSettings.checkEnabled === false) {
         this.updateInfo = { available: false, currentVersion: '', currentReleaseTime: '', latestVersion: '', latestReleasePublished: '', url: '' }
@@ -1535,6 +1632,7 @@ createApp({
             <div class="settings-explainer">
               <strong>VRChatのUser CameraをOSCで操作し、指定間隔で写真を撮影する機能です。</strong>
               <p>VRChat側でOSCを有効にし、Stream方式ではVRChatのStream Camera(Spout)映像を直接受信して静止画として保存します。Photo方式はVRChat標準写真を使うフォールバックです。</p>
+              <p>player_local の basis は manual と avatar_osc を切り替えられます。avatar_osc は専用アバターギミックが必要で、標準OSCだけでは動かず、head/avatar基準で player root 基準ではありません。</p>
               <p>正面、背後、斜めの初期構図にはプレーヤーを写す想定のPoseと拡大率が入っています。構図ごとのテスト撮影で見え方を確認できます。</p>
               <p>v0.1.8では撮影時の解像度変更は行わず、VRChat側の現在のカメラ解像度設定で保存します。</p>
             </div>
@@ -1555,6 +1653,32 @@ createApp({
                 プレイヤー基準Pose: {{ autoCaptureSettings.playerLocal.calibrated ? '保存済み' : '未設定' }}
                 <span v-if="autoCaptureSettings.playerLocal.updatedAt"> / {{ autoCaptureSettings.playerLocal.updatedAt }}</span>
               </p>
+              <div class="setting-row">
+                <div><strong>プレイヤー基準の取得元</strong><p>manual は手動保存した基準Pose、avatar_osc は専用アバターギミックから受けるOSC基準Poseです。標準OSCだけでは使えず、head/avatar基準で player root 基準ではありません。</p></div>
+                <label>
+                  <select v-model="autoCaptureSettings.playerLocal.basisSource">
+                    <option value="manual">manual</option>
+                    <option value="avatar_osc">avatar_osc</option>
+                  </select>
+                </label>
+              </div>
+              <div class="setting-row" :class="{ disabled: autoCaptureSettings.playerLocal.basisSource !== 'avatar_osc' }">
+                <div><strong>avatar_osc 受信状態</strong><p>専用アバターギミックが送る基準Poseの受信状態、最終受信、position/yaw、エラーを表示します。</p></div>
+                <div class="settings-control-stack">
+                  <div class="inline-actions">
+                    <span class="status-pill" :class="avatarOSCBasisStatusClass()">{{ avatarOSCBasisStatusLabel() }}</span>
+                    <button type="button" class="secondary" @click="refreshAvatarOSCBasisStatus" :disabled="avatarOscStatusLoading">{{ avatarOscStatusLoading ? '更新中' : '更新' }}</button>
+                  </div>
+                  <p class="setting-note">
+                    受信状態: {{ avatarOscBasisStatus?.state || avatarOscBasisStatus?.message || '未取得' }}
+                    <span v-if="avatarOscBasisStatus?.sourcePrefix"> / prefix: {{ avatarOscBasisStatus.sourcePrefix }}</span>
+                  </p>
+                  <p class="setting-note">最終受信: {{ avatarOscBasisStatus?.lastReceivedAt || '未受信' }}</p>
+                  <p class="setting-note">position: {{ formatAvatarOSCBasisPosition() }} / yaw: {{ formatAvatarOSCBasisYaw() }}</p>
+                  <p v-if="avatarOscBasisStatus?.error" class="setting-note warning">エラー: {{ avatarOscBasisStatus.error }}</p>
+                  <p v-else class="setting-note">専用ギミック未導入、OSC無効、parameter欠落、鮮度切れでは自動追従できません。</p>
+                </div>
+              </div>
               <div v-if="autoCaptureViews.length" class="view-list">
                 <article v-for="(cameraView, index) in autoCaptureViews" :key="cameraView.id" class="view-card">
                   <div class="view-card-main">

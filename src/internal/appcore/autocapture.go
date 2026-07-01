@@ -450,18 +450,22 @@ func (r AutoCaptureRunner) finalizeAutoCaptureImage(photoPath string, batchID st
 		}
 	}
 	if cfg.Output.WriteSidecarJSON {
+		basisSource, basisPose, basisUpdatedAt := autoCapturePlayerLocalBasisMetadata(cfg)
 		sidecar := AutoCaptureSidecar{
-			SchemaVersion:    1,
-			BatchID:          batchID,
-			ShotID:           shotID,
-			CapturedAtLocal:  time.Now().Format(time.RFC3339),
-			CapturedAtUTC:    time.Now().UTC().Format(time.RFC3339),
-			CaptureMode:      cfg.Capture.Mode,
-			View:             view,
-			Stream:           autoCaptureStreamMetadata(streamInfo),
-			VRChat:           autoCaptureVRChatMetadata(world, confidence),
-			Users:            sidecarUsers,
-			MetadataWarnings: metadataWarnings,
+			SchemaVersion:             1,
+			BatchID:                   batchID,
+			ShotID:                    shotID,
+			CapturedAtLocal:           time.Now().Format(time.RFC3339),
+			CapturedAtUTC:             time.Now().UTC().Format(time.RFC3339),
+			CaptureMode:               cfg.Capture.Mode,
+			View:                      view,
+			PlayerLocalBasisSource:    basisSource,
+			PlayerLocalBasisPose:      basisPose,
+			PlayerLocalBasisUpdatedAt: basisUpdatedAt,
+			Stream:                    autoCaptureStreamMetadata(streamInfo),
+			VRChat:                    autoCaptureVRChatMetadata(world, confidence),
+			Users:                     sidecarUsers,
+			MetadataWarnings:          metadataWarnings,
 		}
 		if err == nil {
 			sidecar.ResolvedPose = &resolvedPose
@@ -512,19 +516,22 @@ func (r AutoCaptureRunner) emit(event AutoCaptureEvent) {
 }
 
 type AutoCaptureSidecar struct {
-	SchemaVersion    int                        `json:"schema_version"`
-	BatchID          string                     `json:"batch_id"`
-	ShotID           string                     `json:"shot_id"`
-	CapturedAtLocal  string                     `json:"captured_at_local"`
-	CapturedAtUTC    string                     `json:"captured_at_utc"`
-	CaptureMode      string                     `json:"capture_mode"`
-	View             CameraViewConfig           `json:"view"`
-	ResolvedPose     *CameraPoseConfig          `json:"resolved_pose,omitempty"`
-	Stream           *AutoCaptureStreamMetadata `json:"stream,omitempty"`
-	VRChat           AutoCaptureVRChatMetadata  `json:"vrchat"`
-	Users            []PresenceUser             `json:"users"`
-	Files            AutoCaptureFileMetadata    `json:"files"`
-	MetadataWarnings []string                   `json:"metadata_warnings,omitempty"`
+	SchemaVersion             int                        `json:"schema_version"`
+	BatchID                   string                     `json:"batch_id"`
+	ShotID                    string                     `json:"shot_id"`
+	CapturedAtLocal           string                     `json:"captured_at_local"`
+	CapturedAtUTC             string                     `json:"captured_at_utc"`
+	CaptureMode               string                     `json:"capture_mode"`
+	View                      CameraViewConfig           `json:"view"`
+	ResolvedPose              *CameraPoseConfig          `json:"resolved_pose,omitempty"`
+	PlayerLocalBasisSource    string                     `json:"player_local_basis_source,omitempty"`
+	PlayerLocalBasisPose      *CameraPoseConfig          `json:"player_local_basis_pose,omitempty"`
+	PlayerLocalBasisUpdatedAt string                     `json:"player_local_basis_updated_at,omitempty"`
+	Stream                    *AutoCaptureStreamMetadata `json:"stream,omitempty"`
+	VRChat                    AutoCaptureVRChatMetadata  `json:"vrchat"`
+	Users                     []PresenceUser             `json:"users"`
+	Files                     AutoCaptureFileMetadata    `json:"files"`
+	MetadataWarnings          []string                   `json:"metadata_warnings,omitempty"`
 }
 
 type AutoCaptureStreamMetadata struct {

@@ -60,6 +60,15 @@ func TestConfigNormalizeAppliesDefaultsAndTrimsQuotes(t *testing.T) {
 	if cfg.AutoPhoto.ScanIntervalSeconds != 2 {
 		t.Fatalf("ScanIntervalSeconds = %d, want 2", cfg.AutoPhoto.ScanIntervalSeconds)
 	}
+	if cfg.AutoCapture.PlayerLocal.BasisSource != PlayerLocalBasisSourceManual {
+		t.Fatalf("PlayerLocal.BasisSource = %q, want manual", cfg.AutoCapture.PlayerLocal.BasisSource)
+	}
+	if cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix != "CFVRC/basis" {
+		t.Fatalf("PlayerLocal.AvatarOSC.ParameterPrefix = %q", cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix)
+	}
+	if cfg.AutoCapture.PlayerLocal.AvatarOSC.PositionScale != 1000 {
+		t.Fatalf("PlayerLocal.AvatarOSC.PositionScale = %v, want 1000", cfg.AutoCapture.PlayerLocal.AvatarOSC.PositionScale)
+	}
 	if cfg.ScreenshotAutoPost.ScreenshotDirectory != `C:\Users\test\Pictures\Screenshots` {
 		t.Fatalf("ScreenshotDirectory = %q", cfg.ScreenshotAutoPost.ScreenshotDirectory)
 	}
@@ -118,6 +127,40 @@ func TestConfigNormalizeTrimsSpoutHelperPathWithoutResettingCustomPath(t *testin
 	cfg.Normalize()
 	if cfg.AutoCapture.Stream.SpoutHelperPath != `C:\tools\custom-spout-capture.exe` {
 		t.Fatalf("SpoutHelperPath = %q", cfg.AutoCapture.Stream.SpoutHelperPath)
+	}
+}
+
+func TestAutoCapturePlayerLocalNormalizeDefaultsAndSourceFallback(t *testing.T) {
+	cfg := AutoCapturePlayerLocalConfig{
+		BasisSource: "unknown",
+		AvatarOSC: AutoCapturePlayerLocalAvatarOSCConfig{
+			ParameterPrefix:       ` "  " `,
+			PositionScale:         0,
+			InvertMagnitude:       true,
+			PositiveFlagThreshold: 0.75,
+			MaxAbsPosition:        -1,
+			MaxAbsForward:         0,
+			FreshnessSec:          0,
+		},
+	}
+	cfg.Normalize()
+	if cfg.BasisSource != PlayerLocalBasisSourceManual {
+		t.Fatalf("BasisSource = %q, want manual", cfg.BasisSource)
+	}
+	if cfg.AvatarOSC.ParameterPrefix != "CFVRC/basis" {
+		t.Fatalf("ParameterPrefix = %q", cfg.AvatarOSC.ParameterPrefix)
+	}
+	if cfg.AvatarOSC.PositionScale != 1000 {
+		t.Fatalf("PositionScale = %v, want 1000", cfg.AvatarOSC.PositionScale)
+	}
+	if cfg.AvatarOSC.PositiveFlagThreshold != 0.75 {
+		t.Fatalf("PositiveFlagThreshold = %v, want 0.75", cfg.AvatarOSC.PositiveFlagThreshold)
+	}
+	if cfg.AvatarOSC.MaxAbsPosition != 10000 || cfg.AvatarOSC.MaxAbsForward != 2000 {
+		t.Fatalf("unexpected max abs limits: %+v", cfg.AvatarOSC)
+	}
+	if cfg.AvatarOSC.FreshnessSec != 3 {
+		t.Fatalf("FreshnessSec = %d, want 3", cfg.AvatarOSC.FreshnessSec)
 	}
 }
 

@@ -3,6 +3,7 @@ package appcore
 import (
 	"math"
 	"testing"
+	"time"
 )
 
 func TestTransformPlayerLocalPoseRoundTrip(t *testing.T) {
@@ -60,6 +61,85 @@ func TestResolveCameraViewPoseRequiresPlayerBasis(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertPoseClose(t, got, TransformPlayerLocalPose(cfg.PlayerLocal.BasisPose, view.Pose))
+}
+
+func TestResolvePlayerLocalBasisPoseSupportsAvatarOSC(t *testing.T) {
+	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
+	cfg := DefaultAutoCaptureConfig()
+	cfg.PlayerLocal.BasisSource = PlayerLocalBasisSourceAvatarOSC
+	cfg.PlayerLocal.AvatarOSC.PositionScale = 1000
+	cfg.PlayerLocal.AvatarOSC.InvertMagnitude = true
+	cfg.PlayerLocal.AvatarOSC.PositiveFlagThreshold = 0
+	cfg.PlayerLocal.AvatarOSC.MaxAbsPosition = 2000
+	cfg.PlayerLocal.AvatarOSC.MaxAbsForward = 2000
+	cfg.PlayerLocal.AvatarOSC.FreshnessSec = 3
+
+	sample := AvatarOSCBasisSample{
+		ReceivedAt: now.Add(-time.Second),
+		Position: AvatarOSCBasisVectorSample{
+			X: AvatarOSCBasisAxisSample{Magnitude: 0.877, SignFlag: 1, Present: true},
+			Y: AvatarOSCBasisAxisSample{Magnitude: 0.544, SignFlag: 0, Present: true},
+			Z: AvatarOSCBasisAxisSample{Magnitude: 0.211, SignFlag: 1, Present: true},
+		},
+		Forward: AvatarOSCBasisVectorSample{
+			X: AvatarOSCBasisAxisSample{Magnitude: 0, SignFlag: 1, Present: true},
+			Y: AvatarOSCBasisAxisSample{Magnitude: 1, SignFlag: 0, Present: true},
+			Z: AvatarOSCBasisAxisSample{Magnitude: 1, SignFlag: 1, Present: true},
+		},
+	}
+
+	got, err := ResolvePlayerLocalBasisPose(cfg, sample, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertPoseClose(t, got, CameraPoseConfig{
+		Position: CameraVector3Config{X: 123, Y: -456, Z: 789},
+		Rotation: CameraVector3Config{Y: 90},
+	})
+}
+
+func TestAvatarOSCBasisValidationRejectsPartialStaleAndInvalidSamples(t *testing.T) {
+	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
+	cfg := DefaultAutoCaptureConfig().PlayerLocal.AvatarOSC
+
+	partial := AvatarOSCBasisSample{
+		ReceivedAt: now,
+		Position: AvatarOSCBasisVectorSample{
+			X: AvatarOSCBasisAxisSample{Magnitude: 0.1, SignFlag: 1, Present: true},
+			Y: AvatarOSCBasisAxisSample{Magnitude: 0.2, SignFlag: 1, Present: false},
+			Z: AvatarOSCBasisAxisSample{Magnitude: 0.3, SignFlag: 1, Present: true},
+		},
+		Forward: AvatarOSCBasisVectorSample{
+			X: AvatarOSCBasisAxisSample{Magnitude: 0.4, SignFlag: 1, Present: true},
+			Y: AvatarOSCBasisAxisSample{Magnitude: 0.5, SignFlag: 1, Present: true},
+			Z: AvatarOSCBasisAxisSample{Magnitude: 0.6, SignFlag: 1, Present: true},
+		},
+	}
+	if err := ValidateAvatarOSCBasisSample(partial, cfg, now); err == nil {
+		t.Fatal("expected partial sample to be rejected")
+	}
+
+	stale := partial
+	stale.Position.Y.Present = true
+	stale.ReceivedAt = now.Add(-4 * time.Second)
+	if err := ValidateAvatarOSCBasisSample(stale, cfg, now); err == nil {
+		t.Fatal("expected stale sample to be rejected")
+	}
+
+	invalid := stale
+	invalid.ReceivedAt = now.Add(-time.Second)
+	invalid.Position.X.Magnitude = 1.5
+	if err := ValidateAvatarOSCBasisSample(invalid, cfg, now); err == nil {
+		t.Fatal("expected invalid sample to be rejected")
+	}
+}
+
+func TestYawFromForwardVectorUsesHorizontalComponent(t *testing.T) {
+	got, err := YawFromForwardVector(CameraVector3Config{X: 1, Z: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertClose(t, got, 45)
 }
 
 func assertPoseClose(t *testing.T, got CameraPoseConfig, want CameraPoseConfig) {

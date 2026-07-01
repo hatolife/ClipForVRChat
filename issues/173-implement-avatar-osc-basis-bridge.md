@@ -12,14 +12,14 @@
 
 ## 受け入れ条件
 
-- [ ] 自動撮影設定に、player basis sourceとして `manual` / `avatar_osc` を選べる設定を追加する。
-- [ ] `avatar_osc` 有効時、VRChat OSC送信ポートから `/avatar/parameters/...` のbasis用parameterを受信できる。
-- [ ] 受信したpositionとforward/yawを、既存の `AutoCapture.PlayerLocal.BasisPose` 相当へ変換できる。
-- [ ] basis値には鮮度を持たせ、古い値では撮影せず、理由をUI/診断ログ/テスト撮影結果へ表示する。
-- [ ] 専用アバターギミック未導入、OSC無効、parameter不足、値欠落、鮮度切れ、異常値を区別して診断できる。
-- [ ] `player_local` 構図は `avatar_osc` basisが新鮮な場合にプレイヤー移動/回転へ追従して撮影できる。
-- [ ] 受信basisとresolved world poseをsidecar/埋め込みmetadataへ区別して記録できる。
-- [ ] 専用ギミックが必要な機能であること、通常の標準OSCだけでは動かないことをREADME/SPEC/UIへ明記する。
+- [x] 自動撮影設定に、player basis sourceとして `manual` / `avatar_osc` を選べる設定を追加する。
+- [x] `avatar_osc` 有効時、VRChat OSC送信ポートから `/avatar/parameters/...` のbasis用parameterを受信できる。
+- [x] 受信したpositionとforward/yawを、既存の `AutoCapture.PlayerLocal.BasisPose` 相当へ変換できる。
+- [x] basis値には鮮度を持たせ、古い値では撮影せず、理由をUI/診断ログ/テスト撮影結果へ表示する。
+- [x] 専用アバターギミック未導入、OSC無効、parameter不足、値欠落、鮮度切れ、異常値を区別して診断できる。
+- [x] `player_local` 構図は `avatar_osc` basisが新鮮な場合にプレイヤー移動/回転へ追従して撮影できる。
+- [x] 受信basisとresolved world poseをsidecar/埋め込みmetadataへ区別して記録できる。
+- [x] 専用ギミックが必要な機能であること、通常の標準OSCだけでは動かないことをREADME/SPEC/UIへ明記する。
 - [ ] Windows実機で、専用アバター導入済みのVRChatからposition/yawを受け、正面/背後/斜め構図の追従撮影を確認する。
 
 ## 実装に必要な情報
@@ -96,6 +96,10 @@ forward/yawは、受信したforward vector相当の水平成分から算出す�
 
 ### Go側実装箇所候補
 
+#### 今回の担当範囲
+
+- `src/internal/appcore/config.go` と `src/internal/appcore/player_local.go` で、basis source / avatar OSC basis 復元 / 判定ロジックを先に実装する。
+
 - `src/internal/appcore/config.go`
   - `AutoCapturePlayerLocalConfig` にbasis sourceとavatar OSC設定を追加する。
   - 既存configの後方互換Normalizeを追加する。
@@ -103,7 +107,7 @@ forward/yawは、受信したforward vector相当の水平成分から算出す�
   - `AvatarOSCBasis` から `CameraPoseConfig` へ変換する関数を追加する。
   - Yaw算出、異常値除外、鮮度判定をテスト可能に分離する。
 - `src/app.go`
-  - 既存のOSC pose receiverとは別に、avatar basis receiverを管理する。
+  - 既存のOSC pose receiverと同じ受信ループで、avatar basis parameterも管理する。
   - 受信状態を設定画面へ返すAPIを追加する。
   - `ResolveCameraViewPose` に渡すbasisを、source設定に応じてmanual/avatar OSCから選ぶ。
 - `src/frontend/src/main.js`
@@ -145,6 +149,14 @@ forward/yawは、受信したforward vector相当の水平成分から算出す�
 - アバターを未導入アバターへ切り替えると、鮮度切れで安全に失敗する。
 - OSCを無効にすると、診断表示が分かる。
 - Stream/Spout方式とPhoto方式の両方でbasis解決が同じになる。
+
+### 作業メモ
+
+- 2026-07-02: Go runtime/app 層で avatar OSC basis 受信と snapshot API、player_local 撮影時の basis 解決までを先行実装する。frontend UI と appcore の復元ロジックは別作業者と分担する。
+- 2026-07-02: frontend の自動撮影タブに `manual` / `avatar_osc` の basis source 表示と、`GetAvatarOSCBasisStatus` 想定の受信状態UIを追加する。
+- 2026-07-02: README / SPEC / docs に、専用アバターギミック必須、標準OSC単独では動かない、head基準で player root ではないことを明記する。
+- 2026-07-02: 実機確認では、YL-ATG互換 `ATG/*` と ClipForVRChat案 `CFVRC/basis/*` のどちらを使うかを事前に決め、position / yaw / stale / fallback を確認する。
+- 2026-07-02: 監督レビューで、`/avatar/parameters/` 付きOSC addressをcanonical化する修正、Wails JS wrapper追加、構図保存時の `avatar_osc` basis適用、未使用の旧復元経路削除、sidecar/埋め込みmetadataへの basis source/pose 記録を追加した。
 
 ## 非対象
 

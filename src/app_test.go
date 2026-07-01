@@ -10,10 +10,12 @@ import (
 	"image/color"
 	"image/png"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
 	"github.com/hatolife/ClipForVRChat/internal/appcore"
@@ -157,9 +159,12 @@ func TestAppStartupStartsAutoPhotoWatcherWithoutDiscordUpload(t *testing.T) {
 
 	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults, Config: cfg})
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	app.startup(ctx)
-	defer app.shutdown(context.Background())
+	defer func() {
+		cancel()
+		app.shutdown(context.Background())
+		time.Sleep(50 * time.Millisecond)
+	}()
 
 	if app.autoCancel == nil {
 		t.Fatal("auto photo watcher was not started")
@@ -177,9 +182,12 @@ func TestAppStartupDoesNotStartAutoPhotoWatcherWhileReviewingSettings(t *testing
 
 	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeSettings, Config: cfg, ConfigPath: configPath})
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	app.startup(ctx)
-	defer app.shutdown(context.Background())
+	defer func() {
+		cancel()
+		app.shutdown(context.Background())
+		time.Sleep(50 * time.Millisecond)
+	}()
 
 	if app.autoCancel != nil {
 		t.Fatal("auto photo watcher started while imported settings were only open for review")
@@ -292,7 +300,13 @@ func TestAppStartupWritesVersionHashAndRedactedConfig(t *testing.T) {
 	cfg.AutoPhoto.WebhookURL = "https://discord.com/api/webhooks/auto-secret"
 	app := NewApp(configPath, appcore.UIState{Config: cfg})
 
-	app.startup(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	app.startup(ctx)
+	defer func() {
+		cancel()
+		app.shutdown(context.Background())
+		time.Sleep(50 * time.Millisecond)
+	}()
 
 	data, err := os.ReadFile(appcore.DiagnosticLogPath(configPath))
 	if err != nil {
@@ -307,6 +321,92 @@ func TestAppStartupWritesVersionHashAndRedactedConfig(t *testing.T) {
 	}
 	if strings.Contains(text, "secret") {
 		t.Fatalf("diagnostic log leaked webhook URL: %q", text)
+	}
+}
+
+func TestAppLatestPlayerLocalBasisManual(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceManual
+	app.state.Config.AutoCapture.PlayerLocal.Calibrated = true
+	app.state.Config.AutoCapture.PlayerLocal.BasisPose = appcore.CameraPoseConfig{
+		Position: appcore.CameraVector3Config{X: 1, Y: 2, Z: 3},
+		Rotation: appcore.CameraVector3Config{Y: 45},
+	}
+
+	got := app.GetLatestPlayerLocalBasis()
+	if got.Source != "manual" || got.Status != "ready" || !got.Fresh {
+		t.Fatalf("snapshot = %+v", got)
+	}
+	if got.Pose.Position.X != 1 || got.Pose.Rotation.Y != 45 {
+		t.Fatalf("pose = %+v", got.Pose)
+	}
+}
+
+func TestAppLatestPlayerLocalBasisAvatarOSC(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
+	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
+	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.PositionScale = 1000
+	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.InvertMagnitude = true
+	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.PositiveFlagThreshold = 0
+	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.MaxAbsPosition = 2000
+	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.MaxAbsForward = 2000
+	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
+	app.avatarOSCBasisSamples = map[string]avatarOSCBasisSample{
+		"CFVRC/basis/p/x":     {Float: 0.877, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"CFVRC/basis/p/xSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"CFVRC/basis/p/y":     {Float: 0.544, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"CFVRC/basis/p/ySign": {Float: 0, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"CFVRC/basis/p/z":     {Float: 0.211, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"CFVRC/basis/p/zSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"CFVRC/basis/f/x":     {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"CFVRC/basis/f/xSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"CFVRC/basis/f/y":     {Float: 0.5, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"CFVRC/basis/f/ySign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"CFVRC/basis/f/z":     {Float: 0, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"CFVRC/basis/f/zSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+	}
+
+	got := app.latestPlayerLocalBasisLocked(app.state.Config, now)
+	if got.Source != "avatar_osc" || got.Status != "ready" || !got.Fresh {
+		t.Fatalf("snapshot = %+v", got)
+	}
+	if math.Abs(got.Pose.Position.X-123) > 0.000001 || math.Abs(got.Pose.Position.Y+456) > 0.000001 || math.Abs(got.Pose.Position.Z-789) > 0.000001 {
+		t.Fatalf("pose = %+v", got.Pose)
+	}
+	if math.Abs(got.Pose.Rotation.Y) > 0.000001 {
+		t.Fatalf("rotation = %+v", got.Pose.Rotation)
+	}
+}
+
+func TestAppPrepareAutoCaptureConfigRejectsStaleAvatarOSCBasis(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
+	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
+	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
+	app.avatarOSCBasisSamples = map[string]avatarOSCBasisSample{
+		"CFVRC/basis/p/x":     {Float: 0.8, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
+		"CFVRC/basis/p/xSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
+		"CFVRC/basis/p/y":     {Float: 0.5, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
+		"CFVRC/basis/p/ySign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
+		"CFVRC/basis/p/z":     {Float: 0.2, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
+		"CFVRC/basis/p/zSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
+		"CFVRC/basis/f/x":     {Float: 1, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
+		"CFVRC/basis/f/xSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
+		"CFVRC/basis/f/y":     {Float: 0, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
+		"CFVRC/basis/f/ySign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
+		"CFVRC/basis/f/z":     {Float: 0, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
+		"CFVRC/basis/f/zSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
+	}
+
+	app.mu.Lock()
+	_, err := app.prepareAutoCaptureConfigForRunLocked(app.state.Config)
+	app.mu.Unlock()
+	if err == nil {
+		t.Fatal("expected stale avatar OSC basis to be rejected")
 	}
 }
 

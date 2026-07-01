@@ -108,7 +108,7 @@ Stream方式で `Spout helperが見つかりません`、`Spout helperは見つ�
 
 自動撮影では、画像と同じ場所にsidecar JSONを保存できます。sidecar JSONには撮影時刻、構図、Stream sender情報、VRChat output logから取得できた同席ユーザー、world ID、instance ID、画像SHA256を記録します。PNG/JPEG画像内にも、設定に応じて自動撮影メタデータを埋め込めます。
 
-プレイヤー基準構図を使う場合は、標準OSCだけではプレイヤーrootを自動取得できないため、「現在Poseをプレイヤー基準に保存」で手動基準Poseを保存してから `player_local` 構図を使います。
+プレイヤー基準構図は、通常の `manual` basis では「現在Poseをプレイヤー基準に保存」で保存した手動基準Poseを使います。専用アバターギミックを導入した場合は `avatar_osc` basis に切り替えられますが、標準OSCだけでは動かず、head/avatar基準で player root 基準ではありません。確認手順は `docs/v0.1.9-avatar-osc-basis-verification.md` と `docs/v0.1.8-player-local-verification.md` を参照してください。
 
 RC確認時の詳しい確認手順は、`docs/v0.1.8-stream-spout-verification.md`、`docs/v0.1.8-player-local-verification.md`、`docs/v0.1.8-embedded-metadata-verification.md` を参照してください。
 
@@ -176,6 +176,7 @@ Discord投稿では、本文に含まれる `@everyone`、`@here`、ユーザー
 - 更新通知: 新しいバージョンが見つかったとき、画面上部に通知を表示します。初期値はONです。
 
 Discord投稿がOFFの場合、投稿URLの自動コピーとWebhook設定はグレーアウトします。VRChat写真自動処理とスクリーンショット自動処理は、縮小、QRコードURL検出、ローカル保存を行えるためグレーアウトしません。ローカル保存がOFFの場合、出力形式を含むローカル保存に関係する設定はグレーアウトします。
+自動撮影の `player_local` は `manual` basis と `avatar_osc` basis を切り替えられます。`avatar_osc` は専用アバターギミックが必要で、標準OSCだけでは使えません。受信状態や最終受信時刻、position/yaw は設定画面の自動撮影タブで確認できます。
 
 ## 画面
 

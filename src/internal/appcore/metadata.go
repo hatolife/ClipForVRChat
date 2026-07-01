@@ -20,22 +20,25 @@ const (
 var pngSignature = []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}
 
 type AutoCaptureEmbeddedMetadata struct {
-	SchemaVersion      int                        `json:"schema_version"`
-	App                string                     `json:"app"`
-	AppVersion         string                     `json:"app_version"`
-	BatchID            string                     `json:"batch_id"`
-	ShotID             string                     `json:"shot_id"`
-	CapturedAtUTC      string                     `json:"captured_at_utc"`
-	CaptureMode        string                     `json:"capture_mode"`
-	View               CameraViewConfig           `json:"view"`
-	ResolvedPose       *CameraPoseConfig          `json:"resolved_pose,omitempty"`
-	Stream             *AutoCaptureStreamMetadata `json:"stream,omitempty"`
-	PresenceSource     string                     `json:"presence_source"`
-	PresenceConfidence string                     `json:"presence_confidence"`
-	UserCount          int                        `json:"user_count"`
-	UsersTruncated     bool                       `json:"users_truncated,omitempty"`
-	MetadataWarnings   []string                   `json:"metadata_warnings,omitempty"`
-	Users              []PresenceUser             `json:"users,omitempty"`
+	SchemaVersion             int                        `json:"schema_version"`
+	App                       string                     `json:"app"`
+	AppVersion                string                     `json:"app_version"`
+	BatchID                   string                     `json:"batch_id"`
+	ShotID                    string                     `json:"shot_id"`
+	CapturedAtUTC             string                     `json:"captured_at_utc"`
+	CaptureMode               string                     `json:"capture_mode"`
+	View                      CameraViewConfig           `json:"view"`
+	ResolvedPose              *CameraPoseConfig          `json:"resolved_pose,omitempty"`
+	PlayerLocalBasisSource    string                     `json:"player_local_basis_source,omitempty"`
+	PlayerLocalBasisPose      *CameraPoseConfig          `json:"player_local_basis_pose,omitempty"`
+	PlayerLocalBasisUpdatedAt string                     `json:"player_local_basis_updated_at,omitempty"`
+	Stream                    *AutoCaptureStreamMetadata `json:"stream,omitempty"`
+	PresenceSource            string                     `json:"presence_source"`
+	PresenceConfidence        string                     `json:"presence_confidence"`
+	UserCount                 int                        `json:"user_count"`
+	UsersTruncated            bool                       `json:"users_truncated,omitempty"`
+	MetadataWarnings          []string                   `json:"metadata_warnings,omitempty"`
+	Users                     []PresenceUser             `json:"users,omitempty"`
 }
 
 func BuildAutoCaptureEmbeddedMetadata(cfg AutoCaptureConfig, batchID string, shotID string, view CameraViewConfig, users []PresenceUser, confidence string, streamInfo SpoutCaptureResult) AutoCaptureEmbeddedMetadata {
@@ -46,21 +49,35 @@ func BuildAutoCaptureEmbeddedMetadata(cfg AutoCaptureConfig, batchID string, sho
 			metadataUsers = presenceUsersWithoutIDs(users)
 		}
 	}
+	basisSource, basisPose, basisUpdatedAt := autoCapturePlayerLocalBasisMetadata(cfg)
 	return AutoCaptureEmbeddedMetadata{
-		SchemaVersion:      1,
-		App:                embeddedMetadataApp,
-		AppVersion:         embeddedMetadataAppVersion,
-		BatchID:            batchID,
-		ShotID:             shotID,
-		CapturedAtUTC:      time.Now().UTC().Format(time.RFC3339),
-		CaptureMode:        cfg.Capture.Mode,
-		View:               view,
-		Stream:             autoCaptureStreamMetadata(streamInfo),
-		PresenceSource:     "output_log",
-		PresenceConfidence: confidence,
-		UserCount:          len(metadataUsers),
-		Users:              metadataUsers,
+		SchemaVersion:             1,
+		App:                       embeddedMetadataApp,
+		AppVersion:                embeddedMetadataAppVersion,
+		BatchID:                   batchID,
+		ShotID:                    shotID,
+		CapturedAtUTC:             time.Now().UTC().Format(time.RFC3339),
+		CaptureMode:               cfg.Capture.Mode,
+		View:                      view,
+		PlayerLocalBasisSource:    basisSource,
+		PlayerLocalBasisPose:      basisPose,
+		PlayerLocalBasisUpdatedAt: basisUpdatedAt,
+		Stream:                    autoCaptureStreamMetadata(streamInfo),
+		PresenceSource:            "output_log",
+		PresenceConfidence:        confidence,
+		UserCount:                 len(metadataUsers),
+		Users:                     metadataUsers,
 	}
+}
+
+func autoCapturePlayerLocalBasisMetadata(cfg AutoCaptureConfig) (string, *CameraPoseConfig, string) {
+	cfg.Normalize()
+	source := cfg.PlayerLocal.BasisSource
+	if !cfg.PlayerLocal.Calibrated {
+		return source, nil, ""
+	}
+	pose := cfg.PlayerLocal.BasisPose
+	return source, &pose, cfg.PlayerLocal.UpdatedAt
 }
 
 func WriteAutoCaptureEmbeddedMetadata(imagePath string, metadata AutoCaptureEmbeddedMetadata) error {

@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
+	"math"
 	"net"
 	"net/url"
 	"os"
@@ -35,14 +37,45 @@ func emitWailsEvent(ctx context.Context, name string, data any) {
 }
 
 type App struct {
-	ctx        context.Context
-	configPath string
-	state      appcore.UIState
-	autoCancel context.CancelFunc
-	oscCancel  context.CancelFunc
-	latestPose appcore.CameraPoseConfig
-	poseAt     time.Time
-	mu         sync.Mutex
+	ctx                   context.Context
+	configPath            string
+	state                 appcore.UIState
+	autoCancel            context.CancelFunc
+	oscCancel             context.CancelFunc
+	latestPose            appcore.CameraPoseConfig
+	poseAt                time.Time
+	latestAvatarOSCBasis  avatarOSCBasisState
+	avatarOSCBasisSamples map[string]avatarOSCBasisSample
+	mu                    sync.Mutex
+}
+
+type avatarOSCBasisSample struct {
+	Float      float64
+	HasFloat   bool
+	Bool       bool
+	HasBool    bool
+	ReceivedAt time.Time
+}
+
+type avatarOSCBasisState struct {
+	Source     string
+	Status     string
+	Pose       appcore.CameraPoseConfig
+	UpdatedAt  time.Time
+	UpdatedBy  string
+	LastError  string
+	ResolvedAt time.Time
+}
+
+type PlayerLocalBasisSnapshot struct {
+	Source     string                   `json:"source"`
+	Status     string                   `json:"status"`
+	Configured bool                     `json:"configured"`
+	Fresh      bool                     `json:"fresh"`
+	UpdatedAt  string                   `json:"updatedAt,omitempty"`
+	AgeMS      int64                    `json:"ageMs"`
+	Error      string                   `json:"error,omitempty"`
+	Pose       appcore.CameraPoseConfig `json:"pose"`
 }
 
 type AppInfo struct {
@@ -77,6 +110,7 @@ func (a *App) startup(ctx context.Context) {
 	defer a.mu.Unlock()
 	a.ctx = ctx
 	a.logStartupLocked()
+	a.restartCameraPoseReceiverLocked(a.state.Config)
 	if a.state.Mode == appcore.ModeResults {
 		a.restartAutoPhotoWatcher(a.state.Config)
 	}
@@ -396,6 +430,16 @@ func (a *App) GetLatestCameraPose() appcore.CameraPoseSnapshot {
 	return a.latestCameraPoseLocked(a.state.Config)
 }
 
+func (a *App) GetLatestPlayerLocalBasis() PlayerLocalBasisSnapshot {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.latestPlayerLocalBasisLocked(a.state.Config, time.Now())
+}
+
+func (a *App) GetAvatarOSCBasisStatus() PlayerLocalBasisSnapshot {
+	return a.GetLatestPlayerLocalBasis()
+}
+
 func (a *App) SaveCurrentCameraPoseToView(viewID string) (appcore.Config, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -413,10 +457,11 @@ func (a *App) SaveCurrentCameraPoseToView(viewID string) (appcore.Config, error)
 		}
 		savedPose := pose
 		if cfg.AutoCapture.Views[i].CoordinateSpace == "player_local" {
-			if !cfg.AutoCapture.PlayerLocal.Calibrated {
-				return cfg, fmt.Errorf("プレイヤー基準Poseが未設定のため、player_local構図を保存できません。自動撮影タブで現在Poseをプレイヤー基準として保存してください")
+			basisPose, err := a.freshPlayerLocalBasisLocked(cfg)
+			if err != nil {
+				return cfg, fmt.Errorf("player_local構図を保存できません: %w", err)
 			}
-			savedPose = appcore.InverseTransformPlayerLocalPose(cfg.AutoCapture.PlayerLocal.BasisPose, pose)
+			savedPose = appcore.InverseTransformPlayerLocalPose(basisPose, pose)
 		}
 		cfg.AutoCapture.Views[i].Pose = savedPose
 		cfg.AutoCapture.Views[i].Calibrated = true
@@ -457,10 +502,11 @@ func (a *App) AddCurrentCameraPoseAsView(viewID string) (appcore.Config, error) 
 	}
 	savedPose := pose
 	if sourceView.CoordinateSpace == "player_local" {
-		if !cfg.AutoCapture.PlayerLocal.Calibrated {
-			return cfg, fmt.Errorf("プレイヤー基準Poseが未設定のため、player_local構図を追加できません。自動撮影タブで現在Poseをプレイヤー基準として保存してください")
+		basisPose, err := a.freshPlayerLocalBasisLocked(cfg)
+		if err != nil {
+			return cfg, fmt.Errorf("player_local構図を追加できません: %w", err)
 		}
-		savedPose = appcore.InverseTransformPlayerLocalPose(cfg.AutoCapture.PlayerLocal.BasisPose, pose)
+		savedPose = appcore.InverseTransformPlayerLocalPose(basisPose, pose)
 	}
 	id := newCameraViewID(cfg.AutoCapture.Views)
 	var zoom *float64
@@ -752,6 +798,12 @@ func (a *App) TestAutoCaptureView(viewID string) ([]appcore.Result, error) {
 	a.mu.Lock()
 	cfg := a.state.Config
 	cfg.Normalize()
+	var err error
+	cfg, err = a.prepareAutoCaptureConfigForRunLocked(cfg)
+	if err != nil {
+		a.mu.Unlock()
+		return nil, err
+	}
 	viewID = strings.TrimSpace(viewID)
 	found := false
 	for i := range cfg.AutoCapture.Views {
@@ -1262,6 +1314,17 @@ func (a *App) runAutoCaptureScheduler(ctx context.Context, cfg appcore.Config) {
 func (a *App) runAutoCaptureBatch(ctx context.Context, cfg appcore.Config) {
 	logPath := appcore.DiagnosticLogPath(a.configPath)
 	cfg.DiagnosticLogPath = logPath
+	a.mu.Lock()
+	cfg, err := a.prepareAutoCaptureConfigForRunLocked(cfg)
+	a.mu.Unlock()
+	if err != nil {
+		appcore.AppendDiagnosticLog(logPath, "auto-capture batch error: player_local basis resolve failed: %v", err)
+		a.mu.Lock()
+		a.state.Message = "自動撮影でエラーが発生しました: " + err.Error()
+		a.state.Mode = appcore.ModeResults
+		a.mu.Unlock()
+		return
+	}
 	appcore.AppendDiagnosticLog(logPath, "auto-capture batch begin")
 	runner := appcore.AutoCaptureRunner{
 		Config: cfg,
@@ -1355,22 +1418,22 @@ func (a *App) restartCameraPoseReceiverLocked(cfg appcore.Config) {
 	}
 	ctx, cancel := context.WithCancel(a.ctx)
 	a.oscCancel = cancel
-	go a.runCameraPoseReceiver(ctx, host, port, logPath)
+	go a.runCameraPoseReceiver(ctx, host, port, cfg.AutoCapture.PlayerLocal.BasisSource, logPath)
 }
 
-func (a *App) runCameraPoseReceiver(ctx context.Context, host string, port int, logPath string) {
+func (a *App) runCameraPoseReceiver(ctx context.Context, host string, port int, basisSource string, logPath string) {
 	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", host, port))
 	if err != nil {
-		appcore.AppendDiagnosticLog(logPath, "auto-capture pose receiver resolve error: %v", err)
+		appcore.AppendDiagnosticLog(logPath, "auto-capture osc receiver resolve error: %v", err)
 		return
 	}
 	conn, err := net.ListenUDP("udp", addr)
 	if err != nil {
-		appcore.AppendDiagnosticLog(logPath, "auto-capture pose receiver listen error: addr=%s err=%v", addr.String(), err)
+		appcore.AppendDiagnosticLog(logPath, "auto-capture osc receiver listen error: addr=%s err=%v", addr.String(), err)
 		return
 	}
 	defer conn.Close()
-	appcore.AppendDiagnosticLog(logPath, "auto-capture pose receiver start: addr=%s", addr.String())
+	appcore.AppendDiagnosticLog(logPath, "auto-capture osc receiver start: addr=%s basis_source=%q", addr.String(), basisSource)
 	go func() {
 		<-ctx.Done()
 		_ = conn.Close()
@@ -1380,21 +1443,43 @@ func (a *App) runCameraPoseReceiver(ctx context.Context, host string, port int, 
 		n, _, err := conn.ReadFromUDP(buf)
 		if err != nil {
 			if ctx.Err() != nil {
-				appcore.AppendDiagnosticLog(logPath, "auto-capture pose receiver stop: err=%v", ctx.Err())
+				appcore.AppendDiagnosticLog(logPath, "auto-capture osc receiver stop: err=%v", ctx.Err())
 				return
 			}
-			appcore.AppendDiagnosticLog(logPath, "auto-capture pose receiver read error: %v", err)
+			appcore.AppendDiagnosticLog(logPath, "auto-capture osc receiver read error: %v", err)
 			continue
 		}
-		pose, ok := appcore.ParseOSCPose(buf[:n])
+		packet := append([]byte(nil), buf[:n]...)
+		address, typeTags, payload, ok := appcore.ParseOSCPacket(packet)
 		if !ok {
 			continue
 		}
-		a.mu.Lock()
-		a.latestPose = pose
-		a.poseAt = time.Now()
-		a.mu.Unlock()
-		appcore.AppendDiagnosticLog(logPath, "auto-capture pose received: x=%.3f y=%.3f z=%.3f rx=%.3f ry=%.3f rz=%.3f", pose.Position.X, pose.Position.Y, pose.Position.Z, pose.Rotation.X, pose.Rotation.Y, pose.Rotation.Z)
+		now := time.Now()
+		if pose, ok := appcore.ParseOSCPose(packet); ok {
+			a.mu.Lock()
+			a.latestPose = pose
+			a.poseAt = now
+			a.mu.Unlock()
+			appcore.AppendDiagnosticLog(logPath, "auto-capture pose received: x=%.3f y=%.3f z=%.3f rx=%.3f ry=%.3f rz=%.3f", pose.Position.X, pose.Position.Y, pose.Position.Z, pose.Rotation.X, pose.Rotation.Y, pose.Rotation.Z)
+		}
+		if strings.HasPrefix(address, "/avatar/parameters/") {
+			sample, ok := decodeAvatarOSCBasisSample(typeTags, payload)
+			if !ok {
+				continue
+			}
+			sample.ReceivedAt = now
+			canonicalAddress := canonicalAvatarOSCBasisAddress(address)
+			if canonicalAddress == "" {
+				continue
+			}
+			a.mu.Lock()
+			if a.avatarOSCBasisSamples == nil {
+				a.avatarOSCBasisSamples = make(map[string]avatarOSCBasisSample)
+			}
+			a.avatarOSCBasisSamples[canonicalAddress] = sample
+			a.rebuildAvatarOSCBasisLocked(now, logPath)
+			a.mu.Unlock()
+		}
 	}
 }
 
@@ -1426,6 +1511,347 @@ func (a *App) freshCameraPoseLocked(cfg appcore.Config) (appcore.CameraPoseConfi
 		return appcore.CameraPoseConfig{}, fmt.Errorf("User Camera Poseが古いです。VRChat内でUser Cameraを少し動かしてから保存してください。")
 	}
 	return snapshot.Pose, nil
+}
+
+func (a *App) latestPlayerLocalBasisLocked(cfg appcore.Config, now time.Time) PlayerLocalBasisSnapshot {
+	cfg.Normalize()
+	source := normalizePlayerLocalBasisSource(cfg.AutoCapture.PlayerLocal.BasisSource)
+	if source != "avatar_osc" {
+		if !cfg.AutoCapture.PlayerLocal.Calibrated {
+			return PlayerLocalBasisSnapshot{
+				Source:     "manual",
+				Status:     "missing",
+				Configured: false,
+				Fresh:      false,
+				Error:      "プレイヤー基準Poseが未設定です。自動撮影タブで現在Poseをプレイヤー基準として保存してください",
+			}
+		}
+		updatedAt := strings.TrimSpace(cfg.AutoCapture.PlayerLocal.UpdatedAt)
+		snapshot := PlayerLocalBasisSnapshot{
+			Source:     "manual",
+			Status:     "ready",
+			Configured: true,
+			Fresh:      true,
+			UpdatedAt:  updatedAt,
+			Pose:       cfg.AutoCapture.PlayerLocal.BasisPose,
+		}
+		if updatedAt == "" {
+			snapshot.UpdatedAt = now.Format(time.RFC3339Nano)
+		}
+		return snapshot
+	}
+	snapshot := a.latestAvatarOSCBasisSnapshotLocked(cfg, now)
+	if snapshot.Source == "" {
+		snapshot.Source = "avatar_osc"
+	}
+	return snapshot
+}
+
+func (a *App) freshPlayerLocalBasisLocked(cfg appcore.Config) (appcore.CameraPoseConfig, error) {
+	snapshot := a.latestPlayerLocalBasisLocked(cfg, time.Now())
+	if snapshot.Source == "manual" {
+		if !snapshot.Configured {
+			return appcore.CameraPoseConfig{}, fmt.Errorf("プレイヤー基準Poseが未設定のため、player_local構図を撮影できません。自動撮影タブで現在Poseをプレイヤー基準として保存してください")
+		}
+		return snapshot.Pose, nil
+	}
+	if snapshot.Status != "ready" || !snapshot.Fresh {
+		if snapshot.Error != "" {
+			return appcore.CameraPoseConfig{}, fmt.Errorf("%s", snapshot.Error)
+		}
+		if snapshot.Status == "stale" {
+			return appcore.CameraPoseConfig{}, fmt.Errorf("avatar OSC basisが古いです。専用アバターギミックをVRChatで有効にして新しいOSC値を受信してから撮影してください")
+		}
+		return appcore.CameraPoseConfig{}, fmt.Errorf("avatar OSC basisがまだ受信されていません。専用アバターギミックを有効にしたアバターを使用し、/avatar/parameters 送信を確認してください")
+	}
+	return snapshot.Pose, nil
+}
+
+func (a *App) prepareAutoCaptureConfigForRunLocked(cfg appcore.Config) (appcore.Config, error) {
+	cfg.Normalize()
+	source := normalizePlayerLocalBasisSource(cfg.AutoCapture.PlayerLocal.BasisSource)
+	if source != "avatar_osc" {
+		return cfg, nil
+	}
+	pose, err := a.freshPlayerLocalBasisLocked(cfg)
+	if err != nil {
+		appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "avatar osc basis resolve error: source=%q err=%v", source, err)
+		return cfg, err
+	}
+	cfg.AutoCapture.PlayerLocal.BasisPose = pose
+	cfg.AutoCapture.PlayerLocal.Calibrated = true
+	if snapshot := a.latestPlayerLocalBasisLocked(cfg, time.Now()); snapshot.UpdatedAt != "" {
+		cfg.AutoCapture.PlayerLocal.UpdatedAt = snapshot.UpdatedAt
+	} else {
+		cfg.AutoCapture.PlayerLocal.UpdatedAt = time.Now().Format(time.RFC3339)
+	}
+	return cfg, nil
+}
+
+func (a *App) latestAvatarOSCBasisSnapshotLocked(cfg appcore.Config, now time.Time) PlayerLocalBasisSnapshot {
+	cfg.Normalize()
+	snapshot := PlayerLocalBasisSnapshot{
+		Source:     "avatar_osc",
+		Configured: true,
+		Status:     "missing",
+	}
+	sample, scheme, ok, err := a.buildAvatarOSCBasisSampleLocked(cfg)
+	if !ok {
+		if err != nil {
+			lower := strings.ToLower(err.Error())
+			switch {
+			case strings.Contains(lower, "partial"):
+				snapshot.Status = "partial"
+			case strings.Contains(lower, "missing"):
+				snapshot.Status = "missing"
+			default:
+				snapshot.Status = "invalid"
+			}
+			snapshot.Error = err.Error()
+		} else {
+			snapshot.Error = "avatar OSC basisがまだ受信されていません。専用アバターギミックを有効にしたアバターを使用してください"
+		}
+		snapshot.Pose = a.latestAvatarOSCBasis.Pose
+		if !a.latestAvatarOSCBasis.UpdatedAt.IsZero() {
+			snapshot.UpdatedAt = a.latestAvatarOSCBasis.UpdatedAt.Format(time.RFC3339Nano)
+			snapshot.AgeMS = now.Sub(a.latestAvatarOSCBasis.UpdatedAt).Milliseconds()
+		}
+		return snapshot
+	}
+	pose, err := appcore.ResolvePlayerLocalBasisPose(cfg.AutoCapture, sample, now)
+	snapshot.Pose = pose
+	snapshot.UpdatedAt = sample.ReceivedAt.Format(time.RFC3339Nano)
+	snapshot.AgeMS = now.Sub(sample.ReceivedAt).Milliseconds()
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "stale") {
+			snapshot.Status = "stale"
+		} else if strings.Contains(strings.ToLower(err.Error()), "partial") {
+			snapshot.Status = "partial"
+		} else {
+			snapshot.Status = "invalid"
+		}
+		snapshot.Error = err.Error()
+		return snapshot
+	}
+	snapshot.Status = "ready"
+	snapshot.Fresh = true
+	if scheme != "" {
+		snapshot.Error = ""
+	}
+	return snapshot
+}
+
+func (a *App) rebuildAvatarOSCBasisLocked(now time.Time, logPath string) {
+	snapshot := a.latestAvatarOSCBasisSnapshotLocked(a.state.Config, now)
+	a.latestAvatarOSCBasis.Source = snapshot.Source
+	a.latestAvatarOSCBasis.Status = snapshot.Status
+	a.latestAvatarOSCBasis.UpdatedBy = snapshot.Source
+	a.latestAvatarOSCBasis.LastError = snapshot.Error
+	if snapshot.Status == "ready" {
+		a.latestAvatarOSCBasis.Pose = snapshot.Pose
+		if snapshot.UpdatedAt != "" {
+			if parsed, parseErr := time.Parse(time.RFC3339Nano, snapshot.UpdatedAt); parseErr == nil {
+				a.latestAvatarOSCBasis.UpdatedAt = parsed
+				a.latestAvatarOSCBasis.ResolvedAt = parsed
+			}
+		} else {
+			a.latestAvatarOSCBasis.UpdatedAt = now
+			a.latestAvatarOSCBasis.ResolvedAt = now
+		}
+	}
+	if snapshot.UpdatedAt != "" && snapshot.Status != "ready" {
+		if parsed, parseErr := time.Parse(time.RFC3339Nano, snapshot.UpdatedAt); parseErr == nil {
+			a.latestAvatarOSCBasis.UpdatedAt = parsed
+			a.latestAvatarOSCBasis.ResolvedAt = parsed
+		}
+	}
+	if snapshot.Status != "ready" {
+		appcore.AppendDiagnosticLog(logPath, "avatar osc basis resolve error: status=%q err=%q", snapshot.Status, snapshot.Error)
+		return
+	}
+	appcore.AppendDiagnosticLog(logPath, "avatar osc basis resolved: source=%q updated_at=%q age_ms=%d pose=%+v", snapshot.Source, snapshot.UpdatedAt, snapshot.AgeMS, snapshot.Pose)
+}
+
+func normalizePlayerLocalBasisSource(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "avatar_osc":
+		return "avatar_osc"
+	default:
+		return "manual"
+	}
+}
+
+func (a *App) buildAvatarOSCBasisSampleLocked(cfg appcore.Config) (appcore.AvatarOSCBasisSample, string, bool, error) {
+	cfg.AutoCapture.PlayerLocal.AvatarOSC.Normalize()
+	if len(a.avatarOSCBasisSamples) == 0 {
+		return appcore.AvatarOSCBasisSample{}, "", false, nil
+	}
+	prefix := canonicalAvatarOSCBasisAddress(cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix)
+	if prefix == "" {
+		prefix = "CFVRC/basis"
+	}
+	scheme := "CFVRC"
+	positionRoot := prefix + "/p"
+	forwardRoot := prefix + "/f"
+	signSuffix := "Sign"
+	if strings.EqualFold(prefix, "ATG") || strings.HasPrefix(strings.ToUpper(prefix), "ATG/") {
+		scheme = "ATG"
+		positionRoot = strings.TrimSuffix(prefix, "/") + "/p"
+		forwardRoot = strings.TrimSuffix(prefix, "/") + "/r"
+		signSuffix = "+"
+	}
+	sample := appcore.AvatarOSCBasisSample{}
+	ok, err := a.fillAvatarOSCBasisVector(&sample.Position, positionRoot, signSuffix)
+	if err != nil || !ok {
+		return appcore.AvatarOSCBasisSample{}, scheme, ok, err
+	}
+	ok, err = a.fillAvatarOSCBasisVector(&sample.Forward, forwardRoot, signSuffix)
+	if err != nil || !ok {
+		return appcore.AvatarOSCBasisSample{}, scheme, ok, err
+	}
+	sample.ReceivedAt = latestAvatarOSCSampleTime(a.avatarOSCBasisSamples, positionRoot, forwardRoot, signSuffix)
+	return sample, scheme, true, nil
+}
+
+func (a *App) fillAvatarOSCBasisVector(target *appcore.AvatarOSCBasisVectorSample, root string, signSuffix string) (bool, error) {
+	var any bool
+	for _, axis := range []struct {
+		name string
+		set  func(appcore.AvatarOSCBasisAxisSample)
+		get  func() *appcore.AvatarOSCBasisAxisSample
+	}{
+		{name: "x", get: func() *appcore.AvatarOSCBasisAxisSample { return &target.X }, set: func(sample appcore.AvatarOSCBasisAxisSample) { target.X = sample }},
+		{name: "y", get: func() *appcore.AvatarOSCBasisAxisSample { return &target.Y }, set: func(sample appcore.AvatarOSCBasisAxisSample) { target.Y = sample }},
+		{name: "z", get: func() *appcore.AvatarOSCBasisAxisSample { return &target.Z }, set: func(sample appcore.AvatarOSCBasisAxisSample) { target.Z = sample }},
+	} {
+		magnitudeSample, ok := a.lookupAvatarOSCBasisRawSample(root + "/" + axis.name)
+		if !ok {
+			return false, fmt.Errorf("partial avatar OSC basis sample: missing %s/%s", root, axis.name)
+		}
+		magnitude, ok := magnitudeSample.floatValue()
+		if !ok {
+			return false, fmt.Errorf("invalid avatar OSC basis sample: %s/%s", root, axis.name)
+		}
+		signSample, _ := a.lookupAvatarOSCBasisRawSample(root + "/" + axis.name + signSuffix)
+		signFlag := 1.0
+		if value, ok := signSample.floatValue(); ok {
+			signFlag = value
+		} else if value, ok := signSample.boolValue(); ok {
+			if value {
+				signFlag = 1
+			} else {
+				signFlag = 0
+			}
+		}
+		axis.set(appcore.AvatarOSCBasisAxisSample{
+			Magnitude: magnitude,
+			SignFlag:  signFlag,
+			Present:   true,
+		})
+		any = true
+	}
+	if !any {
+		return false, fmt.Errorf("missing avatar OSC basis sample: %s", root)
+	}
+	return any, nil
+}
+
+func (a *App) lookupAvatarOSCBasisRawSample(address string) (avatarOSCBasisSample, bool) {
+	canonicalAddress := canonicalAvatarOSCBasisAddress(address)
+	if canonicalAddress == "" {
+		return avatarOSCBasisSample{}, false
+	}
+	if sample, ok := a.avatarOSCBasisSamples[canonicalAddress]; ok {
+		return sample, true
+	}
+	if sample, ok := a.avatarOSCBasisSamples["/avatar/parameters/"+canonicalAddress]; ok {
+		return sample, true
+	}
+	return avatarOSCBasisSample{}, false
+}
+
+func latestAvatarOSCSampleTime(samples map[string]avatarOSCBasisSample, roots ...string) time.Time {
+	var oldest time.Time
+	for address, sample := range samples {
+		canonicalAddress := canonicalAvatarOSCBasisAddress(address)
+		for _, root := range roots {
+			if strings.HasPrefix(canonicalAddress, canonicalAvatarOSCBasisAddress(root)) && !sample.ReceivedAt.IsZero() {
+				if oldest.IsZero() || sample.ReceivedAt.Before(oldest) {
+					oldest = sample.ReceivedAt
+				}
+			}
+		}
+	}
+	if oldest.IsZero() {
+		return time.Now()
+	}
+	return oldest
+}
+
+func canonicalAvatarOSCBasisAddress(address string) string {
+	address = strings.TrimSpace(address)
+	address = strings.TrimPrefix(address, "/avatar/parameters/")
+	address = strings.TrimPrefix(address, "avatar/parameters/")
+	return strings.Trim(address, "/")
+}
+
+func (s avatarOSCBasisSample) floatValue() (float64, bool) {
+	switch {
+	case s.HasFloat:
+		return s.Float, true
+	case s.HasBool:
+		if s.Bool {
+			return 1, true
+		}
+		return 0, true
+	default:
+		return 0, false
+	}
+}
+
+func (s avatarOSCBasisSample) boolValue() (bool, bool) {
+	switch {
+	case s.HasBool:
+		return s.Bool, true
+	case s.HasFloat:
+		return s.Float > 0, true
+	default:
+		return false, false
+	}
+}
+
+func decodeAvatarOSCBasisSample(typeTags string, payload []byte) (avatarOSCBasisSample, bool) {
+	if len(typeTags) < 2 || typeTags[0] != ',' {
+		return avatarOSCBasisSample{}, false
+	}
+	switch typeTags[1] {
+	case 'f':
+		if len(payload) < 4 {
+			return avatarOSCBasisSample{}, false
+		}
+		return avatarOSCBasisSample{Float: float64(math.Float32frombits(binary.BigEndian.Uint32(payload[:4]))), HasFloat: true, ReceivedAt: time.Now()}, true
+	case 'd':
+		if len(payload) < 8 {
+			return avatarOSCBasisSample{}, false
+		}
+		return avatarOSCBasisSample{Float: math.Float64frombits(binary.BigEndian.Uint64(payload[:8])), HasFloat: true, ReceivedAt: time.Now()}, true
+	case 'i':
+		if len(payload) < 4 {
+			return avatarOSCBasisSample{}, false
+		}
+		return avatarOSCBasisSample{Float: float64(int32(binary.BigEndian.Uint32(payload[:4]))), HasFloat: true, ReceivedAt: time.Now()}, true
+	case 'h':
+		if len(payload) < 8 {
+			return avatarOSCBasisSample{}, false
+		}
+		return avatarOSCBasisSample{Float: float64(int64(binary.BigEndian.Uint64(payload[:8]))), HasFloat: true, ReceivedAt: time.Now()}, true
+	case 'T':
+		return avatarOSCBasisSample{Bool: true, HasBool: true, ReceivedAt: time.Now()}, true
+	case 'F':
+		return avatarOSCBasisSample{Bool: false, HasBool: true, ReceivedAt: time.Now()}, true
+	default:
+		return avatarOSCBasisSample{}, false
+	}
 }
 
 func newCameraViewID(views []appcore.CameraViewConfig) string {

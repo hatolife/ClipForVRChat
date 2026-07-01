@@ -1,12 +1,11 @@
-# v0.1.8-rc13 作成チェックリスト
+# issue 173 作業チェックリスト
 
-- [x] Spout helper埋め込みによる単一exe配布を実装する
-- [x] Releaseで単一exe版と分離版zipを生成・検証する
-- [x] `ClipForVRChat.exe`、`spout-capture.exe`、`SpoutLibrary.dll` を単一exe配布へ戻せるか調査する
-- [x] C案採用前提で単一exe版と分離版をReleaseに併存できるか調査する
-- [x] Go以外への書き直しとOBS/VRChat Stream Cameraの方式を調査する
-- [x] `spout-capture.exe` と `SpoutLibrary.dll` の説明をREADME、Release Notes、仕様、実機確認手順へ追記する
-- [x] `spout-capture.exe` と `SpoutLibrary.dll` の必要性・安全性説明をREADME/SPEC/Release Notesへ追記する
-- [ ] `v0.1.8-rc13` 署名付きタグをMD更新後のHEADへ作成し直す
-- [ ] `v0.1.8-rc13` をpushする
-- [ ] CI/Release workflowの成功を確認する
+- [x] frontend の自動撮影タブに `manual` / `avatar_osc` の basis source UI を追加する
+- [x] `avatar_osc` の受信状態、最終受信、position/yaw、エラー表示を追加する
+- [x] backend で `/avatar/parameters/...` を受信し、`CFVRC/basis` / `ATG` 系のbasisへ復元する
+- [x] `avatar_osc` basis を自動撮影と player_local 構図保存へ適用する
+- [x] sidecar / 埋め込みmetadataへ basis source と basis pose を記録する
+- [x] Wails wrapper と frontend API 呼び出しを合わせる
+- [x] README / SPEC / docs に専用アバターギミック必須と head/avatar 基準の注意を追記する
+- [x] Go test / Wails API surface / frontend build を通す
+- [ ] Windows実機で専用アバターOSCから position / yaw / stale / player_local追従を確認する
