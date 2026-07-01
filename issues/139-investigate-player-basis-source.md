@@ -134,3 +134,46 @@ VRChat world座標へ変換するには別途キャリブレーションが必�
 - VRChat OSCQuery: https://docs.vrchat.com/docs/oscquery
 - VRChat Creator Docs Player API: https://creators.vrchat.com/worlds/udon/players/
 - VRChat Creator Docs Player Positions: https://creators.vrchat.com/worlds/udon/players/player-positions/
+
+## 2026-07-02 追加調査: YL-ATG
+
+`https://github.com/YozoraKurage/YL-ATG` が、アバターギミック併用で現在のプレイヤー位置を外部OSCへ出せる根拠になるか確認する。
+
+### 調査結果
+
+YL-ATGは、アバター上の任意オブジェクトの絶対座標をOSC経由で外部Unityプロジェクトへ同期するためのギミック/プログラム。
+READMEでは、`ATG_ForAvatar.unitypackage` をアバターへ入れ、`ATG/point` のMA Bone Proxyにトラッキングしたいオブジェクトを指定する。デフォルトはHead。
+外部側は `ATG_ForUnity.unitypackage` とOscCoreを入れ、Play Modeで `YL-ATG/TrackingObject` がVRChatから取得した位置になる、と説明している。
+
+実装上の構成:
+
+- アバター側prefabはModular Avatarで `ATG/p/x`, `ATG/p/y`, `ATG/p/z`, `ATG/p/x+`, `ATG/p/y+`, `ATG/p/z+`, `ATG/r/x`, `ATG/r/y`, `ATG/r/z`, `ATG/r/x+`, `ATG/r/y+`, `ATG/r/z+`, `ATG/SaveObject` のparametersを追加している。
+- 座標値はアバター上のscriptではなく、Avatar Dynamics Contact Sender/ReceiverとConstraintを使ってFloat parameterへエンコードしている。
+- `ATG_OSCHub.py` はVRChatのOSC送信ポート9001をlistenし、`/avatar/parameters/ATG/*` を `ports.json` の `9010`, `9003`, `9004` へ転送するだけ。
+- 外部Unity側 `YL_ATGCore.cs` は受信値を `vrc_p_x = (1 - value) * 1000` のように復元し、`ATG/p/*+` のflagで正負を決める。復元値を `TrackingObject.transform.position` へ反映する。
+- rotation系も同様に `ATG/r/*` と `ATG/r/*+` で方向ベクトル相当を復元し、`RotationVecObject.transform.position` へ反映している。
+
+このため、前回の「アバター単体でworld座標を取得してAvatar Parameterへ入れる標準APIは見当たらない」という判断は、通常のAnimator Parameter/APIという意味では正しい。
+一方でYL-ATGはContact/Constraintを使ったエンコードにより、アバターギミックだけでworld座標相当を外部OSCへ出す実例になっている。
+
+ClipForVRChatへの応用可能性:
+
+- 専用アバターギミック併用を許容するなら、現在のHead等のworld positionをClipForVRChatがOSCで受け取り、`player_local` のbasisとして使える可能性がある。
+- `ATG/point` の対象をHeadにすると、取得できるのはplayer rootではなくHead付近。player root基準が必要なら、アバターroot相当や腰/足元相当を安定して取れる対象を別途検証する必要がある。
+- yawはrotationそのものではなく、YL-ATGのrotation vector相当から水平成分を取って推定する実装になりそう。
+- ClipForVRChat側には `/avatar/parameters/ATG/*` のOSC受信、値の復元、鮮度管理、basis更新、診断表示が必要。
+
+制限とリスク:
+
+- 利用者のアバターへ専用ギミックを入れる必要がある。一般ユーザー向けの初期導線としては重い。
+- Modular Avatar、Avatar Dynamics Contact、OSC Avatar Parameter出力に依存する。
+- Expression Parameter枠、Contact数、Avatar Performance、既存ギミックとのtag/parameter衝突を考慮する必要がある。
+- Float parameterのOSC出力頻度・精度・遅延・VRChat更新による挙動差は実機確認が必要。
+- default Head trackingでは、プレイヤーの足元/rootではなく頭部基準になる。撮影構図としてはむしろ有用な可能性があるが、仕様名を「player root」ではなく「avatar/head basis」などへ分けるべき。
+
+判断:
+
+「専用アバターギミックを合わせて開発し、アバターからOSCでworld座標を送る」案は可能性あり。
+ただし、標準OSCだけで誰でも自動追従できる機能ではなく、アバター改変を前提にした拡張機能として扱うのが妥当。
+
+次に進めるなら、YL-ATG方式を参考に最小ギミックを作り、ClipForVRChatが `head position + forward vector` を受け取って `player_local` basisを自動更新できるかを実機検証する。
