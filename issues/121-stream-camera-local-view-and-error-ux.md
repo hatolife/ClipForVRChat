@@ -32,3 +32,7 @@ Stream方式はダミーではなく、実際にVRChat Stream Cameraの映像か
 ## 対応内容
 
 - v0.1.8実装に合わせて対応済み。Stream方式はSpout主経路へ置き換え、ffmpeg主導線は廃止。詳細はREADME/SPEC/RELEASE_NOTESを参照。
+
+## 再監査メモ
+
+- 2026-07-01: [#164](164-audit-v018-completed-items.md) の再監査で未達が見つかったため、完了扱いを取り消して `要対応` に戻した。
