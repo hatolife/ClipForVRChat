@@ -1,0 +1,372 @@
+Imported configs can start silent auto-photo exfiltration
+Link: https://chatgpt.com/codex/cloud/security/findings/6f12be9d1f688191a5163df106d7889f?sev=critical%2Chigh
+Criticality: high (attack path: high)
+Status: new
+
+# Metadata
+Repo: hatolife/ClipForVRChat
+Commit: 7efdf8d
+Author: poppo@hato.life
+Created: 2026/6/29 13:37:05
+Assignee: Unassigned
+Signals: Security, Validated, Patch generated, Attack-path
+
+# Summary
+Introduced bug: the auto-photo feature is activated from untrusted/imported configuration during application startup instead of only after the user saves/enables the setting in the normal trusted config flow. The introduced watcher also forces uploads for matched files, creating an unintended data-exfiltration path.
+This commit adds AutoPhoto settings and starts the watcher unconditionally from App.startup whenever cfg.AutoPhoto.Enabled is true. The existing startup path allows a single .json argument to be loaded into settings mode for editing/review. Because startup calls restartAutoPhotoWatcher regardless of the current UI mode or whether the config has been saved/confirmed, an attacker can supply a JSON config with autoPhoto.enabled=true, autoPhoto.photoDirectory set to a sensitive or broad image directory, and autoPhoto.webhookUrl or discord.webhookUrl set to an attacker-controlled Discord webhook or compatible upload endpoint. Once the UI opens, the watcher recursively scans the configured directory and processes newly appearing image files. The process path forcibly enables Discord upload and substitutes the auto-photo webhook if present, so future VRChat photos or other newly created supported images are automatically uploaded without an explicit processing action by the user. Existing files are marked as seen on watcher startup, so this primarily affects new files created after opening the config, but it still violates user consent and can leak private photos/paths while the user is merely reviewing settings.
+
+# Validation
+## Rubric
+- [x] Imported single-JSON configuration can populate state.Config while the app is only in settings/review mode before user save or confirmation.
+- [x] App startup starts AutoPhoto based solely on cfg.AutoPhoto.Enabled, without checking whether the config is trusted/saved or whether state.Mode is settings.
+- [x] The watcher monitors the attacker-controlled photoDirectory and processes newly created supported image files.
+- [x] AutoPhoto processing forces Discord upload and replaces the webhook with autoPhoto.webhookUrl, even when normal output.uploadDiscord is false.
+- [x] A local attacker-controlled webhook receives the automatically uploaded newly created image, demonstrating the unintended exfiltration path.
+## Report
+Validated. I first checked the relevant code paths: src/main.go:45-56 loads a single .json argument into state.Config, sets state.Mode=ModeSettings, and opens the UI without requiring save/confirmation; src/app.go:41-43 calls restartAutoPhotoWatcher(a.state.Config) during startup; src/app.go:349-374 starts the watcher whenever cfg.AutoPhoto.Enabled is true with no mode/trust check; src/internal/appcore/config.go:39-43 and 78-90 load autoPhoto.enabled, photoDirectory, and webhookUrl directly from JSON; src/internal/appcore/autophoto.go:24-36 starts by scanning the configured directory, 41-51 processes newly appearing files, 67-73 forces cfg.Output.UploadDiscord=true and substitutes cfg.AutoPhoto.WebhookURL, and 83-99 recursively scans supported images; src/internal/appcore/processor.go:91-95 then calls UploadDiscord. Dynamic PoC: I added a targeted Go test artifact. TestPoCImportedConfigStartupStartsWatcherInSettingsMode simulates the imported .json settings/review state and calls App.startup; output shows: startup accepted imported config in ModeSettings and started watcher for /tmp/.../sensitive_photos. TestPoCAutoPhotoWatcherForcesUploadToConfigWebhook uses the same malicious config shape with output.uploadDiscord=false and a local httptest webhook, creates secret.png after watcher startup, and captured: POST /api/webhooks/attacker/token?wait=true ... contains_secret_name=true, with handler result URL=https://cdn.example/secret.png. This proves new files in the attacker-selected directory are automatically exfiltrated to the configured webhook despite normal Discord upload being disabled. Crash attempt: this is a logic/consent bug, so no memory-safety crash is expected; the direct PoC reproduces by successful unintended upload rather than crash. Valgrind was unavailable in the container; go test -asan reproduced the same functional behavior and passed, confirming no sanitizer crash was needed. Debugger validation: an LLDB trace on a debug test binary hit App.startup at app.go:42, App.restartAutoPhotoWatcher at app.go:349 from startup at app.go:43, AutoPhotoWatcher.process at autophoto.go:67 through tick/Run, and UploadDiscord at discord.go:30 through Processor.processImage at processor.go:94 and AutoPhotoWatcher.process at autophoto.go:73. This confirms the runtime chain.
+
+# Evidence
+src/app.go (L349 to 374)
+  Note: The watcher is started whenever cfg.AutoPhoto.Enabled is true and updates history/results from a background goroutine; there is no check that the user has saved or confirmed the imported settings.
+```
+func (a *App) restartAutoPhotoWatcher(cfg appcore.Config) {
+	if a.autoCancel != nil {
+		a.autoCancel()
+		a.autoCancel = nil
+	}
+	if a.ctx == nil || !cfg.AutoPhoto.Enabled {
+		return
+	}
+	ctx, cancel := context.WithCancel(a.ctx)
+	a.autoCancel = cancel
+	watcher := appcore.AutoPhotoWatcher{
+		Config: cfg,
+		Handler: func(event appcore.AutoPhotoEvent) {
+			if event.Result.URL != "" && event.Result.Error == "" {
+				results := []appcore.Result{event.Result}
+				if history, err := appcore.AddResultsToHistory(appcore.HistoryPath(a.configPath), results); err == nil {
+					a.state.History = history
+					event.Result = results[0]
+				}
+			}
+			a.state.Results = append([]appcore.Result{event.Result}, a.state.Results...)
+			a.state.Mode = appcore.ModeResults
+			runtime.EventsEmit(a.ctx, "auto-photo:result", event)
+		},
+	}
+	go watcher.Run(ctx)
+```
+
+src/app.go (L41 to 43)
+  Note: The newly added startup hook immediately restarts the auto-photo watcher using the current state.Config, regardless of whether the config came from an imported JSON file or is only being reviewed.
+```
+func (a *App) startup(ctx context.Context) {
+	a.ctx = ctx
+	a.restartAutoPhotoWatcher(a.state.Config)
+```
+
+src/internal/appcore/autophoto.go (L67 to 73)
+  Note: Auto-photo processing forcibly enables Discord upload and uses the auto-photo webhook URL when present, allowing a malicious config to redirect automatically detected photos to an attacker-controlled webhook.
+```
+func (w *AutoPhotoWatcher) process(path string) Result {
+	cfg := w.Config
+	cfg.Output.UploadDiscord = true
+	if strings.TrimSpace(cfg.AutoPhoto.WebhookURL) != "" {
+		cfg.Discord.WebhookURL = cfg.AutoPhoto.WebhookURL
+	}
+	results, err := Processor{Config: cfg}.ProcessPaths([]string{path})
+```
+
+src/internal/appcore/autophoto.go (L83 to 99)
+  Note: The watcher recursively scans the configured photo directory for supported image extensions, so an attacker-controlled config can select what local tree will be monitored for newly created images.
+```
+func scanPhotoFiles(dir string) map[string]time.Time {
+	files := make(map[string]time.Time)
+	if strings.TrimSpace(dir) == "" {
+		return files
+	}
+	_ = filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
+		if err != nil || entry.IsDir() || !isSupportedPhotoPath(path) {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return nil
+		}
+		files[path] = info.ModTime()
+		return nil
+	})
+	return files
+```
+
+src/internal/appcore/config.go (L39 to 43)
+  Note: The introduced AutoPhotoConfig fields are loaded directly from JSON, including Enabled, PhotoDirectory, and WebhookURL, which are sufficient to activate and direct the automatic uploads.
+```
+type AutoPhotoConfig struct {
+	Enabled        bool   `json:"enabled"`
+	PhotoDirectory string `json:"photoDirectory"`
+	WebhookURL     string `json:"webhookUrl"`
+}
+```
+
+src/main.go (L45 to 56)
+  Note: A single .json argument is loaded as a configuration and the UI is opened in settings mode, meaning external/untrusted configs can populate state.Config before the user saves or confirms them.
+```
+	if len(args) == 1 && strings.EqualFold(filepath.Ext(args[0]), ".json") {
+		configPath = args[0]
+		cfg, err := appcore.LoadConfig(configPath)
+		if err != nil {
+			state.Mode = appcore.ModeError
+			state.Message = fmt.Sprintf("設定を読み込めませんでした: %v", err)
+		} else {
+			state.Mode = appcore.ModeSettings
+			state.Config = cfg
+			state.ConfigPath = configPath
+		}
+		runUI(configPath, state)
+```
+
+Proposed patch:
+diff --git a/issues/014-vrchat-photo-auto-post.md b/issues/014-vrchat-photo-auto-post.md
+index a13c24a42f3ca31f692ca752e61831de14724ff3..eebee2c43ed1b9817b9ef358ac399283ec44202b 100644
+--- a/issues/014-vrchat-photo-auto-post.md
++++ b/issues/014-vrchat-photo-auto-post.md
+@@ -10,25 +10,41 @@ VRChatで写真撮影したあと、毎回手動で画像をドラッグ&ドロ
+ - 起動後に新しく保存された写真を検知する。
+ - 検知した写真を通常の画像処理と同様に縮小、保存、Discord投稿、履歴保存する。
+ - 自動投稿専用のWebhook URLを設定できる。
+ - 自動投稿専用Webhook URLが未設定の場合は、通常のDiscord Webhook URLへ投稿する。
+ - 写真フォルダは設定画面から入力またはフォルダ選択できる。
+ - 監視対象フォルダ配下のサブフォルダも対象にする。
+ 
+ ## 実装方針
+ 
+ 初期対応ではOSCイベントではなく、VRChatの写真保存フォルダを定期スキャンして新規ファイルを検知する。
+ 
+ 理由:
+ 
+ - 写真として実際に保存されたファイルを確実に処理できる。
+ - OSC設定に依存せず、ユーザーが導入しやすい。
+ - 既存の縮小、Discord投稿、履歴保存の処理をそのまま使える。
+ 
+ ## 受け入れ条件
+ 
+ - 設定画面でVRChat写真自動投稿をON/OFFできる。
+ - 写真フォルダを設定できる。
+ - 自動投稿用Webhook URLを設定できる。
+ - 自動投稿用Webhook URLが空の場合、通常のDiscord Webhook URLが使われる。
+ - 起動後に追加された写真が自動処理される。
+ - 自動処理された結果が結果画面と履歴に反映される。
++
++## セキュリティ追記: インポート設定の未確認自動投稿
++
++### 問題
++
++外部から渡された `.json` 設定を確認するために設定画面で開いた場合でも、起動時に `autoPhoto.enabled` が有効な設定を信頼済みとして扱い、自動写真投稿の監視が開始される可能性がある。悪意ある設定ファイルにより、ユーザーが保存・確認する前に新規画像が意図しないWebhookへ投稿される恐れがある。
++
++### 期待する挙動
++
++外部設定を設定画面で確認している間は自動写真投稿を開始せず、ユーザーが設定を保存した後にのみ保存済み設定として監視を開始する。
++
++### 受け入れ条件
++
++- `.json` 引数で設定画面を開いた直後は、自動写真投稿の監視が開始されない。
++- 通常起動で保存済み設定を読み込んだ場合は、従来どおり有効な自動写真投稿の監視が開始される。
++- 設定保存後は、有効な自動写真投稿の監視が開始または再開される。
+
+
+diff --git a/src/app.go b/src/app.go
+index 88f1e19e9e4a5650ad57a293ec18d25bc9fb90c9..2a2cc07bbfaa2cc077313d8ae497ef59eade58b2 100644
+--- a/src/app.go
++++ b/src/app.go
+@@ -43,51 +43,53 @@ type App struct {
+ type AppInfo struct {
+ 	Name    string `json:"name"`
+ 	Version string `json:"version"`
+ 	GitHub  string `json:"github"`
+ }
+ 
+ type OSSLicense struct {
+ 	Name      string `json:"name"`
+ 	License   string `json:"license"`
+ 	Copyright string `json:"copyright"`
+ 	URL       string `json:"url"`
+ }
+ 
+ func NewApp(configPath string, initial appcore.UIState) *App {
+ 	return &App{
+ 		configPath: configPath,
+ 		state:      initial,
+ 	}
+ }
+ 
+ func (a *App) startup(ctx context.Context) {
+ 	a.mu.Lock()
+ 	defer a.mu.Unlock()
+ 	a.ctx = ctx
+ 	a.logStartupLocked()
+-	a.restartAutoPhotoWatcher(a.state.Config)
++	if a.state.Mode == appcore.ModeResults {
++		a.restartAutoPhotoWatcher(a.state.Config)
++	}
+ }
+ 
+ func (a *App) GetInitialState() appcore.UIState {
+ 	a.mu.Lock()
+ 	defer a.mu.Unlock()
+ 	a.refreshHistory()
+ 	return a.state
+ }
+ 
+ func (a *App) GetAppInfo() AppInfo {
+ 	return AppInfo{
+ 		Name:    "ClipForVRChat",
+ 		Version: appVersion(),
+ 		GitHub:  githubURL,
+ 	}
+ }
+ 
+ func (a *App) OpenURL(rawURL string) error {
+ 	trustedURL, err := trustedExternalURL(rawURL)
+ 	if err != nil {
+ 		return err
+ 	}
+ 	runtime.BrowserOpenURL(a.ctx, trustedURL)
+ 	return nil
+ }
+
+
+diff --git a/src/app_test.go b/src/app_test.go
+index bb3c3988bc1845a56636df04c3ddcf2614be8513..2b95faae3709fd6dcc5764d57a109b4b010ba61c 100644
+--- a/src/app_test.go
++++ b/src/app_test.go
+@@ -133,65 +133,85 @@ func TestAppProcessToStateHidesNoWorkResults(t *testing.T) {
+ 		t.Fatal(err)
+ 	}
+ 	if len(state.Results) != 0 {
+ 		t.Fatalf("results = %+v, want empty", state.Results)
+ 	}
+ 	if !strings.Contains(state.Message, "実行された処理はありません") {
+ 		t.Fatalf("message = %q", state.Message)
+ 	}
+ 	history, err := appcore.LoadHistory(appcore.HistoryPath(configPath))
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	if len(history) != 0 {
+ 		t.Fatalf("history = %+v, want empty", history)
+ 	}
+ }
+ 
+ func TestAppStartupStartsAutoPhotoWatcherWithoutDiscordUpload(t *testing.T) {
+ 	configPath := filepath.Join(t.TempDir(), "config.json")
+ 	cfg := appcore.DefaultConfig()
+ 	cfg.Output.UploadDiscord = false
+ 	cfg.AutoPhoto.Enabled = true
+ 	cfg.AutoPhoto.PhotoDirectory = t.TempDir()
+ 	cfg.AutoPhoto.ScanIntervalSeconds = 3600
+ 
+-	app := NewApp(configPath, appcore.UIState{Config: cfg})
++	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults, Config: cfg})
+ 	ctx, cancel := context.WithCancel(context.Background())
+ 	defer cancel()
+ 	app.startup(ctx)
+ 	defer func() {
+ 		if app.autoCancel != nil {
+ 			app.autoCancel()
+ 		}
+ 	}()
+ 
+ 	if app.autoCancel == nil {
+ 		t.Fatal("auto photo watcher was not started")
+ 	}
+ }
+ 
++func TestAppStartupDoesNotStartAutoPhotoWatcherWhileReviewingSettings(t *testing.T) {
++	configPath := filepath.Join(t.TempDir(), "imported.json")
++	cfg := appcore.DefaultConfig()
++	cfg.Output.UploadDiscord = true
++	cfg.AutoPhoto.Enabled = true
++	cfg.AutoPhoto.PhotoDirectory = t.TempDir()
++	cfg.AutoPhoto.WebhookURL = "https://example.com/api/webhooks/attacker/token"
++	cfg.AutoPhoto.ScanIntervalSeconds = 3600
++
++	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeSettings, Config: cfg, ConfigPath: configPath})
++	ctx, cancel := context.WithCancel(context.Background())
++	defer cancel()
++	app.startup(ctx)
++
++	if app.autoCancel != nil {
++		app.autoCancel()
++		t.Fatal("auto photo watcher started while imported settings were only open for review")
++	}
++}
++
+ func TestExplorerSelectArgsRejectsMissingPath(t *testing.T) {
+ 	if _, err := explorerRevealPath("", ""); err == nil {
+ 		t.Fatal("expected empty path error")
+ 	}
+ 	if _, err := explorerRevealPath(filepath.Join(t.TempDir(), "missing.png"), ""); err == nil {
+ 		t.Fatal("expected missing file error")
+ 	}
+ }
+ 
+ func TestExplorerSelectArgsRejectsDirectory(t *testing.T) {
+ 	if _, err := explorerRevealPath(t.TempDir(), ""); err == nil {
+ 		t.Fatal("expected directory error")
+ 	}
+ }
+ 
+ func TestExplorerSelectArgsResolvesRelativePathFromBaseDir(t *testing.T) {
+ 	dir := t.TempDir()
+ 	outputDir := filepath.Join(dir, "output")
+ 	if err := os.MkdirAll(outputDir, 0700); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	if err := os.WriteFile(filepath.Join(outputDir, "out.png"), []byte("image"), 0600); err != nil {
+ 		t.Fatal(err)
+ 	}
+
+# Attack-path analysis
+Final: high | Decider: model_decided | Matrix severity: high | Policy adjusted: high
+## Rationale
+The original high severity is supported. Static evidence and the provided executable PoC show a clear chain from attacker-controlled imported JSON to automatic background monitoring and outbound image upload without save/confirmation. This is in scope for the product's threat model and has a major privacy impact because private VRChat or other local images can be silently exfiltrated. It is not raised to critical because the app is a single-user desktop application with no public ingress, exploitation requires user interaction, and the watcher primarily affects newly created supported image files rather than arbitrary immediate file read or code execution.
+## Likelihood
+high - A remote attacker can plausibly deliver a malicious config and persuade a user to open it, and the code path is automatic after startup. Likelihood is not high because it still requires user interaction and a new image to appear after the watcher begins. | Remote network vector
+## Impact
+high - The impact is unauthorized disclosure of newly created private image files from an attacker-selected directory, plus potential history/state changes. It does not provide code execution, persistence, cloud credential compromise, or multi-user/server compromise, and it primarily affects a single desktop victim.
+## Assumptions
+- A remote/social attacker can persuade a user to open an attacker-supplied .json configuration with ClipForVRChat.
+- The desktop application runs with the victim user's normal filesystem read permissions and outbound network access.
+- A new supported image file is created in the attacker-selected watched directory after the watcher starts; pre-existing files are marked as already seen on startup.
+- Victim opens a single .json file with the application
+- Imported JSON sets autoPhoto.enabled=true
+- Imported JSON selects a photoDirectory containing future private images
+- Imported JSON sets autoPhoto.webhookUrl or discord.webhookUrl to an attacker-controlled upload endpoint
+- A new .png, .jpg, .jpeg, or .webp file appears after startup
+## Path
+attacker config.json -> victim opens in ClipForVRChat -> imported settings state -> startup watcher -> watched local directory -> new image -> forced webhook upload -> attacker endpoint
+## Path evidence
+- `src/main.go:45-56` - A single .json argument is loaded via LoadConfig into state.Config, state.Mode is set to ModeSettings, and the UI starts without requiring user save or confirmation.
+- `src/app.go:41-43` - Application startup unconditionally calls restartAutoPhotoWatcher using the current state.Config.
+- `src/app.go:349-374` - restartAutoPhotoWatcher starts a background watcher whenever cfg.AutoPhoto.Enabled is true and does not check whether the configuration is trusted, persisted, or merely being reviewed.
+- `src/internal/appcore/config.go:39-43` - AutoPhoto settings loaded from JSON include enabled, photoDirectory, and webhookUrl, which are sufficient to activate and direct the watcher.
+- `src/internal/appcore/config.go:78-91` - LoadConfig reads the JSON file and unmarshals it into Config, then normalizes it; it does not mark imported configs as untrusted or disable side effects.
+- `src/internal/appcore/autophoto.go:24-51` - The watcher records existing files as seen, then on each tick scans the configured directory and processes newly appearing stable supported files.
+- `src/internal/appcore/autophoto.go:67-73` - Auto-photo processing forces upload behavior and substitutes the configured auto-photo webhook URL before processing the image.
+- `src/internal/appcore/processor.go:91-95` - When UploadDiscord is true, Processor uploads the processed image through UploadDiscord.
+- `src/internal/appcore/discord.go:53-60` - UploadDiscord creates and sends an outbound POST request to the configured webhook URL with the image multipart body.
+## Narrative
+This is a real, reachable security issue in the main desktop runtime. A single .json argument is loaded directly into state.Config and displayed in settings mode, but App.startup immediately calls restartAutoPhotoWatcher with that untrusted imported config. restartAutoPhotoWatcher starts a goroutine whenever cfg.AutoPhoto.Enabled is true, with no check that the config was saved or confirmed. The watcher recursively scans the configured photoDirectory, ignores files already present at startup, and processes newly appearing supported images. Its process path sets UploadDiscord=true and replaces the Discord webhook with cfg.AutoPhoto.WebhookURL when present, then Processor calls UploadDiscord. The earlier validation evidence included executable Go tests with a local httptest webhook that received the automatically uploaded newly created image, confirming the data-exfiltration path. The application is not internet-facing and exploitation requires user interaction plus a future image creation event, so this is not critical; however, private VRChat or other local photos can be silently exfiltrated to an attacker-controlled destination, which supports high severity in this project context.
+## Controls
+- No public server, ingress, load balancer, or listening port is defined; this is a local Wails desktop application.
+- Exploit requires user interaction to open an attacker-supplied JSON file.
+- Existing files are marked as seen when the watcher starts, reducing immediate bulk exfiltration of already-present files.
+- Only supported image extensions are processed by the watcher.
+- HTTP upload uses a timeout.
+- Missing control: imported/review-only configuration is not distinguished from trusted saved configuration before starting sensitive background network/file side effects.
+## Blindspots
+- Static repository review did not verify Windows file association behavior or the exact end-user UX for opening .json files.
+- No cloud APIs were called and no live Discord endpoint was tested in this attack-path pass.
+- Runtime behavior was inferred from source plus the earlier validation PoC; OS-specific Wails startup nuances were not independently re-executed here.
+- The repository contains no deployment manifests or IaC for network exposure analysis beyond confirming this is a desktop Wails app.
