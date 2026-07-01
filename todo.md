@@ -4,4 +4,5 @@
   - [x] `SpoutLibrary_static.lib` リンク失敗の原因をissueへ追記する
   - [x] CMakeを上流Spout2の実ターゲットに合わせる
   - [x] `SpoutLibrary.dll` をCI/Release同梱・検証対象にする
-  - [ ] GitHub ActionsのCI/Release成功を確認する
+  - [x] `release/v0.1.8` のGitHub Actions CI成功を確認する
+  - [ ] Release成果物を作成するタグ方針を決める
