@@ -582,16 +582,16 @@ func DefaultVRChatLogDirectory() string {
 
 func defaultCameraViews() []CameraViewConfig {
 	return []CameraViewConfig{
-		defaultCameraView("front", "正面", 0, CameraPoseConfig{
-			Position: CameraVector3Config{X: 0, Y: 1.55, Z: 0.9},
+		defaultCameraView("front", "正面", 0, "player_local", CameraPoseConfig{
+			Position: CameraVector3Config{X: 0, Y: 0, Z: 1.0},
 			Rotation: CameraVector3Config{X: 0, Y: 180, Z: 0},
 		}, 1.0),
-		defaultCameraView("back", "背後", 1, CameraPoseConfig{
-			Position: CameraVector3Config{X: 0, Y: 1.85, Z: -1.6},
+		defaultCameraView("back", "背後", 1, "player_local", CameraPoseConfig{
+			Position: CameraVector3Config{X: 0, Y: 0.35, Z: -1.6},
 			Rotation: CameraVector3Config{X: 12, Y: 0, Z: 0},
 		}, 1.0),
-		defaultCameraView("diagonal", "斜め", 2, CameraPoseConfig{
-			Position: CameraVector3Config{X: 0.8, Y: 1.75, Z: 1.1},
+		defaultCameraView("diagonal", "斜め", 2, "player_local", CameraPoseConfig{
+			Position: CameraVector3Config{X: 0.8, Y: 0.2, Z: 1.1},
 			Rotation: CameraVector3Config{X: 8, Y: -145, Z: 0},
 		}, 1.0),
 	}
@@ -610,13 +610,13 @@ func DefaultCameraViews() []CameraViewConfig {
 	return defaultCameraViews()
 }
 
-func defaultCameraView(id string, name string, order int, pose CameraPoseConfig, zoom float64) CameraViewConfig {
+func defaultCameraView(id string, name string, order int, coordinateSpace string, pose CameraPoseConfig, zoom float64) CameraViewConfig {
 	return CameraViewConfig{
 		ID:              id,
 		Name:            name,
 		Enabled:         true,
 		SortOrder:       order,
-		CoordinateSpace: "world",
+		CoordinateSpace: coordinateSpace,
 		Pose:            pose,
 		Zoom:            float64ConfigPtr(zoom),
 		LookAtMe:        boolConfigPtr(true),

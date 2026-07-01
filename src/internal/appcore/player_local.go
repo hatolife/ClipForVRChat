@@ -38,3 +38,25 @@ func TransformPlayerLocalPose(basis CameraPoseConfig, local CameraPoseConfig) Ca
 		},
 	}
 }
+
+func InverseTransformPlayerLocalPose(basis CameraPoseConfig, world CameraPoseConfig) CameraPoseConfig {
+	yaw := basis.Rotation.Y * math.Pi / 180
+	sinY := math.Sin(yaw)
+	cosY := math.Cos(yaw)
+	dx := world.Position.X - basis.Position.X
+	dz := world.Position.Z - basis.Position.Z
+	x := dx*cosY - dz*sinY
+	z := dx*sinY + dz*cosY
+	return CameraPoseConfig{
+		Position: CameraVector3Config{
+			X: x,
+			Y: world.Position.Y - basis.Position.Y,
+			Z: z,
+		},
+		Rotation: CameraVector3Config{
+			X: world.Rotation.X - basis.Rotation.X,
+			Y: world.Rotation.Y - basis.Rotation.Y,
+			Z: world.Rotation.Z - basis.Rotation.Z,
+		},
+	}
+}

@@ -11,6 +11,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <thread>
 #include <vector>
 
@@ -18,9 +19,17 @@
 
 namespace {
 
+struct SenderInfo {
+  std::string name;
+  unsigned int width = 0;
+  unsigned int height = 0;
+  std::string host_path;
+};
+
 struct Options {
   bool list_senders = false;
   bool capture = false;
+  bool show_version = false;
   std::string sender;
   std::filesystem::path output;
   int timeout_ms = 10000;
@@ -64,9 +73,42 @@ std::string json_escape(const std::string &value) {
   return out.str();
 }
 
-void print_error(const std::string &code, const std::string &message) {
+std::string helper_version() {
+#ifdef SPOUT_CAPTURE_VERSION
+  return SPOUT_CAPTURE_VERSION;
+#else
+  return "unknown";
+#endif
+}
+
+void print_help() {
+  std::cout << "spout-capture --help\n"
+            << "spout-capture --version\n"
+            << "spout-capture --list-senders\n"
+            << "spout-capture --capture [--sender name] --output file.png --timeout-ms 10000\n";
+}
+
+void print_version() {
+  std::cout << "{\"ok\":true,\"name\":\"spout-capture\",\"version\":\""
+            << json_escape(helper_version()) << "\"}\n";
+}
+
+void print_error(const std::string &code, const std::string &message, const std::vector<SenderInfo> &senders = {}) {
   std::cout << "{\"ok\":false,\"code\":\"" << json_escape(code)
-            << "\",\"message\":\"" << json_escape(message) << "\"}\n";
+            << "\",\"message\":\"" << json_escape(message) << "\"";
+  if (!senders.empty()) {
+    std::cout << ",\"senders\":[";
+    for (size_t i = 0; i < senders.size(); ++i) {
+      if (i > 0) {
+        std::cout << ",";
+      }
+      std::cout << "{\"name\":\"" << json_escape(senders[i].name) << "\",\"width\":"
+                << senders[i].width << ",\"height\":" << senders[i].height
+                << ",\"hostPath\":\"" << json_escape(senders[i].host_path) << "\"}";
+    }
+    std::cout << "]";
+  }
+  std::cout << "}\n";
 }
 
 bool parse_int(const std::string &value, int *out) {
@@ -90,6 +132,8 @@ bool parse_args(int argc, char **argv, Options *options, std::string *error) {
       options->list_senders = true;
     } else if (arg == "--capture") {
       options->capture = true;
+    } else if (arg == "--version") {
+      options->show_version = true;
     } else if (arg == "--sender") {
       if (++i >= argc) {
         *error = "--sender requires a value";
@@ -108,13 +152,16 @@ bool parse_args(int argc, char **argv, Options *options, std::string *error) {
         return false;
       }
     } else if (arg == "--help" || arg == "-h") {
-      std::cout << "spout-capture --list-senders\n"
-                << "spout-capture --capture [--sender name] --output file.png --timeout-ms 10000\n";
+      print_help();
       std::exit(0);
     } else {
       *error = "unknown argument: " + arg;
       return false;
     }
+  }
+  if (options->show_version) {
+    print_version();
+    std::exit(0);
   }
   if (options->list_senders == options->capture) {
     *error = "specify exactly one of --list-senders or --capture";
@@ -141,6 +188,13 @@ std::string wide_to_utf8(const std::wstring &value) {
   std::string out(static_cast<size_t>(size - 1), '\0');
   WideCharToMultiByte(CP_UTF8, 0, value.c_str(), -1, out.data(), size, nullptr, nullptr);
   return out;
+}
+
+std::string lower_copy(std::string value) {
+  std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
+    return static_cast<char>(std::tolower(c));
+  });
+  return value;
 }
 
 bool write_png_wic(const std::filesystem::path &path, unsigned int width, unsigned int height,
@@ -214,64 +268,105 @@ bool write_png_wic(const std::filesystem::path &path, unsigned int width, unsign
   return true;
 }
 
-std::vector<std::string> sorted_senders(SPOUTHANDLE spout) {
-  auto senders = spout->GetSenderList();
-  std::sort(senders.begin(), senders.end());
+std::vector<SenderInfo> sorted_senders(SPOUTHANDLE spout) {
+  auto sender_names = spout->GetSenderList();
+  std::sort(sender_names.begin(), sender_names.end());
+  std::vector<SenderInfo> senders;
+  senders.reserve(sender_names.size());
+  for (const auto &name : sender_names) {
+    SenderInfo info;
+    info.name = name;
+    unsigned int width = 0;
+    unsigned int height = 0;
+    HANDLE handle = nullptr;
+    DWORD format = 0;
+    char host_path[MAX_PATH] = {};
+    spout->GetSenderInfo(name.c_str(), width, height, handle, format);
+    spout->GetHostPath(name.c_str(), host_path, MAX_PATH);
+    info.width = width;
+    info.height = height;
+    info.host_path = host_path;
+    senders.push_back(std::move(info));
+  }
   return senders;
 }
 
-std::string choose_sender(SPOUTHANDLE spout, const std::string &requested, std::string *error) {
+struct SenderSelection {
+  std::string name;
+  std::string code;
+  std::string message;
+  std::vector<SenderInfo> senders;
+};
+
+bool sender_matches_requested(const std::string &candidate, const std::string &requested) {
+  return candidate == requested || lower_copy(candidate) == lower_copy(requested);
+}
+
+SenderSelection choose_sender(SPOUTHANDLE spout, const std::string &requested) {
+  SenderSelection selection;
+  selection.senders = sorted_senders(spout);
   if (!requested.empty()) {
-    return requested;
+    for (const auto &sender : selection.senders) {
+      if (sender_matches_requested(sender.name, requested)) {
+        selection.name = sender.name;
+        return selection;
+      }
+    }
+    selection.code = "sender_not_found";
+    selection.message = "指定されたSpout senderが見つかりません。候補一覧を確認してください。";
+    return selection;
   }
-  auto senders = sorted_senders(spout);
-  if (senders.empty()) {
-    *error = "Spout senderがありません。VRChatでStream Cameraを起動してください。";
-    return {};
+  if (selection.senders.empty()) {
+    selection.code = "sender_not_found";
+    selection.message = "Spout senderがありません。VRChatでStream Cameraを起動してください。";
+    return selection;
   }
-  if (senders.size() == 1) {
-    return senders[0];
+  if (selection.senders.size() == 1) {
+    selection.name = selection.senders[0].name;
+    return selection;
   }
-  for (const auto &sender : senders) {
-    std::string lower = sender;
-    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  std::vector<SenderInfo> auto_candidates;
+  for (const auto &sender : selection.senders) {
+    std::string lower = lower_copy(sender.name);
     if (lower.find("vrchat") != std::string::npos || lower.find("stream") != std::string::npos) {
-      return sender;
+      auto_candidates.push_back(sender);
     }
   }
-  *error = "複数のSpout senderがあり自動選択できません。sender名を選択してください。";
-  return {};
+  if (auto_candidates.size() == 1) {
+    selection.name = auto_candidates[0].name;
+    return selection;
+  }
+  selection.code = "sender_ambiguous";
+  selection.message = "複数のSpout senderがあり自動選択できません。sender名を選択してください。";
+  if (!auto_candidates.empty()) {
+    selection.senders = std::move(auto_candidates);
+  }
+  return selection;
 }
 
 int list_senders(SPOUTHANDLE spout) {
   auto senders = sorted_senders(spout);
   std::cout << "{\"ok\":true,\"senders\":[";
   for (size_t i = 0; i < senders.size(); ++i) {
-    unsigned int width = 0;
-    unsigned int height = 0;
-    HANDLE handle = nullptr;
-    DWORD format = 0;
-    char host_path[MAX_PATH] = {};
-    spout->GetSenderInfo(senders[i].c_str(), width, height, handle, format);
-    spout->GetHostPath(senders[i].c_str(), host_path, MAX_PATH);
     if (i > 0) {
       std::cout << ",";
     }
-    std::cout << "{\"name\":\"" << json_escape(senders[i]) << "\",\"width\":" << width
-              << ",\"height\":" << height << ",\"hostPath\":\"" << json_escape(host_path) << "\"}";
+    std::cout << "{\"name\":\"" << json_escape(senders[i].name) << "\",\"width\":"
+              << senders[i].width << ",\"height\":" << senders[i].height
+              << ",\"hostPath\":\"" << json_escape(senders[i].host_path) << "\"}";
   }
   std::cout << "]}\n";
   return 0;
 }
 
 int capture(SPOUTHANDLE spout, const Options &options) {
-  std::string choose_error;
-  std::string sender = choose_sender(spout, options.sender, &choose_error);
-  if (sender.empty()) {
-    print_error("sender_not_selected", choose_error);
+  SenderSelection selection = choose_sender(spout, options.sender);
+  if (selection.name.empty()) {
+    print_error(selection.code.empty() ? "sender_not_selected" : selection.code,
+                selection.message, selection.senders);
     return 2;
   }
-  spout->SetReceiverName(sender.c_str());
+  spout->SetReceiverName(selection.name.c_str());
   auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(options.timeout_ms);
   std::vector<unsigned char> pixels;
   unsigned int width = 0;
@@ -280,7 +375,7 @@ int capture(SPOUTHANDLE spout, const Options &options) {
   DWORD format = 0;
   bool received = false;
   while (std::chrono::steady_clock::now() < deadline) {
-    spout->GetSenderInfo(sender.c_str(), width, height, handle, format);
+    spout->GetSenderInfo(selection.name.c_str(), width, height, handle, format);
     if (width == 0 || height == 0) {
       std::this_thread::sleep_for(std::chrono::milliseconds(30));
       continue;
@@ -293,7 +388,9 @@ int capture(SPOUTHANDLE spout, const Options &options) {
     std::this_thread::sleep_for(std::chrono::milliseconds(30));
   }
   if (!received) {
-    print_error("capture_timeout", "Spoutフレームを取得できませんでした。VRChat Stream Cameraとsender設定を確認してください。");
+    print_error("capture_timeout",
+                "Spoutフレームを取得できませんでした。VRChat Stream Cameraとsender設定を確認してください。",
+                selection.senders);
     return 3;
   }
   std::error_code ec;
@@ -316,7 +413,7 @@ int capture(SPOUTHANDLE spout, const Options &options) {
   gmtime_s(&utc, &t);
   char timestamp[32] = {};
   std::strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%SZ", &utc);
-  std::cout << "{\"ok\":true,\"senderName\":\"" << json_escape(spout->GetSenderName())
+  std::cout << "{\"ok\":true,\"senderName\":\"" << json_escape(selection.name)
             << "\",\"width\":" << width << ",\"height\":" << height
             << ",\"frame\":" << spout->GetSenderFrame()
             << ",\"capturedAt\":\"" << timestamp << "\",\"outputPath\":\""

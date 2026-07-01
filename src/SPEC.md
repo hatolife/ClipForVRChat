@@ -195,9 +195,9 @@ Stream方式は主経路です。ffmpeg/gdigrabによるデスクトップやVRC
 
 - 画像と同じ場所のsidecar JSON
 - Discord投稿本文
-- PNG iTXtまたはJPEG EXIF APP1の埋め込みメタデータ
+- PNG iTXt/eXIfまたはJPEG EXIF APP1の埋め込みメタデータ
 
-sidecar JSONは撮影画像との紐づけの正本です。履歴JSONは一覧表示と削除操作の索引として扱います。SQLiteなどのローカルDBはv0.1.8では使いません。
+sidecar JSONは撮影画像との紐づけの正本です。埋め込みメタデータの書き込みに失敗した場合も、可能な限りsidecar JSON、Discord投稿、履歴追加は継続し、警告をsidecar JSONと診断ログへ残します。履歴JSONは一覧表示と削除操作の索引として扱います。SQLiteなどのローカルDBはv0.1.8では使いません。
 
 ユーザーIDは出力先ごとに独立した設定で制御します。画像埋め込みメタデータへユーザーIDを入れる設定は初期値OFFです。
 

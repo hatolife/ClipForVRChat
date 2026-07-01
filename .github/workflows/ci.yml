@@ -72,6 +72,9 @@ jobs:
         working-directory: src/frontend
         run: npm run build
 
+      - name: Check Wails API surface
+        run: node scripts/check-wails-api-surface.mjs
+
       - name: Test Go packages
         working-directory: src
         run: go test ./...
@@ -94,6 +97,8 @@ jobs:
             throw "spout-capture.exe was not created"
           }
           & $helper.FullName --help
+          & $helper.FullName --version
+          & $helper.FullName --list-senders
 
       - name: Add Go bin to PATH
         shell: pwsh

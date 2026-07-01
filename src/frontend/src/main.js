@@ -820,7 +820,7 @@ createApp({
       return id
     },
     addAutoCaptureView() {
-      this.autoCaptureSettings.views.push(this.newAutoCaptureView({ calibrated: false, coordinateSpace: 'world' }))
+      this.autoCaptureSettings.views.push(this.newAutoCaptureView({ calibrated: false, coordinateSpace: 'player_local' }))
       this.normalizeAutoCaptureViewOrders()
     },
     duplicateAutoCaptureView(view) {
@@ -887,14 +887,14 @@ createApp({
         this.error = String(err)
       }
     },
-    async addCurrentCameraPoseAsView() {
+    async addCurrentCameraPoseAsView(view) {
       if (!api?.AddCurrentCameraPoseAsView) {
         this.error = '現在Pose追加APIが利用できません。'
         return
       }
       this.error = ''
       try {
-        const updated = await api.AddCurrentCameraPoseAsView()
+        const updated = await api.AddCurrentCameraPoseAsView(view?.id || '')
         this.syncAutoCaptureConfig(updated)
         if (updated?.id) {
           this.autoCaptureSettings.views.push(this.newAutoCaptureView(updated))
@@ -1002,8 +1002,9 @@ createApp({
       this.toast = 'テスト撮影中です'
       try {
         const results = await api.TestAutoCaptureView(view.id)
-        const firstError = (results || []).find((result) => result?.error)?.error
-        this.autoCaptureTestResults[view.id] = firstError ? { ok: false, message: firstError } : { ok: true, message: 'テスト撮影に成功しました' }
+        const entry = this.formatAutoCaptureTestResult(results)
+        this.autoCaptureTestResults = { ...this.autoCaptureTestResults, [view.id]: entry }
+        const firstError = entry.results.find((result) => result?.error)?.error
         if (firstError) {
           this.error = firstError
         }
@@ -1013,8 +1014,41 @@ createApp({
         }, 1800)
       } catch (err) {
         this.error = String(err)
-        this.autoCaptureTestResults[view.id] = { ok: false, message: String(err) }
+        this.autoCaptureTestResults = {
+          ...this.autoCaptureTestResults,
+          [view.id]: { ok: false, message: String(err), results: [], updatedAt: new Date().toLocaleString() }
+        }
         this.toast = ''
+      }
+    },
+    formatAutoCaptureTestResult(results) {
+      const normalized = (results || []).map((result) => ({
+        ...result,
+        sidecarPath: result?.outputPath ? `${result.outputPath}.json` : ''
+      }))
+      const firstError = normalized.find((result) => result?.error)?.error
+      const successCount = normalized.filter((result) => result?.outputPath || result?.url || result?.sourcePath).length
+      let message = 'テスト撮影結果が返りませんでした。'
+      if (firstError) {
+        message = firstError
+      } else if (successCount > 0) {
+        message = `テスト撮影に成功しました。${successCount}件の結果があります。`
+      }
+      return {
+        ok: !firstError && successCount > 0,
+        message,
+        results: normalized,
+        updatedAt: new Date().toLocaleString()
+      }
+    },
+    async revealAutoCaptureResult(result) {
+      const path = result?.outputPath || result?.sourcePath
+      if (!path || !api?.RevealFileInExplorer) return
+      this.error = ''
+      try {
+        await api.RevealFileInExplorer(path)
+      } catch (err) {
+        this.error = String(err)
       }
     },
     async checkSpoutHelper() {
@@ -1492,7 +1526,7 @@ createApp({
                   <div class="view-actions">
                     <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, -1)" :disabled="index === 0">↑</button>
                     <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, 1)" :disabled="index === autoCaptureViews.length - 1">↓</button>
-                    <button type="button" class="secondary" @click="addCurrentCameraPoseAsView">現在Poseから追加</button>
+                    <button type="button" class="secondary" @click="addCurrentCameraPoseAsView(cameraView)">現在Poseから追加</button>
                     <button type="button" class="secondary" @click="saveCurrentCameraPoseToView(cameraView)">現在Poseを保存</button>
                     <button type="button" class="secondary" @click="moveCameraToView(cameraView)">このPoseへカメラ移動</button>
                     <button type="button" class="secondary" @click="testAutoCaptureView(cameraView)">テスト撮影</button>
@@ -1503,6 +1537,21 @@ createApp({
                   <p v-if="autoCaptureTestResults[cameraView.id]" :class="['setting-note', autoCaptureTestResults[cameraView.id].ok ? 'ok' : 'warning']">
                     {{ autoCaptureTestResults[cameraView.id].message }}
                   </p>
+                  <div v-if="autoCaptureTestResults[cameraView.id]" class="auto-capture-test-result">
+                    <small>更新: {{ autoCaptureTestResults[cameraView.id].updatedAt }}</small>
+                    <div v-if="autoCaptureTestResults[cameraView.id].results.length" class="test-result-list">
+                      <div v-for="(result, resultIndex) in autoCaptureTestResults[cameraView.id].results" :key="cameraView.id + '-test-' + resultIndex" class="test-result-item">
+                        <img v-if="result.thumbnail" :src="result.thumbnail" alt="" class="test-result-thumb" />
+                        <dl class="test-result-meta">
+                          <div><dt>保存先</dt><dd>{{ result.outputPath || result.sourcePath || 'なし' }}</dd></div>
+                          <div><dt>sidecar</dt><dd>{{ result.sidecarPath || 'なし' }}</dd></div>
+                          <div><dt>Discord URL</dt><dd>{{ result.url || 'なし' }}</dd></div>
+                          <div v-if="result.error"><dt>エラー</dt><dd>{{ result.error }}</dd></div>
+                        </dl>
+                        <button type="button" class="secondary" @click="revealAutoCaptureResult(result)" :disabled="!(result.outputPath || result.sourcePath)">表示</button>
+                      </div>
+                    </div>
+                  </div>
                 </article>
               </div>
               <p v-else class="empty">構図プリセットがありません。</p>
@@ -1594,6 +1643,12 @@ createApp({
               <div><strong>Stream取得タイムアウト</strong><p>Spout helperが1枚のStream Cameraフレームを保存するまで待つ最大ミリ秒です。</p></div>
               <label>
                 <input type="number" min="1000" max="60000" step="500" v-model.number="autoCaptureSettings.stream.captureTimeoutMs" :disabled="autoCaptureSettings.capture.mode !== 'stream'" />
+              </label>
+            </div>
+            <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
+              <div><strong>Stream起動後待機</strong><p>VRChat Stream CameraをONにしてからSpoutフレーム取得を始めるまで待つミリ秒です。</p></div>
+              <label>
+                <input type="number" min="0" max="10000" step="100" v-model.number="autoCaptureSettings.stream.startDelayMs" :disabled="autoCaptureSettings.capture.mode !== 'stream'" />
               </label>
             </div>
             <div class="setting-row">

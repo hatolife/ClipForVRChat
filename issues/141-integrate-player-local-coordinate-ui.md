@@ -59,3 +59,7 @@
 - `world` viewで現在Pose保存するとworld poseがそのまま保存される。
 - `player_local` viewで現在Pose保存するとローカルoffsetとして保存され、カメラ移動時に元のworld poseへ戻る。
 - 基準Pose未保存で `player_local` 保存/追加は明確に失敗し、設定を壊さない。
+
+## 作業メモ
+
+- 2026-07-01: player_local の初期値と world <-> player_local 逆変換、保存/追加の座標系尊重、resolved world pose の sidecar 反映を実装中。

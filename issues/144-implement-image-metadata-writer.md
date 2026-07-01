@@ -27,6 +27,12 @@ PNG/JPEG画像へ、定義済みschemaのメタデータを壊れない形で書
 
 - 2026-07-01: [#164](164-audit-v018-completed-items.md) の再監査で未達が見つかったため、完了扱いを取り消して `要対応` に戻した。
 
+## 進行中メモ
+
+- 2026-07-01: PNG は `iTXt` だけでなく `eXIf` も書き込み、JPEG は APP1 を idempotent に置換する実装へ寄せる。
+- 2026-07-01: 画像形式判定は拡張子ではなく magic bytes に切り替え、自前 reader `ReadAutoCaptureEmbeddedMetadata(path)` を追加する。
+- 2026-07-01: `finalizeAutoCaptureImage()` 側は metadata 書き込み失敗を画像保存失敗にせず、warning として継続できるようにする。
+
 ## 実装前調査メモ
 
 実装方針:
