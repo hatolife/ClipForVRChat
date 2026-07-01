@@ -7,6 +7,7 @@
 - 設定画面に「自動撮影」タブを追加し、OSC、撮影間隔、撮影方式、出力、Presence、Discord投稿設定をまとめました。
 - VRChat User CameraへOSCで構図を送り、Stream Camera(Spout)方式またはPhoto方式で有効な構図を順番に撮影する自動撮影機能を追加しました。
 - Stream方式では同梱の `spout-capture.exe` がVRChat Stream CameraのSpout senderから1フレームをPNGとして受信し、必要に応じてJPGへ変換して保存します。`spout-capture.exe` は `SpoutLibrary.dll` と同じフォルダで実行される必要があります。
+- `spout-capture.exe` はSpout受信だけを担当するWindows helperです。Spout/DirectX/OpenGL/DLLロードをClipForVRChat本体から隔離するために分離しており、sender列挙、1フレーム受信、指定先へのPNG保存、結果JSON出力だけを行います。ネットワーク送信やWebhook URL/設定ファイルの読み取りは行いません。
 - VRChat output logから同じインスタンスにいるユーザー情報、world ID、instance IDを推定し、撮影画像に対応するsidecar JSONへ保存するようにしました。
 - 自動撮影画像へPNG iTXt/eXIfまたはJPEG EXIF APP1で撮影メタデータを埋め込めるようにしました。ユーザーID埋め込みは設定で独立して制御できます。
 - 自動撮影した画像を既存の結果/履歴画面で扱えるようにし、設定で有効化した場合はDiscord Webhookへ投稿できるようにしました。画像添付なしの本文のみ投稿にも対応しました。

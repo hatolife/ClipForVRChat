@@ -172,6 +172,7 @@
 | 165 | [v0.1.8未完了項目の実装前調査](165-plan-v018-incomplete-implementation.md) | 完了 | `v0.1.8` | 未完了項目を実装可能な粒度に調査し、各issueへ実装方針を追記する。 |
 | 166 | [v0.1.8-rc13作成可能状態まで未完了項目を解消する](166-prepare-v018-rc13-readiness.md) | 要確認 | `v0.1.8` | RC13作成前に未完了issueを実装・検証し、残課題を再チケット化する。 |
 | 167 | [Codex Security findingsを現在HEADで再検証し修正する](167-remediate-codex-security-findings-2026-07-01.md) | 完了 | `v0.1.8` | Codex Security findingsを現在HEADで再検証し、未修正または部分修正の問題だけを安全に修正する。 |
+| 169 | [Spout同梱バイナリの必要性と安全性説明を追加する](169-document-spout-binary-necessity-and-safety.md) | 完了 | `v0.1.8` | `spout-capture.exe` と `SpoutLibrary.dll` の必要性、安全性の根拠、利用者の確認観点をREADME/SPEC/Release Notesへ追記する。 |
 
 ## 状態の意味
 
