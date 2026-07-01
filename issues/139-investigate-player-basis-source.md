@@ -177,3 +177,116 @@ ClipForVRChatへの応用可能性:
 ただし、標準OSCだけで誰でも自動追従できる機能ではなく、アバター改変を前提にした拡張機能として扱うのが妥当。
 
 次に進めるなら、YL-ATG方式を参考に最小ギミックを作り、ClipForVRChatが `head position + forward vector` を受け取って `player_local` basisを自動更新できるかを実機検証する。
+
+## 2026-07-02 追加調査: 類似プロジェクトと取得手段
+
+YL-ATGと似た仕組みの他プロジェクト、およびVRChatのプレイヤー位置座標を取得する手段を調査する。
+
+### 類似/周辺プロジェクト
+
+#### YL-ATG
+
+- URL: https://github.com/YozoraKurage/YL-ATG
+- 種別: VRChat内のアバター上オブジェクト座標をOSC Avatar Parameters経由で外部へ出す。
+- 方式: Avatar Dynamics Contact Sender/Receiver + Constraintで座標をFloat parameterへエンコードし、`/avatar/parameters/ATG/*` として送信する。
+- ClipForVRChatへの関連度: 高い。専用アバターギミック前提なら、head/avatar基準の自動basis取得に応用できる可能性がある。
+
+#### VRCPrismStudio
+
+- YL-ATG READMEで主な併用先として言及されている。
+- 調査時点では公開リポジトリや詳細実装を確認できなかった。
+- ClipForVRChatへの関連度: 中。YL-ATGの受け側/撮影側ワークフローの参考になり得るが、実装根拠としてはYL-ATG本体を見る方が確実。
+
+#### VRCThumbParamsOSC
+
+- URL: https://github.com/I5UCC/VRCThumbParamsOSC
+- 種別: SteamVR controller action、Tracker button action、XInput actionをAvatar Parametersへ送るOSCツール。
+- 方式: pyopenvr等で外部デバイス状態を読み、VRChat OSC serverへparameterとして入力する。
+- 座標取得: trackerの存在/ボタン等は扱うが、VRChat内のplayer world positionを取得して外へ出すものではない。
+- ClipForVRChatへの関連度: 低から中。OpenVR/SteamVRを読む外部アプリ設計やOSC parameter送信設定の参考にはなるが、VRChat world座標取得の直接解ではない。
+
+#### VRCFaceTracking
+
+- URL: https://github.com/benaclejames/VRCFaceTracking
+- 種別: eye/lip/face tracking hardwareとVRChat OSC serverのbridge。
+- 方式: 外部tracking hardwareの値をAvatar Parametersへ送る。
+- 座標取得: 顔/目/口の表情入力であり、VRChat world position取得ではない。
+- ClipForVRChatへの関連度: 低。外部データをOSCでAvatar Parametersへ流す成熟例として参考になる。
+
+#### ContactGloveOSC
+
+- URL: https://github.com/Diver-X/ContactGloveOSC
+- 種別: ContactGloveのhand trackingをVRChat OSC APIで使うAvatar Gimmick + 自動セットアップツール。
+- 方式: 外部グローブ情報をVRChatへ入力し、専用アバターギミックで扱う。
+- 座標取得: VRChat内player world positionを外へ出すものではない。
+- ClipForVRChatへの関連度: 低から中。専用アバターギミックと外部OSCアプリをセットで配る設計の参考にはなる。
+
+#### OSC-Syncer
+
+- URL: https://github.com/itsrivervrc/OSC-Syncer
+- 種別: README上は別VRChatアカウント追従/ダンス同期を謳う個人プロジェクト。
+- 方式: 公開内容は説明文中心で、位置取得の実装根拠は確認できない。
+- ClipForVRChatへの関連度: 低。コンセプト例としては近いが、採用判断の根拠にはしない。
+
+### 取得手段の整理
+
+#### A. VRChat標準OSC readback
+
+- `/usercamera/Pose` はUser Camera poseでありplayer rootではない。
+- `/tracking/trackers/...` は外部tracker poseをVRChatへ入れる用途で、VRChatから現在位置を読む用途ではない。
+- Avatar Parametersは標準built-inにworld position/yawがない。
+
+評価: 汎用のplayer position取得手段としては不可。
+
+#### B. Avatar Dynamics Contact/Constraintエンコード
+
+- YL-ATG方式。
+- アバター上にContact Sender/ReceiverとConstraintを組み、対象transformのworld座標をcontact値としてFloat parameterへ変換し、OSC Avatar Parametersで外部へ送る。
+- スクリプトなしアバターギミックとして成立している点が重要。
+
+評価: 専用アバター改変を許容するなら最有力。ClipForVRChatでは「avatar/head basis OSC bridge」として別機能化するのが妥当。
+
+#### C. Udon/専用ワールド
+
+- Udonなら `VRCPlayerApi.GetPosition()` / `GetRotation()` / `GetTrackingData()` を取得できる。
+- ただし任意ワールドでは使えず、外部アプリへOSC送信する経路も別途設計が必要。
+
+評価: 専用ワールド/撮影スタジオ用途なら候補。一般利用の標準機能には不向き。
+
+#### D. 外部VRランタイム
+
+- OpenVR/SteamVR/OpenXRからHMD/tracker poseを取る。
+- VRCThumbParamsOSCのように外部VR runtimeを読むOSCツールは存在する。
+- ただし取得できるのはVR runtime tracking spaceであり、VRChat world座標とは原点/Yawが一致しない。Desktop/Quest単体にも弱い。
+
+評価: VR専用の高度機能なら候補。必ずキャリブレーションが必要。
+
+#### E. 外部ハードウェアbridge
+
+- VRCFaceTrackingやContactGloveOSCのように、外部hardware stateをOSCでVRChatへ送る方式。
+- プレイヤー位置取得ではなく、外部入力をavatar parameterへ反映する用途。
+
+評価: ClipForVRChatのplayer_local自動追従には直接使えないが、専用OSCアプリ+専用アバターギミックの配布設計は参考になる。
+
+#### F. User Camera LookAtMe/Poseからの推定
+
+- User CameraのLookAtMe挙動とPose readbackからプレイヤー方向を推定する案。
+- rootではなく注視点推定になり、安定性や副作用が不明。
+
+評価: 実験候補。標準仕様として扱うには弱い。
+
+#### G. クライアント改造/メモリ読み/非公式API
+
+- 技術的には位置情報へ到達できる可能性はあるが、VRChat ToSや安全性、配布リスクの問題が大きい。
+
+評価: ClipForVRChatでは採用しない。
+
+### 判断
+
+公開例として最もClipForVRChatに近いのはYL-ATG。
+他の多くのOSCプロジェクトは「外部デバイスからVRChatへ入力」するもので、「VRChat内のworld座標を外部アプリへ出す」ものではない。
+
+ClipForVRChatで現実的に進めるなら、次の2段階がよい。
+
+1. v0.1.8短期: 初期構図を `world` に戻すか、`player_local` を手動基準として明確化する。
+2. v0.1.9以降: YL-ATG方式の最小avatar prefabを別配布し、`head position + forward vector` をOSCで受ける実験機能を作る。
