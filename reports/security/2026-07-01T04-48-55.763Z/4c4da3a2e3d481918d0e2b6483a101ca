@@ -1,0 +1,304 @@
+Release build trusts cached Wails executable
+Link: https://chatgpt.com/codex/cloud/security/findings/4c4da3a2e3d481918d0e2b6483a101ca?sev=critical%2Chigh
+Criticality: high (attack path: high)
+Status: new
+
+# Metadata
+Repo: hatolife/ClipForVRChat
+Commit: 22ca489
+Author: poppo@hato.life
+Created: 2026/6/29 13:04:53
+Assignee: Unassigned
+Signals: Security, Validated, Patch generated, Attack-path
+
+# Summary
+Introduced: the commit adds an executable Actions cache for Wails and uses the cached executable in the release build path. Before this change, the release workflow always installed the pinned Wails CLI version with `go install` before building.
+The release workflow now places ~/go/bin on PATH, restores ~/go/bin/wails.exe from GitHub Actions cache, and skips `go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}` whenever the cache key hits. The cached binary is then executed for `wails version` and later used to build the release executable. The cache key only includes runner OS, Go version, and Wails version; it does not authenticate the cached executable or compare it with a known digest. `wails version` is not an integrity check because a malicious binary can print the expected version. If an attacker can populate or poison the cache in a scope visible to the release workflow, the release job will execute attacker-controlled code and can produce a backdoored Windows executable that is subsequently packaged and signed. Release workflows should avoid trusting cached executables, or should reinstall/rebuild the CLI in the release job and verify an expected cryptographic digest before execution.
+
+# Validation
+## Rubric
+- [x] The commit must add/modify an Actions cache for the executable Wails CLI in the release path.
+- [x] The cache restore path/key must cover `~/go/bin/wails.exe` and allow a cache hit to skip the pinned `go install`.
+- [x] The cached executable must be placed on PATH and executed before any cryptographic integrity check.
+- [x] The same cached executable must be used later for release build/package/signing steps.
+- [x] A local PoC should demonstrate that attacker-controlled `wails.exe` can satisfy `wails version` and run in the build path when a cache hit is simulated.
+## Report
+Validated the finding as a CI/workflow supply-chain issue rather than a memory-safety crash. Crash/valgrind/debugger-style validation is not directly applicable to a GitHub Actions YAML bug; valgrind/gdb/pwsh were not installed, and I ran the PoC under lldb as a bounded debugger attempt, which confirmed execution of the malicious cached tool with exit status 0.
+
+Evidence from the checked-out commit:
+- .github/workflows/release.yml:60-69 adds $HOME/go/bin to PATH and restores an executable cache at ~/go/bin/wails.exe using key `${{ runner.os }}-go-${{ env.GO_VERSION }}-wails-${{ env.WAILS_VERSION }}`.
+- .github/workflows/release.yml:71-73 skips `go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}` whenever `steps.cache-wails.outputs.cache-hit == 'true'`.
+- .github/workflows/release.yml:75-76 runs `wails version`; this executes the PATH-resolved cached executable but does not verify a digest/signature.
+- .github/workflows/release.yml:102-105 later runs `wails build ...`, so the same cached executable controls release build output.
+- .github/workflows/release.yml:123-140 signs `dist/ClipForVRChat/ClipForVRChat.exe` after the build, so a compromised build output would be signed.
+- Parent commit evidence: `git show HEAD^:.github/workflows/release.yml` showed the prior release workflow unconditionally ran `go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0` with no executable cache in this path.
+- .github/workflows/ci.yml:82-98 contains the same executable cache pattern for CI.
+
+Local PoC evidence: I created an attacker-controlled `wails.exe` that prints `Wails CLI v2.12.0` for `version` and writes a fake/backdoored `build/bin/ClipForVRChat.exe` for `build`. The reproduction script simulates a cache hit, prepends `$HOME/go/bin` to PATH, skips installation, then runs the same `wails version` and `wails build` sequence. Output included:
+`Wails CLI v2.12.0`
+`cached wails.exe invoked with args: version`
+`cached wails.exe invoked with args: build -ldflags ...`
+`BACKDOORED artifact created by cached wails.exe`
+
+This demonstrates the core vulnerability: if a malicious `~/go/bin/wails.exe` is present in an Actions cache scope visible to release, the workflow will execute it, accept its spoofed version output, and use it to produce the release executable. The container cannot reproduce GitHub's cache service scope/poisoning mechanics, so exploitation still depends on an attacker being able to populate or poison the relevant Actions cache, but the workflow trust boundary flaw is present and introduced by this commit.
+
+# Evidence
+github/workflows/ci.yml (L86 to 95)
+  Note: The CI workflow uses the same executable cache pattern and key structure, creating a shared unverified cached build tool rather than rebuilding the pinned Wails CLI every time.
+
+github/workflows/release.yml (L102 to 105)
+  Note: The potentially cached Wails executable is used to build the release application, so a poisoned cache can alter the produced release binary.
+
+github/workflows/release.yml (L60 to 73)
+  Note: The release job adds the cached Go bin directory to PATH, restores ~/go/bin/wails.exe from Actions cache, and skips the pinned go install when the cache hits.
+
+github/workflows/release.yml (L75 to 76)
+  Note: `wails version` executes the cached binary but does not verify its authenticity or integrity.
+
+Proposed patch:
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 9569dbdd82fa891abe1a179b6f9587ae8e08a975..1a5acb0efbab66fa812f5ecb0cc7222848a2d845 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -61,56 +61,48 @@ jobs:
+ 
+       - name: Install frontend dependencies
+         working-directory: src/frontend
+         run: npm ci
+ 
+       - name: Audit frontend dependencies
+         working-directory: src/frontend
+         run: npm audit --omit=dev
+ 
+       - name: Build frontend
+         working-directory: src/frontend
+         run: npm run build
+ 
+       - name: Test Go packages
+         working-directory: src
+         run: go test ./...
+ 
+       - name: Check Go vulnerabilities
+         working-directory: src
+         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+ 
+       - name: Add Go bin to PATH
+         shell: pwsh
+         run: '"$HOME/go/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append'
+ 
+-      - name: Cache Wails CLI
+-        id: cache-wails
+-        uses: actions/cache@v6
+-        with:
+-          path: ~/go/bin/wails.exe
+-          key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-wails-${{ env.WAILS_VERSION }}
+-
+       - name: Install Wails
+-        if: steps.cache-wails.outputs.cache-hit != 'true'
+         run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+ 
+       - name: Check Wails
+         run: wails version
+ 
+       - name: Build application
+         working-directory: src
+         shell: pwsh
+         run: |
+           $shortSha = "${{ github.sha }}".Substring(0, 7)
+           $releaseTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+           node ../scripts/write-wails-info.mjs "ci" wails.json
+           node ../scripts/write-wails-windows-info.mjs "ci" $shortSha build/windows/info.json
+           wails build -ldflags "-X main.version=ci -X main.revision=$shortSha -X main.releaseTime=$releaseTime -X main.buildChannel=ci"
+ 
+       - name: Check executable
+         working-directory: src
+         shell: pwsh
+         run: |
+           if (!(Test-Path "build/bin/ClipForVRChat.exe")) {
+             throw "build/bin/ClipForVRChat.exe was not created"
+           }
+
+
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index cf2a56ced1827fdfa9ad0f4550fdfd01ced4d522..95b04f19a66a0c12225389e1b5bb573ad16e76c5 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -41,59 +41,51 @@ jobs:
+ 
+       - name: Install frontend dependencies
+         working-directory: src/frontend
+         run: npm ci
+ 
+       - name: Audit frontend dependencies
+         working-directory: src/frontend
+         run: npm audit --omit=dev
+ 
+       - name: Build frontend
+         working-directory: src/frontend
+         run: npm run build
+ 
+       - name: Test Go packages
+         working-directory: src
+         run: go test ./...
+ 
+       - name: Check Go vulnerabilities
+         working-directory: src
+         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+ 
+       - name: Add Go bin to PATH
+         shell: pwsh
+         run: '"$HOME/go/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append'
+ 
+-      - name: Cache Wails CLI
+-        id: cache-wails
+-        uses: actions/cache@v6
+-        with:
+-          path: ~/go/bin/wails.exe
+-          key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-wails-${{ env.WAILS_VERSION }}
+-
+       - name: Install Wails
+-        if: steps.cache-wails.outputs.cache-hit != 'true'
+         run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+ 
+       - name: Check Wails
+         run: wails version
+ 
+       - name: Prepare version
+         id: version
+         shell: pwsh
+         run: |
+           $tagName = "${{ github.ref_name }}"
+           $shortSha = "${{ github.sha }}".Substring(0, 7)
+           $releaseTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+           $isStable = $tagName -match '^v\d+\.\d+\.\d+$'
+           $isReleaseCandidate = $tagName -match '^v\d+\.\d+\.\d+-rc\d+$'
+           $draft = if ($isStable -or $isReleaseCandidate) { "false" } else { "true" }
+           $prerelease = if ($isReleaseCandidate) { "true" } else { "false" }
+           "app_version=$tagName.$shortSha" >> $env:GITHUB_OUTPUT
+           "version=$tagName" >> $env:GITHUB_OUTPUT
+           "revision=$shortSha" >> $env:GITHUB_OUTPUT
+           "release_time=$releaseTime" >> $env:GITHUB_OUTPUT
+           "draft=$draft" >> $env:GITHUB_OUTPUT
+           "prerelease=$prerelease" >> $env:GITHUB_OUTPUT
+ 
+       - name: Prepare Windows version info
+         shell: pwsh
+
+
+diff --git a/issues/109-avoid-cached-wails-executable.md b/issues/109-avoid-cached-wails-executable.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..58abc7bfce8cbc9b0c37b69710e03237063b20f8
+--- /dev/null
++++ b/issues/109-avoid-cached-wails-executable.md
+@@ -0,0 +1,16 @@
++# 109. Wails CLIの実行ファイルキャッシュを信頼しない
++
++## 問題
++
++Release/CI workflowで `~/go/bin/wails.exe` をGitHub Actions cacheから復元し、cache hit時に `go install` を省略している。キャッシュされた実行ファイルの真正性や完全性を検証していないため、キャッシュ汚染時にReleaseビルドで攻撃者制御のWails CLIを実行する可能性がある。
++
++## 期待する挙動
++
++Release/CI workflowでは、キャッシュされたWails実行ファイルを信頼せず、指定したWailsバージョンをジョブ内でインストールしてから実行する。
++
++## 受け入れ条件
++
++- `.github/workflows/release.yml` が `~/go/bin/wails.exe` のActions cacheを復元・実行しない。
++- `.github/workflows/ci.yml` が `~/go/bin/wails.exe` のActions cacheを復元・実行しない。
++- Wails CLIは既存の `WAILS_VERSION` に基づいて `go install` される。
++- 既存のビルド、テスト、Release手順の挙動を維持する。
+
+
+diff --git a/issues/README.md b/issues/README.md
+index a24fd4937fbd683e554a23dd90aaf4d608ca278b..2cfe3e472ae69a580b498e72095f3c3628934b35 100644
+--- a/issues/README.md
++++ b/issues/README.md
+@@ -91,34 +91,35 @@
+ | 084 | [Explorerで生成ファイルを選択表示できない](084-fix-explorer-file-selection.md) | 完了 | `v0.1.7` | `explorer.exe /select,` ではなく Windows Shell API でファイル選択表示する。 |
+ | 085 | [診断データ復号後のzipが破損する](085-encrypt-diagnostic-package-as-binary.md) | 完了 | `v0.1.7` | 診断データをOpenPGP binary literal dataとして暗号化し、復号後zipの破損を防ぐ。 |
+ | 086 | [診断zip内のログとoutput構成を整理する](086-normalize-diagnostic-zip-layout-and-output-log.md) | 完了 | `v0.1.7` | zip内ログを `logs/` に統一し、output画像は含めず一覧を診断ログへ記録する。 |
+ | 087 | [zipファイル引数を公開鍵で暗号化する](087-encrypt-zip-from-cli-argument.md) | 完了 | `v0.1.7` | zip単体引数でUIを起動せず、同じ公開鍵で `<zip>.gpg` を生成する。 |
+ | 088 | [診断ログ実フォルダ名をlogsへ統一する](088-use-logs-directory-for-diagnostic-logs.md) | 完了 | `v0.1.7` | アプリ実フォルダの診断ログ出力先も `logs/YYYY-MM-DD.log` に統一する。 |
+ | 089 | [不具合報告用データの説明を情報画面に追加する](089-explain-diagnostic-data-in-about.md) | 完了 | `v0.1.7` | 情報画面に含まれる情報、暗号化方法、利用目的の説明を追加する。 |
+ | 090 | [不具合報告用データを段階作成しパスを置換する](090-stage-and-sanitize-diagnostic-data.md) | 完了 | `v0.1.7` | `diagnostics/<timestamp>/` に確認用zipと暗号化zipを作成し、テキスト内パスを環境変数表記へ置換する。 |
+ | 091 | [セキュリティ監査報告書を作成する](091-security-audit-2026-06-25.md) | 完了 | `8e46ffd` | `reports/2026-06-25/security-audit-prompt.md` に基づき、現行リポジトリのセキュリティ監査報告書を作成した。 |
+ | 092 | [監査報告書の配置と説明を整理する](092-organize-reports-and-clarify-security-notes.md) | 完了 | `v0.1.7` | 監査報告書を日付ディレクトリへ移動し、診断zip、Release workflow、Windows ACLの説明を補足する。 |
+ | 093 | [人間が確認する必要がある作業を手順化する](093-human-verification-guide.md) | 完了 | `v0.1.7` | 監査後に人間が確認する作業、現時点の確認結果、判断基準をMarkdown化する。 |
+ | 094 | [設定画面の初期タブと初期値を調整する](094-settings-initial-tab-and-defaults.md) | 完了 | `v0.1.7` | 初回起動時の設定タブ選択とDiscord投稿/投稿URL自動コピーの初期値を調整する。 |
+ | 095 | [設定画面のDiscord投稿分類を整理する](095-settings-discord-post-tab-reclassification.md) | 完了 | `v0.1.7` | WebhookタブをDiscord投稿へ変更し、Discord投稿関連設定をまとめる。 |
+ | 096 | [develop版バージョンに親コミットIDを含める](096-develop-version-include-parent-commit.md) | 完了 | `v0.1.7` | develop版バージョン表記に親コミットIDを含めて追跡しやすくする。 |
+ | 097 | [govulncheckのGO-2026-4550を解消する](097-fix-circl-govulncheck-finding.md) | 完了 | `v0.1.7` | `cloudflare/circl` の既知脆弱性を解消し、govulncheckを成功させる。 |
+ | 098 | [診断データからWebhook URLとDiscord tokenを除外する](098-redact-diagnostic-secrets.md) | 完了 | `v0.1.7` | 確認用zipと暗号化zipからWebhook URLとDiscord tokenの生値を除外する。 |
+ | 099 | [Release workflowの権限を最小化する](099-harden-release-workflow-permissions.md) | 完了 | `v0.1.7` | Release作成権限を必要なjobへ限定する。 |
+ | 100 | [OpenURLで開けるURLを許可ホストに制限する](100-restrict-open-url-hosts.md) | 完了 | `v0.1.7` | アプリから開ける外部URLを信頼済みHTTPSホストへ限定する。 |
+ | 101 | [履歴のローカル削除対象を管理output配下に制限する](101-restrict-history-local-delete-to-output.md) | 完了 | `v0.1.7` | 履歴改ざん時にoutput外ファイルを削除できないようにする。 |
+ | 102 | [診断ログのローカルパスと秘密情報を抑制する](102-redact-diagnostic-log-paths.md) | 完了 | `v0.1.7` | 診断ログ出力時点でパスと秘密情報を可能な範囲で抑制する。 |
+ | 103 | [Windows実機でACLを確認する](103-check-windows-acl.md) | 要確認 | 未定 | Windows実機でconfig/history/logs/diagnosticsのACLを確認する。 |
+ | 104 | [ReleaseにSBOMまたはビルドメタデータを追加する](104-add-release-sbom-or-build-metadata.md) | 完了 | `v0.1.7` | Release成果物に依存関係やビルド環境の追跡情報を追加する。 |
+ | 105 | [Windows GoテストでWailsイベント送信ガードが効かない](105-fix-windows-test-wails-event-guard.md) | 完了 | `v0.1.7` | Windowsの `.test.exe` テストバイナリでもWailsイベント送信を抑制する。 |
+ | 106 | [Release NotesのダウンロードURLをMarkdownリンクにする](106-release-notes-download-links.md) | 完了 | `v0.1.7` | Release本文のダウンロード欄でファイル名をリンクテキストとして表示する。 |
+ | 107 | [Git Flow運用をAGENTS.mdへ明文化する](107-update-git-flow-agents.md) | 完了 | `v0.1.7` | `develop` 基準の通常開発と `master` 基準のリリースブランチ運用を明文化する。 |
+ | 108 | [Discord投稿ONで通常投稿用Webhook URLが空欄の場合に保存時警告を出す](108-warn-empty-discord-webhook-on-save.md) | 完了 | `v0.1.7` | Discord投稿ONで通常投稿用Webhook URLが空欄の場合、保存後も画面上部に警告を表示する。 |
++| 109 | [Wails CLIの実行ファイルキャッシュを信頼しない](109-avoid-cached-wails-executable.md) | 完了 | 未定 | Release/CI workflowでキャッシュされたWails実行ファイルを信頼せず、毎回指定バージョンをインストールする。 |
+ 
+ ## 状態の意味
+ 
+ | 状態 | 意味 |
+ | --- | --- |
+ | 完了 | 実装、テスト、またはドキュメント作成が完了している。 |
+ | 要対応 | 問題を整理済みで、実装またはドキュメント更新が必要。 |
+ | 要確認 | 修正は入っているが、対象環境や実機での再現確認が必要。 |
+ | 一部将来対応あり | 主要な受け入れ条件は満たしているが、明示的に将来対応へ回した項目が残っている。 |
+
+
+diff --git a/todo.md b/todo.md
+index b3232f7de3b57a3cefabadb6c643f3d273df53a6..39c78f8d6d1c9be0be360ae730f61a3a2eb16c65 100644
+--- a/todo.md
++++ b/todo.md
+@@ -1,3 +1 @@
+ # Current Todo
+-
+-- [ ] Windows実機で診断データ関連ファイルのACLを確認する
+
+# Attack-path analysis
+Final: high | Decider: model_decided | Matrix severity: high | Policy adjusted: high
+## Rationale
+Severity remains high but not critical. The impact is high because the release workflow can execute an unauthenticated cached build tool and then sign and publish the resulting Windows executable, enabling official supply-chain compromise. However, the probability is constrained by major preconditions: an attacker must first populate or poison an Actions cache visible to the release workflow, and live GitHub cache-scope exploitability was not proven from the repository alone. This makes the issue less urgent than a public, unauthenticated, trivially reachable release-signing compromise, but still a credible high-severity CI/CD vulnerability.
+## Likelihood
+high - The vulnerable execution path is clear once a malicious cache is restored, but the hardest prerequisite is the ability to create or poison a cache visible to the release workflow. External unauthenticated attackers generally should not have that capability under normal GitHub cache scoping, so exploitation likely requires repository write access, compromised CI/maintainer credentials, or another cache-scope weakness. | Remote network vector
+## Impact
+high - Successful exploitation gives attacker-controlled code execution in the release build process and can alter the Windows executable that is subsequently signed and published as an official release. This is a serious supply-chain integrity compromise for users of the desktop application.
+## Assumptions
+- The attacker does not have arbitrary code execution on the GitHub runner by default; exploitation requires the separate ability to create or poison a GitHub Actions cache entry visible to the release workflow.
+- GitHub Actions cache scoping and branch/tag visibility rules are enforced by GitHub and could make external fork-PR poisoning impractical; this analysis does not call GitHub APIs and cannot validate live cache scopes.
+- Users may trust and install official GitHub release artifacts for this desktop application.
+- Ability to populate or poison the Actions cache key used by the release workflow: runner OS, Go version, and Wails version
+- A release workflow run by tag push or workflow_dispatch that restores that cache as a hit
+- The restored executable must be named ~/go/bin/wails.exe and be found on PATH
+- Release artifacts are downloaded or trusted by users
+## Path
+Attacker cache -> restore ~/go/bin/wails.exe -> skip go install -> wails version/build -> backdoored exe -> GPG signature/package/SHA256 -> GitHub release -> users
+## Path evidence
+- `.github/workflows/release.yml:3-10` - Release workflow runs on version tags and manual dispatch and has contents: write permission for release publishing.
+- `.github/workflows/release.yml:60-69` - The release job adds ~/go/bin to PATH and restores ~/go/bin/wails.exe from an Actions cache keyed only by runner OS, Go version, and Wails version.
+- `.github/workflows/release.yml:71-76` - The pinned Wails installation is skipped on a cache hit and the PATH-resolved `wails version` command is executed without a cryptographic integrity check.
+- `.github/workflows/release.yml:102-105` - The same PATH-resolved Wails executable is used to build the release application.
+- `.github/workflows/release.yml:123-143` - The built executable is signed after the build, so compromised build output would receive the release signature.
+- `.github/workflows/release.yml:145-151` - The signed output is packaged and a SHA256 hash is computed over the resulting zip, which does not establish that the build tool was trustworthy.
+- `.github/workflows/release.yml:194-203` - The workflow publishes the zip, SHA256 file, and detached executable signature as GitHub release artifacts.
+- `.github/workflows/ci.yml:82-98` - The CI workflow uses the same executable cache pattern, indicating the repository now treats a cached Wails binary as a reusable build input.
+## Narrative
+The finding is a real CI/CD supply-chain vulnerability in the release path. The release workflow restores an executable `~/go/bin/wails.exe` from `actions/cache`, adds that directory to PATH, skips the pinned `go install` when the cache hits, then executes `wails version` and later `wails build`. There is no digest or signature verification of the restored executable; `wails version` is only behavior-based and can be spoofed. The generated executable is then copied into the release directory, signed with the release GPG key, packaged, hashed, and uploaded to a GitHub release. This can materially compromise release integrity if an attacker can populate or poison a cache visible to the release job. The impact remains high because it can ship a signed malicious Windows executable to users, but likelihood is low because the critical precondition is non-trivial and likely requires repository-level cache-writing capability, a compromised maintainer/CI path, or a GitHub cache-scope weakness rather than unauthenticated internet access.
+## Controls
+- Release workflow is limited to tag pushes matching v* and workflow_dispatch rather than public HTTP traffic.
+- GitHub Actions cache scoping limits which workflow runs can restore or save caches, reducing but not eliminating cache-poisoning feasibility.
+- The Wails version is pinned for cache misses.
+- Go tests, npm audit, and govulncheck run before the release build.
+- Release signing secrets are scoped to the Sign executable step, not directly to the Wails build step.
+- The workflow validates the presence and shape of release assets before publishing.
+## Blindspots
+- Static repository review cannot verify live GitHub Actions cache visibility across branches, tags, forks, or prior workflow runs.
+- No cloud or GitHub APIs were called, so existing cache contents and repository settings such as branch protections, environment protections, and Actions permissions were not inspected.
+- The analysis cannot determine whether untrusted external contributors can save a cache that the release tag workflow can restore in this specific repository.
+- The exact behavior of `actions/cache@v6` and GitHub-hosted runner cache isolation is assumed from workflow semantics rather than tested against GitHub infrastructure.
+

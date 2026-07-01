@@ -1,0 +1,286 @@
+PGP verification trusts a release-bundled public key
+Link: https://chatgpt.com/codex/cloud/security/findings/59f9a5b30a288191a71a017014713bc5?sev=critical%2Chigh
+Criticality: high (attack path: high)
+Status: new
+
+# Metadata
+Repo: hatolife/ClipForVRChat
+Commit: 749bd2e
+Author: poppo@hato.life
+Created: 2026/6/29 13:21:12
+Assignee: Unassigned
+Signals: Security, Validated, Patch generated, Attack-path
+
+# Summary
+Introduced a release-integrity verification flaw in the new PGP signing guidance and release asset publication. The signing operation itself creates a valid detached signature, but the public key distribution and user instructions make the verification susceptible to key substitution.
+The new release workflow exports `ClipForVRChat-release-signing-public-key.asc` as another release asset, and both README/UI guidance instruct users to import that key from the same release before verifying `ClipForVRChat.exe.asc`. The UI further states that seeing `Good signature` means the executable is confirmed as official. This lacks a trust anchor: users are not given an out-of-band fingerprint, embedded/pinned public key, or other independent way to confirm that the imported key is the project's real release key. Therefore, compromise of the release assets, a malicious mirror, or any substituted download bundle can bypass the intended signature check by replacing the exe, asc, and public key together.
+
+# Validation
+## Rubric
+- [x] Confirm the commit publishes the detached signature and public key as release assets alongside the executable/zip.
+- [x] Confirm README/UI instructions tell users to import the public key from the same release before verification.
+- [x] Confirm there is no independent trust anchor such as a pinned fingerprint or embedded public key in user-facing guidance.
+- [x] Demonstrate that a substituted executable, signature, and public key produce GPG exit code 0 and `Good signature` in a clean verifier keyring.
+- [x] Check whether the guidance overstates `Good signature` as proof of official origin despite GPG reporting the imported key as uncertified/unknown.
+## Report
+Validated the suspected release-integrity flaw. The commit adds a signing step in `.github/workflows/release.yml:85-107` that creates `ClipForVRChat.exe.asc`, verifies it locally, then exports the signing public key to `dist/ClipForVRChat-release-signing-public-key.asc`. The release publication block at `.github/workflows/release.yml:109-116` publishes the zip, `.sha256`, `.asc`, and exported public key together as mutable release assets. User guidance then tells users to import that public key from the same release: `README.md:29-31` says to download `ClipForVRChat.exe.asc` and import `ClipForVRChat-release-signing-public-key.asc` from the same release before verifying. The in-app guidance at `src/frontend/src/main.js:671-674` similarly instructs users to use the same-release `.asc` and same-release public key, run `gpg --verify`, and treats `Good signature` as confirmation that the exe is official. A targeted grep for fingerprint/key anchors found no user-facing pinned fingerprint or embedded public key in README/UI; the only fingerprint-related user-facing line is `issues/038-about-official-distribution-and-pgp.md:20`, which explicitly says not to show the release-signing public-key fingerprint in the information screen. I reproduced the trust-substitution problem with a minimal GPG PoC: generated an attacker key, created a fake `ClipForVRChat.exe`, signed it, exported the attacker's public key under the expected release asset name, imported that same-release key into a fresh verifier keyring, and ran the documented verification command. GPG exited 0 and printed `Good signature from "ClipForVRChat Release Signing Key (attacker-supplied) <attacker@example.invalid>" [unknown]`, proving that if exe/signature/key are substituted together, the documented `Good signature` check succeeds without any independent trust anchor. Crash/valgrind/debugger attempts were considered because the repo contains Go code, but this vulnerability is a release process/documentation integrity flaw rather than a memory-safety flaw. A crash-oriented execution of the PoC returned exit 0 as expected; `valgrind` was unavailable; running the same GPG verification under `lldb` showed the process printed `Good signature` and exited status 0.
+
+# Evidence
+github/workflows/release.yml (L104 to 116)
+  Note: The workflow verifies the signature locally, then exports the public key and publishes it as a mutable release asset alongside the zip and signature.
+
+issues/038-about-official-distribution-and-pgp.md (L18 to 20)
+  Note: The acceptance criteria explicitly avoid showing the release signing fingerprint in the information screen, removing an important out-of-band trust anchor.
+```
+- PGPが分からない場合は公式配布場所から直接ダウンロードするよう案内する。
+- PGP確認手順はzipではなく `ClipForVRChat.exe` と `ClipForVRChat.exe.asc` を対象にする。
+- 情報画面上にはRelease署名用公開鍵のfingerprintを表示しない。
+```
+
+README.md (L29 to 31)
+  Note: The README instructs users to import the public key from the same release, providing no independent fingerprint or pinned key to authenticate it.
+```
+同じリリースには、zip本体とは別に `.sha256` と `ClipForVRChat.exe.asc` も添付されています。`.sha256` はzipのファイル破損確認用、`ClipForVRChat.exe.asc` はexeのPGP署名検証用です。通常はzipだけダウンロードすれば使用できます。
+
+PGP署名を確認する場合は、zipを展開して `ClipForVRChat.exe` を取り出し、GitHub Releasesから同じリリースの `ClipForVRChat.exe.asc` を同じフォルダに保存してください。そのうえで、同じリリースの `ClipForVRChat-release-signing-public-key.asc` を取り込んでから、exeと `.asc` を検証してください。
+```
+
+src/frontend/src/main.js (L663 to 674)
+  Note: The in-app guidance tells users to import the key from the same release and treats `Good signature` as proof of an official executable, which is unsafe if the key can be substituted.
+```
+        <section class="about-note">
+          <h3>PGPで改竄確認できます</h3>
+          <p>
+            GitHub Releasesでは、zipとは別に <code>ClipForVRChat.exe.asc</code> 署名ファイルも配布しています。PGP/GPGを使うと、展開した <code>ClipForVRChat.exe</code> が公式の配布用鍵で署名され、途中で書き換えられていないことを確認できます。
+          </p>
+          <ol>
+            <li><button class="link-button inline" @click="openURL(releasesUrl)">GitHub Releases</button> で使いたいバージョンを開きます。</li>
+            <li>zipを展開し、確認したい <code>ClipForVRChat.exe</code> を用意します。</li>
+            <li>同じReleaseにある <code>ClipForVRChat.exe.asc</code> を、exeと同じフォルダに保存します。</li>
+            <li>公式の公開鍵を取り込みます。公開鍵は同じReleaseにある公開鍵ファイル、またはREADMEに記載されているものを使用してください。</li>
+            <li>コマンドプロンプトやPowerShellで <code>gpg --verify ClipForVRChat.exe.asc ClipForVRChat.exe</code> を実行します。</li>
+            <li><code>Good signature</code> と表示されれば、公式配布のexeとして確認できています。</li>
+```
+
+Proposed patch:
+diff --git a/README.md b/README.md
+index 8c5b6ad7bfa2ffd8462bd281375a04d22e70fe2f..d5e7ca72caa46ba5808d69022f562d2342558cfd 100644
+--- a/README.md
++++ b/README.md
+@@ -8,51 +8,51 @@ ClipForVRChat は、VRChat で外部画像URLを使いやすくするための W
+ 
+ - 画像を縦横 2048px 以内に縮小
+ - 複数画像をまとめて処理
+ - PNG または JPG で保存
+ - 縮小画像をPCに保存
+ - Discord Webhook に画像を投稿
+ - 投稿された画像URLをクリップボードへコピー
+ - 画像内のQRコードURLを検出してDiscord本文と結果画面に表示
+ - 取得した画像URLを履歴として保存
+ - 履歴画面からDiscord上の投稿画像を削除
+ - VRChatで撮影された写真を自動で検知してDiscordへ投稿
+ - Win+Shift+Sで保存されたスクリーンショットを自動で検知してDiscordへ投稿
+ 
+ ## 使い方
+ 
+ ### 1. ダウンロード
+ 
+ 最新リリースから `ClipForVRChat-vX.Y.Z-windows-amd64.zip` をダウンロードします。
+ 
+ https://github.com/hatolife/ClipForVRChat/releases/latest
+ 
+ zipファイルを展開し、中にある `ClipForVRChat.exe` を起動してください。
+ 
+ 同じリリースには、zip本体とは別に `.sha256` と `ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc` も添付されています。`.sha256` はzipのファイル破損確認用、`.exe.asc` はexeのPGP署名検証用です。通常はzipだけダウンロードすれば使用できます。
+ 
+-PGP署名を確認する場合は、zipを展開して `ClipForVRChat.exe` を取り出します。GitHub Releasesに別添付されている同じバージョンの `.exe.asc` をexeと同じフォルダに保存してください。そのうえで、zip内の `Release-signing-public-key.url` から公式公開鍵を確認して取り込み、exeと `.asc` を検証してください。
++PGP署名を確認する場合は、zipを展開して `ClipForVRChat.exe` を取り出します。GitHub Releasesに別添付されている同じバージョンの `.exe.asc` をexeと同じフォルダに保存してください。公開鍵は、ダウンロードしたzip内の `Release-signing-public-key.url` だけで信頼せず、このREADMEや公式サイトなどダウンロード物とは別経路の案内と照合してから取り込み、exeと `.asc` を検証してください。`Good signature` は「取り込んだ公開鍵で署名されたファイルから変更されていない」ことを示すだけなので、公開鍵自体が公式のものかも別途確認してください。
+ 
+ ### 2. 初回設定
+ 
+ 初めて起動したときは設定画面が開きます。
+ 
+ まずはそのまま保存しても使用できます。Discordへ投稿したい場合は、Discord Webhook URL を設定してください。
+ 
+ 設定は `ClipForVRChat.exe` と同じ場所の `config.json` に保存されます。通常はこのファイルを直接編集する必要はありません。
+ 
+ ### 3. 画像を処理する
+ 
+ アプリ画面に画像ファイルをドラッグ&ドロップします。
+ 
+ 複数の画像をまとめてドロップすると、一括で処理できます。処理中は結果欄に進捗が表示され、完了した画像からサムネイルへ切り替わります。
+ 
+ クリップボードにコピーした画像を処理したい場合は、「クリップボード画像を処理」ボタンを押してください。
+ 
+ ### 4. URLをコピーする
+ 
+ Discord投稿がONの場合、投稿された画像URLを取得できます。
+ 
+ 1枚だけ処理した場合は、設定がONなら自動でクリップボードへコピーされます。結果欄のサムネイルをクリックすると、その画像URLをもう一度コピーできます。
+ 
+ ### 5. QRコードURLを確認する
+ 
+
+
+diff --git a/issues/109-pgp-verification-trust-anchor.md b/issues/109-pgp-verification-trust-anchor.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..28a165c382b908f331bc11fc249202ff15667f13
+--- /dev/null
++++ b/issues/109-pgp-verification-trust-anchor.md
+@@ -0,0 +1,15 @@
++# 109 PGP署名確認の信頼アンカーを明確にする
++
++## 問題
++
++PGP署名確認手順が、ダウンロードしたzip内の公開鍵URLだけで公開鍵を取得するように読める。zip、署名ファイル、公開鍵案内が同時に差し替えられた場合、利用者が `Good signature` を公式配布確認と誤解する可能性がある。
++
++## 期待する挙動
++
++署名確認では、公開鍵をダウンロード成果物だけで信頼せず、公式READMEなどダウンロード物とは別経路の情報で確認する必要があることを案内する。`Good signature` は「取り込んだ鍵とファイルが一致する」確認であり、鍵自体の正当性確認が別途必要であることを明記する。
++
++## 受け入れ条件
++
++- READMEのPGP確認手順が、zip内URLだけを信頼しないよう案内している。
++- アプリ内AboutのPGP確認手順が、公開鍵の正当性を別経路で確認するよう案内している。
++- `Good signature` だけで公式配布のexeと断定しない説明になっている。
+
+
+diff --git a/issues/README.md b/issues/README.md
+index a24fd4937fbd683e554a23dd90aaf4d608ca278b..9f20cc504ecf6928ceb6d1970a82cd165faede89 100644
+--- a/issues/README.md
++++ b/issues/README.md
+@@ -91,34 +91,35 @@
+ | 084 | [Explorerで生成ファイルを選択表示できない](084-fix-explorer-file-selection.md) | 完了 | `v0.1.7` | `explorer.exe /select,` ではなく Windows Shell API でファイル選択表示する。 |
+ | 085 | [診断データ復号後のzipが破損する](085-encrypt-diagnostic-package-as-binary.md) | 完了 | `v0.1.7` | 診断データをOpenPGP binary literal dataとして暗号化し、復号後zipの破損を防ぐ。 |
+ | 086 | [診断zip内のログとoutput構成を整理する](086-normalize-diagnostic-zip-layout-and-output-log.md) | 完了 | `v0.1.7` | zip内ログを `logs/` に統一し、output画像は含めず一覧を診断ログへ記録する。 |
+ | 087 | [zipファイル引数を公開鍵で暗号化する](087-encrypt-zip-from-cli-argument.md) | 完了 | `v0.1.7` | zip単体引数でUIを起動せず、同じ公開鍵で `<zip>.gpg` を生成する。 |
+ | 088 | [診断ログ実フォルダ名をlogsへ統一する](088-use-logs-directory-for-diagnostic-logs.md) | 完了 | `v0.1.7` | アプリ実フォルダの診断ログ出力先も `logs/YYYY-MM-DD.log` に統一する。 |
+ | 089 | [不具合報告用データの説明を情報画面に追加する](089-explain-diagnostic-data-in-about.md) | 完了 | `v0.1.7` | 情報画面に含まれる情報、暗号化方法、利用目的の説明を追加する。 |
+ | 090 | [不具合報告用データを段階作成しパスを置換する](090-stage-and-sanitize-diagnostic-data.md) | 完了 | `v0.1.7` | `diagnostics/<timestamp>/` に確認用zipと暗号化zipを作成し、テキスト内パスを環境変数表記へ置換する。 |
+ | 091 | [セキュリティ監査報告書を作成する](091-security-audit-2026-06-25.md) | 完了 | `8e46ffd` | `reports/2026-06-25/security-audit-prompt.md` に基づき、現行リポジトリのセキュリティ監査報告書を作成した。 |
+ | 092 | [監査報告書の配置と説明を整理する](092-organize-reports-and-clarify-security-notes.md) | 完了 | `v0.1.7` | 監査報告書を日付ディレクトリへ移動し、診断zip、Release workflow、Windows ACLの説明を補足する。 |
+ | 093 | [人間が確認する必要がある作業を手順化する](093-human-verification-guide.md) | 完了 | `v0.1.7` | 監査後に人間が確認する作業、現時点の確認結果、判断基準をMarkdown化する。 |
+ | 094 | [設定画面の初期タブと初期値を調整する](094-settings-initial-tab-and-defaults.md) | 完了 | `v0.1.7` | 初回起動時の設定タブ選択とDiscord投稿/投稿URL自動コピーの初期値を調整する。 |
+ | 095 | [設定画面のDiscord投稿分類を整理する](095-settings-discord-post-tab-reclassification.md) | 完了 | `v0.1.7` | WebhookタブをDiscord投稿へ変更し、Discord投稿関連設定をまとめる。 |
+ | 096 | [develop版バージョンに親コミットIDを含める](096-develop-version-include-parent-commit.md) | 完了 | `v0.1.7` | develop版バージョン表記に親コミットIDを含めて追跡しやすくする。 |
+ | 097 | [govulncheckのGO-2026-4550を解消する](097-fix-circl-govulncheck-finding.md) | 完了 | `v0.1.7` | `cloudflare/circl` の既知脆弱性を解消し、govulncheckを成功させる。 |
+ | 098 | [診断データからWebhook URLとDiscord tokenを除外する](098-redact-diagnostic-secrets.md) | 完了 | `v0.1.7` | 確認用zipと暗号化zipからWebhook URLとDiscord tokenの生値を除外する。 |
+ | 099 | [Release workflowの権限を最小化する](099-harden-release-workflow-permissions.md) | 完了 | `v0.1.7` | Release作成権限を必要なjobへ限定する。 |
+ | 100 | [OpenURLで開けるURLを許可ホストに制限する](100-restrict-open-url-hosts.md) | 完了 | `v0.1.7` | アプリから開ける外部URLを信頼済みHTTPSホストへ限定する。 |
+ | 101 | [履歴のローカル削除対象を管理output配下に制限する](101-restrict-history-local-delete-to-output.md) | 完了 | `v0.1.7` | 履歴改ざん時にoutput外ファイルを削除できないようにする。 |
+ | 102 | [診断ログのローカルパスと秘密情報を抑制する](102-redact-diagnostic-log-paths.md) | 完了 | `v0.1.7` | 診断ログ出力時点でパスと秘密情報を可能な範囲で抑制する。 |
+ | 103 | [Windows実機でACLを確認する](103-check-windows-acl.md) | 要確認 | 未定 | Windows実機でconfig/history/logs/diagnosticsのACLを確認する。 |
+ | 104 | [ReleaseにSBOMまたはビルドメタデータを追加する](104-add-release-sbom-or-build-metadata.md) | 完了 | `v0.1.7` | Release成果物に依存関係やビルド環境の追跡情報を追加する。 |
+ | 105 | [Windows GoテストでWailsイベント送信ガードが効かない](105-fix-windows-test-wails-event-guard.md) | 完了 | `v0.1.7` | Windowsの `.test.exe` テストバイナリでもWailsイベント送信を抑制する。 |
+ | 106 | [Release NotesのダウンロードURLをMarkdownリンクにする](106-release-notes-download-links.md) | 完了 | `v0.1.7` | Release本文のダウンロード欄でファイル名をリンクテキストとして表示する。 |
+ | 107 | [Git Flow運用をAGENTS.mdへ明文化する](107-update-git-flow-agents.md) | 完了 | `v0.1.7` | `develop` 基準の通常開発と `master` 基準のリリースブランチ運用を明文化する。 |
+ | 108 | [Discord投稿ONで通常投稿用Webhook URLが空欄の場合に保存時警告を出す](108-warn-empty-discord-webhook-on-save.md) | 完了 | `v0.1.7` | Discord投稿ONで通常投稿用Webhook URLが空欄の場合、保存後も画面上部に警告を表示する。 |
++| 109 | [PGP署名確認の信頼アンカーを明確にする](109-pgp-verification-trust-anchor.md) | 完了 | 未定 | 署名確認時に公開鍵をダウンロード物とは別経路で確認するようREADME/Aboutを明確化する。 |
+ 
+ ## 状態の意味
+ 
+ | 状態 | 意味 |
+ | --- | --- |
+ | 完了 | 実装、テスト、またはドキュメント作成が完了している。 |
+ | 要対応 | 問題を整理済みで、実装またはドキュメント更新が必要。 |
+ | 要確認 | 修正は入っているが、対象環境や実機での再現確認が必要。 |
+ | 一部将来対応あり | 主要な受け入れ条件は満たしているが、明示的に将来対応へ回した項目が残っている。 |
+
+
+diff --git a/src/frontend/src/main.js b/src/frontend/src/main.js
+index 78c37f215da0a24967c72605a56bf5855a038ddc..e8a5bbcf632c4eab8cc9d528b3dfe19dc07a72a0 100644
+--- a/src/frontend/src/main.js
++++ b/src/frontend/src/main.js
+@@ -915,53 +915,53 @@ createApp({
+           <div><dt>ライセンス</dt><dd>MIT License / Copyright (c) 2026 hatolife</dd></div>
+           <div><dt>GitHub</dt><dd><button class="link-button" @click="openURL(info.github)">{{ info.github }}</button></dd></div>
+           <div><dt>作者</dt><dd><button class="link-button" @click="openURL(authorTwitterUrl)">@hato_poppo_life</button></dd></div>
+           <div><dt>バグ報告</dt><dd><button class="link-button" @click="openURL(issuesUrl)">{{ issuesUrl }}</button></dd></div>
+         </dl>
+         <section class="about-note">
+           <h3>公式の配布場所</h3>
+           <p>公式の配布場所は下記のみです。他で取得したファイルについては、内容や安全性に責任を取れません。</p>
+           <ul>
+             <li><button class="link-button inline" @click="openURL(latestReleaseUrl)">GitHub - https://github.com/hatolife/ClipForVRChat/releases/latest</button></li>
+             <li><button class="link-button inline" @click="openURL(boothUrl)">BOOTH - https://hatolife.booth.pm/items/8531663</button></li>
+           </ul>
+         </section>
+         <section class="about-note">
+           <h3>PGPで改竄確認できます</h3>
+           <p>
+             GitHub Releasesでは、zipとは別に <code>ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc</code> 署名ファイルも配布しています。
+           </p>
+           <p>
+             展開した <code>ClipForVRChat.exe</code> が改竄されていないことを確認できます。
+           </p>
+           <ol>
+             <li><button class="link-button inline" @click="openURL(releasesUrl)">GitHub Releases</button> で使いたいバージョンを開きます。</li>
+             <li>zipを展開し、確認したい <code>ClipForVRChat.exe</code> を用意します。</li>
+             <li>同じReleaseに別添付されている <code>.exe.asc</code> を、exeと同じフォルダに保存します。</li>
+-            <li>zip内の <code>Release-signing-public-key.url</code> から公式公開鍵を確認して取り込みます。</li>
++            <li>公開鍵は、ダウンロードしたzip内の <code>Release-signing-public-key.url</code> だけで信頼せず、公式READMEなどダウンロード物とは別経路の案内と照合してから取り込みます。</li>
+             <li>コマンドプロンプトやPowerShellで <code>gpg --verify ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc ClipForVRChat.exe</code> を実行します。</li>
+-            <li><code>Good signature</code> と表示されれば、公式配布のexeとして確認できています。</li>
++            <li><code>Good signature</code> は「取り込んだ公開鍵で署名されたファイルから変更されていない」ことを示します。公開鍵自体が公式のものかも別途確認してください。</li>
+           </ol>
+           <p>PGPがよく分からない場合は、公式の配布場所から直接ダウンロードしてください。</p>
+           <ul>
+             <li><button class="link-button inline" @click="openURL(latestReleaseUrl)">GitHub - https://github.com/hatolife/ClipForVRChat/releases/latest</button></li>
+             <li><button class="link-button inline" @click="openURL(boothUrl)">BOOTH - https://hatolife.booth.pm/items/8531663</button></li>
+           </ul>
+         </section>
+         <section class="about-note">
+           <h3>連絡・要望</h3>
+           <p>
+             不具合や使いにくい点、要望などがありましたら、Twitterの <button class="link-button inline" @click="openURL(authorTwitterUrl)">@hato_poppo_life</button> までお気軽にご連絡ください。
+           </p>
+           <p>
+             「こんな機能が欲しい」といったご意見でも問題ありません。全てのご要望にお応えすることは難しいですが、できる限り改善していきます。
+           </p>
+           <p>
+             できれば
+             <button class="link-button inline" @click="openURL(feedbackTweetUrl)">このツイートへの返信</button>
+             でご連絡いただけると、管理しやすく助かります。
+           </p>
+           <p>
+             GitHubのIssueからの報告でも問題ありません。日本語で気軽に投稿してください。
+           </p>
+           <p>
+             恐らく反応はTwitterのほうが早いです。GitHub Issueは返信が遅くなる場合がありますが、ご容赦ください。
+
+# Attack-path analysis
+Final: high | Decider: model_decided | Matrix severity: high | Policy adjusted: high
+## Rationale
+Keeping the original high severity is justified by high impact and credible reachability within the release-integrity threat model. The issue is not critical because it does not by itself grant release publishing access or signing-key compromise and requires asset substitution plus user interaction. It is still high because the affected artifacts are the official release workflow and user-facing verification instructions; .github/workflows/release.yml:85-116 publishes the signing public key with the mutable release assets, README.md:29-31 and src/frontend/src/main.js:671-674 direct users to trust that same-release key, and validation demonstrated that a malicious exe/signature/key bundle produces a Good signature result. This can lead directly to execution of attacker code under the victim user's account.
+## Likelihood
+high - The vulnerable guidance is public and reachable by normal users, and the PoC demonstrates the verification bypass. However, exploitation is not zero-click: it requires the attacker to control or convincingly substitute the downloadable asset set or mirror, and the victim must perform verification and execute the binary. | Remote network vector
+## Impact
+high - If the release/download asset set is substituted, the documented verification can bless an attacker-signed malicious Windows executable as official. Running that executable gives code execution with the victim user's privileges and can compromise local files, Discord webhook secrets, images, clipboard data, and other user data accessible to the application/user.
+## Assumptions
+- The attacker can substitute the downloadable executable/signature/public-key asset set, for example through compromised GitHub release asset publishing, compromised release credentials, a malicious mirror, or a substituted download bundle.
+- The victim follows the documented PGP verification steps, imports the same-release public key, sees a Good signature result, and then runs the executable.
+- No independent, already-trusted copy of the release signing key or fingerprint is available to the victim through the product guidance.
+- attacker control over substituted release/download assets or a convincing malicious mirror/bundle
+- victim user interaction to download assets, import the bundled public key, verify, and execute the binary
+- absence of an out-of-band trusted fingerprint or pinned public key check
+## Path
+Attacker asset control -> malicious exe + .asc + attacker public key -> victim imports same-release key -> gpg Good signature -> victim runs malicious exe
+## Path evidence
+- `.github/workflows/release.yml:85-116` - The workflow imports the release signing key, creates a detached signature, verifies it locally, exports the public key to dist/ClipForVRChat-release-signing-public-key.asc, and publishes the public key alongside the executable zip, checksum, and .asc signature as release assets.
+- `README.md:29-31` - The README tells users to obtain ClipForVRChat.exe.asc and ClipForVRChat-release-signing-public-key.asc from the same release before verifying, without providing an independent key fingerprint or pinned key.
+- `src/frontend/src/main.js:663-674` - The in-app guidance tells users to use the same-release signature and same-release public key, run gpg --verify, and treats Good signature as confirmation that the executable is an official distribution.
+- `issues/038-about-official-distribution-and-pgp.md:18-20` - The acceptance criteria explicitly say not to display the release signing public-key fingerprint in the information screen, removing an obvious out-of-band trust anchor from the UI guidance.
+## Narrative
+This is a real in-scope release-integrity weakness. The release workflow signs ClipForVRChat.exe, exports the signing public key, and publishes the zip, hash, detached signature, and exported public key together as release assets. README and in-app instructions then tell users to import that same-release public key and treat a Good signature result as confirmation that the executable is official. Because there is no independent fingerprint or pinned key in the user-facing guidance, an attacker who can substitute the release/download asset set can replace the executable, signature, and public key together. The validation PoC showed that GPG exits successfully and prints Good signature for such an attacker-signed executable in a fresh keyring. Impact is high because successful exploitation can cause a user to run a malicious Windows executable while believing it passed official verification. Likelihood is lower than a directly internet-exposed runtime bug because asset substitution or malicious mirror delivery and user interaction are required.
+## Controls
+- GitHub HTTPS release hosting
+- GitHub Actions release workflow with contents: write
+- GPG detached executable signature
+- Workflow-local gpg --verify after signing
+- GitHub Actions secrets for release signing key material
+- SHA256 file for corruption checking
+## Blindspots
+- Static repository analysis only; no GitHub/cloud APIs were called to verify current release settings, branch protection, release immutability, or repository collaborator permissions.
+- Actual exploit likelihood depends on external distribution-channel compromise, malicious mirror success, or social-engineering conditions that cannot be measured from the repository alone.
+- The analysis did not verify how many users follow the optional PGP verification guidance versus downloading and running the zip without verification.
+
