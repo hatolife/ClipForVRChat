@@ -1,8 +1,7 @@
-# Codex Security findings修正チェックリスト
+# release/v0.1.8 分岐解消チェックリスト
 
-- [x] finding CSVを現在HEADで分類・再検証する
-- [x] Release workflowのtag/ref injectionとWails cache trustを修正する
-- [x] 自動処理/Discord投稿の保存前確認を追加する
-- [x] PGP検証のtrust anchor説明を修正する
-- [x] 報告書に判定、修正、テスト、残リスクを記録する
-- [x] CI相当のローカル検証を実行する
+- [x] remote側の分岐コミット内容を確認する
+- [x] `todo.md` のmerge conflictを解消する
+- [x] Codex Security finding本文を `reports/security/2026-07-01T04-48-55.763Z/` に統一する
+- [ ] merge後のローカル検証を実行する
+- [ ] `release/v0.1.8` をpushし、分岐解消を確認する
