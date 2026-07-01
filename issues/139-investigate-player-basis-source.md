@@ -71,6 +71,28 @@ Avatar Parametersは外部OSCへ値を出せるが、アバター側が自身の
 
 判断: 一般配布アプリの解決策としては弱い。専用アバターギミック前提の可能性は残るが、汎用性は低い。
 
+##### 2026-07-02補足: 専用アバターギミックからOSCでworld座標を送れるか
+
+結論として、「Avatar Parameterとして既に持っている値をOSCで外部へ送る」ことは可能だが、「アバター単体で自分のworld座標を取得してAvatar Parameterへ入れ、それをOSC送信する」ことは標準機能だけでは成立しない可能性が高い。
+
+根拠:
+
+- OSC Avatar Parametersは、Avatar Parameterを外部OSCアプリへ送信できる。configの `output.address` を設定すれば、parameter値の変化を任意OSC addressへ送れる。
+- Animator Parametersのbuilt-in一覧には、`VelocityX/Y/Z`、`VelocityMagnitude`、`Upright`、`Grounded`、`TrackingType`、avatar scale系などはあるが、world positionやworld yawはない。
+- custom Expression Parameterは作れるが、制御手段はExpressions Menu、Avatar Parameter Driver、OSC入力などであり、アバター自身のworld transformを数値化してparameterへ書き込むAPIではない。
+- Contact Receiverはavatar上ではAnimator Parameterを更新できるが、主に接触/近接の0..1値であり、world座標そのものではない。world上のUdonではContact Senderのworld position等を読めるが、それはワールド側Udon機能であり、任意の通常ワールドでアバター単体が外部アプリへ座標を出す仕組みではない。
+
+したがって、専用アバターを同梱するだけでは、ClipForVRChatへローカルプレイヤーworld座標を安定送信する設計にはならない。
+実現性があるとすれば以下のどちらか。
+
+1. 専用ワールド/Udon連携
+   - Udonで `VRCPlayerApi.GetPosition()` / `GetRotation()` / `GetTrackingData()` を取得する。
+   - ただしUdonから任意UDP/OSCで外部アプリへ直接送信する公式経路は確認できていない。別の橋渡し手段が必要。
+
+2. 外部VRランタイム連携
+   - SteamVR/OpenXR等からHMD poseを取得し、ClipForVRChat側でVRChat world座標へキャリブレーションする。
+   - VR専用かつ座標合わせが必要で、Desktop/Quest単体の汎用解決にはならない。
+
 #### 5. SteamVR/OpenVR/OpenXR等の外部VRランタイム
 
 VRモードでは外部ランタイムからHMD poseを取れる可能性がある。
