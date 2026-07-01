@@ -673,6 +673,9 @@ config.json
 GitHub Release のWindows配布zipには以下を含めます。
 
 - `ClipForVRChat.exe`
+- `spout-capture.exe`
+- `SpoutLibrary.dll`
+- `Spout2-LICENSE.txt`
 - `Release-signing-public-key.url`
 - `README.md`
 - `LICENSE`

@@ -96,6 +96,10 @@ jobs:
           if (!$helper) {
             throw "spout-capture.exe was not created"
           }
+          $spoutDll = Join-Path $helper.DirectoryName "SpoutLibrary.dll"
+          if (!(Test-Path $spoutDll)) {
+            throw "SpoutLibrary.dll was not copied next to spout-capture.exe"
+          }
           & $helper.FullName --help
           & $helper.FullName --version
           & $helper.FullName --list-senders

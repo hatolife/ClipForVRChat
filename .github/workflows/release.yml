@@ -144,6 +144,11 @@ jobs:
             throw "spout-capture.exe was not created"
           }
           Copy-Item $spoutHelper.FullName "dist/ClipForVRChat/"
+          $spoutDll = Join-Path $spoutHelper.DirectoryName "SpoutLibrary.dll"
+          if (!(Test-Path $spoutDll)) {
+            throw "SpoutLibrary.dll was not copied next to spout-capture.exe"
+          }
+          Copy-Item $spoutDll "dist/ClipForVRChat/"
           Copy-Item "README.md" "dist/ClipForVRChat/"
           Copy-Item "LICENSE" "dist/ClipForVRChat/"
           Copy-Item "third_party/Spout2-LICENSE.txt" "dist/ClipForVRChat/"
@@ -245,6 +250,7 @@ jobs:
             "dist/ClipForVRChat/LICENSE",
             "dist/ClipForVRChat/Release-signing-public-key.url",
             "dist/ClipForVRChat/spout-capture.exe",
+            "dist/ClipForVRChat/SpoutLibrary.dll",
             "dist/ClipForVRChat/Spout2-LICENSE.txt"
           )
           foreach ($path in $required) {
@@ -258,6 +264,7 @@ jobs:
             "LICENSE",
             "Release-signing-public-key.url",
             "spout-capture.exe",
+            "SpoutLibrary.dll",
             "Spout2-LICENSE.txt"
           )
           foreach ($name in $requiredZip) {

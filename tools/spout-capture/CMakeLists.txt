@@ -14,9 +14,14 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Spout2)
 
 add_executable(spout-capture main.cpp)
-target_link_libraries(spout-capture PRIVATE SpoutLibrary_static windowscodecs ole32)
+target_link_libraries(spout-capture PRIVATE SpoutLibrary windowscodecs ole32)
 target_include_directories(spout-capture PRIVATE
   ${spout2_SOURCE_DIR}/SPOUTSDK/SpoutLibrary
+)
+add_custom_command(TARGET spout-capture POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    $<TARGET_FILE:SpoutLibrary>
+    $<TARGET_FILE_DIR:spout-capture>
 )
 
 execute_process(
