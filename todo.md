@@ -1,7 +1,7 @@
-# release/v0.1.8 分岐解消チェックリスト
+# v0.1.8-rc13 作成チェックリスト
 
-- [x] remote側の分岐コミット内容を確認する
-- [x] `todo.md` のmerge conflictを解消する
-- [x] Codex Security finding本文を `reports/security/2026-07-01T04-48-55.763Z/` に統一する
-- [x] merge後のローカル検証を実行する
-- [x] `release/v0.1.8` をpushし、分岐解消を確認する
+- [x] 既存 `v0.1.8-rc13` タグが旧コミットを指していることを確認する
+- [x] GitHub Release `v0.1.8-rc13` が未作成であることを確認する
+- [ ] 現在HEADに `v0.1.8-rc13` 署名付きタグを作成し直す
+- [ ] `v0.1.8-rc13` をpushする
+- [ ] CI/Release workflowの成功を確認する
