@@ -1,0 +1,454 @@
+GitHub Actions tag name command injection
+Link: https://chatgpt.com/codex/cloud/security/findings/34b9209ff92c8191b1ceb10d5da23f17?sev=critical%2Chigh
+Criticality: high (attack path: high)
+Status: new
+
+# Metadata
+Repo: hatolife/ClipForVRChat
+Commit: 2a3fa25
+Author: poppo@hato.life
+Created: 2026/6/29 13:20:39
+Assignee: Unassigned
+Signals: Security, Validated, Patch generated, Attack-path
+
+# Summary
+A security bug was introduced by adding the `Prepare version` step with direct unsanitized `${{ github.ref_name }}` interpolation into PowerShell. This creates a new command-injection sink and feeds attacker-controlled output into the later build command.
+The release job runs on tag pushes matching `v*` and grants `contents: write`. This commit adds a `Prepare version` PowerShell step that embeds `${{ github.ref_name }}` directly into a double-quoted PowerShell string, then uses the resulting output in another PowerShell command. Git tag names can contain characters such as double quotes, semicolons, `#`, and redirection characters, so a tag such as `v";whoami;#` can break out of the string and execute arbitrary PowerShell on the release runner. Because this job builds and publishes release artifacts with a write-scoped GitHub token, command execution here can tamper with official release assets. The workflow also still contains older direct `${{ github.ref_name }}` interpolations in packaging paths, so the tag name should be validated or passed through environment variables and treated strictly as data.
+
+# Validation
+## Rubric
+- [x] Confirm the release workflow is security-sensitive: tag-triggered on `v*` and has `contents: write` permissions.
+- [x] Confirm the commit added a new `Prepare version` PowerShell step that directly interpolates `${{ github.ref_name }}` into executable script text.
+- [x] Confirm an attacker-controlled tag containing PowerShell metacharacters is a valid git tag and matches the `v*` trigger.
+- [x] Render the vulnerable workflow command with the malicious tag and show it produces a separate injected PowerShell statement.
+- [ ] Dynamically execute the rendered script under PowerShell; skipped because `pwsh`/`powershell` is not installed in the container.
+## Report
+Validated the suspected GitHub Actions PowerShell command injection. The workflow at `.github/workflows/release.yml:3-10` runs on tag pushes matching `v*` and grants `contents: write`. The newly added step at `.github/workflows/release.yml:57-63` uses `shell: pwsh` and directly interpolates `${{ github.ref_name }}` into a double-quoted PowerShell string: `"app_version=${{ github.ref_name }}.$shortSha" >> $env:GITHUB_OUTPUT`. I verified that a malicious tag name is accepted by git: `git check-ref-format 'refs/tags/v";whoami>pwned.txt;#'` returned 0, and creating/listing the local tag produced `v";whoami>pwned.txt;#`. GitHub Actions expression interpolation happens before PowerShell execution, so this tag renders the Prepare version script as: `$shortSha = "2a3fa25208bf983fe95ee6782866790fa0af64eb".Substring(0, 7)` followed by `"app_version=v";whoami>pwned.txt;#.$shortSha" >> $env:GITHUB_OUTPUT`. In PowerShell, the injected double quote closes the string, `;` starts a new statement, `whoami>pwned.txt` executes, and `#` comments out the remaining suffix/redirection. This confirms arbitrary command execution in the release runner context. I also confirmed the commit introduced this new `Prepare version` sink via `git show`, although the parent workflow already had older unsanitized `github.ref_name` interpolations in build/package commands. Dynamic execution with PowerShell was not possible in this Linux container because `pwsh`/`powershell` is not installed; `gdb` and `valgrind` are also unavailable and not applicable to this CI YAML command-injection issue.
+
+# Evidence
+github/workflows/release.yml (L3 to 10)
+  Note: The workflow is triggered by tag names matching `v*` and runs with `contents: write`, making tag-name injection security-sensitive for release integrity.
+
+github/workflows/release.yml (L57 to 63)
+  Note: The newly added step embeds `${{ github.ref_name }}` directly into a PowerShell double-quoted string, allowing a crafted tag name containing quote and statement separators to execute commands.
+
+github/workflows/release.yml (L64 to 67)
+  Note: The later build command interpolates the generated step output into another PowerShell command, carrying the attacker-controlled version string forward.
+
+github/workflows/release.yml (L80 to 83)
+  Note: The workflow continues to interpolate the tag name directly into PowerShell packaging commands, showing the same untrusted tag-name data is not validated or safely escaped.
+
+Proposed patch:
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index cf2a56ced1827fdfa9ad0f4550fdfd01ced4d522..904e980dc18a99e87e5a9df551cc99936109bc8e 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -1,47 +1,51 @@
+ name: Release
+ 
+ on:
+   push:
+     tags:
+       - "v*"
+   workflow_dispatch:
+ 
+ permissions:
+   contents: read
+ 
+ env:
+   GO_VERSION: "1.26.4"
+   NODE_VERSION: "22"
+   WAILS_VERSION: "v2.12.0"
+ 
+ jobs:
+   build:
+     name: Build exe and package release assets
+     runs-on: windows-latest
+     permissions:
+       contents: read
++    outputs:
++      version: ${{ steps.version.outputs.version }}
++      draft: ${{ steps.version.outputs.draft }}
++      prerelease: ${{ steps.version.outputs.prerelease }}
+ 
+     steps:
+       - name: Checkout
+         uses: actions/checkout@v7
+ 
+       - name: Setup Go
+         uses: actions/setup-go@v6
+         with:
+           go-version: ${{ env.GO_VERSION }}
+           cache: true
+           cache-dependency-path: src/go.sum
+ 
+       - name: Setup Node
+         uses: actions/setup-node@v6
+         with:
+           node-version: ${{ env.NODE_VERSION }}
+           cache: npm
+           cache-dependency-path: src/frontend/package-lock.json
+ 
+       - name: Install frontend dependencies
+         working-directory: src/frontend
+         run: npm ci
+ 
+       - name: Audit frontend dependencies
+         working-directory: src/frontend
+@@ -58,209 +62,224 @@ jobs:
+       - name: Check Go vulnerabilities
+         working-directory: src
+         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+ 
+       - name: Add Go bin to PATH
+         shell: pwsh
+         run: '"$HOME/go/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append'
+ 
+       - name: Cache Wails CLI
+         id: cache-wails
+         uses: actions/cache@v6
+         with:
+           path: ~/go/bin/wails.exe
+           key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-wails-${{ env.WAILS_VERSION }}
+ 
+       - name: Install Wails
+         if: steps.cache-wails.outputs.cache-hit != 'true'
+         run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+ 
+       - name: Check Wails
+         run: wails version
+ 
+       - name: Prepare version
+         id: version
+         shell: pwsh
++        env:
++          REF_NAME: ${{ github.ref_name }}
++          COMMIT_SHA: ${{ github.sha }}
+         run: |
+-          $tagName = "${{ github.ref_name }}"
+-          $shortSha = "${{ github.sha }}".Substring(0, 7)
++          $tagName = $env:REF_NAME
++          if ($tagName -notmatch '^v[0-9A-Za-z][0-9A-Za-z._-]*$') {
++            throw "Unsupported release tag name: $tagName"
++          }
++          $shortSha = $env:COMMIT_SHA.Substring(0, 7)
+           $releaseTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+           $isStable = $tagName -match '^v\d+\.\d+\.\d+$'
+           $isReleaseCandidate = $tagName -match '^v\d+\.\d+\.\d+-rc\d+$'
+           $draft = if ($isStable -or $isReleaseCandidate) { "false" } else { "true" }
+           $prerelease = if ($isReleaseCandidate) { "true" } else { "false" }
+           "app_version=$tagName.$shortSha" >> $env:GITHUB_OUTPUT
+           "version=$tagName" >> $env:GITHUB_OUTPUT
+           "revision=$shortSha" >> $env:GITHUB_OUTPUT
+           "release_time=$releaseTime" >> $env:GITHUB_OUTPUT
+           "draft=$draft" >> $env:GITHUB_OUTPUT
+           "prerelease=$prerelease" >> $env:GITHUB_OUTPUT
+ 
+       - name: Prepare Windows version info
+         shell: pwsh
++        env:
++          RELEASE_TAG: ${{ steps.version.outputs.version }}
++          RELEASE_REVISION: ${{ steps.version.outputs.revision }}
+         run: |
+-          node scripts/write-wails-info.mjs "${{ steps.version.outputs.version }}" src/wails.json
+-          node scripts/write-wails-windows-info.mjs "${{ steps.version.outputs.version }}" "${{ steps.version.outputs.revision }}" src/build/windows/info.json
++          node scripts/write-wails-info.mjs $env:RELEASE_TAG src/wails.json
++          node scripts/write-wails-windows-info.mjs $env:RELEASE_TAG $env:RELEASE_REVISION src/build/windows/info.json
+ 
+       - name: Build application
+         working-directory: src
+         shell: pwsh
+-        run: wails build -ldflags "-X main.version=${{ steps.version.outputs.version }} -X main.revision=${{ steps.version.outputs.revision }} -X main.releaseTime=${{ steps.version.outputs.release_time }} -X main.buildChannel=release"
++        env:
++          RELEASE_TAG: ${{ steps.version.outputs.version }}
++          RELEASE_REVISION: ${{ steps.version.outputs.revision }}
++          RELEASE_TIME: ${{ steps.version.outputs.release_time }}
++        run: wails build -ldflags "-X main.version=$env:RELEASE_TAG -X main.revision=$env:RELEASE_REVISION -X main.releaseTime=$env:RELEASE_TIME -X main.buildChannel=release"
+ 
+       - name: Prepare package directory
+         shell: pwsh
+         run: |
+           if (!(Test-Path "src/build/bin/ClipForVRChat.exe")) {
+             throw "src/build/bin/ClipForVRChat.exe was not created"
+           }
+           New-Item -ItemType Directory -Force dist | Out-Null
+           New-Item -ItemType Directory -Force "dist/ClipForVRChat" | Out-Null
+           Copy-Item "src/build/bin/ClipForVRChat.exe" "dist/ClipForVRChat/"
+           Copy-Item "README.md" "dist/ClipForVRChat/"
+           Copy-Item "LICENSE" "dist/ClipForVRChat/"
+           @(
+             "[InternetShortcut]",
+             "URL=https://keys.openpgp.org/search?q=release-signing@hato.life"
+           ) | Set-Content -Encoding ASCII "dist/ClipForVRChat/Release-signing-public-key.url"
+ 
+       - name: Sign executable
+         shell: bash
+         env:
+           RELEASE_GPG_PRIVATE_KEY: ${{ secrets.CI_RELEASE_GPG_PRIVATE_KEY }}
+           RELEASE_GPG_PASSPHRASE: ${{ secrets.CI_RELEASE_GPG_PASSPHRASE }}
+           RELEASE_GPG_FINGERPRINT: ${{ secrets.CI_RELEASE_GPG_FINGERPRINT }}
+         run: |
+           test -n "$RELEASE_GPG_PRIVATE_KEY"
+           test -n "$RELEASE_GPG_PASSPHRASE"
+           test -n "$RELEASE_GPG_FINGERPRINT"
+           export GNUPGHOME="$(mktemp -d)"
+           chmod 700 "$GNUPGHOME"
+           printf '%s' "$RELEASE_GPG_PRIVATE_KEY" | gpg --batch --import
+           printf '%s' "$RELEASE_GPG_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+             --local-user "$RELEASE_GPG_FINGERPRINT" \
+             --armor --detach-sign \
+-            --output "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.exe.asc" \
++            --output "dist/ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.exe.asc" \
+             "dist/ClipForVRChat/ClipForVRChat.exe"
+           gpg --batch --verify \
+-            "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.exe.asc" \
++            "dist/ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.exe.asc" \
+             "dist/ClipForVRChat/ClipForVRChat.exe"
+ 
+       - name: Package executable
+         shell: pwsh
+         run: |
+-          Compress-Archive -Path "dist/ClipForVRChat/*" -DestinationPath "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip" -Force
+-          Get-FileHash "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip" -Algorithm SHA256 |
+-            ForEach-Object { "$($_.Hash.ToLower())  ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip" } |
+-            Set-Content "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip.sha256"
++          Compress-Archive -Path "dist/ClipForVRChat/*" -DestinationPath "dist/ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.zip" -Force
++          Get-FileHash "dist/ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.zip" -Algorithm SHA256 |
++            ForEach-Object { "$($_.Hash.ToLower())  ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.zip" } |
++            Set-Content "dist/ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.zip.sha256"
+ 
+       - name: Write build metadata
+         shell: pwsh
+         run: |
+           $metadata = [ordered]@{
+-            tag = "${{ github.ref_name }}"
++            tag = "${{ steps.version.outputs.version }}"
+             commit = "${{ github.sha }}"
+             appVersion = "${{ steps.version.outputs.app_version }}"
+             version = "${{ steps.version.outputs.version }}"
+             revision = "${{ steps.version.outputs.revision }}"
+             releaseTime = "${{ steps.version.outputs.release_time }}"
+             goVersion = "${{ env.GO_VERSION }}"
+             nodeVersion = "${{ env.NODE_VERSION }}"
+             wailsVersion = "${{ env.WAILS_VERSION }}"
+           }
+-          $metadata | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 "dist/ClipForVRChat-${{ github.ref_name }}-build-metadata.json"
++          $metadata | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 "dist/ClipForVRChat-${{ steps.version.outputs.version }}-build-metadata.json"
+ 
+       - name: Validate release assets
+         shell: pwsh
+         run: |
+           $unexpected = Get-ChildItem dist -Recurse -File | Where-Object {
+             $_.Name -like "*release-signing-public-key.asc" -or
+             ($_.FullName -like "*\dist\ClipForVRChat\*" -and $_.Extension -eq ".asc")
+           }
+           if ($unexpected) {
+             $unexpected | ForEach-Object { Write-Error "Unexpected file in release output: $($_.FullName)" }
+             throw "Unexpected release output files were found"
+           }
+           $zipCheckDir = Join-Path $env:RUNNER_TEMP "release-zip-check"
+           Remove-Item -Recurse -Force $zipCheckDir -ErrorAction SilentlyContinue
+-          Expand-Archive "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip" -DestinationPath $zipCheckDir
++          Expand-Archive "dist/ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.zip" -DestinationPath $zipCheckDir
+           $unexpectedZipFiles = Get-ChildItem $zipCheckDir -Recurse -File | Where-Object {
+             $_.Name -like "*release-signing-public-key.asc" -or $_.Extension -eq ".asc"
+           }
+           if ($unexpectedZipFiles) {
+             $unexpectedZipFiles | ForEach-Object { Write-Error "Unexpected file in release zip: $($_.FullName)" }
+             throw "Unexpected files were found in release zip"
+           }
+           $required = @(
+-            "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip",
+-            "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip.sha256",
+-            "dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.exe.asc",
+-            "dist/ClipForVRChat-${{ github.ref_name }}-build-metadata.json",
++            "dist/ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.zip",
++            "dist/ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.zip.sha256",
++            "dist/ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.exe.asc",
++            "dist/ClipForVRChat-${{ steps.version.outputs.version }}-build-metadata.json",
+             "dist/ClipForVRChat/Release-signing-public-key.url"
+           )
+           foreach ($path in $required) {
+             if (!(Test-Path $path)) {
+               throw "Required release output was not created: $path"
+             }
+           }
+ 
+       - name: Prepare release notes
+         if: steps.version.outputs.draft == 'false'
+-        run: node scripts/extract-release-notes.mjs "${{ github.ref_name }}" RELEASE_NOTES.md dist/release-body.md --fallback-rc-notes
++        run: node scripts/extract-release-notes.mjs "${{ steps.version.outputs.version }}" RELEASE_NOTES.md dist/release-body.md --fallback-rc-notes
+ 
+       - name: Prepare draft release notes
+         if: steps.version.outputs.draft == 'true'
+-        run: node scripts/extract-release-notes.mjs "${{ github.ref_name }}" RELEASE_NOTES.md dist/release-body.md --fallback-draft-notes
++        run: node scripts/extract-release-notes.mjs "${{ steps.version.outputs.version }}" RELEASE_NOTES.md dist/release-body.md --fallback-draft-notes
+ 
+       - name: Upload release assets artifact
+         uses: actions/upload-artifact@v6
+         with:
+-          name: release-assets-${{ github.ref_name }}
++          name: release-assets-${{ steps.version.outputs.version }}
+           path: |
+-            dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip
+-            dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip.sha256
+-            dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.exe.asc
+-            dist/ClipForVRChat-${{ github.ref_name }}-build-metadata.json
++            dist/ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.zip
++            dist/ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.zip.sha256
++            dist/ClipForVRChat-${{ steps.version.outputs.version }}-windows-amd64.exe.asc
++            dist/ClipForVRChat-${{ steps.version.outputs.version }}-build-metadata.json
+             dist/release-body.md
+ 
+   release:
+     name: Create GitHub release
+     runs-on: ubuntu-latest
+     needs: build
+     permissions:
+       contents: write
+ 
+     steps:
+       - name: Download release assets artifact
+         uses: actions/download-artifact@v7
+         with:
+-          name: release-assets-${{ github.ref_name }}
++          name: release-assets-${{ needs.build.outputs.version }}
+           path: dist
+ 
+       - name: Prepare version
+         id: version
+         shell: bash
++        env:
++          REF_NAME: ${{ needs.build.outputs.version }}
+         run: |
+-          tag_name="${{ github.ref_name }}"
++          tag_name="$REF_NAME"
+           if [[ "$tag_name" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ || "$tag_name" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc[0-9]+$ ]]; then
+             draft=false
+           else
+             draft=true
+           fi
+           if [[ "$tag_name" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc[0-9]+$ ]]; then
+             prerelease=true
+           else
+             prerelease=false
+           fi
+           echo "draft=$draft" >> "$GITHUB_OUTPUT"
+           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+ 
+       - name: Create release
+         uses: softprops/action-gh-release@v3
+         with:
+           draft: ${{ steps.version.outputs.draft }}
+           prerelease: ${{ steps.version.outputs.prerelease }}
+           body_path: dist/release-body.md
+           files: |
+-            dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip
+-            dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip.sha256
+-            dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.exe.asc
+-            dist/ClipForVRChat-${{ github.ref_name }}-build-metadata.json
++            dist/ClipForVRChat-${{ needs.build.outputs.version }}-windows-amd64.zip
++            dist/ClipForVRChat-${{ needs.build.outputs.version }}-windows-amd64.zip.sha256
++            dist/ClipForVRChat-${{ needs.build.outputs.version }}-windows-amd64.exe.asc
++            dist/ClipForVRChat-${{ needs.build.outputs.version }}-build-metadata.json
+
+
+diff --git a/issues/109-harden-release-tag-name-handling.md b/issues/109-harden-release-tag-name-handling.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..32e2a045f19e0dadc736e8d75ba03c9c812fe320
+--- /dev/null
++++ b/issues/109-harden-release-tag-name-handling.md
+@@ -0,0 +1,15 @@
++# Release workflow のタグ名コマンドインジェクション対策
++
++## 問題
++
++Release workflow が `v*` タグで起動し、タグ名を PowerShell / Bash のコマンド文字列へ直接埋め込んでいる。悪意あるタグ名により文字列を抜けて任意コマンドが実行され、Release 成果物が改ざんされる可能性がある。
++
++## 期待する挙動
++
++タグ名は workflow 内で安全な文字種へ検証し、シェルへは環境変数として渡してデータとして扱う。成果物名や Release 作成に使うタグ名も検証済みの値だけを使う。
++
++## 受け入れ条件
++
++- Release workflow の PowerShell / Bash スクリプト内で `${{ github.ref_name }}` を直接展開しない。
++- `vX.Y.Z`、`vX.Y.Z-rcW`、検証用の安全な `v*` タグのみを許可し、危険な文字を含むタグでは失敗する。
++- 成果物名、署名、ハッシュ、メタデータ、Release 作成は検証済みタグ名を使う。
+
+
+diff --git a/issues/README.md b/issues/README.md
+index a24fd4937fbd683e554a23dd90aaf4d608ca278b..d697d753aad9aa478a3a687c1987f9a86b1a056d 100644
+--- a/issues/README.md
++++ b/issues/README.md
+@@ -91,34 +91,35 @@
+ | 084 | [Explorerで生成ファイルを選択表示できない](084-fix-explorer-file-selection.md) | 完了 | `v0.1.7` | `explorer.exe /select,` ではなく Windows Shell API でファイル選択表示する。 |
+ | 085 | [診断データ復号後のzipが破損する](085-encrypt-diagnostic-package-as-binary.md) | 完了 | `v0.1.7` | 診断データをOpenPGP binary literal dataとして暗号化し、復号後zipの破損を防ぐ。 |
+ | 086 | [診断zip内のログとoutput構成を整理する](086-normalize-diagnostic-zip-layout-and-output-log.md) | 完了 | `v0.1.7` | zip内ログを `logs/` に統一し、output画像は含めず一覧を診断ログへ記録する。 |
+ | 087 | [zipファイル引数を公開鍵で暗号化する](087-encrypt-zip-from-cli-argument.md) | 完了 | `v0.1.7` | zip単体引数でUIを起動せず、同じ公開鍵で `<zip>.gpg` を生成する。 |
+ | 088 | [診断ログ実フォルダ名をlogsへ統一する](088-use-logs-directory-for-diagnostic-logs.md) | 完了 | `v0.1.7` | アプリ実フォルダの診断ログ出力先も `logs/YYYY-MM-DD.log` に統一する。 |
+ | 089 | [不具合報告用データの説明を情報画面に追加する](089-explain-diagnostic-data-in-about.md) | 完了 | `v0.1.7` | 情報画面に含まれる情報、暗号化方法、利用目的の説明を追加する。 |
+ | 090 | [不具合報告用データを段階作成しパスを置換する](090-stage-and-sanitize-diagnostic-data.md) | 完了 | `v0.1.7` | `diagnostics/<timestamp>/` に確認用zipと暗号化zipを作成し、テキスト内パスを環境変数表記へ置換する。 |
+ | 091 | [セキュリティ監査報告書を作成する](091-security-audit-2026-06-25.md) | 完了 | `8e46ffd` | `reports/2026-06-25/security-audit-prompt.md` に基づき、現行リポジトリのセキュリティ監査報告書を作成した。 |
+ | 092 | [監査報告書の配置と説明を整理する](092-organize-reports-and-clarify-security-notes.md) | 完了 | `v0.1.7` | 監査報告書を日付ディレクトリへ移動し、診断zip、Release workflow、Windows ACLの説明を補足する。 |
+ | 093 | [人間が確認する必要がある作業を手順化する](093-human-verification-guide.md) | 完了 | `v0.1.7` | 監査後に人間が確認する作業、現時点の確認結果、判断基準をMarkdown化する。 |
+ | 094 | [設定画面の初期タブと初期値を調整する](094-settings-initial-tab-and-defaults.md) | 完了 | `v0.1.7` | 初回起動時の設定タブ選択とDiscord投稿/投稿URL自動コピーの初期値を調整する。 |
+ | 095 | [設定画面のDiscord投稿分類を整理する](095-settings-discord-post-tab-reclassification.md) | 完了 | `v0.1.7` | WebhookタブをDiscord投稿へ変更し、Discord投稿関連設定をまとめる。 |
+ | 096 | [develop版バージョンに親コミットIDを含める](096-develop-version-include-parent-commit.md) | 完了 | `v0.1.7` | develop版バージョン表記に親コミットIDを含めて追跡しやすくする。 |
+ | 097 | [govulncheckのGO-2026-4550を解消する](097-fix-circl-govulncheck-finding.md) | 完了 | `v0.1.7` | `cloudflare/circl` の既知脆弱性を解消し、govulncheckを成功させる。 |
+ | 098 | [診断データからWebhook URLとDiscord tokenを除外する](098-redact-diagnostic-secrets.md) | 完了 | `v0.1.7` | 確認用zipと暗号化zipからWebhook URLとDiscord tokenの生値を除外する。 |
+ | 099 | [Release workflowの権限を最小化する](099-harden-release-workflow-permissions.md) | 完了 | `v0.1.7` | Release作成権限を必要なjobへ限定する。 |
+ | 100 | [OpenURLで開けるURLを許可ホストに制限する](100-restrict-open-url-hosts.md) | 完了 | `v0.1.7` | アプリから開ける外部URLを信頼済みHTTPSホストへ限定する。 |
+ | 101 | [履歴のローカル削除対象を管理output配下に制限する](101-restrict-history-local-delete-to-output.md) | 完了 | `v0.1.7` | 履歴改ざん時にoutput外ファイルを削除できないようにする。 |
+ | 102 | [診断ログのローカルパスと秘密情報を抑制する](102-redact-diagnostic-log-paths.md) | 完了 | `v0.1.7` | 診断ログ出力時点でパスと秘密情報を可能な範囲で抑制する。 |
+ | 103 | [Windows実機でACLを確認する](103-check-windows-acl.md) | 要確認 | 未定 | Windows実機でconfig/history/logs/diagnosticsのACLを確認する。 |
+ | 104 | [ReleaseにSBOMまたはビルドメタデータを追加する](104-add-release-sbom-or-build-metadata.md) | 完了 | `v0.1.7` | Release成果物に依存関係やビルド環境の追跡情報を追加する。 |
+ | 105 | [Windows GoテストでWailsイベント送信ガードが効かない](105-fix-windows-test-wails-event-guard.md) | 完了 | `v0.1.7` | Windowsの `.test.exe` テストバイナリでもWailsイベント送信を抑制する。 |
+ | 106 | [Release NotesのダウンロードURLをMarkdownリンクにする](106-release-notes-download-links.md) | 完了 | `v0.1.7` | Release本文のダウンロード欄でファイル名をリンクテキストとして表示する。 |
+ | 107 | [Git Flow運用をAGENTS.mdへ明文化する](107-update-git-flow-agents.md) | 完了 | `v0.1.7` | `develop` 基準の通常開発と `master` 基準のリリースブランチ運用を明文化する。 |
+ | 108 | [Discord投稿ONで通常投稿用Webhook URLが空欄の場合に保存時警告を出す](108-warn-empty-discord-webhook-on-save.md) | 完了 | `v0.1.7` | Discord投稿ONで通常投稿用Webhook URLが空欄の場合、保存後も画面上部に警告を表示する。 |
++| 109 | [Release workflow のタグ名コマンドインジェクション対策](109-harden-release-tag-name-handling.md) | 完了 | 未定 | Release workflowでタグ名を検証し、シェルへ直接展開しないようにする。 |
+ 
+ ## 状態の意味
+ 
+ | 状態 | 意味 |
+ | --- | --- |
+ | 完了 | 実装、テスト、またはドキュメント作成が完了している。 |
+ | 要対応 | 問題を整理済みで、実装またはドキュメント更新が必要。 |
+ | 要確認 | 修正は入っているが、対象環境や実機での再現確認が必要。 |
+ | 一部将来対応あり | 主要な受け入れ条件は満たしているが、明示的に将来対応へ回した項目が残っている。 |
+
+# Attack-path analysis
+Final: high | Decider: model_decided | Matrix severity: high | Policy adjusted: high
+## Rationale
+Real vulnerability and in-scope supply-chain impact are confirmed by .github/workflows/release.yml:3-10, 57-62, and 85-90. Arbitrary PowerShell execution can occur before official release artifact publication with contents: write. The original critical rating is reduced to high because the repository artifact shows a release-pipeline compromise path but not broad unauthenticated reachability: an attacker must be able to push or induce a matching upstream tag, and static analysis cannot prove that tag protection/rulesets are absent or that a signing key/automatic update channel would also be compromised.
+## Likelihood
+high - The vulnerable input is attacker-controlled if the attacker can create a v* tag, and the injection is straightforward. However, tag creation in the upstream repository is not public; it requires collaborator/release automation access or compromise of such an account, so likelihood is not high from an internet-exposed perspective. | Remote network vector
+## Impact
+high - Successful exploitation gives arbitrary command execution in the official release job with contents: write, enabling modification of distributed release executables, archives, checksums, or release metadata.
+## Assumptions
+- The repository's GitHub Actions workflow is used to build and publish official ClipForVRChat release artifacts.
+- An attacker must be able to create or cause creation of a tag matching v* in the upstream GitHub repository, or compromise credentials/automation with that capability.
+- Static repository analysis cannot verify GitHub-side tag protection, rulesets, environment approvals, or collaborator permissions.
+- Ability to push or otherwise create a Git tag beginning with v in the upstream repository
+- Release workflow execution on that tag
+- Workflow token with contents: write permission
+## Path
+attacker/tag access -> push tag v";cmd;# -> release.yml tag trigger -> pwsh run block interpolation -> runner command execution -> malicious official release asset
+## Path evidence
+- `.github/workflows/release.yml:3-10` - The workflow is triggered by tag pushes matching v* and grants contents: write to the workflow token.
+- `.github/workflows/release.yml:57-62` - The Prepare version step runs under pwsh and directly interpolates github.ref_name into executable PowerShell script text inside a double-quoted string.
+- `.github/workflows/release.yml:64-67` - The generated version output is used in the Wails build command, so attacker-influenced data is carried into the build step.
+- `.github/workflows/release.yml:80-90` - The workflow packages artifacts with github.ref_name in PowerShell commands and then uploads the resulting zip and checksum as GitHub release assets.
+## Narrative
+The finding is a real, reachable CI/CD command-injection issue in the release workflow. The workflow runs on tag pushes matching v* and grants contents: write. The Prepare version step uses shell: pwsh and embeds ${{ github.ref_name }} directly inside a double-quoted PowerShell string. GitHub expression expansion occurs before the shell runs, so a crafted valid tag name can terminate the string and inject an additional PowerShell statement. The injected code runs before the Wails build and before release asset publication, so it can alter the executable, zip, checksum, or release contents. This is in scope because release integrity is part of the project threat model. I adjust the severity from critical to high because exploitation is not public/unauthenticated; it requires upstream tag creation rights or compromise of an actor with those rights, and static repo evidence does not prove absent tag protections, automatic update delivery, or signing-key compromise.
+## Controls
+- GitHub authentication and repository permissions are required to push matching tags
+- Workflow uses GitHub-hosted windows-latest runner
+- Release job runs tests, npm audit, and govulncheck before publishing, but these do not mitigate shell injection
+- No tag-name allowlist or escaping is visible in the workflow
+- No protected environment approval is visible in the workflow
+## Blindspots
+- Static-only analysis cannot inspect GitHub repository collaborators, tag protection, branch/ruleset configuration, or environment approvals.
+- PowerShell was not executed in this container, so dynamic runner behavior is based on GitHub Actions expression semantics and PowerShell parsing evidence from validation.
+- The workflow shown does not include release signing secrets, but other out-of-repo release controls could exist.
+- Downstream user impact depends on how users obtain releases and whether malicious assets would be detected or replaced.

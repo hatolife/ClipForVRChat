@@ -1,0 +1,315 @@
+Unpinned govulncheck runs in release workflow
+Link: https://chatgpt.com/codex/cloud/security/findings/f631949b6f788191892caa81263409a2?sev=critical%2Chigh
+Criticality: high (attack path: high)
+Status: new
+
+# Metadata
+Repo: hatolife/ClipForVRChat
+Commit: 5c935b1
+Author: poppo@hato.life
+Created: 2026/6/29 13:35:00
+Assignee: Unassigned
+Signals: Security, Validated, Patch generated, Attack-path
+
+# Summary
+Introduced: the commit added an unpinned runtime dependency execution path in both CI and the release workflow. The release workflow instance is security significant because it precedes artifact creation and runs in a job with repository write permission.
+The new Go vulnerability check is executed as `go run golang.org/x/vuln/cmd/govulncheck@latest ./...` in the release workflow. Because `@latest` is resolved at workflow runtime rather than being pinned in the repository, a compromised or malicious future `golang.org/x/vuln` release would execute arbitrary code on the GitHub Actions runner. In the release job, this occurs with `contents: write` permission and before the application is built, packaged, hashed, and uploaded. That malicious code could modify source files, alter the built executable, replace release artifacts, or abuse persisted checkout credentials/release permissions. This is a supply-chain release-integrity issue introduced by the commit. Pinning govulncheck to a reviewed version, tracking it through a tools module/lockfile, and reducing permissions until the publish step would reduce the risk.
+
+# Validation
+## Rubric
+- [x] Confirm the commit introduced `go run golang.org/x/vuln/cmd/govulncheck@latest ./...` in release/CI workflows.
+- [x] Confirm the release workflow has elevated repository permission (`contents: write`) when this step runs.
+- [x] Confirm the unpinned tool execution occurs before build, package, checksum, and release upload steps.
+- [x] Confirm govulncheck is not pinned or tracked through `go.mod`, `go.sum`, or another tools lockfile in the repository.
+- [x] Dynamically demonstrate that the exact `go run ...@latest` command executes code resolved at runtime and can write/tamper within the workspace.
+## Report
+Validated the finding as a workflow supply-chain/release-integrity issue. The commit changed only `.github/workflows/ci.yml` and `.github/workflows/release.yml`; `git show` confirmed the new govulncheck steps were introduced in this commit. In `.github/workflows/release.yml`, repository write permission is granted at lines 9-10 (`permissions: contents: write`). The release job checks out the repository at lines 18-19, then runs the unpinned command at lines 50-52: `go run golang.org/x/vuln/cmd/govulncheck@latest ./...`. The build and packaging steps occur only afterward at lines 54-83, including artifact zip creation, checksum creation, and upload through `softprops/action-gh-release@v2`. CI has the same unpinned execution at `.github/workflows/ci.yml:73-75`. A targeted grep found no pinned govulncheck/tooling reference in `.github` or `src/go.mod`/`src/go.sum`, only the two `@latest` invocations. To dynamically validate the execution primitive without network access, I created a local Go module proxy containing a fake future `golang.org/x/vuln` version `v0.0.999` with `cmd/govulncheck` code that writes marker files. Running the same workflow command from `src` with `GOPROXY` pointed at that proxy executed the malicious code and created markers in the source tree and pre-build `dist` area. Captured output: `MALICIOUS GOVULNCHECK POC EXECUTED`, followed by marker contents showing `cwd=/workspace/ClipForVRChat/src` and `args=[.../govulncheck ./...]`. This demonstrates that whatever code resolves as `@latest` at workflow runtime executes before the release artifact build/package/upload steps, so a malicious or compromised future upstream govulncheck release could tamper with release inputs/artifacts. Crash/valgrind/debugger validation is not applicable to this workflow-configuration supply-chain issue; additionally `gdb` and `valgrind` were not present in the container.
+
+# Evidence
+github/workflows/ci.yml (L73 to 75)
+  Note: The same unpinned `@latest` execution was also added to CI, though the release workflow has the more security-sensitive impact.
+
+github/workflows/release.yml (L50 to 52)
+  Note: The newly added govulncheck step executes `@latest`, fetching and running unpinned Go code at release time.
+
+github/workflows/release.yml (L57 to 60)
+  Note: The application is built after the unpinned tool runs, so malicious tool code could modify inputs before compilation.
+
+github/workflows/release.yml (L62 to 83)
+  Note: The workflow packages, hashes, and uploads the artifacts after the unpinned code has had an opportunity to tamper with the workspace.
+
+github/workflows/release.yml (L9 to 10)
+  Note: The release job has repository contents write permission, increasing the impact of arbitrary code execution in earlier release steps.
+
+Proposed patch:
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 9569dbdd82fa891abe1a179b6f9587ae8e08a975..3b401bce06e3c185c33483df74652e87ec6e5aaf 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -1,40 +1,41 @@
+ name: CI
+ 
+ on:
+   push:
+     branches:
+       - "**"
+   pull_request:
+ 
+ permissions:
+   contents: read
+ 
+ env:
+   GO_VERSION: "1.26.4"
+   NODE_VERSION: "22"
+   WAILS_VERSION: "v2.12.0"
++  GOVULNCHECK_VERSION: "v1.1.4"
+ 
+ jobs:
+   docs:
+     name: Documentation checks
+     runs-on: ubuntu-latest
+ 
+     steps:
+       - name: Checkout
+         uses: actions/checkout@v7
+ 
+       - name: Check required files
+         run: |
+           test -s README.md
+           test -s src/SPEC.md
+           test -s LICENSE
+           test -s src/build/appicon.png
+           test -s src/build/icons/appicon-16.png
+           test -s src/build/icons/appicon-256.png
+ 
+       - name: Check project name references
+         run: |
+           grep -q "ClipForVRChat" README.md
+           grep -q "ClipForVRChat" src/SPEC.md
+ 
+   build:
+@@ -55,51 +56,51 @@ jobs:
+       - name: Setup Node
+         uses: actions/setup-node@v6
+         with:
+           node-version: ${{ env.NODE_VERSION }}
+           cache: npm
+           cache-dependency-path: src/frontend/package-lock.json
+ 
+       - name: Install frontend dependencies
+         working-directory: src/frontend
+         run: npm ci
+ 
+       - name: Audit frontend dependencies
+         working-directory: src/frontend
+         run: npm audit --omit=dev
+ 
+       - name: Build frontend
+         working-directory: src/frontend
+         run: npm run build
+ 
+       - name: Test Go packages
+         working-directory: src
+         run: go test ./...
+ 
+       - name: Check Go vulnerabilities
+         working-directory: src
+-        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
++        run: go run golang.org/x/vuln/cmd/govulncheck@${{ env.GOVULNCHECK_VERSION }} ./...
+ 
+       - name: Add Go bin to PATH
+         shell: pwsh
+         run: '"$HOME/go/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append'
+ 
+       - name: Cache Wails CLI
+         id: cache-wails
+         uses: actions/cache@v6
+         with:
+           path: ~/go/bin/wails.exe
+           key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-wails-${{ env.WAILS_VERSION }}
+ 
+       - name: Install Wails
+         if: steps.cache-wails.outputs.cache-hit != 'true'
+         run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+ 
+       - name: Check Wails
+         run: wails version
+ 
+       - name: Build application
+         working-directory: src
+         shell: pwsh
+         run: |
+           $shortSha = "${{ github.sha }}".Substring(0, 7)
+           $releaseTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+
+
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index cf2a56ced1827fdfa9ad0f4550fdfd01ced4d522..ad8f1653f80f5bd4eda7df3dff679176f247a155 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -1,85 +1,86 @@
+ name: Release
+ 
+ on:
+   push:
+     tags:
+       - "v*"
+   workflow_dispatch:
+ 
+ permissions:
+   contents: read
+ 
+ env:
+   GO_VERSION: "1.26.4"
+   NODE_VERSION: "22"
+   WAILS_VERSION: "v2.12.0"
++  GOVULNCHECK_VERSION: "v1.1.4"
+ 
+ jobs:
+   build:
+     name: Build exe and package release assets
+     runs-on: windows-latest
+     permissions:
+       contents: read
+ 
+     steps:
+       - name: Checkout
+         uses: actions/checkout@v7
+ 
+       - name: Setup Go
+         uses: actions/setup-go@v6
+         with:
+           go-version: ${{ env.GO_VERSION }}
+           cache: true
+           cache-dependency-path: src/go.sum
+ 
+       - name: Setup Node
+         uses: actions/setup-node@v6
+         with:
+           node-version: ${{ env.NODE_VERSION }}
+           cache: npm
+           cache-dependency-path: src/frontend/package-lock.json
+ 
+       - name: Install frontend dependencies
+         working-directory: src/frontend
+         run: npm ci
+ 
+       - name: Audit frontend dependencies
+         working-directory: src/frontend
+         run: npm audit --omit=dev
+ 
+       - name: Build frontend
+         working-directory: src/frontend
+         run: npm run build
+ 
+       - name: Test Go packages
+         working-directory: src
+         run: go test ./...
+ 
+       - name: Check Go vulnerabilities
+         working-directory: src
+-        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
++        run: go run golang.org/x/vuln/cmd/govulncheck@${{ env.GOVULNCHECK_VERSION }} ./...
+ 
+       - name: Add Go bin to PATH
+         shell: pwsh
+         run: '"$HOME/go/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append'
+ 
+       - name: Cache Wails CLI
+         id: cache-wails
+         uses: actions/cache@v6
+         with:
+           path: ~/go/bin/wails.exe
+           key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-wails-${{ env.WAILS_VERSION }}
+ 
+       - name: Install Wails
+         if: steps.cache-wails.outputs.cache-hit != 'true'
+         run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+ 
+       - name: Check Wails
+         run: wails version
+ 
+       - name: Prepare version
+         id: version
+         shell: pwsh
+         run: |
+           $tagName = "${{ github.ref_name }}"
+           $shortSha = "${{ github.sha }}".Substring(0, 7)
+
+
+diff --git a/issues/020-add-security-checks-to-ci-release.md b/issues/020-add-security-checks-to-ci-release.md
+index 496c4168e18b8903e225fe3fb9a8173fc68e95c4..1aac58e5045c8728739079b83d384526a7174ebe 100644
+--- a/issues/020-add-security-checks-to-ci-release.md
++++ b/issues/020-add-security-checks-to-ci-release.md
+@@ -1,16 +1,32 @@
+ # CI/Release のセキュリティチェック追加
+ 
+ ## 問題
+ 
+ CI/Release の Go バージョンが `go.mod` と揃っておらず、`govulncheck` や `npm audit` がリリース前に実行されていない。Release zip の改ざん確認用チェックサムもない。
+ 
+ ## 期待する挙動
+ 
+ CI/Release で依存関係の既知脆弱性を確認し、Release artifact のチェックサムを生成する。
+ 
+ ## 受け入れ条件
+ 
+ - CI/Release の Go バージョンが `go.mod` と一致する。
+ - CI/Release で `govulncheck ./...` を実行する。
+ - CI/Release で `npm audit --omit=dev` を実行する。
+ - Release に zip と SHA256 チェックサムを添付する。
++
++## 追記: govulncheck 実行バージョンの固定
++
++## 問題
++
++CI/Release workflow の `govulncheck` が `@latest` で実行されており、workflow 実行時に解決された未固定の Go モジュールコードが実行される。
++
++## 期待する挙動
++
++CI/Release workflow はレビュー済みの固定バージョンの `govulncheck` を実行し、将来公開される未確認コードを自動実行しない。
++
++## 受け入れ条件
++
++- CI workflow の `govulncheck` 実行が `@latest` を使わない。
++- Release workflow の `govulncheck` 実行が `@latest` を使わない。
++- 使用する `govulncheck` バージョンが workflow 内で明示されている。
+
+# Attack-path analysis
+Final: high | Decider: model_decided | Matrix severity: high | Policy adjusted: high
+## Rationale
+Severity is kept at high, not critical. The issue is real and in scope: `.github/workflows/release.yml` grants `contents: write` and executes `go run golang.org/x/vuln/cmd/govulncheck@latest ./...` before build, packaging, checksum creation, and release upload. The validation evidence shows the exact primitive can execute attacker-controlled module code and write into the workspace. Impact is high because official release artifacts can be compromised. Likelihood is low because exploitation depends on compromise or malicious control of the upstream golang.org/x/vuln module and a subsequent release run; no direct signing-key compromise or public unauthenticated application RCE is evidenced. The probability-impact combination supports high release-integrity risk but not critical.
+## Likelihood
+high - The vulnerable command is definitely reachable during release runs, and a validation PoC demonstrated arbitrary code execution from a runtime-resolved module. However, a real attacker must first compromise or maliciously publish the upstream govulncheck module selected by `@latest`, making practical exploitation relatively uncommon and higher complexity. | Remote network vector
+## Impact
+high - Successful exploitation can affect official release integrity: malicious code running before build and package can alter the executable, zip, or checksum that are uploaded to GitHub Releases. This can propagate to end users who trust the official release channel.
+## Assumptions
+- The release workflow is used to publish official end-user Windows release artifacts.
+- A future malicious or compromised golang.org/x/vuln module version would be selected by @latest during a release run.
+- GitHub Actions default checkout credential behavior is in effect unless overridden; the workflow does not set persist-credentials: false.
+- No external GitHub repository settings, environment protection rules, or branch/tag protections were inspected because analysis is limited to repository artifacts.
+- Attacker controls or compromises a future golang.org/x/vuln/cmd/govulncheck module version resolved by @latest
+- A release workflow run occurs through tag push or workflow_dispatch
+- The unpinned govulncheck step runs before build, packaging, checksum, and release upload
+## Path
+Attacker controls govulncheck release -> release job runs `go run ...@latest` -> code executes in workspace with contents:write job -> source/artifact tampering -> build/package/checksum -> GitHub Release -> users
+## Path evidence
+- `.github/workflows/release.yml:9-10` - The release workflow grants repository `contents: write` permission to the job.
+- `.github/workflows/release.yml:18-19` - The repository is checked out before the unpinned tool runs, creating a workspace that malicious tool code could modify.
+- `.github/workflows/release.yml:50-52` - The workflow executes govulncheck via `go run ...@latest`, causing runtime resolution and execution of unpinned third-party Go code.
+- `.github/workflows/release.yml:57-60` - The application build occurs after the unpinned govulncheck execution.
+- `.github/workflows/release.yml:62-83` - Packaging, checksum creation, and release upload occur after the unpinned code has had an opportunity to tamper with the workspace.
+- `.github/workflows/ci.yml:73-75` - The same unpinned govulncheck execution also exists in CI, although CI has only contents:read and is less impactful than release.
+## Narrative
+The finding is a real release-pipeline supply-chain issue. The release job grants `contents: write`, checks out the repository, then executes `go run golang.org/x/vuln/cmd/govulncheck@latest ./...`. That command downloads and executes code selected at workflow runtime rather than code pinned in this repository. The application build, zip packaging, SHA256 generation, and GitHub Release upload all occur afterward, so malicious code in a future compromised govulncheck release could modify sources or artifacts before they become official releases. The issue is in scope because release integrity is part of the project threat model. Severity remains high due to potential compromise of official artifacts, but likelihood is low because exploitation requires compromise or malicious publication of an upstream Go module version and a subsequent release run.
+## Controls
+- CI workflow uses `contents: read`, reducing impact for the CI instance of the issue.
+- Release workflow is limited to tag pushes and manual `workflow_dispatch`, so exploitation requires a release run.
+- Go module checksum validation can detect content substitution for known versions but does not prevent malicious code in a newly published latest version.
+- Generated SHA256 checksum is not an independent control because it is produced after the potentially compromised build/package step.
+- No repository artifact shows govulncheck pinned in go.mod, go.sum, or a tools lockfile.
+## Blindspots
+- Static repository analysis cannot verify GitHub branch/tag protection, required reviewers, environment protection, or organization Actions policies.
+- Static analysis cannot confirm actual GitHub Actions runtime token exposure beyond workflow permissions and standard action behavior.
+- No cloud or GitHub APIs were called, so current release usage, installed secrets, and repository settings were not inspected.
+- The workflow does not show a detached release signature step in the inspected file, so conclusions are limited to executable zip and checksum integrity.
