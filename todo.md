@@ -1,26 +1,19 @@
-# v0.1.8 issue解決チェックリスト
+# v0.1.8-rc13準備チェックリスト
 
-- [x] Stream Camera(Spout)を主経路として保存する
-  - [x] Spout受信ヘルパーCLIを追加する
-  - [x] Go側からhelperを検出・sender列挙・1フレーム取得する
-  - [x] 自動撮影Stream方式をffmpeg画面キャプチャからSpoutへ切り替える
-  - [x] Spout取得画像を検証し、sidecar/Discord/履歴へ紐づける
-  - [x] UIとドキュメントからffmpeg主経路の説明を外す
-  - [x] CI/Releaseでhelperとライセンスを同梱する
-- [x] プレイヤー中心ローカル座標系を成立する仕様で実装する
-  - [x] 標準OSCで自動取得できない前提を明記し、手動基準Pose方式を実装する
-  - [x] `player_local` 変換処理とテストを追加する
-  - [x] 構図UI、現在Pose保存/追加、移動、テスト撮影へ反映する
-- [x] 同席ユーザー情報と埋め込みメタデータを完成させる
-  - [x] metadata schemaを定義する
-  - [x] PNG/JPEGへ非破壊でメタデータを書き込む
-  - [x] sidecar/Discord/履歴との整合を取る
-  - [x] UIに埋め込み設定とプライバシー説明を出す
-- [x] 未接続・不要設定を整理する
-  - [x] multi/Camera Dolly、ローカルDB、OSCQueryなどv0.1.8で使わない要件を仕様から外す
-  - [x] Discord postMode/includeImages、出力形式/テンプレート、sidecar削除ライフサイクルを実装またはUIから整理する
-  - [x] Wails API同期チェックとテスト結果表示を追加する
-- [ ] 検証とリリース準備
-  - [x] Goテスト、フロントビルド、workflow構文確認を通す
-  - [x] issues/README.md と各issueを完了状態へ更新する
-  - [x] 署名付きコミットを作成する
+- [ ] Stream Camera(Spout)経路を完了扱いにできる状態へ修正する
+  - [ ] helperのsender選択/エラーJSON/バージョン表示を完成させる
+  - [ ] Go側のSpout画像検証、ログ、sidecar/Discord紐づけを確認する
+  - [ ] Stream設定UIとCI/Release同梱検証をSpout前提へ揃える
+- [ ] player_local構図を完了扱いにできる状態へ修正する
+  - [ ] 初期構図をplayer_localへ変更し、妥当な初期値へ更新する
+  - [ ] world/player_localの順変換・逆変換と保存/追加/移動APIを確認する
+  - [ ] 構図ごとのテスト撮影結果表示を確認する
+- [ ] 埋め込みメタデータを完了扱いにできる状態へ修正する
+  - [ ] metadata schema、PNG/JPEG writer/reader、サイズ超過処理を完成させる
+  - [ ] 保存処理でmetadata失敗を警告扱いにし、sidecar/Discord/履歴と整合させる
+  - [ ] 読み戻しテストと検証手順を追加する
+- [ ] 周辺検証とドキュメントをRC13向けに揃える
+  - [ ] Wails API同期チェックをCIへ追加する
+  - [ ] world/instance metadata取得テストを追加する
+  - [ ] README/SPEC/SETTINGS_SPEC/RELEASE_NOTES/検証手順を同期する
+  - [ ] 未完了が残る場合はissue化し、完了扱いにしない
