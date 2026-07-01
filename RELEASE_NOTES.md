@@ -6,7 +6,7 @@
 
 - 設定画面に「自動撮影」タブを追加し、OSC、撮影間隔、撮影方式、出力、Presence、Discord投稿設定をまとめました。
 - VRChat User CameraへOSCで構図を送り、Stream Camera(Spout)方式またはPhoto方式で有効な構図を順番に撮影する自動撮影機能を追加しました。
-- Stream方式では同梱の `spout-capture.exe` がVRChat Stream CameraのSpout senderから1フレームをPNGとして受信し、必要に応じてJPGへ変換して保存します。
+- Stream方式では同梱の `spout-capture.exe` がVRChat Stream CameraのSpout senderから1フレームをPNGとして受信し、必要に応じてJPGへ変換して保存します。`spout-capture.exe` は `SpoutLibrary.dll` と同じフォルダで実行される必要があります。
 - VRChat output logから同じインスタンスにいるユーザー情報、world ID、instance IDを推定し、撮影画像に対応するsidecar JSONへ保存するようにしました。
 - 自動撮影画像へPNG iTXt/eXIfまたはJPEG EXIF APP1で撮影メタデータを埋め込めるようにしました。ユーザーID埋め込みは設定で独立して制御できます。
 - 自動撮影した画像を既存の結果/履歴画面で扱えるようにし、設定で有効化した場合はDiscord Webhookへ投稿できるようにしました。画像添付なしの本文のみ投稿にも対応しました。
@@ -26,6 +26,8 @@
 - 署名確認用ファイル: [ClipForVRChat-v0.1.8-windows-amd64.exe.asc](https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.8/ClipForVRChat-v0.1.8-windows-amd64.exe.asc)
 - 署名確認用公開鍵: https://keys.openpgp.org/search?q=release-signing@hato.life
 - 署名確認用fingerprint: `BE40 AA8D 082F 493F 613B C072 21DC 3486 1B40 E77D`
+
+配布zipにはStream Camera(Spout)方式用の `spout-capture.exe` と `SpoutLibrary.dll` を同梱します。通常はClipForVRChatから自動実行されるため、手動起動は不要です。
 
 ### 比較
 
