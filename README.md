@@ -100,6 +100,8 @@ Stream方式はVRChat Stream CameraのSpout映像を同梱の `spout-capture.exe
 
 プレイヤー基準構図を使う場合は、標準OSCだけではプレイヤーrootを自動取得できないため、「現在Poseをプレイヤー基準に保存」で手動基準Poseを保存してから `player_local` 構図を使います。
 
+RC確認時の詳しい確認手順は、`docs/v0.1.8-stream-spout-verification.md`、`docs/v0.1.8-player-local-verification.md`、`docs/v0.1.8-embedded-metadata-verification.md` を参照してください。
+
 ### 11. コマンドラインで確認する
 
 PowerShell、cmd、Git Bash からバージョンとヘルプを確認できます。

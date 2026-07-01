@@ -19,6 +19,19 @@ target_include_directories(spout-capture PRIVATE
   ${spout2_SOURCE_DIR}/SPOUTSDK/SpoutLibrary
 )
 
+execute_process(
+  COMMAND git -C ${CMAKE_CURRENT_SOURCE_DIR} rev-parse --short=7 HEAD
+  OUTPUT_VARIABLE SPOUT_CAPTURE_GIT_REVISION
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  ERROR_QUIET
+)
+if (NOT SPOUT_CAPTURE_GIT_REVISION)
+  set(SPOUT_CAPTURE_GIT_REVISION "unknown")
+endif()
+target_compile_definitions(spout-capture PRIVATE
+  SPOUT_CAPTURE_VERSION="v0.1.8-${SPOUT_CAPTURE_GIT_REVISION}"
+)
+
 if (MSVC)
   target_compile_options(spout-capture PRIVATE /W4 /permissive-)
 endif()

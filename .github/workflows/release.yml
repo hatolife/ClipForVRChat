@@ -232,11 +232,17 @@ jobs:
             $unexpectedZipFiles | ForEach-Object { Write-Error "Unexpected file in release zip: $($_.FullName)" }
             throw "Unexpected files were found in release zip"
           }
+          & "dist/ClipForVRChat/spout-capture.exe" --help
+          & "dist/ClipForVRChat/spout-capture.exe" --version
+          & "dist/ClipForVRChat/spout-capture.exe" --list-senders
           $required = @(
             "dist/$env:ASSET_PREFIX-windows-amd64.zip",
             "dist/$env:ASSET_PREFIX-windows-amd64.zip.sha256",
             "dist/$env:ASSET_PREFIX-windows-amd64.exe.asc",
             "dist/$env:ASSET_PREFIX-build-metadata.json",
+            "dist/ClipForVRChat/ClipForVRChat.exe",
+            "dist/ClipForVRChat/README.md",
+            "dist/ClipForVRChat/LICENSE",
             "dist/ClipForVRChat/Release-signing-public-key.url",
             "dist/ClipForVRChat/spout-capture.exe",
             "dist/ClipForVRChat/Spout2-LICENSE.txt"
@@ -244,6 +250,19 @@ jobs:
           foreach ($path in $required) {
             if (!(Test-Path $path)) {
               throw "Required release output was not created: $path"
+            }
+          }
+          $requiredZip = @(
+            "ClipForVRChat.exe",
+            "README.md",
+            "LICENSE",
+            "Release-signing-public-key.url",
+            "spout-capture.exe",
+            "Spout2-LICENSE.txt"
+          )
+          foreach ($name in $requiredZip) {
+            if (!(Test-Path (Join-Path $zipCheckDir $name))) {
+              throw "Required release zip file was not created: $name"
             }
           }
 

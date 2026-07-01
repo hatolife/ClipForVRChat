@@ -430,27 +430,45 @@ func (r AutoCaptureRunner) waitCaptureDelay(ctx context.Context, view CameraView
 func (r AutoCaptureRunner) finalizeAutoCaptureImage(photoPath string, batchID string, shotID string, view CameraViewConfig, sidecarUsers []PresenceUser, discordUsers []PresenceUser, confidence string, world AutoCaptureVRChatMetadata, streamInfo SpoutCaptureResult) Result {
 	cfg := r.Config.AutoCapture
 	logPath := r.Config.DiagnosticLogPath
+	resolvedPose, err := ResolveCameraViewPose(cfg, view)
+	metadataWarnings := []string{}
 	if cfg.Output.WriteEXIF {
 		metadata := BuildAutoCaptureEmbeddedMetadata(cfg, batchID, shotID, view, discordUsers, confidence, streamInfo)
-		if err := WriteAutoCaptureEmbeddedMetadata(photoPath, metadata); err != nil {
-			diagAutoCapture(logPath, "embedded metadata write error: image=%q err=%v", photoPath, err)
-			return Result{Name: view.Name, SourcePath: photoPath, Error: err.Error()}
+		if err == nil {
+			metadata.ResolvedPose = &resolvedPose
+		} else {
+			diagAutoCapture(logPath, "embedded metadata resolved pose skipped: image=%q view_id=%q coordinate_space=%q err=%v", photoPath, view.ID, view.CoordinateSpace, err)
 		}
-		diagAutoCapture(logPath, "embedded metadata write success: image=%q users=%d include_ids=%t", photoPath, len(metadata.Users), cfg.Output.WriteUserIDsToEXIF)
+		warnings, writeErr := WriteAutoCaptureEmbeddedMetadataWithWarnings(photoPath, metadata)
+		metadataWarnings = append(metadataWarnings, warnings...)
+		if writeErr != nil {
+			warning := "埋め込みメタデータを書き込めませんでした: " + writeErr.Error()
+			metadataWarnings = append(metadataWarnings, warning)
+			diagAutoCapture(logPath, "embedded metadata write warning: image=%q err=%v", photoPath, writeErr)
+		} else {
+			diagAutoCapture(logPath, "embedded metadata write success: image=%q users=%d include_ids=%t warnings=%d", photoPath, len(metadata.Users), cfg.Output.WriteUserIDsToEXIF, len(metadataWarnings))
+		}
 	}
 	if cfg.Output.WriteSidecarJSON {
-		if err := WriteAutoCaptureSidecar(photoPath, AutoCaptureSidecar{
-			SchemaVersion:   1,
-			BatchID:         batchID,
-			ShotID:          shotID,
-			CapturedAtLocal: time.Now().Format(time.RFC3339),
-			CapturedAtUTC:   time.Now().UTC().Format(time.RFC3339),
-			CaptureMode:     cfg.Capture.Mode,
-			View:            view,
-			Stream:          autoCaptureStreamMetadata(streamInfo),
-			VRChat:          autoCaptureVRChatMetadata(world, confidence),
-			Users:           sidecarUsers,
-		}); err != nil {
+		sidecar := AutoCaptureSidecar{
+			SchemaVersion:    1,
+			BatchID:          batchID,
+			ShotID:           shotID,
+			CapturedAtLocal:  time.Now().Format(time.RFC3339),
+			CapturedAtUTC:    time.Now().UTC().Format(time.RFC3339),
+			CaptureMode:      cfg.Capture.Mode,
+			View:             view,
+			Stream:           autoCaptureStreamMetadata(streamInfo),
+			VRChat:           autoCaptureVRChatMetadata(world, confidence),
+			Users:            sidecarUsers,
+			MetadataWarnings: metadataWarnings,
+		}
+		if err == nil {
+			sidecar.ResolvedPose = &resolvedPose
+		} else {
+			diagAutoCapture(logPath, "sidecar resolved pose skipped: image=%q view_id=%q coordinate_space=%q err=%v", photoPath, view.ID, view.CoordinateSpace, err)
+		}
+		if err := WriteAutoCaptureSidecar(photoPath, sidecar); err != nil {
 			diagAutoCapture(logPath, "sidecar write error: image=%q err=%v", photoPath, err)
 		} else {
 			diagAutoCapture(logPath, "sidecar write success: image=%q users=%d", photoPath, len(sidecarUsers))
@@ -458,7 +476,7 @@ func (r AutoCaptureRunner) finalizeAutoCaptureImage(photoPath string, batchID st
 	} else {
 		diagAutoCapture(logPath, "sidecar write skipped: disabled image=%q", photoPath)
 	}
-	result := Result{SourcePath: photoPath, OutputPath: photoPath, Name: filepath.Base(photoPath)}
+	result := Result{SourcePath: photoPath, OutputPath: photoPath, Name: filepath.Base(photoPath), Warnings: metadataWarnings}
 	if cfg.Discord.Enabled {
 		webhook := cfg.Discord.WebhookURL
 		if strings.TrimSpace(webhook) == "" {
@@ -494,17 +512,19 @@ func (r AutoCaptureRunner) emit(event AutoCaptureEvent) {
 }
 
 type AutoCaptureSidecar struct {
-	SchemaVersion   int                        `json:"schema_version"`
-	BatchID         string                     `json:"batch_id"`
-	ShotID          string                     `json:"shot_id"`
-	CapturedAtLocal string                     `json:"captured_at_local"`
-	CapturedAtUTC   string                     `json:"captured_at_utc"`
-	CaptureMode     string                     `json:"capture_mode"`
-	View            CameraViewConfig           `json:"view"`
-	Stream          *AutoCaptureStreamMetadata `json:"stream,omitempty"`
-	VRChat          AutoCaptureVRChatMetadata  `json:"vrchat"`
-	Users           []PresenceUser             `json:"users"`
-	Files           AutoCaptureFileMetadata    `json:"files"`
+	SchemaVersion    int                        `json:"schema_version"`
+	BatchID          string                     `json:"batch_id"`
+	ShotID           string                     `json:"shot_id"`
+	CapturedAtLocal  string                     `json:"captured_at_local"`
+	CapturedAtUTC    string                     `json:"captured_at_utc"`
+	CaptureMode      string                     `json:"capture_mode"`
+	View             CameraViewConfig           `json:"view"`
+	ResolvedPose     *CameraPoseConfig          `json:"resolved_pose,omitempty"`
+	Stream           *AutoCaptureStreamMetadata `json:"stream,omitempty"`
+	VRChat           AutoCaptureVRChatMetadata  `json:"vrchat"`
+	Users            []PresenceUser             `json:"users"`
+	Files            AutoCaptureFileMetadata    `json:"files"`
+	MetadataWarnings []string                   `json:"metadata_warnings,omitempty"`
 }
 
 type AutoCaptureStreamMetadata struct {
@@ -821,18 +841,22 @@ func SnapshotVRChatWorld(logDir string) AutoCaptureVRChatMetadata {
 }
 
 func parseVRChatWorldMetadata(logText string) AutoCaptureVRChatMetadata {
-	worldRe := regexp.MustCompile(`wrld_[0-9A-Za-z-]+(?::[0-9A-Za-z~._:-]+)?`)
+	worldRe := regexp.MustCompile(`wrld_[0-9A-Za-z-]+(?::[0-9A-Za-z~._:()%-]+)?`)
 	matches := worldRe.FindAllString(logText, -1)
 	if len(matches) == 0 {
 		return AutoCaptureVRChatMetadata{}
 	}
-	last := matches[len(matches)-1]
+	last := trimVRChatWorldToken(matches[len(matches)-1])
 	parts := strings.SplitN(last, ":", 2)
 	meta := AutoCaptureVRChatMetadata{WorldID: parts[0]}
 	if len(parts) == 2 {
 		meta.InstanceID = parts[1]
 	}
 	return meta
+}
+
+func trimVRChatWorldToken(value string) string {
+	return strings.TrimRight(value, ".,;]")
 }
 
 func presenceUsersWithoutIDs(users []PresenceUser) []PresenceUser {

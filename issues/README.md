@@ -125,7 +125,7 @@
 | 118 | [自動撮影の解像度一時変更はv0.1.8で断念する](118-defer-auto-capture-resolution-control.md) | 完了 | `v0.1.8` | v0.1.8ではVRChatの現在のカメラ解像度設定を使用し、未完成の解像度変更設定を出さない。 |
 | 119 | [未実装の自動撮影方式を設定画面から外す](119-remove-unimplemented-auto-capture-mode-options.md) | 完了 | `v0.1.8` | 実装済みのStream(ffmpeg)方式とPhoto方式だけを表示し、未実装方式を設定画面から外す。 |
 | 120 | [自動撮影のPose操作と初期構図設定を修正する](120-fix-auto-capture-pose-controls-and-defaults.md) | 完了 | `v0.1.8` | 初期Pose、拡大率、撮影トグル、現在Pose保存/追加APIを修正する。 |
-| 121 | [自動撮影をローカル視点基準とStream方式中心に修正する](121-stream-camera-local-view-and-error-ux.md) | 要対応 | `v0.1.8` | ローカル視点、テスト撮影、失敗表示、UI文言、Stream方式を修正する。 |
+| 121 | [自動撮影をローカル視点基準とStream方式中心に修正する](121-stream-camera-local-view-and-error-ux.md) | 要確認 | `v0.1.8` | ローカル視点、テスト撮影、失敗表示、UI文言、Stream方式を修正する。 |
 | 122 | [自動撮影Stream方式のffmpeg確認と導入導線を追加する](122-auto-capture-ffmpeg-status-and-install.md) | 完了 | `v0.1.8` | Stream方式に必要なffmpegの確認、未導入表示、winget導入ボタンを追加する。 |
 | 123 | [自動撮影Stream方式でデスクトップ全体を撮らない](123-avoid-desktop-ffmpeg-stream-input.md) | 完了 | `v0.1.8` | ffmpeg入力引数の初期値と既存設定移行でデスクトップ全体撮影を避ける。 |
 | 124 | [自動撮影Stream方式で白画像になるtitle取得を避ける](124-capture-vrchat-window-region-instead-of-title.md) | 完了 | `v0.1.8` | VRChatウィンドウtitle直接取得ではなく画面上のウィンドウ範囲を切り出す。 |
@@ -133,25 +133,25 @@
 | 126 | [自動撮影OSCの押下状態を解除するデバッグボタンを追加する](126-add-auto-capture-osc-recovery-button.md) | 完了 | `v0.1.8` | User Camera関連OSCをfalse/Offへ戻すデバッグボタンを追加する。 |
 | 127 | [v0.1.8最小要件のtodoを再整理する](127-restate-v018-minimum-requirements-todo.md) | 完了 | `v0.1.8` | v0.1.8の最小要件を大項目/小項目でtodoへ再整理する。 |
 | 128 | [VRChat Stream Camera/Spout映像そのものを保存する方式を調査する](128-investigate-vrchat-stream-camera-spout-capture.md) | 完了 | `v0.1.8` | Stream Camera/Spout出力を直接受信して静止画保存する方式を調査し、実装issueへ分割する。 |
-| 129 | [Spout受信ヘルパーを追加する](129-add-spout-capture-helper.md) | 要対応 | `v0.1.8` | Windows同梱のSpout受信ヘルパーでsender列挙と1フレームPNG保存を行う。 |
-| 130 | [Spout sender設定と診断UIを追加する](130-add-spout-sender-settings-and-diagnostics.md) | 要対応 | `v0.1.8` | 自動撮影タブからSpout helper確認、sender一覧取得、sender選択/自動選択を設定できるようにする。 |
-| 131 | [自動撮影Stream方式をSpoutヘルパーへ統合する](131-integrate-spout-helper-into-auto-capture.md) | 要対応 | `v0.1.8` | Stream方式でFFmpeg画面キャプチャではなくSpoutヘルパーから画像を取得する。 |
-| 132 | [Spout取得画像とメタデータを検証する](132-validate-spout-capture-output-and-metadata.md) | 要対応 | `v0.1.8` | Spout取得画像の有効性とsender情報を検証し、sidecar/Discordへ紐づける。 |
-| 133 | [Stream方式UIとドキュメントをSpout前提へ更新する](133-update-auto-capture-stream-ui-and-docs-for-spout.md) | 要対応 | `v0.1.8` | 自動撮影タブとドキュメントからFFmpeg主経路の誤解をなくし、Stream Camera(Spout)前提にする。 |
-| 134 | [CI/ReleaseでSpoutヘルパーをビルド/同梱する](134-package-spout-helper-in-ci-release.md) | 要対応 | `v0.1.8` | Windows CI/ReleaseでSpoutヘルパーと必要DLL/ライセンスをビルド・同梱・検証する。 |
-| 135 | [Stream Camera/Spout方式の実機確認手順を整備する](135-add-spout-stream-camera-verification-guide.md) | 要対応 | `v0.1.8` | RC実機確認でStream Camera映像そのものを保存できているか確認する手順を作る。 |
+| 129 | [Spout受信ヘルパーを追加する](129-add-spout-capture-helper.md) | 要確認 | `v0.1.8` | Windows同梱のSpout受信ヘルパーでsender列挙と1フレームPNG保存を行う。 |
+| 130 | [Spout sender設定と診断UIを追加する](130-add-spout-sender-settings-and-diagnostics.md) | 要確認 | `v0.1.8` | 自動撮影タブからSpout helper確認、sender一覧取得、sender選択/自動選択を設定できるようにする。 |
+| 131 | [自動撮影Stream方式をSpoutヘルパーへ統合する](131-integrate-spout-helper-into-auto-capture.md) | 要確認 | `v0.1.8` | Stream方式でFFmpeg画面キャプチャではなくSpoutヘルパーから画像を取得する。 |
+| 132 | [Spout取得画像とメタデータを検証する](132-validate-spout-capture-output-and-metadata.md) | 要確認 | `v0.1.8` | Spout取得画像の有効性とsender情報を検証し、sidecar/Discordへ紐づける。 |
+| 133 | [Stream方式UIとドキュメントをSpout前提へ更新する](133-update-auto-capture-stream-ui-and-docs-for-spout.md) | 完了 | `v0.1.8` | 自動撮影タブとドキュメントからFFmpeg主経路の誤解をなくし、Stream Camera(Spout)前提にする。 |
+| 134 | [CI/ReleaseでSpoutヘルパーをビルド/同梱する](134-package-spout-helper-in-ci-release.md) | 要確認 | `v0.1.8` | Windows CI/ReleaseでSpoutヘルパーと必要DLL/ライセンスをビルド・同梱・検証する。 |
+| 135 | [Stream Camera/Spout方式の実機確認手順を整備する](135-add-spout-stream-camera-verification-guide.md) | 完了 | `v0.1.8` | RC実機確認でStream Camera映像そのものを保存できているか確認する手順を作る。 |
 | 136 | [プレイヤー中心ローカル座標系の仕様を確定する](136-investigate-player-local-camera-coordinate-spec.md) | 完了 | `v0.1.8` | 自動撮影構図をプレイヤー位置/向き基準のローカル座標として扱う仕様と実装方針を調査し、実装issueへ分割する。 |
 | 137 | [EXIFへ同席ユーザー情報を書き込む方式を調査する](137-investigate-exif-presence-user-metadata.md) | 完了 | `v0.1.8` | 自動撮影画像へ同席ユーザー情報をEXIF/XMP/PNGメタデータとして保持する方式を調査し、実装issueへ分割する。 |
-| 138 | [`player_local` 座標仕様を確定する](138-define-player-local-coordinate-spec.md) | 要対応 | `v0.1.8` | プレイヤー中心ローカル構図の原点、軸、回転、初期値、既存設定互換を定義する。 |
+| 138 | [`player_local` 座標仕様を確定する](138-define-player-local-coordinate-spec.md) | 完了 | `v0.1.8` | プレイヤー中心ローカル構図の原点、軸、回転、初期値、既存設定互換を定義する。 |
 | 139 | [ローカルプレイヤー基準Poseの取得可否を実機調査する](139-investigate-player-basis-source.md) | 完了 | `v0.1.8` | 標準OSC/OSCQuery/ログ等からプレイヤー位置と向きを取得できるか確認する。 |
-| 140 | [`player_local` からUser Camera Poseへの変換処理を実装する](140-implement-player-local-pose-transform.md) | 要対応 | `v0.1.8` | プレイヤー基準Poseがある場合にローカル構図をワールドPoseへ変換する。 |
-| 141 | [自動撮影構図UIへ `player_local` を統合する](141-integrate-player-local-coordinate-ui.md) | 要対応 | `v0.1.8` | 構図設定、現在Pose保存/追加、リセット、移動、テスト撮影を座標系に対応させる。 |
-| 142 | [プレイヤー中心構図の実機確認手順を整備する](142-verify-player-local-camera-compositions.md) | 要対応 | `v0.1.8` | Desktop/VR/アバター差分を含めた正面・背後・斜め構図の確認手順を作る。 |
-| 143 | [自動撮影の埋め込みメタデータschemaを確定する](143-define-autocapture-embedded-metadata-schema.md) | 要対応 | `v0.1.8` | EXIF/PNGメタデータへ入れる撮影情報と同席ユーザー情報のschema、サイズ、プライバシー方針を決める。 |
-| 144 | [PNG/JPEGの埋め込みメタデータwriterを追加する](144-implement-image-metadata-writer.md) | 要対応 | `v0.1.8` | JPEG EXIF APP1、PNG eXIf/iTXtへ非破壊でメタデータを書き込むwriterを追加する。 |
-| 145 | [自動撮影保存処理へEXIF/PNGメタデータ書き込みを統合する](145-integrate-exif-presence-metadata.md) | 要対応 | `v0.1.8` | `finalizeAutoCaptureImage` に埋め込みメタデータ書き込みを接続し、sidecar/Discordと整合させる。 |
+| 140 | [`player_local` からUser Camera Poseへの変換処理を実装する](140-implement-player-local-pose-transform.md) | 完了 | `v0.1.8` | プレイヤー基準Poseがある場合にローカル構図をワールドPoseへ変換する。 |
+| 141 | [自動撮影構図UIへ `player_local` を統合する](141-integrate-player-local-coordinate-ui.md) | 要確認 | `v0.1.8` | 構図設定、現在Pose保存/追加、リセット、移動、テスト撮影を座標系に対応させる。 |
+| 142 | [プレイヤー中心構図の実機確認手順を整備する](142-verify-player-local-camera-compositions.md) | 完了 | `v0.1.8` | Desktop/VR/アバター差分を含めた正面・背後・斜め構図の確認手順を作る。 |
+| 143 | [自動撮影の埋め込みメタデータschemaを確定する](143-define-autocapture-embedded-metadata-schema.md) | 完了 | `v0.1.8` | EXIF/PNGメタデータへ入れる撮影情報と同席ユーザー情報のschema、サイズ、プライバシー方針を決める。 |
+| 144 | [PNG/JPEGの埋め込みメタデータwriterを追加する](144-implement-image-metadata-writer.md) | 完了 | `v0.1.8` | JPEG EXIF APP1、PNG eXIf/iTXtへ非破壊でメタデータを書き込むwriterを追加する。 |
+| 145 | [自動撮影保存処理へEXIF/PNGメタデータ書き込みを統合する](145-integrate-exif-presence-metadata.md) | 完了 | `v0.1.8` | `finalizeAutoCaptureImage` に埋め込みメタデータ書き込みを接続し、sidecar/Discordと整合させる。 |
 | 146 | [EXIF/埋め込みメタデータ設定とプライバシー説明をUIへ出す](146-expose-exif-privacy-settings.md) | 完了 | `v0.1.8` | 自動撮影タブで埋め込みメタデータとユーザーID埋め込みを設定できるようにする。 |
-| 147 | [埋め込みメタデータの読み戻し/Discord投稿後/実機検証を整備する](147-verify-embedded-metadata-output.md) | 要対応 | `v0.1.8` | PNG/JPEG読み戻し、Discord投稿後、ユーザー数過多時のメタデータ検証手順を整備する。 |
+| 147 | [埋め込みメタデータの読み戻し/Discord投稿後/実機検証を整備する](147-verify-embedded-metadata-output.md) | 完了 | `v0.1.8` | PNG/JPEG読み戻し、Discord投稿後、ユーザー数過多時のメタデータ検証手順を整備する。 |
 | 148 | [未実装/ダミー/簡易実装を洗い出す](148-audit-incomplete-dummy-implementations.md) | 完了 | `v0.1.8` | 既存コードの未実装、仮実装、設定だけ存在する項目を洗い出して個別issueへ分割する。 |
 | 149 | [自動撮影multi/Camera Dolly設定を実装または削除する](149-implement-or-remove-autocapture-multi-camera-settings.md) | 完了 | `v0.1.8` | 保存/正規化されるmulti撮影設定を実装するか、未実装設定として隠す。 |
 | 150 | [自動撮影スケジュールの重複実行制御を接続する](150-connect-autocapture-scheduler-overlap-controls.md) | 完了 | `v0.1.8` | `skipIfPreviousBatchRunning` と `maxBatches` を実際のスケジューラ挙動へ反映する。 |
@@ -160,17 +160,17 @@
 | 153 | [自動撮影の出力形式/ファイル名テンプレートを設定画面へ出す](153-expose-autocapture-output-format-and-filename-template.md) | 完了 | `v0.1.8` | `imageFormat` と `filenameTemplate` を自動撮影タブから設定できるようにする。 |
 | 154 | [DiscordユーザーID出力をsidecar JSON設定から独立させる](154-decouple-autocapture-discord-user-id-from-sidecar-user-id.md) | 完了 | `v0.1.8` | sidecar/Discord/EXIFのユーザーID出力制御を出力先ごとに独立させる。 |
 | 155 | [sidecar JSONの履歴・削除ライフサイクルを定義する](155-define-sidecar-json-lifecycle-with-history-delete.md) | 完了 | `v0.1.8` | 画像削除や履歴削除時にsidecar JSONをどう扱うか仕様化し実装へ接続する。 |
-| 156 | [Wails公開APIとフロント呼び出しの同期チェックを追加する](156-add-wails-api-surface-check.md) | 要対応 | `v0.1.8` | フロントが呼ぶWails APIとGo公開メソッドの不一致をCI/検証で検出する。 |
-| 157 | [v0.1.8自動撮影とRelease成果物仕様をREADME/SPECへ反映する](157-sync-v018-autocapture-docs-and-specs.md) | 要対応 | `v0.1.8` | README/設定仕様/SPECをv0.1.8自動撮影の実装済み範囲と制約に同期する。 |
-| 158 | [自動撮影sidecarのworld/instance metadataを取得または削除する](158-populate-or-remove-autocapture-world-instance-metadata.md) | 要対応 | `v0.1.8` | sidecarに存在するworld/instance metadataフィールドを実データへ接続するかschemaから外す。 |
+| 156 | [Wails公開APIとフロント呼び出しの同期チェックを追加する](156-add-wails-api-surface-check.md) | 完了 | `v0.1.8` | フロントが呼ぶWails APIとGo公開メソッドの不一致をCI/検証で検出する。 |
+| 157 | [v0.1.8自動撮影とRelease成果物仕様をREADME/SPECへ反映する](157-sync-v018-autocapture-docs-and-specs.md) | 完了 | `v0.1.8` | README/設定仕様/SPECをv0.1.8自動撮影の実装済み範囲と制約に同期する。 |
+| 158 | [自動撮影sidecarのworld/instance metadataを取得または削除する](158-populate-or-remove-autocapture-world-instance-metadata.md) | 完了 | `v0.1.8` | sidecarに存在するworld/instance metadataフィールドを実データへ接続するかschemaから外す。 |
 | 159 | [Discord投稿でallowed_mentionsを無効化する](159-disable-discord-allowed-mentions.md) | 完了 | `v0.1.8` | Webhook投稿payloadで意図しないメンションを防ぐ。 |
 | 160 | [自動撮影ローカルDB要件を実装または仕様から外す](160-decide-autocapture-local-database-requirement.md) | 完了 | `v0.1.8` | SQLite/ローカルDB要件と現行sidecar/history方式の差分を解消する。 |
 | 161 | [OSCQueryによるVRChat OSC検出を実装または延期明示する](161-implement-or-defer-oscquery-discovery.md) | 完了 | `v0.1.8` | OSCQuery未実装の扱いを決め、実装または手動設定のみの仕様へ整理する。 |
 | 162 | [自動撮影間隔のUI最小値をNormalizeと一致させる](162-align-autocapture-interval-ui-validation.md) | 完了 | `v0.1.8` | 撮影間隔UIの最小値とNormalizeの丸め値を一致させる。 |
-| 163 | [自動撮影テスト結果を設定画面に表示する](163-show-autocapture-test-results-in-settings.md) | 要対応 | `v0.1.8` | 構図ごとのテスト撮影成功/失敗結果を設定画面上で確認できるようにする。 |
+| 163 | [自動撮影テスト結果を設定画面に表示する](163-show-autocapture-test-results-in-settings.md) | 完了 | `v0.1.8` | 構図ごとのテスト撮影成功/失敗結果を設定画面上で確認できるようにする。 |
 | 164 | [v0.1.8完了扱い項目の再監査](164-audit-v018-completed-items.md) | 完了 | `v0.1.8` | 完了扱いのv0.1.8項目に不完全な実装や未確認項目が残っていないか確認する。 |
 | 165 | [v0.1.8未完了項目の実装前調査](165-plan-v018-incomplete-implementation.md) | 完了 | `v0.1.8` | 未完了項目を実装可能な粒度に調査し、各issueへ実装方針を追記する。 |
-| 166 | [v0.1.8-rc13作成可能状態まで未完了項目を解消する](166-prepare-v018-rc13-readiness.md) | 要対応 | `v0.1.8` | RC13作成前に未完了issueを実装・検証し、残課題を再チケット化する。 |
+| 166 | [v0.1.8-rc13作成可能状態まで未完了項目を解消する](166-prepare-v018-rc13-readiness.md) | 要確認 | `v0.1.8` | RC13作成前に未完了issueを実装・検証し、残課題を再チケット化する。 |
 
 ## 状態の意味
 

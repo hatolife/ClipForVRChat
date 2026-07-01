@@ -29,7 +29,7 @@ func TestDefaultAutoCaptureConfig(t *testing.T) {
 	if cfg.AutoCapture.Views[0].ID != "front" || cfg.AutoCapture.Views[0].Calibrated || cfg.AutoCapture.Views[0].Zoom == nil {
 		t.Fatalf("unexpected first view: %+v", cfg.AutoCapture.Views[0])
 	}
-	if cfg.AutoCapture.Views[0].CoordinateSpace != "world" || cfg.AutoCapture.Views[0].Pose.Position.Z == 0 {
+	if cfg.AutoCapture.Views[0].CoordinateSpace != "player_local" || cfg.AutoCapture.Views[0].Pose.Position.Z != 1.0 {
 		t.Fatalf("default front view pose was not initialized: %+v", cfg.AutoCapture.Views[0])
 	}
 }
@@ -148,7 +148,7 @@ func TestAutoCaptureConfigNormalizeMigratesDefaultTemplateViews(t *testing.T) {
 	}
 	cfg.Normalize()
 	view := cfg.AutoCapture.Views[0]
-	if view.CoordinateSpace != "world" || view.Pose.Position.Z == 0 || view.Zoom == nil {
+	if view.CoordinateSpace != "player_local" || view.Pose.Position.Z != 1.0 || view.Zoom == nil {
 		t.Fatalf("default template view was not migrated: %+v", view)
 	}
 }
@@ -328,10 +328,10 @@ func TestAutoCaptureUserIDOutputsAreIndependent(t *testing.T) {
 func TestParseVRChatWorldMetadata(t *testing.T) {
 	logText := `
 2026.06.30 20:00:00 Log - Joining wrld_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:12345~region(jp)
-2026.06.30 21:00:00 Log - Joining wrld_ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee:67890~region(us)
+2026.06.30 21:00:00 Log - Joining wrld_ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee:67890~private(usr_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa)~nonce(123456)~region(us).
 `
 	meta := parseVRChatWorldMetadata(logText)
-	if meta.WorldID != "wrld_ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee" || meta.InstanceID != "67890~region" {
+	if meta.WorldID != "wrld_ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee" || meta.InstanceID != "67890~private(usr_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa)~nonce(123456)~region(us)" {
 		t.Fatalf("meta = %+v", meta)
 	}
 }

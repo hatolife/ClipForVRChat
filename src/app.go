@@ -411,8 +411,14 @@ func (a *App) SaveCurrentCameraPoseToView(viewID string) (appcore.Config, error)
 		if cfg.AutoCapture.Views[i].ID != viewID {
 			continue
 		}
-		cfg.AutoCapture.Views[i].Pose = pose
-		cfg.AutoCapture.Views[i].CoordinateSpace = "world"
+		savedPose := pose
+		if cfg.AutoCapture.Views[i].CoordinateSpace == "player_local" {
+			if !cfg.AutoCapture.PlayerLocal.Calibrated {
+				return cfg, fmt.Errorf("プレイヤー基準Poseが未設定のため、player_local構図を保存できません。自動撮影タブで現在Poseをプレイヤー基準として保存してください")
+			}
+			savedPose = appcore.InverseTransformPlayerLocalPose(cfg.AutoCapture.PlayerLocal.BasisPose, pose)
+		}
+		cfg.AutoCapture.Views[i].Pose = savedPose
 		cfg.AutoCapture.Views[i].Calibrated = true
 		found = true
 		break
@@ -427,7 +433,7 @@ func (a *App) SaveCurrentCameraPoseToView(viewID string) (appcore.Config, error)
 	return a.state.Config, nil
 }
 
-func (a *App) AddCurrentCameraPoseAsView() (appcore.Config, error) {
+func (a *App) AddCurrentCameraPoseAsView(viewID string) (appcore.Config, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	cfg := a.state.Config
@@ -436,23 +442,96 @@ func (a *App) AddCurrentCameraPoseAsView() (appcore.Config, error) {
 	if err != nil {
 		return cfg, err
 	}
+	viewID = strings.TrimSpace(viewID)
+	var sourceView appcore.CameraViewConfig
+	found := false
+	for _, candidate := range cfg.AutoCapture.Views {
+		if candidate.ID == viewID {
+			sourceView = candidate
+			found = true
+			break
+		}
+	}
+	if !found {
+		return cfg, fmt.Errorf("構図が見つかりません: %s", viewID)
+	}
+	savedPose := pose
+	if sourceView.CoordinateSpace == "player_local" {
+		if !cfg.AutoCapture.PlayerLocal.Calibrated {
+			return cfg, fmt.Errorf("プレイヤー基準Poseが未設定のため、player_local構図を追加できません。自動撮影タブで現在Poseをプレイヤー基準として保存してください")
+		}
+		savedPose = appcore.InverseTransformPlayerLocalPose(cfg.AutoCapture.PlayerLocal.BasisPose, pose)
+	}
 	id := newCameraViewID(cfg.AutoCapture.Views)
-	zoom := 1.0
+	var zoom *float64
+	if sourceView.Zoom != nil {
+		value := *sourceView.Zoom
+		zoom = &value
+	}
+	var exposure *float64
+	if sourceView.Exposure != nil {
+		value := *sourceView.Exposure
+		exposure = &value
+	}
+	var focalDistance *float64
+	if sourceView.FocalDistance != nil {
+		value := *sourceView.FocalDistance
+		focalDistance = &value
+	}
+	var aperture *float64
+	if sourceView.Aperture != nil {
+		value := *sourceView.Aperture
+		aperture = &value
+	}
+	var lookAtMe *bool
+	if sourceView.LookAtMe != nil {
+		value := *sourceView.LookAtMe
+		lookAtMe = &value
+	}
+	var showUIInCamera *bool
+	if sourceView.ShowUIInCamera != nil {
+		value := *sourceView.ShowUIInCamera
+		showUIInCamera = &value
+	}
+	var localPlayer *bool
+	if sourceView.LocalPlayer != nil {
+		value := *sourceView.LocalPlayer
+		localPlayer = &value
+	}
+	var remotePlayer *bool
+	if sourceView.RemotePlayer != nil {
+		value := *sourceView.RemotePlayer
+		remotePlayer = &value
+	}
+	var environment *bool
+	if sourceView.Environment != nil {
+		value := *sourceView.Environment
+		environment = &value
+	}
 	cfg.AutoCapture.Views = append(cfg.AutoCapture.Views, appcore.CameraViewConfig{
 		ID:              id,
 		Name:            fmt.Sprintf("構図 %d", len(cfg.AutoCapture.Views)+1),
-		Enabled:         true,
+		Enabled:         sourceView.Enabled,
 		SortOrder:       nextCameraViewSortOrder(cfg.AutoCapture.Views),
-		CoordinateSpace: "world",
-		Pose:            pose,
-		Zoom:            &zoom,
-		SettleDelayMS:   cfg.AutoCapture.Capture.SettleDelayMS,
+		CoordinateSpace: sourceView.CoordinateSpace,
+		Pose:            savedPose,
+		Zoom:            zoom,
+		Exposure:        exposure,
+		FocalDistance:   focalDistance,
+		Aperture:        aperture,
+		LookAtMe:        lookAtMe,
+		ShowUIInCamera:  showUIInCamera,
+		LocalPlayer:     localPlayer,
+		RemotePlayer:    remotePlayer,
+		Environment:     environment,
+		SettleDelayMS:   sourceView.SettleDelayMS,
+		CaptureDelayMS:  sourceView.CaptureDelayMS,
 		Calibrated:      true,
 	})
 	if err := a.saveAutoCaptureConfigFromSettingsLocked(cfg); err != nil {
 		return cfg, err
 	}
-	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "auto-capture pose saved as new view=%q", id)
+	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "auto-capture pose saved as new view=%q source_view_id=%q coordinate_space=%q", id, viewID, sourceView.CoordinateSpace)
 	return a.state.Config, nil
 }
 

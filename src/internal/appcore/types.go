@@ -28,6 +28,7 @@ type Result struct {
 	QRURLs           []string `json:"qrUrls"`
 	Thumbnail        string   `json:"thumbnail"`
 	Error            string   `json:"error"`
+	Warnings         []string `json:"warnings,omitempty"`
 	HistoryID        string   `json:"historyId"`
 	DiscordMessageID string   `json:"discordMessageId"`
 	DiscordWebhookID string   `json:"discordWebhookId"`
