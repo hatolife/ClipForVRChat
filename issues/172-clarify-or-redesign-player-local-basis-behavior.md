@@ -22,3 +22,4 @@
 
 - 標準OSCの `/usercamera/Pose` はUser Cameraのworld poseであり、ローカルプレイヤーrootの位置/Yawを返すものではない。
 - rc14では `AutoCapture.PlayerLocal.BasisPose` を手動保存し、そのPoseを原点/Yaw基準として `player_local` 構図をworld poseへ変換している。
+- 現在のプレイヤー位置取得方法の再調査は [#139](139-investigate-player-basis-source.md) に追記した。
