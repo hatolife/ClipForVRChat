@@ -1,0 +1,195 @@
+Release workflow uses unpinned write-capable actions
+Link: https://chatgpt.com/codex/cloud/security/findings/e26bcdb25a588191983c383de4124ed5?sev=critical%2Chigh
+Criticality: high (attack path: high)
+Status: new
+
+# Metadata
+Repo: hatolife/ClipForVRChat
+Commit: 9a816fe
+Author: poppo@hato.life
+Created: 2026/6/29 13:49:24
+Assignee: Unassigned
+Signals: Security, Validated, Patch generated, Attack-path
+
+# Summary
+A supply-chain hardening bug was introduced by adding a write-capable release workflow that depends on mutable action tags. Pin release actions to audited commit SHAs, preferably minimize token permissions to the exact operations needed, and consider using trusted first-party tooling or verifying action provenance.
+The release workflow introduced in this commit runs on release tags and manual dispatch with `contents: write`, then executes `softprops/action-gh-release@v2`. Because the action is referenced by a mutable tag rather than an immutable commit SHA, a compromise of the upstream action repository, action maintainer account, or tag could cause arbitrary code to run in this repository's release workflow with a write-capable GITHUB_TOKEN. That code could create or modify official GitHub releases and upload malicious release assets under the project's trusted release channel. `actions/checkout@v4` is also tag-pinned, but the most security-relevant issue is the third-party release action combined with write permissions.
+
+# Validation
+## Rubric
+- [x] Confirm the target commit and that `.github/workflows/release.yml` was introduced by this commit.
+- [x] Confirm the workflow is reachable through release-style triggers such as pushed `v*` tags or manual dispatch.
+- [x] Confirm the workflow grants `GITHUB_TOKEN` write authority relevant to releases/repository contents.
+- [x] Confirm a third-party release action is executed in the write-capable job.
+- [x] Confirm the action reference is a mutable tag/version rather than an immutable audited commit SHA.
+## Report
+Validated the finding against checked-out commit 9a816fec98b8ea7940509c4a53d08fdec836f21e. Direct crash/Valgrind/debugger validation is not applicable because this is a GitHub Actions supply-chain configuration issue, not a runtime memory-safety bug; targeted enumeration showed the repository contains only documentation and workflow files, and no compiled/executable target was present. gdb and valgrind were also not installed. Evidence: `find . -maxdepth 3 -type f` listed `.github/workflows/ci.yml`, `.github/workflows/release.yml`, `LICENSE`, `README.md`, and `SPEC.md`; `command -v gdb` and `command -v valgrind` returned no paths. The release workflow was introduced by this commit: `git show --name-status HEAD -- .github/workflows/release.yml` showed `A .github/workflows/release.yml`, and `git show HEAD^:.github/workflows/release.yml` failed because the file did not exist in the parent. In `.github/workflows/release.yml`, lines 3-7 trigger the workflow on pushed tags matching `v*`, line 7 enables `workflow_dispatch`, lines 9-10 grant `contents: write`, and lines 26-30 execute `softprops/action-gh-release@v2` to create/upload release artifacts. The `@v2` ref is not an immutable 40-character commit SHA, so the job depends on a mutable third-party action ref while running with a write-capable GITHUB_TOKEN. A validation script confirmed: `tag_trigger=True`, `manual_dispatch=True`, `contents_write_lines=10`, `mutable_action_refs=19:actions/checkout@v4;27:softprops/action-gh-release@v2`, `third_party_release_action_mutably_pinned=27:softprops/action-gh-release@v2`, and `RESULT=VULNERABLE_CONFIGURATION_PRESENT`. This supports the suspected supply-chain hardening bug: if the upstream action/tag or maintainer is compromised, arbitrary action code could run in this release workflow with authority to create/modify GitHub releases and upload assets.
+
+# Evidence
+github/workflows/release.yml (L18 to 19)
+  Note: The workflow uses an action pinned only to a mutable version tag rather than an immutable commit SHA.
+
+github/workflows/release.yml (L26 to 30)
+  Note: A third-party release action is executed with write permissions and is referenced as softprops/action-gh-release@v2, a mutable tag that could be retargeted or compromised.
+
+github/workflows/release.yml (L9 to 10)
+  Note: The workflow grants the GITHUB_TOKEN contents write permission, giving actions in this job authority to create or modify releases and repository contents.
+
+Proposed patch:
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index cf2a56ced1827fdfa9ad0f4550fdfd01ced4d522..cd95dbfad1265c35d95e825b68781ef602e35fbe 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -232,35 +232,52 @@ jobs:
+       - name: Download release assets artifact
+         uses: actions/download-artifact@v7
+         with:
+           name: release-assets-${{ github.ref_name }}
+           path: dist
+ 
+       - name: Prepare version
+         id: version
+         shell: bash
+         run: |
+           tag_name="${{ github.ref_name }}"
+           if [[ "$tag_name" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ || "$tag_name" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc[0-9]+$ ]]; then
+             draft=false
+           else
+             draft=true
+           fi
+           if [[ "$tag_name" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc[0-9]+$ ]]; then
+             prerelease=true
+           else
+             prerelease=false
+           fi
+           echo "draft=$draft" >> "$GITHUB_OUTPUT"
+           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+ 
+       - name: Create release
+-        uses: softprops/action-gh-release@v3
+-        with:
+-          draft: ${{ steps.version.outputs.draft }}
+-          prerelease: ${{ steps.version.outputs.prerelease }}
+-          body_path: dist/release-body.md
+-          files: |
+-            dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip
+-            dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.zip.sha256
+-            dist/ClipForVRChat-${{ github.ref_name }}-windows-amd64.exe.asc
+-            dist/ClipForVRChat-${{ github.ref_name }}-build-metadata.json
++        env:
++          GH_TOKEN: ${{ github.token }}
++          TAG_NAME: ${{ github.ref_name }}
++          DRAFT: ${{ steps.version.outputs.draft }}
++          PRERELEASE: ${{ steps.version.outputs.prerelease }}
++        run: |
++          set -euo pipefail
++          args=(
++            --title "$TAG_NAME"
++            --notes-file dist/release-body.md
++          )
++          if [[ "$DRAFT" == "true" ]]; then
++            args+=(--draft)
++          fi
++          if [[ "$PRERELEASE" == "true" ]]; then
++            args+=(--prerelease)
++          fi
++          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
++            gh release edit "$TAG_NAME" "${args[@]}"
++          else
++            gh release create "$TAG_NAME" "${args[@]}"
++          fi
++          gh release upload "$TAG_NAME" --clobber \
++            "dist/ClipForVRChat-${TAG_NAME}-windows-amd64.zip" \
++            "dist/ClipForVRChat-${TAG_NAME}-windows-amd64.zip.sha256" \
++            "dist/ClipForVRChat-${TAG_NAME}-windows-amd64.exe.asc" \
++            "dist/ClipForVRChat-${TAG_NAME}-build-metadata.json"
+
+
+diff --git a/issues/099-harden-release-workflow-permissions.md b/issues/099-harden-release-workflow-permissions.md
+index 3f02049b1df2450b6b877a16df522295427f4317..fa296c3a814ecf62c38b0e75e6ed6ad85e823fd5 100644
+--- a/issues/099-harden-release-workflow-permissions.md
++++ b/issues/099-harden-release-workflow-permissions.md
+@@ -1,22 +1,43 @@
+ # Release workflowの権限を最小化する
+ 
+ ## 問題
+ 
+ Release workflowでRelease作成に必要な `contents: write` がworkflow全体に付与されている。外部Actionもメジャーバージョンタグ参照であり、サプライチェーンリスクが残る。
+ 
+ ## 期待する挙動
+ 
+ GitHub Actionsの権限をjob単位で必要最小限にし、Release作成権限をRelease作成jobへ限定する。
+ 
+ ## 受け入れ条件
+ 
+ - build/test相当のjobは `contents: read` で動作する。
+ - Release作成に必要なjobだけ `contents: write` を持つ。
+ - Release用secretが不要なjobに露出しない。
+ - RC/正式Release workflowが従来通り成果物を作成できる。
+ 
+ ## 対応内容
+ 
+ - Release workflowをビルド/パッケージ作成jobとGitHub Release作成jobに分けた。
+ - workflow既定権限とビルドjobを `contents: read` にした。
+ - GitHub Release作成jobだけ `contents: write` を持つようにした。
++
++## 追加調査 2026-06-29
++
++### 問題
++
++Release作成jobは `contents: write` に限定済みだが、GitHub Release作成に `softprops/action-gh-release@v3` の可変タグ参照を使っている。第三者Actionのタグやメンテナが侵害された場合、write権限を持つRelease作成jobで任意コードが実行されるリスクがある。
++
++### 期待する挙動
++
++write権限を持つRelease作成処理では、可変タグ参照の第三者Actionに依存しない。
++
++### 受け入れ条件
++
++- `contents: write` を持つRelease作成jobで第三者Actionの可変タグ参照を実行しない。
++- Release本文、draft/prerelease判定、添付ファイル一覧は従来通り維持する。
++- build jobは引き続き `contents: read` のまま動作する。
++
++## 対応内容（2026-06-29）
++
++- `softprops/action-gh-release` を使わず、GitHub CLIでRelease作成・更新・添付ファイルアップロードを行うようにした。
++- Release作成jobの `contents: write` はRelease操作に必要な最小権限として維持し、build jobは `contents: read` のまま維持した。
+
+# Attack-path analysis
+Final: high | Decider: model_decided | Matrix severity: ignore | Policy adjusted: ignore
+## Rationale
+Maintained as high, not critical. The issue is in an in-scope release workflow and the evidence directly shows contents: write combined with a mutable third-party release action reference. The exploitation precondition is high-complexity supply-chain compromise of the external action/tag, so likelihood is low; however, successful exploitation crosses a trust boundary into this repository's release pipeline and can tamper with official release assets, a major supply-chain integrity impact for a desktop app. It is not critical because there is no evidence of signing-key compromise, no runtime RCE path in the application, no public service exposure, and the current workflow only creates a source archive before release publication.
+## Likelihood
+low - The workflow is reachable during normal release operations, but an attacker must first compromise or retarget the external softprops/action-gh-release@v2 action/tag or maintainer account. There is no public network service or direct end-user input path to trigger this independently.
+## Impact
+high - A compromised mutable release action could use the write-capable GITHUB_TOKEN to create or alter official GitHub releases and upload malicious assets under the project's trusted release channel. This is a major integrity impact for a desktop application distribution path, though the current workflow only builds a source archive and no signing-key compromise is evidenced.
+## Assumptions
+- GitHub Actions executes third-party action code with the job's GITHUB_TOKEN permissions unless otherwise constrained by repository or organization policy.
+- Project users may treat assets attached to official GitHub releases as trusted distribution artifacts.
+- No cloud APIs were queried; conclusions are based only on repository workflow files and local git metadata.
+- A release workflow run is triggered by a pushed tag matching v* or by manual workflow dispatch.
+- The upstream softprops/action-gh-release v2 tag, action repository, or maintainer account is compromised or retargeted maliciously.
+- The repository or organization does not enforce immutable action SHA pinning outside the workflow file.
+## Path
+compromised softprops/action-gh-release@v2
+        + release trigger v* / workflow_dispatch
+        -> GitHub Actions job executes third-party code
+        -> GITHUB_TOKEN with contents:write
+        -> official release asset creation/modification
+        -> malicious artifact distributed through trusted release channel
+## Path evidence
+- `.github/workflows/release.yml:3-7` - The release workflow is reachable through pushed tags matching v* and through manual workflow_dispatch.
+- `.github/workflows/release.yml:9-10` - The workflow grants the GitHub Actions token contents: write permission.
+- `.github/workflows/release.yml:18-19` - actions/checkout is referenced by mutable version tag @v4 rather than an immutable commit SHA.
+- `.github/workflows/release.yml:26-30` - The release step invokes third-party action softprops/action-gh-release@v2 using a mutable tag while the workflow has contents: write.
+- `.github/workflows/release.yml:21-24` - The workflow creates a release artifact from the repository source archive before publishing it.
+## Narrative
+The finding is real and in scope. The checked-out commit added .github/workflows/release.yml. The workflow runs on v* tags and manual dispatch, grants contents: write, then executes softprops/action-gh-release@v2. Because @v2 is a mutable third-party action reference, compromise or malicious retargeting of that action can execute arbitrary code inside this repository's release workflow with a write-capable GITHUB_TOKEN. The direct impact is compromise of official GitHub release integrity, including adding or modifying trusted release assets. The main mitigating factor is likelihood: exploitation requires compromise of the external action/tag or maintainer and a release workflow run, so this is not internet-reachable application RCE. The current workflow creates only a source archive and no signing key is present in this checkout, which keeps this below critical, but the release-channel integrity impact supports high severity.
+## Controls
+- CI workflow uses contents: read only
+- Release workflow is limited to v* tag pushes and manual dispatch rather than every pull request
+- No cloud infrastructure exposure or runtime network listener is present in the checked-out repository
+- No release signing secret is visible in this release workflow
+## Blindspots
+- Static-only analysis cannot verify repository or organization-level GitHub Actions policies that might enforce SHA pinning or restrict third-party actions.
+- Static-only analysis cannot verify branch/tag protection rules, release approval settings, or GitHub token restrictions configured outside the repository.
+- The checked-out commit contains documentation and workflow files but not the full application implementation referenced by the broader threat model, so release consumer impact is inferred from project documentation and release workflow intent.
