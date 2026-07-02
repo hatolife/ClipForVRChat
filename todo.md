@@ -1,11 +1,10 @@
-# issue 173 作業チェックリスト
+# AvatarBeacon RC 作業チェックリスト
 
-- [x] frontend の自動撮影タブに `manual` / `avatar_osc` の basis source UI を追加する
-- [x] `avatar_osc` の受信状態、最終受信、position/yaw、エラー表示を追加する
-- [x] backend で `/avatar/parameters/...` を受信し、`CFVRC/basis` / `ATG` 系のbasisへ復元する
-- [x] `avatar_osc` basis を自動撮影と player_local 構図保存へ適用する
-- [x] sidecar / 埋め込みmetadataへ basis source と basis pose を記録する
-- [x] Wails wrapper と frontend API 呼び出しを合わせる
-- [x] README / SPEC / docs に専用アバターギミック必須と head/avatar 基準の注意を追記する
-- [x] Go test / Wails API surface / frontend build を通す
-- [ ] Windows実機で専用アバターOSCから position / yaw / stale / player_local追従を確認する
+- [ ] #175 / #176 を `AvatarBeacon` の汎用アバターギミック方針へ更新する
+- [ ] `AvatarBeacon` のUnity asset sourceを `Assets/PoppoWorks/AvatarBeacon/...` に配置する
+- [ ] YL-ATG由来部分のMITライセンス、NOTICE、コピー/改変範囲を記録する
+- [ ] CI/ReleaseでAvatarBeacon元ファイルzipとsha256を生成・検証する
+- [ ] README / SPEC / RELEASE_NOTES にAvatarBeacon配布と手動unitypackage化手順を反映する
+- [ ] ローカルでzip内容、不要ファイル混入、Go/frontend検証を確認する
+- [ ] `v0.1.8-rc16` を作成し、GitHub ActionsのRelease結果を確認する
+- [ ] ユーザーがCI生成物からAvatarBeaconをアバターに設定して実機確認できる導線を最終確認する

@@ -10,7 +10,7 @@
 
 ## 期待する挙動
 
-アバターギミックのデータをリポジトリ内でアプリ本体と分かりやすく分離し、CIで `ClipForVRChatAvatarGimmickSource-vX.Y.Z.zip` のような元ファイルzipを生成できる。
+アバターギミックのデータをリポジトリ内でアプリ本体と分かりやすく分離し、CIで `AvatarBeacon-vX.Y.Z-source.zip` のような元ファイルzipを生成できる。
 
 zip内には、Unityへコピーまたはimportして手作業で `.unitypackage` を作るために必要なowned asset、README、ライセンス/NOTICEを含める。
 CIではUnity Editorを起動せず、zipの中身、ファイル名、sha256、不要ファイル混入を検証する。
@@ -22,10 +22,10 @@ Release本文と通常配布導線では、CI生成zipと手動添付 `.unitypac
 
 ```text
 avatar-gimmicks/
-  ClipForVRChatAvatarOSCBasis/
+  AvatarBeacon/
     Assets/
       PoppoWorks/
-        ClipForVRChatAvatarOSCBasis/
+        AvatarBeacon/
           Prefabs/
           Materials/
           Animations/
@@ -105,6 +105,6 @@ CIの対象はUnity project全体ではなく、配布対象のowned asset root�
 ## メモ
 
 - 現時点では方針更新のみ。アバターギミック本体とCI実装は未実施。
-- アバターギミック名の候補は仮に `ClipForVRChatAvatarOSCBasis` としている。最終名は実装前に再検討する。
+- アバターギミック名は `AvatarBeacon` とする。ClipForVRChat専用ではなく、同じOSC parameterを受信できる他ツールでも使える汎用アバターギミックとして扱う。
 - `.unitypackage` はAsset pathを保持するため、source側も最初から `Assets/PoppoWorks/<アバターギミック名>/...` に置くのが安全。
 - CIでUnityを動かさないため、Unity import確認と `.unitypackage` 作成確認は手作業のリリースチェックに寄せる。

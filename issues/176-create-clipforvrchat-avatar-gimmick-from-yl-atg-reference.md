@@ -1,23 +1,24 @@
-# YL-ATGを参考にClipForVRChat用アバターギミックを作成する
+# YL-ATGを参考にAvatarBeaconアバターギミックを作成する
 
 ## 問題
 
-`avatar_osc` による `player_local` basis受信はアプリ側に実装済みだが、VRChatアバターへ導入するClipForVRChat用アバターギミック本体がまだリポジトリに存在しない。
-ユーザーが参考資料として `ATG_ForAvatar_V0.0.3.unitypackage` と展開済みディレクトリを配置したため、これを調査材料にしつつ、ClipForVRChat用のPrefab/Assetを作成する必要がある。
+`avatar_osc` による `player_local` basis受信はアプリ側に実装済みだが、VRChatアバターへ導入するアバターギミック本体がまだリポジトリに存在しない。
+ユーザーが参考資料として `ATG_ForAvatar_V0.0.3.unitypackage` と展開済みディレクトリを配置したため、これを調査材料にしつつ、汎用アバターギミック `AvatarBeacon` のPrefab/Assetを作成する必要がある。
 
 YL-ATGはMIT Licenseだが、Prefab、FBX、Material、構成、パラメータ設計など元プロジェクトに権利がある部分をコピーまたは改変する場合、著作権表示とライセンス表記を正しく保持する必要がある。
 
 ## 期待する挙動
 
-ClipForVRChat用のアバターギミックを、アプリ本体と分かりやすく分離したUnity asset sourceとしてリポジトリに配置する。
+`AvatarBeacon` を、アプリ本体と分かりやすく分離したUnity asset sourceとしてリポジトリに配置する。
 CIは元ファイルzipを配布し、リリース担当者が手作業で作成した `.unitypackage` をUnityへimportすると、Assetは次のようなパスへ入る。
 
 ```text
-Assets/PoppoWorks/ClipForVRChatAvatarOSCBasis/...
+Assets/PoppoWorks/AvatarBeacon/...
 ```
 
-Prefabをアバターへ導入すると、VRChat OSC Avatar Parameters経由でClipForVRChatが受信できるbasis用のposition/forward情報を送信できる。
-既定のparameter prefixはClipForVRChat専用の `CFVRC/basis` とし、必要であれば検証用にYL-ATG互換の `ATG` 系入力も扱えるようにする。
+Prefabをアバターへ導入すると、VRChat OSC Avatar Parameters経由で外部ツールが受信できるbasis用のposition/forward情報を送信できる。
+既定のparameter prefixは現行ClipForVRChat互換の `CFVRC/basis` とするが、ギミック名・配布名はClipForVRChat専用にしない。
+必要であれば検証用にYL-ATG互換の `ATG` 系入力も扱えるようにする。
 
 YL-ATG由来のAssetまたは実装をコピー・改変する場合は、YozoraKurage/YL-ATGのMIT License表示をソース、package、Release同梱ライセンスに反映する。
 コピーせず仕様参考として再実装する場合でも、調査・参考元としてREADMEに明記するかどうかを実装時に判断し、コピー範囲を記録する。
@@ -70,10 +71,10 @@ Issue #175 のCI元ファイルzip配布方針と合わせ、初期候補は次�
 
 ```text
 avatar-gimmicks/
-  ClipForVRChatAvatarOSCBasis/
+  AvatarBeacon/
     Assets/
       PoppoWorks/
-        ClipForVRChatAvatarOSCBasis/
+        AvatarBeacon/
           Prefabs/
           Materials/
           README.md
@@ -86,7 +87,7 @@ YL-ATGのAssetをそのまま検証用に保持する必要がある場合は、
 
 ### OSC parameter案
 
-ClipForVRChat専用Prefabでは、次のparameterを既定にする。
+AvatarBeaconでは、ClipForVRChat v0.1.8-rc時点の受信実装と互換にするため、次のparameterを既定にする。
 
 ```text
 /avatar/parameters/CFVRC/basis/p/x
@@ -116,7 +117,7 @@ ClipForVRChat専用Prefabでは、次のparameterを既定にする。
 コピーまたは改変した部分がある場合は、最低限次を満たす。
 
 - YL-ATGのMIT License全文を `LICENSES/YL-ATG-MIT.txt` などへ保存する。
-- ClipForVRChat側READMEに、YozoraKurage/YL-ATG、URL、MIT License、利用または改変範囲を書く。
+- AvatarBeacon側READMEに、YozoraKurage/YL-ATG、URL、MIT License、利用または改変範囲を書く。
 - 手動作成する `.unitypackage` 内にもライセンスまたはNOTICEを含める。
 - CI生成元ファイルzip、手動作成 `.unitypackage`、Release配布物のライセンス/NOTICEにYL-ATG由来部分を含める。
 - PrefabやAssetのメタ情報、README、NOTICEなど、実務上確認しやすい場所に由来を残す。
@@ -125,13 +126,13 @@ ClipForVRChat専用Prefabでは、次のparameterを既定にする。
 
 ## 受け入れ条件
 
-- [ ] リポジトリ内に、ClipForVRChat用アバターギミックのUnity asset sourceを追加する。
-- [ ] 配布packageのimport先が `Assets/PoppoWorks/ClipForVRChatAvatarOSCBasis/...` になる。
+- [ ] リポジトリ内に、AvatarBeaconのUnity asset sourceを追加する。
+- [ ] 配布packageのimport先が `Assets/PoppoWorks/AvatarBeacon/...` になる。
 - [ ] アバターへ導入できるPrefabを用意し、追跡対象TransformまたはBoneを設定できる。
 - [ ] 既定の追跡対象をHead相当にし、Head基準でありplayer root基準ではないことをREADMEに明記する。
 - [ ] Prefabが `CFVRC/basis/*` のposition/forward情報をOSC Avatar Parametersへ出せる。
 - [ ] Expression Parameter枠、Contact数、Modular Avatar/VRCSDK依存、Performance Rankへの影響をREADMEに書く。
-- [ ] Unity上でimportし、`Assets/PoppoWorks/ClipForVRChatAvatarOSCBasis/...` に展開されることを確認する。
+- [ ] Unity上でimportし、`Assets/PoppoWorks/AvatarBeacon/...` に展開されることを確認する。
 - [ ] ClipForVRChatが実機VRChatから新鮮なposition/yawを受信し、`player_local` 構図の追従撮影に使えることを確認する。
 - [ ] YL-ATGからコピー・改変した部分の有無と範囲を記録する。
 - [ ] YL-ATG由来部分がある場合、MIT License全文、著作権表示、NOTICE/README表記をソース、CI生成元ファイルzip、手動作成 `.unitypackage`、Release配布物へ含める。
@@ -143,7 +144,7 @@ ClipForVRChat専用Prefabでは、次のparameterを既定にする。
 - VRChat client改造、メモリ読み、非公式APIによる位置取得。
 - YL-ATG upstreamへ変更を取り込むこと。
 - Quest単体でClipForVRChatなしに完結する仕組み。
-- `Assets/YozoLab/...` をClipForVRChat配布packageの主import pathとして使うこと。
+- `Assets/YozoLab/...` をAvatarBeacon配布packageの主import pathとして使うこと。
 
 ## メモ
 
