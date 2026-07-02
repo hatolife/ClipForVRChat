@@ -177,6 +177,7 @@
 | 171 | [Spout helperを本体exeへ埋め込み単一exe配布にする](171-embed-spout-helper-single-exe-release.md) | 要確認 | `v0.1.8` | C案採用に基づき、通常利用者向けReleaseを単一exe主導線へ戻し、分離版zipも検証用に残す。 |
 | 172 | [player_local基準Poseの挙動を見直す](172-clarify-or-redesign-player-local-basis-behavior.md) | 未着手 | 未定 | `player_local` が自動追従ではなく手動基準Pose方式であるため、初期構図とUI説明の期待ズレを解消する。 |
 | 173 | [専用アバターギミックOSCでhead/avatar基準Poseを自動取得する](173-implement-avatar-osc-basis-bridge.md) | 要確認 | `v0.1.8` | YL-ATG方式を参考に、専用アバターギミックからOSCでhead/avatar基準Poseを受け取り `player_local` basisへ使う実験機能を実装する。 |
+| 174 | [Release本文先頭にダウンロード導線を置き、通常配布zipへ必要物をまとめる](174-release-top-download-zip-with-avatar-package.md) | 未着手 | 未定 | Release本文の最上部に通常配布zipへの大きなダウンロードリンクを置き、zipへ単一exe、アバターギミック用unitypackage、README、ライセンスを同梱する。 |
 
 ## 状態の意味
 
