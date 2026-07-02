@@ -4,6 +4,7 @@
 
 `avatar_osc` は専用アバターギミックが必要だが、このリポジトリには現時点でアバター側のPrefabやUnityプロジェクトが存在しない。
 Releaseで通常配布zipへアバターギミック用 `unitypackage` を同梱するには、リポジトリ上の配置、Unity packageの生成方法、CIでの検証方法を決める必要がある。
+アバターギミック本体の作成とYL-ATG由来部分のライセンス整理は #176 で扱う。
 
 ## 期待する挙動
 
@@ -155,3 +156,4 @@ GitHub Actionsで実行する場合は、Unity Editorとライセンスが必要
 - アバターギミック名の候補は `ClipForVRChatAvatarOSCBasis`。最終名は実装時に確定する。
 - `.unitypackage` はAsset pathを保持するため、source側も最初から `Assets/PoppoWorks/<アバターギミック名>/...` に置くのが安全。
 - `IncludeDependencies` を安易に使うと、VRCSDKやModular Avatar側のAsset/Packageまで含む可能性があるため、初期実装ではowned assetを1フォルダへ集約する。
+- アバターギミック本体は #176 の成果物をCI export対象にする。
