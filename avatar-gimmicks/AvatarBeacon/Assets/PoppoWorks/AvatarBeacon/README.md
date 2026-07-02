@@ -19,14 +19,14 @@ Prefab内GameObjectの役割と削除判断は、リポジトリ側の `docs/ava
 ## 使い方
 
 1. アバターの root 配下に `AvatarBeacon.prefab` を配置します。
-2. Modular Avatar の Bone Proxy target は `AvatarBeacon/point` を Head 基準で割り当てます。
-   - これは player root 基準ではありません。
-   - 既定の追跡対象は Head 相当です。
-3. 必要に応じて、対象 Transform を Head 以外へ差し替えます。
+2. Modular Avatar の Bone Proxy target は `AvatarBeacon/point` を Hips 基準で割り当てます。
+   - これは player root そのものではありません。
+   - 既定の追跡対象は Hips 相当で、Headよりプレイヤー位置に近いbasisとして扱います。
+3. 必要に応じて、対象 Transform を Hips 以外へ差し替えます。
 
 ## 送信 parameter
 
-既定の OSC parameter は次の 12 個です。
+既定の basis 用 OSC parameter は次の 12 個です。
 
 - `coord/x`
 - `coord/xSign`
@@ -41,11 +41,14 @@ Prefab内GameObjectの役割と削除判断は、リポジトリ側の `docs/ava
 - `forward/z`
 - `forward/zSign`
 
-`SaveObject` は配布元 YL-ATG の補助制御を `avatar_beacon/save` に置き換えたものです。
+デバッグ用に次の OSC parameter も追加します。
+VRChat Expressions Menu の `AvatarBeacon Debug > Debug OSC Ping` を押すと、OSC疎通確認用に値が変化します。
+
+- `avatar_beacon/debug/ping`
 
 ## 前提コスト
 
-- Expression Parameter 枠を 12 個使います。`SaveObject` を残す構成では追加の保存用 parameter が 1 個増えます。
+- basis 用に Expression Parameter 枠を 12 個、デバッグ用に 1 個使います。
 - Contact / Constraint / Animator の追加分だけ、Avatar Performance Rank に影響します。
 - Modular Avatar と VRChat SDK の依存が必要です。
 
@@ -57,6 +60,7 @@ Prefab内GameObjectの役割と削除判断は、リポジトリ側の `docs/ava
 4. 値が古い、欠落している、または別アバターへ切り替えた場合は、追従しないことを確認します。
 
 OSCが届かない場合は、VRChatの `Options > OSC > Reset OSC Config` を実行し、avatar IDごとのOSC config JSONに `coord/*` と `forward/*` の `output.address` があるか確認してください。
+まず `AvatarBeacon Debug > Debug OSC Ping` を押して、ClipForVRChatの `raw` と `last` に `/avatar/parameters/avatar_beacon/debug/ping` が出るか確認すると、OSC送信経路そのものを切り分けやすくなります。
 Avatar Dynamics Contact / Avatar Interactions が無効な場合も値が変化しない可能性があります。
 
 ## 検証限界
@@ -80,5 +84,8 @@ Avatar Dynamics Contact / Avatar Interactions が無効な場合も値が変化�
 - Prefab 名と公開 import path を `AvatarBeacon` に変更
 - `ATG/p/*` を `coord/*` に置換
 - `ATG/r/*` を `forward/*` に置換
-- `ATG/SaveObject` を `avatar_beacon/save` に置換
+- ClipForVRChatのbasis復元に使わない `ATG/SaveObject` / menu item を削除
+- 既定の Bone Proxy target を Head から Hips へ変更
+- `point` の可視化だけに使われていた `arrow` mesh / material を削除
+- OSC疎通確認用の `AvatarBeacon Debug > Debug OSC Ping` menu item を追加
 - 既定送信名を ClipForVRChat 側の受信実装に合わせて整理
