@@ -14,8 +14,8 @@
 - 埋め込みメタデータ書き込みに失敗した場合も、sidecar JSON、Discord投稿、履歴追加は可能な限り継続し、警告として記録します。
 - 構図カード内に「現在Poseから追加」と「このPoseへカメラ移動」を追加し、設定済みPoseをゲーム内カメラへ送れるようにしました。
 - User Camera関連OSCをfalse/Offへ戻す「カメラOSCをリセット」ボタンを自動撮影タブに追加しました。
-- 実験機能として、専用アバターギミックからOSC Avatar Parametersで送られるhead/avatar基準Poseを `player_local` のbasisに使う `avatar_osc` 取得元を追加しました。標準OSC単体では動作せず、専用アバターギミック導入済みアバターでの実機確認が必要です。
-- AvatarBeacon を `avatar_osc` basis 確認用の汎用アバターギミックとして整理しました。CI は source zip だけを作成し、Unity で作る `.unitypackage` はリリース担当者が手作業で作成して GitHub Release に手動添付します。source zip は `Assets/PoppoWorks/AvatarBeacon/...` に展開できる形です。
+- 専用アバターギミックからOSC Avatar Parametersで送られるhead/avatar基準Poseを `player_local` のbasisに使う `avatar_osc` 取得元を追加しました。標準OSC単体では動作せず、専用アバターギミック導入済みアバターでの実機確認が必要です。
+- AvatarBeacon を `avatar_osc` basis 確認用の汎用アバターギミックとして整理しました。OSC parameterは `coord/*` と `forward/*` を既定にし、CI は source zip だけを作成します。Unity で作る `.unitypackage` はリリース担当者が手作業で作成して GitHub Release に手動添付します。source zip は `Assets/PoppoWorks/AvatarBeacon/...` に展開できる形です。
 
 ### 既知の制限
 

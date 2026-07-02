@@ -10,6 +10,7 @@ License:
 
 Modifications in this tree:
 - Renamed public asset path from `Assets/YozoLab/YL-ATG_ForAvatar` to `Assets/PoppoWorks/AvatarBeacon`.
-- Renamed avatar parameter prefixes from `ATG/*` to `CFVRC/basis/*`.
-- Renamed auxiliary control `ATG/SaveObject` to `AvatarBeacon/SaveObject`.
+- Renamed position parameters from `ATG/p/*` to `coord/*`.
+- Renamed forward/rotation-vector parameters from `ATG/r/*` to `forward/*`.
+- Renamed auxiliary control `ATG/SaveObject` to `avatar_beacon/save`.
 - Adjusted prefab naming to `AvatarBeacon`.

@@ -172,9 +172,9 @@ ONの場合、縮小画像をファイルとして保存します。
 ## VRChat自動撮影
 
 v0.1.8では、設定画面の「自動撮影」タブからVRChat User CameraをOSCで操作し、構図ごとに撮影します。
-`player_local` の basis は `manual` と `avatar_osc` を選べます。`avatar_osc` は専用アバターギミックからOSC Avatar Parametersを受信する実験的な経路で、標準OSCだけでは動きません。
+`player_local` の basis は `manual` と `avatar_osc` を選べます。`avatar_osc` は専用アバターギミックからOSC Avatar Parametersを受信する経路で、標準OSCだけでは動きません。
 
-AvatarBeacon は `avatar_osc` basis の確認に使う汎用アバターギミックであり、ClipForVRChat専用ではありません。CIでは `AvatarBeacon-vX.Y.Z-source.zip` と `AvatarBeacon-vX.Y.Z-source.zip.sha256` の元ファイルzipだけを作成し、Unityで作る `.unitypackage` はリリース担当者が手作業で作成してGitHub Releaseへ手動添付します。source zipをUnity projectへ展開すると `Assets/PoppoWorks/AvatarBeacon/...` になる形を想定します。
+AvatarBeacon は `avatar_osc` basis の確認に使う汎用アバターギミックであり、ClipForVRChat専用ではありません。CIでは `AvatarBeacon-vX.Y.Z-source.zip` と `AvatarBeacon-vX.Y.Z-source.zip.sha256` の元ファイルzipだけを作成し、Unityで作る `.unitypackage` はリリース担当者が手作業で作成してGitHub Releaseへ手動添付します。source zipをUnity projectへ展開すると `Assets/PoppoWorks/AvatarBeacon/...` になる形を想定します。Prefab構造とparameter仕様は `docs/avatarbeacon-spec.md` に記録します。
 
 ### 撮影方式
 

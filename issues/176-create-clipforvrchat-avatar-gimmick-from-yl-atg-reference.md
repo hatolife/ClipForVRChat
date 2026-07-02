@@ -4,6 +4,7 @@
 
 `avatar_osc` による `player_local` basis受信はアプリ側に実装済みだが、VRChatアバターへ導入するアバターギミック本体がまだリポジトリに存在しない。
 ユーザーが参考資料として `ATG_ForAvatar_V0.0.3.unitypackage` と展開済みディレクトリを配置したため、これを調査材料にしつつ、汎用アバターギミック `AvatarBeacon` のPrefab/Assetを作成する必要がある。
+2026-07-02時点の `v0.1.8-rc16` 実機確認では、AvatarBeacon導入時にVRChatからOSC Avatar Parametersが送信されていないように見えるため、PrefabがOSC output条件を満たしているか追加確認が必要。
 
 YL-ATGはMIT Licenseだが、Prefab、FBX、Material、構成、パラメータ設計など元プロジェクトに権利がある部分をコピーまたは改変する場合、著作権表示とライセンス表記を正しく保持する必要がある。
 
@@ -17,7 +18,7 @@ Assets/PoppoWorks/AvatarBeacon/...
 ```
 
 Prefabをアバターへ導入すると、VRChat OSC Avatar Parameters経由で外部ツールが受信できるbasis用のposition/forward情報を送信できる。
-既定のparameter prefixは現行ClipForVRChat互換の `CFVRC/basis` とするが、ギミック名・配布名はClipForVRChat専用にしない。
+既定のparameterは `coord/*` と `forward/*` とし、ギミック名・配布名だけでなくOSC parameterにもClipForVRChat固有名を含めない。
 必要であれば検証用にYL-ATG互換の `ATG` 系入力も扱えるようにする。
 
 YL-ATG由来のAssetまたは実装をコピー・改変する場合は、YozoraKurage/YL-ATGのMIT License表示をソース、package、Release同梱ライセンスに反映する。
@@ -85,26 +86,27 @@ avatar-gimmicks/
 `Assets/YozoLab/...` をClipForVRChat配布packageの公開import pathにはしない。
 YL-ATGのAssetをそのまま検証用に保持する必要がある場合は、`third_party/`、`references/`、または明示的に配布対象外の場所へ分ける。
 
-### OSC parameter案
+### OSC parameter
 
-AvatarBeaconでは、ClipForVRChat v0.1.8-rc時点の受信実装と互換にするため、次のparameterを既定にする。
+AvatarBeaconでは、ClipForVRChat専用名を避け、次の汎用parameterを既定にする。
 
 ```text
-/avatar/parameters/CFVRC/basis/p/x
-/avatar/parameters/CFVRC/basis/p/xSign
-/avatar/parameters/CFVRC/basis/p/y
-/avatar/parameters/CFVRC/basis/p/ySign
-/avatar/parameters/CFVRC/basis/p/z
-/avatar/parameters/CFVRC/basis/p/zSign
-/avatar/parameters/CFVRC/basis/f/x
-/avatar/parameters/CFVRC/basis/f/xSign
-/avatar/parameters/CFVRC/basis/f/y
-/avatar/parameters/CFVRC/basis/f/ySign
-/avatar/parameters/CFVRC/basis/f/z
-/avatar/parameters/CFVRC/basis/f/zSign
+/avatar/parameters/coord/x
+/avatar/parameters/coord/xSign
+/avatar/parameters/coord/y
+/avatar/parameters/coord/ySign
+/avatar/parameters/coord/z
+/avatar/parameters/coord/zSign
+/avatar/parameters/forward/x
+/avatar/parameters/forward/xSign
+/avatar/parameters/forward/y
+/avatar/parameters/forward/ySign
+/avatar/parameters/forward/z
+/avatar/parameters/forward/zSign
 ```
 
-アプリ側は既に `CFVRC/basis/*` と `ATG/*` 互換の受信を扱うため、Prefab側はまず `CFVRC/basis/*` の送信を優先し、必要に応じて `ATG/*` 互換Prefabまたはmigration手順を追加する。
+アプリ側は `coord/*` / `forward/*` を既定受信経路にし、`ATG/*` 互換は検証・切り分け用として残す。
+過去RCで使った `CFVRC/basis/*` はClipForVRChat由来で汎用性が低いため、AvatarBeaconの既定parameterから外す。
 
 ### ライセンス方針
 
@@ -130,9 +132,12 @@ AvatarBeaconでは、ClipForVRChat v0.1.8-rc時点の受信実装と互換にす
 - [x] 配布packageのimport先が `Assets/PoppoWorks/AvatarBeacon/...` になる。
 - [x] アバターへ導入できるPrefabを用意し、追跡対象TransformまたはBoneを設定できる。
 - [x] 既定の追跡対象をHead相当にし、Head基準でありplayer root基準ではないことをREADMEに明記する。
-- [x] Prefabが `CFVRC/basis/*` のposition/forward情報をOSC Avatar Parametersへ出せる。
+- [x] Prefabが `coord/*` と `forward/*` のposition/forward情報をOSC Avatar Parametersへ出せる。
+- [x] AvatarBeacon Prefab内GameObjectの役割、必要性、削除判断を仕様書に記録する。
 - [x] Expression Parameter枠、Contact数、Modular Avatar/VRCSDK依存、Performance Rankへの影響をREADMEに書く。
 - [ ] Unity上でimportし、`Assets/PoppoWorks/AvatarBeacon/...` に展開されることを確認する。
+- [ ] `v0.1.8-rc16` でOSCが送信されない原因を特定し、Prefab/導入手順/VRChat OSC設定のいずれが原因か切り分ける。
+- [x] `avatar_osc` statusにraw受信件数と最後に受けたAvatar Parameter addressを表示し、OSC未送信とparameter不一致を切り分けられるようにする。
 - [ ] ClipForVRChatが実機VRChatから新鮮なposition/yawを受信し、`player_local` 構図の追従撮影に使えることを確認する。
 - [x] YL-ATGからコピー・改変した部分の有無と範囲を記録する。
 - [x] YL-ATG由来部分がある場合、MIT License全文、著作権表示、NOTICE/README表記をソース、CI生成元ファイルzip、手動作成 `.unitypackage`、Release配布物へ含める。
@@ -151,3 +156,7 @@ AvatarBeaconでは、ClipForVRChat v0.1.8-rc時点の受信実装と互換にす
 - AvatarBeacon元ファイルは作成済み。Unity/VRChat実機確認は未実施。
 - 実装時は、まずユーザー配置済みpackageを参照して挙動と構成を再確認する。
 - YL-ATG由来Assetを直接取り込む場合、MIT License上の再配布条件を満たすだけでなく、ClipForVRChat側の配布物から利用者が由来を確認できる状態にする。
+- 2026-07-02: `CFVRC/basis/*` は汎用ギミック名として不適切なため、AvatarBeacon既定parameterを `coord/*` と `forward/*` へ変更する。
+- 2026-07-02: `docs/avatarbeacon-spec.md` にPrefab構造、GameObjectごとの役割、削除候補、Unity実機確認なしに削るべきでない要素を記録した。
+- 2026-07-02: ユーザー実機確認で `v0.1.8-rc16` のAvatarBeaconからOSCが送信されていないように見えるとの報告あり。`localOnly` parameter、Expression Parameters登録、VRChat OSC config生成、Contact receiverの動作条件を優先して調査する。
+- 2026-07-02: VRChat公式OSC仕様ではPublished AvatarのOSC config JSONにある `output.address` が値変化時に送信される。実機切り分けでは `Reset OSC Config`、avatar ID別JSONの `coord/*` / `forward/*` 出力、Avatar Dynamics Contact / Avatar Interactions有効化、ClipForVRChatのraw受信件数を確認する。

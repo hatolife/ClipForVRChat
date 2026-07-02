@@ -52,9 +52,9 @@ Unity上でのimport確認、手動 `.unitypackage` 作成、VRChat実機確認�
 
 関連する既存実装・文書:
 
-- `src/app.go`: `/avatar/parameters/...` のOSC受信と `CFVRC/basis` / `ATG` 系parameter復元。
+- `src/app.go`: `/avatar/parameters/...` のOSC受信と `coord` / `forward` / `ATG` 系parameter復元。
 - `src/internal/appcore/player_local.go`: 受信値からbasis poseを復元。
-- `docs/v0.1.9-avatar-osc-basis-verification.md`: 実機確認手順。
+- `docs/v0.1.8-avatar-osc-basis-verification.md`: 実機確認手順。
 - `issues/173-implement-avatar-osc-basis-bridge.md`: アバターギミック方式の設計メモ。
 - `issues/176-create-clipforvrchat-avatar-gimmick-from-yl-atg-reference.md`: ギミック本体作成とYL-ATGライセンス整理。
 

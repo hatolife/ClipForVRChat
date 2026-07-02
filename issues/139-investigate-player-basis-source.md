@@ -114,11 +114,12 @@ VRChat world座標へ変換するには別途キャリブレーションが必�
 
 ### 実装方針候補
 
-1. v0.1.8短期対応
+1. v0.1.8対応
    - 初期構図を `world` に戻す、または `player_local` 構図を初期OFFにする。
    - `player_local` は手動基準Pose方式として、UI文言を「プレイヤー追従」ではなく「手動基準」に寄せる。
+   - YL-ATG方式を参考にしたAvatarBeaconを用意し、専用アバター導入時はOSC Avatar Parametersからhead/avatar基準Poseを受信できるようにする。
 
-2. v0.1.9以降の実験候補
+2. 追加検証候補
    - User Camera `LookAtMe` とPose readbackによる近似基準推定を実機検証する。
    - OSCQueryでUser Camera/Tracking endpoint一覧を診断表示し、利用可能なendpointを可視化する。
 
@@ -288,5 +289,5 @@ YL-ATGと似た仕組みの他プロジェクト、およびVRChatのプレイ�
 
 ClipForVRChatで現実的に進めるなら、次の2段階がよい。
 
-1. v0.1.8短期: 初期構図を `world` に戻すか、`player_local` を手動基準として明確化する。
-2. v0.1.9以降: YL-ATG方式の最小avatar prefabを別配布し、`head position + forward vector` をOSCで受ける実験機能を作る。
+1. v0.1.8: 初期構図とUIを誤解しにくくし、`manual` basis と `avatar_osc` basis の両方を確認対象にする。
+2. v0.1.8: YL-ATG方式を参考にしたAvatarBeaconを別配布し、`head position + forward vector` をOSCで受ける。

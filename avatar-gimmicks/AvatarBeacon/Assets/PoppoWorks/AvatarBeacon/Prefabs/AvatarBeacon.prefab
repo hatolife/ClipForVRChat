@@ -83,8 +83,8 @@ MonoBehaviour:
   position: {x: 0, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - CFVRC/basis/p/x
-  - CFVRC/basis/p/xSign
+  - coord/x
+  - coord/xSign
 --- !u!1 &491871944873609954
 GameObject:
   m_ObjectHideFlags: 0
@@ -168,8 +168,8 @@ MonoBehaviour:
   position: {x: 0, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - CFVRC/basis/p/z
-  - CFVRC/basis/p/zSign
+  - coord/z
+  - coord/zSign
 --- !u!1 &856071819521952918
 GameObject:
   m_ObjectHideFlags: 0
@@ -223,12 +223,12 @@ MonoBehaviour:
   position: {x: 0.5, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - CFVRC/basis/f/xSign
+  - forward/xSign
   allowSelf: 1
   allowOthers: 0
   localOnly: 0
   receiverType: 2
-  parameter: CFVRC/basis/f/xSign
+  parameter: forward/xSign
   minVelocity: 0.05
 --- !u!114 &4731777765370168354
 MonoBehaviour:
@@ -249,12 +249,12 @@ MonoBehaviour:
   position: {x: 0, y: 0.5, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - CFVRC/basis/f/ySign
+  - forward/ySign
   allowSelf: 1
   allowOthers: 0
   localOnly: 0
   receiverType: 2
-  parameter: CFVRC/basis/f/ySign
+  parameter: forward/ySign
   minVelocity: 0
 --- !u!114 &9180184445733332685
 MonoBehaviour:
@@ -275,12 +275,12 @@ MonoBehaviour:
   position: {x: 0, y: 0, z: 0.5}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - CFVRC/basis/f/zSign
+  - forward/zSign
   allowSelf: 1
   allowOthers: 0
   localOnly: 0
   receiverType: 2
-  parameter: CFVRC/basis/f/zSign
+  parameter: forward/zSign
   minVelocity: 0
 --- !u!1 &1246223224485854335
 GameObject:
@@ -407,8 +407,8 @@ MonoBehaviour:
   position: {x: 0, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - CFVRC/basis/f/y
-  - CFVRC/basis/f/ySign
+  - forward/y
+  - forward/ySign
 --- !u!1 &4281172290312298543
 GameObject:
   m_ObjectHideFlags: 0
@@ -515,8 +515,8 @@ MonoBehaviour:
   position: {x: 0, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - CFVRC/basis/f/x
-  - CFVRC/basis/f/xSign
+  - forward/x
+  - forward/xSign
 --- !u!1 &4848063545533936072
 GameObject:
   m_ObjectHideFlags: 0
@@ -646,7 +646,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   parameters:
-  - nameOrPrefix: CFVRC/basis/p/x
+  - nameOrPrefix: coord/x
     remapTo: 
     internalParameter: 0
     isPrefix: 0
@@ -656,7 +656,7 @@ MonoBehaviour:
     saved: 0
     hasExplicitDefaultValue: 0
     m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: CFVRC/basis/p/xSign
+  - nameOrPrefix: coord/xSign
     remapTo: 
     internalParameter: 0
     isPrefix: 0
@@ -666,7 +666,7 @@ MonoBehaviour:
     saved: 0
     hasExplicitDefaultValue: 0
     m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: CFVRC/basis/p/y
+  - nameOrPrefix: coord/y
     remapTo: 
     internalParameter: 0
     isPrefix: 0
@@ -676,7 +676,7 @@ MonoBehaviour:
     saved: 0
     hasExplicitDefaultValue: 0
     m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: CFVRC/basis/p/ySign
+  - nameOrPrefix: coord/ySign
     remapTo: 
     internalParameter: 0
     isPrefix: 0
@@ -686,7 +686,7 @@ MonoBehaviour:
     saved: 0
     hasExplicitDefaultValue: 0
     m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: CFVRC/basis/p/z
+  - nameOrPrefix: coord/z
     remapTo: 
     internalParameter: 0
     isPrefix: 0
@@ -696,7 +696,7 @@ MonoBehaviour:
     saved: 0
     hasExplicitDefaultValue: 0
     m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: CFVRC/basis/p/zSign
+  - nameOrPrefix: coord/zSign
     remapTo: 
     internalParameter: 0
     isPrefix: 0
@@ -706,7 +706,7 @@ MonoBehaviour:
     saved: 0
     hasExplicitDefaultValue: 0
     m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: CFVRC/basis/f/x
+  - nameOrPrefix: forward/x
     remapTo: 
     internalParameter: 0
     isPrefix: 0
@@ -716,7 +716,7 @@ MonoBehaviour:
     saved: 0
     hasExplicitDefaultValue: 0
     m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: CFVRC/basis/f/xSign
+  - nameOrPrefix: forward/xSign
     remapTo: 
     internalParameter: 0
     isPrefix: 0
@@ -726,7 +726,7 @@ MonoBehaviour:
     saved: 0
     hasExplicitDefaultValue: 0
     m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: CFVRC/basis/f/y
+  - nameOrPrefix: forward/y
     remapTo: 
     internalParameter: 0
     isPrefix: 0
@@ -736,7 +736,7 @@ MonoBehaviour:
     saved: 0
     hasExplicitDefaultValue: 0
     m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: CFVRC/basis/f/ySign
+  - nameOrPrefix: forward/ySign
     remapTo: 
     internalParameter: 0
     isPrefix: 0
@@ -746,7 +746,7 @@ MonoBehaviour:
     saved: 0
     hasExplicitDefaultValue: 0
     m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: CFVRC/basis/f/z
+  - nameOrPrefix: forward/z
     remapTo: 
     internalParameter: 0
     isPrefix: 0
@@ -756,7 +756,7 @@ MonoBehaviour:
     saved: 0
     hasExplicitDefaultValue: 0
     m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: CFVRC/basis/f/zSign
+  - nameOrPrefix: forward/zSign
     remapTo: 
     internalParameter: 0
     isPrefix: 0
@@ -766,7 +766,7 @@ MonoBehaviour:
     saved: 0
     hasExplicitDefaultValue: 0
     m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: AvatarBeacon/SaveObject
+  - nameOrPrefix: avatar_beacon/save
     remapTo: 
     internalParameter: 0
     isPrefix: 0
@@ -919,12 +919,12 @@ MonoBehaviour:
   position: {x: 0, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - CFVRC/basis/f/x
+  - forward/x
   allowSelf: 1
   allowOthers: 0
   localOnly: 0
   receiverType: 2
-  parameter: CFVRC/basis/f/x
+  parameter: forward/x
   minVelocity: 0.05
 --- !u!114 &2446408489463595420
 MonoBehaviour:
@@ -945,12 +945,12 @@ MonoBehaviour:
   position: {x: 0, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - CFVRC/basis/f/y
+  - forward/y
   allowSelf: 1
   allowOthers: 0
   localOnly: 0
   receiverType: 2
-  parameter: CFVRC/basis/f/y
+  parameter: forward/y
   minVelocity: 0.05
 --- !u!114 &2820147324106217612
 MonoBehaviour:
@@ -971,12 +971,12 @@ MonoBehaviour:
   position: {x: 0, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - CFVRC/basis/f/z
+  - forward/z
   allowSelf: 1
   allowOthers: 0
   localOnly: 0
   receiverType: 2
-  parameter: CFVRC/basis/f/z
+  parameter: forward/z
   minVelocity: 0.05
 --- !u!1 &7149249781053256091
 GameObject:
@@ -1027,7 +1027,7 @@ MonoBehaviour:
     icon: {fileID: 0}
     type: 101
     parameter:
-      name: AvatarBeacon/SaveObject
+      name: avatar_beacon/save
     value: 1
     style: 0
     subMenu: {fileID: 0}
@@ -1109,8 +1109,8 @@ MonoBehaviour:
   position: {x: 0, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - CFVRC/basis/f/z
-  - CFVRC/basis/f/zSign
+  - forward/z
+  - forward/zSign
 --- !u!1 &9124242601001485458
 GameObject:
   m_ObjectHideFlags: 0
@@ -1194,8 +1194,8 @@ MonoBehaviour:
   position: {x: 0, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - CFVRC/basis/p/y
-  - CFVRC/basis/p/ySign
+  - coord/y
+  - coord/ySign
 --- !u!1 &9134728414806565927
 GameObject:
   m_ObjectHideFlags: 0
@@ -1269,12 +1269,12 @@ MonoBehaviour:
   position: {x: 0, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - CFVRC/basis/p/x
+  - coord/x
   allowSelf: 1
   allowOthers: 0
   localOnly: 0
   receiverType: 2
-  parameter: CFVRC/basis/p/x
+  parameter: coord/x
   minVelocity: 0.05
 --- !u!114 &877146903721838477
 MonoBehaviour:
@@ -1295,12 +1295,12 @@ MonoBehaviour:
   position: {x: 0, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - CFVRC/basis/p/y
+  - coord/y
   allowSelf: 1
   allowOthers: 0
   localOnly: 0
   receiverType: 2
-  parameter: CFVRC/basis/p/y
+  parameter: coord/y
   minVelocity: 0.05
 --- !u!114 &3659174430522833631
 MonoBehaviour:
@@ -1321,12 +1321,12 @@ MonoBehaviour:
   position: {x: 0, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - CFVRC/basis/p/z
+  - coord/z
   allowSelf: 1
   allowOthers: 0
   localOnly: 0
   receiverType: 2
-  parameter: CFVRC/basis/p/z
+  parameter: coord/z
   minVelocity: 0.05
 --- !u!114 &594679149949896675
 MonoBehaviour:
@@ -1347,12 +1347,12 @@ MonoBehaviour:
   position: {x: 0.5, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - CFVRC/basis/p/xSign
+  - coord/xSign
   allowSelf: 1
   allowOthers: 0
   localOnly: 0
   receiverType: 2
-  parameter: CFVRC/basis/p/xSign
+  parameter: coord/xSign
   minVelocity: 0.05
 --- !u!114 &5596991193576000830
 MonoBehaviour:
@@ -1373,12 +1373,12 @@ MonoBehaviour:
   position: {x: 0, y: 0.5, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - CFVRC/basis/p/ySign
+  - coord/ySign
   allowSelf: 1
   allowOthers: 0
   localOnly: 0
   receiverType: 2
-  parameter: CFVRC/basis/p/ySign
+  parameter: coord/ySign
   minVelocity: 0.05
 --- !u!114 &3285151922791795018
 MonoBehaviour:
@@ -1399,12 +1399,12 @@ MonoBehaviour:
   position: {x: 0, y: 0, z: 0.5}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - CFVRC/basis/p/zSign
+  - coord/zSign
   allowSelf: 1
   allowOthers: 0
   localOnly: 0
   receiverType: 2
-  parameter: CFVRC/basis/p/zSign
+  parameter: coord/zSign
   minVelocity: 0.05
 --- !u!1001 &7932882920427512901
 PrefabInstance:

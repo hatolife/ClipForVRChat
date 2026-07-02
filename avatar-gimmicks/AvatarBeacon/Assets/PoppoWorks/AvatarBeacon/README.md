@@ -1,7 +1,7 @@
 # AvatarBeacon
 
 `AvatarBeacon` は、VRChat アバターからOSC Avatar Parametersへ、アバター基準の位置と向きの情報を送るための汎用ギミック元ファイルです。
-ClipForVRChat は `CFVRC/basis` 形式の受信側ツールのひとつとして利用できます。
+ClipForVRChat は `coord/*` と `forward/*` 形式の受信側ツールのひとつとして利用できます。
 
 ## 前提
 
@@ -14,6 +14,7 @@ ClipForVRChat は `CFVRC/basis` 形式の受信側ツールのひとつとして
 
 Unity プロジェクトへ import すると、配布先は `Assets/PoppoWorks/AvatarBeacon` になります。
 導入用 Prefab は `Assets/PoppoWorks/AvatarBeacon/Prefabs/AvatarBeacon.prefab` です。
+Prefab内GameObjectの役割と削除判断は、リポジトリ側の `docs/avatarbeacon-spec.md` に記録しています。
 
 ## 使い方
 
@@ -27,20 +28,20 @@ Unity プロジェクトへ import すると、配布先は `Assets/PoppoWorks/A
 
 既定の OSC parameter は次の 12 個です。
 
-- `CFVRC/basis/p/x`
-- `CFVRC/basis/p/xSign`
-- `CFVRC/basis/p/y`
-- `CFVRC/basis/p/ySign`
-- `CFVRC/basis/p/z`
-- `CFVRC/basis/p/zSign`
-- `CFVRC/basis/f/x`
-- `CFVRC/basis/f/xSign`
-- `CFVRC/basis/f/y`
-- `CFVRC/basis/f/ySign`
-- `CFVRC/basis/f/z`
-- `CFVRC/basis/f/zSign`
+- `coord/x`
+- `coord/xSign`
+- `coord/y`
+- `coord/ySign`
+- `coord/z`
+- `coord/zSign`
+- `forward/x`
+- `forward/xSign`
+- `forward/y`
+- `forward/ySign`
+- `forward/z`
+- `forward/zSign`
 
-`SaveObject` は配布元 YL-ATG の補助制御を `AvatarBeacon/SaveObject` に置き換えたものです。
+`SaveObject` は配布元 YL-ATG の補助制御を `avatar_beacon/save` に置き換えたものです。
 
 ## 前提コスト
 
@@ -52,8 +53,11 @@ Unity プロジェクトへ import すると、配布先は `Assets/PoppoWorks/A
 
 1. VRChat を起動し、このギミックを入れたアバターを選びます。
 2. ClipForVRChat 側で avatar OSC basis の受信状態を確認します。
-3. 新鮮な `CFVRC/basis` 値が入った状態で `player_local` 撮影を行い、前後左右移動と yaw 回転に追従することを確認します。
+3. 新鮮な `coord/*` と `forward/*` の値が入った状態で `player_local` 撮影を行い、前後左右移動と yaw 回転に追従することを確認します。
 4. 値が古い、欠落している、または別アバターへ切り替えた場合は、追従しないことを確認します。
+
+OSCが届かない場合は、VRChatの `Options > OSC > Reset OSC Config` を実行し、avatar IDごとのOSC config JSONに `coord/*` と `forward/*` の `output.address` があるか確認してください。
+Avatar Dynamics Contact / Avatar Interactions が無効な場合も値が変化しない可能性があります。
 
 ## 検証限界
 
@@ -74,6 +78,7 @@ Unity プロジェクトへ import すると、配布先は `Assets/PoppoWorks/A
 コピー・改変した範囲は以下です。
 
 - Prefab 名と公開 import path を `AvatarBeacon` に変更
-- `ATG/p/*` と `ATG/r/*` を `CFVRC/basis/*` に置換
-- `ATG/SaveObject` を `AvatarBeacon/SaveObject` に置換
+- `ATG/p/*` を `coord/*` に置換
+- `ATG/r/*` を `forward/*` に置換
+- `ATG/SaveObject` を `avatar_beacon/save` に置換
 - 既定送信名を ClipForVRChat 側の受信実装に合わせて整理

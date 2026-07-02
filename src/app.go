@@ -68,14 +68,18 @@ type avatarOSCBasisState struct {
 }
 
 type PlayerLocalBasisSnapshot struct {
-	Source     string                   `json:"source"`
-	Status     string                   `json:"status"`
-	Configured bool                     `json:"configured"`
-	Fresh      bool                     `json:"fresh"`
-	UpdatedAt  string                   `json:"updatedAt,omitempty"`
-	AgeMS      int64                    `json:"ageMs"`
-	Error      string                   `json:"error,omitempty"`
-	Pose       appcore.CameraPoseConfig `json:"pose"`
+	Source              string                   `json:"source"`
+	Status              string                   `json:"status"`
+	Configured          bool                     `json:"configured"`
+	Fresh               bool                     `json:"fresh"`
+	UpdatedAt           string                   `json:"updatedAt,omitempty"`
+	AgeMS               int64                    `json:"ageMs"`
+	Error               string                   `json:"error,omitempty"`
+	Pose                appcore.CameraPoseConfig `json:"pose"`
+	ParameterPrefix     string                   `json:"parameterPrefix,omitempty"`
+	RawSampleCount      int                      `json:"rawSampleCount"`
+	LastReceivedAddress string                   `json:"lastReceivedAddress,omitempty"`
+	LastReceivedAt      string                   `json:"lastReceivedAt,omitempty"`
 }
 
 type AppInfo struct {
@@ -1590,10 +1594,21 @@ func (a *App) prepareAutoCaptureConfigForRunLocked(cfg appcore.Config) (appcore.
 
 func (a *App) latestAvatarOSCBasisSnapshotLocked(cfg appcore.Config, now time.Time) PlayerLocalBasisSnapshot {
 	cfg.Normalize()
+	parameterPrefix := canonicalAvatarOSCBasisAddress(cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix)
+	if parameterPrefix == "" {
+		parameterPrefix = "coord"
+	}
+	lastAddress, lastReceivedAt := latestAvatarOSCParameterSample(a.avatarOSCBasisSamples)
 	snapshot := PlayerLocalBasisSnapshot{
-		Source:     "avatar_osc",
-		Configured: true,
-		Status:     "missing",
+		Source:              "avatar_osc",
+		Configured:          true,
+		Status:              "missing",
+		ParameterPrefix:     parameterPrefix,
+		RawSampleCount:      len(a.avatarOSCBasisSamples),
+		LastReceivedAddress: lastAddress,
+	}
+	if !lastReceivedAt.IsZero() {
+		snapshot.LastReceivedAt = lastReceivedAt.Format(time.RFC3339Nano)
 	}
 	sample, scheme, ok, err := a.buildAvatarOSCBasisSampleLocked(cfg)
 	if !ok {
@@ -1688,13 +1703,18 @@ func (a *App) buildAvatarOSCBasisSampleLocked(cfg appcore.Config) (appcore.Avata
 	}
 	prefix := canonicalAvatarOSCBasisAddress(cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix)
 	if prefix == "" {
-		prefix = "CFVRC/basis"
+		prefix = "coord"
 	}
-	scheme := "CFVRC"
-	positionRoot := prefix + "/p"
-	forwardRoot := prefix + "/f"
+	scheme := "custom"
+	positionRoot := strings.TrimSuffix(prefix, "/") + "/p"
+	forwardRoot := strings.TrimSuffix(prefix, "/") + "/f"
 	signSuffix := "Sign"
-	if strings.EqualFold(prefix, "ATG") || strings.HasPrefix(strings.ToUpper(prefix), "ATG/") {
+	switch {
+	case strings.EqualFold(prefix, "coord"):
+		scheme = "AvatarBeacon"
+		positionRoot = "coord"
+		forwardRoot = "forward"
+	case strings.EqualFold(prefix, "ATG") || strings.HasPrefix(strings.ToUpper(prefix), "ATG/"):
 		scheme = "ATG"
 		positionRoot = strings.TrimSuffix(prefix, "/") + "/p"
 		forwardRoot = strings.TrimSuffix(prefix, "/") + "/r"
@@ -1786,6 +1806,21 @@ func latestAvatarOSCSampleTime(samples map[string]avatarOSCBasisSample, roots ..
 		return time.Now()
 	}
 	return oldest
+}
+
+func latestAvatarOSCParameterSample(samples map[string]avatarOSCBasisSample) (string, time.Time) {
+	var latestAddress string
+	var latestTime time.Time
+	for address, sample := range samples {
+		if sample.ReceivedAt.IsZero() {
+			continue
+		}
+		if latestTime.IsZero() || sample.ReceivedAt.After(latestTime) {
+			latestTime = sample.ReceivedAt
+			latestAddress = address
+		}
+	}
+	return latestAddress, latestTime
 }
 
 func canonicalAvatarOSCBasisAddress(address string) string {

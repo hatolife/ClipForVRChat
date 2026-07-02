@@ -30,10 +30,10 @@
 - [#172](172-clarify-or-redesign-player-local-basis-behavior.md)
 - YL-ATG: https://github.com/YozoraKurage/YL-ATG
 
-### 推奨スコープ
+### 対象スコープ
 
-v0.1.8本線ではなく、v0.1.9以降の実験機能または高度機能として扱う。
-v0.1.8では、初期構図とUIを誤解しにくくする短期修正を優先する。
+`avatar_osc` basis と AvatarBeacon は、`player_local` 構図をプレイヤー移動/回転へ追従させるために v0.1.8 で必要な機能として扱う。
+標準OSC単体ではローカルプレイヤー位置/Yawを直接取得できないため、v0.1.8では手動 `manual` basis と専用アバターギミックによる `avatar_osc` basis の両方を正式な確認対象にする。
 
 ### 用語
 
@@ -59,22 +59,24 @@ YL-ATG互換を優先する場合:
 - rotation vector magnitude: `/avatar/parameters/ATG/r/z`
 - rotation vector sign: `/avatar/parameters/ATG/r/z+`
 
-ClipForVRChat専用に新規設計する場合は、prefixを衝突しにくい名前にする。
+AvatarBeacon既定値は、ClipForVRChat名を含まない汎用parameterにする。
+VRChat公式が定義していない任意Avatar Parameter名であり、`/avatar/parameters/` 配下に出るOSC addressは次の通り。
 
-- `/avatar/parameters/CFVRC/basis/p/x`
-- `/avatar/parameters/CFVRC/basis/p/xSign`
-- `/avatar/parameters/CFVRC/basis/p/y`
-- `/avatar/parameters/CFVRC/basis/p/ySign`
-- `/avatar/parameters/CFVRC/basis/p/z`
-- `/avatar/parameters/CFVRC/basis/p/zSign`
-- `/avatar/parameters/CFVRC/basis/f/x`
-- `/avatar/parameters/CFVRC/basis/f/xSign`
-- `/avatar/parameters/CFVRC/basis/f/y`
-- `/avatar/parameters/CFVRC/basis/f/ySign`
-- `/avatar/parameters/CFVRC/basis/f/z`
-- `/avatar/parameters/CFVRC/basis/f/zSign`
+- `/avatar/parameters/coord/x`
+- `/avatar/parameters/coord/xSign`
+- `/avatar/parameters/coord/y`
+- `/avatar/parameters/coord/ySign`
+- `/avatar/parameters/coord/z`
+- `/avatar/parameters/coord/zSign`
+- `/avatar/parameters/forward/x`
+- `/avatar/parameters/forward/xSign`
+- `/avatar/parameters/forward/y`
+- `/avatar/parameters/forward/ySign`
+- `/avatar/parameters/forward/z`
+- `/avatar/parameters/forward/zSign`
 
-`ATG/*` 互換と `CFVRC/*` 専用の両方を設定で選べると検証しやすい。
+`ATG/*` 互換は既存YL-ATGとの検証・切り分け用に受信側へ残す。
+過去RCで使った `CFVRC/basis/*` はClipForVRChat由来で汎用性が低いため、AvatarBeaconの既定parameterとしては使わない。
 
 ### 復元ロジック案
 
@@ -128,7 +130,8 @@ forward/yawは、受信したforward vector相当の水平成分から算出す�
 - Modular Avatarで導入できるprefabにする。
 - 既定の追跡対象はHead相当とし、必要に応じて対象Bone/Transformを変更可能にする。
 - Avatar Dynamics Contact/Constraintでpositionとforward vectorをFloat parametersへエンコードする。
-- Parameter prefixは `CFVRC/` を既定にし、YL-ATG互換も検証用に受けられるようにする。
+- Parameterは `coord/*` と `forward/*` を既定にし、ClipForVRChat固有名を含めない。
+- YL-ATG互換 `ATG/*` はアプリ側の検証用受信経路として残す。
 - Expression Parameter枠、Contact数、Performance Rankへの影響をREADMEへ書く。
 - 既存アバターギミックとのparameter/tag衝突を避ける命名にする。
 
@@ -155,7 +158,7 @@ forward/yawは、受信したforward vector相当の水平成分から算出す�
 - 2026-07-02: Go runtime/app 層で avatar OSC basis 受信と snapshot API、player_local 撮影時の basis 解決までを先行実装する。frontend UI と appcore の復元ロジックは別作業者と分担する。
 - 2026-07-02: frontend の自動撮影タブに `manual` / `avatar_osc` の basis source 表示と、`GetAvatarOSCBasisStatus` 想定の受信状態UIを追加する。
 - 2026-07-02: README / SPEC / docs に、専用アバターギミック必須、標準OSC単独では動かない、head基準で player root ではないことを明記する。
-- 2026-07-02: 実機確認では、YL-ATG互換 `ATG/*` と ClipForVRChat案 `CFVRC/basis/*` のどちらを使うかを事前に決め、position / yaw / stale / fallback を確認する。
+- 2026-07-02: 実機確認では、AvatarBeacon既定の `coord/*` / `forward/*` を主経路にし、必要に応じてYL-ATG互換 `ATG/*` を切り分け用に使う。
 - 2026-07-02: 監督レビューで、`/avatar/parameters/` 付きOSC addressをcanonical化する修正、Wails JS wrapper追加、構図保存時の `avatar_osc` basis適用、未使用の旧復元経路削除、sidecar/埋め込みmetadataへの basis source/pose 記録を追加した。
 
 ## 非対象

@@ -1164,15 +1164,18 @@ createApp({
           }
         : null
       const yaw = pickNumber(status?.yaw ?? status?.rotationYaw ?? status?.basisPose?.rotation?.y)
+      const state = String(status?.state || status?.receiverState || status?.status || '').trim()
       return {
-        available: status?.available ?? status?.enabled ?? status?.receiving ?? false,
-        state: String(status?.state || status?.receiverState || status?.status || '').trim(),
+        available: status?.available ?? status?.enabled ?? status?.receiving ?? status?.fresh ?? state === 'ready',
+        state,
         lastReceivedAt: String(status?.lastReceivedAt || status?.lastReceived || status?.updatedAt || '').trim(),
         position: normalizedPosition,
         yaw,
         error: String(status?.error || status?.diagnostic || '').trim(),
         message: String(status?.message || '').trim(),
-        sourcePrefix: String(status?.sourcePrefix || status?.prefix || status?.parameterPrefix || '').trim()
+        sourcePrefix: String(status?.sourcePrefix || status?.prefix || status?.parameterPrefix || '').trim(),
+        rawSampleCount: Number.isFinite(Number(status?.rawSampleCount)) ? Number(status.rawSampleCount) : 0,
+        lastReceivedAddress: String(status?.lastReceivedAddress || '').trim()
       }
     },
     avatarOSCBasisStatusClass() {
@@ -1673,7 +1676,7 @@ createApp({
                     受信状態: {{ avatarOscBasisStatus?.state || avatarOscBasisStatus?.message || '未取得' }}
                     <span v-if="avatarOscBasisStatus?.sourcePrefix"> / prefix: {{ avatarOscBasisStatus.sourcePrefix }}</span>
                   </p>
-                  <p class="setting-note">最終受信: {{ avatarOscBasisStatus?.lastReceivedAt || '未受信' }}</p>
+                  <p class="setting-note">最終受信: {{ avatarOscBasisStatus?.lastReceivedAt || '未受信' }} / raw: {{ avatarOscBasisStatus?.rawSampleCount || 0 }}<span v-if="avatarOscBasisStatus?.lastReceivedAddress"> / last: {{ avatarOscBasisStatus.lastReceivedAddress }}</span></p>
                   <p class="setting-note">position: {{ formatAvatarOSCBasisPosition() }} / yaw: {{ formatAvatarOSCBasisYaw() }}</p>
                   <p v-if="avatarOscBasisStatus?.error" class="setting-note warning">エラー: {{ avatarOscBasisStatus.error }}</p>
                   <p v-else class="setting-note">専用ギミック未導入、OSC無効、parameter欠落、鮮度切れでは自動追従できません。</p>

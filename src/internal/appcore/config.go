@@ -548,8 +548,8 @@ func normalizePlayerLocalBasisSource(source string) string {
 
 func (c *AutoCapturePlayerLocalAvatarOSCConfig) Normalize() {
 	c.ParameterPrefix = strings.TrimSpace(strings.Trim(strings.TrimSpace(c.ParameterPrefix), `"`))
-	if c.ParameterPrefix == "" {
-		c.ParameterPrefix = "CFVRC/basis"
+	if c.ParameterPrefix == "" || c.ParameterPrefix == "CFVRC/basis" {
+		c.ParameterPrefix = "coord"
 	}
 	if c.PositionScale <= 0 {
 		c.PositionScale = 1000
@@ -576,7 +576,7 @@ func (c *AutoCapturePlayerLocalAvatarOSCConfig) Normalize() {
 
 func defaultAutoCapturePlayerLocalAvatarOSCConfig() AutoCapturePlayerLocalAvatarOSCConfig {
 	cfg := AutoCapturePlayerLocalAvatarOSCConfig{
-		ParameterPrefix:       "CFVRC/basis",
+		ParameterPrefix:       "coord",
 		PositionScale:         1000,
 		InvertMagnitude:       true,
 		PositiveFlagThreshold: 0,
