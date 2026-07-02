@@ -1,10 +1,7 @@
-# AvatarBeacon 汎用parameter/仕様整理チェックリスト
+# 自動処理Webhookフォールバック改善チェックリスト
 
-- [x] #173 / #176 / #175 を `v0.1.8` 必須機能と汎用parameter方針へ更新する
-- [x] ClipForVRChat側の既定OSC parameterを `coord/*` と `forward/*` に変更し、ATG互換受信は残す
-- [x] AvatarBeacon Prefab/README/NOTICEの公開parameterを `coord/*` と `forward/*` に変更する
-- [x] AvatarBeacon Prefab内GameObjectの役割と削除判断を仕様書へ明記する
-- [x] rc16実機でAvatarBeaconからOSCが送信されない原因を調査する
-- [x] Go/frontend/docsの整合性を検証する
-- [x] AvatarBeaconの既定BoneをHipsへ変更し、デバッグ用OSC送信メニューを追加する
-- [x] 必要なRelease Asset確認用のRCを作成する
+- [x] #177 を作成し、問題・期待する挙動・受け入れ条件を記録する
+- [x] 保存時確認ダイアログを、実効Webhook未設定の場合だけ出す
+- [x] VRChat写真/スクリーンショット/自動撮影Webhook欄に通常投稿用フォールバック表示を追加する
+- [x] 仕様書とissue一覧を同期する
+- [x] ビルド/テストで確認する

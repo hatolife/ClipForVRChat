@@ -182,23 +182,41 @@ createApp({
       const items = []
       const autoPhoto = config.autoPhoto || {}
       const screenshot = config.screenshotAutoPost || {}
+      const autoCapture = config.autoCapture || {}
+      const autoCaptureSchedule = autoCapture.schedule || {}
+      const autoCaptureDiscord = autoCapture.discord || {}
       const output = config.output || {}
       const discord = config.discord || {}
-      if (autoPhoto.enabled) {
-        const target = String(autoPhoto.webhookUrl || discord.webhookUrl || '').trim()
-        items.push({
-          label: 'VRChat写真自動処理',
-          detail: `監視フォルダ: ${autoPhoto.photoDirectory || '(未設定)'}`,
-          discord: output.uploadDiscord ? `Discord投稿: ON / 送信先: ${target ? this.maskWebhook(target) : '(未設定)'}` : 'Discord投稿: OFF'
-        })
+      const primaryWebhook = String(discord.webhookUrl || '').trim()
+      if (output.uploadDiscord && autoPhoto.enabled) {
+        const target = this.effectiveWebhookURL(autoPhoto.webhookUrl, primaryWebhook)
+        if (!target) {
+          items.push({
+            label: 'VRChat写真自動処理',
+            detail: `監視フォルダ: ${autoPhoto.photoDirectory || '(未設定)'}`,
+            discord: 'Discord投稿: ON / 送信先: 未設定'
+          })
+        }
       }
-      if (screenshot.enabled) {
-        const target = String(screenshot.webhookUrl || discord.webhookUrl || '').trim()
-        items.push({
-          label: 'スクリーンショット自動処理',
-          detail: `監視フォルダ: ${screenshot.screenshotDirectory || '(未設定)'}`,
-          discord: output.uploadDiscord ? `Discord投稿: ON / 送信先: ${target ? this.maskWebhook(target) : '(未設定)'}` : 'Discord投稿: OFF'
-        })
+      if (output.uploadDiscord && screenshot.enabled) {
+        const target = this.effectiveWebhookURL(screenshot.webhookUrl, primaryWebhook)
+        if (!target) {
+          items.push({
+            label: 'スクリーンショット自動処理',
+            detail: `監視フォルダ: ${screenshot.screenshotDirectory || '(未設定)'}`,
+            discord: 'Discord投稿: ON / 送信先: 未設定'
+          })
+        }
+      }
+      if (autoCaptureSchedule.enabled && autoCaptureDiscord.enabled) {
+        const target = this.effectiveWebhookURL(autoCaptureDiscord.webhookUrl, primaryWebhook)
+        if (!target) {
+          items.push({
+            label: '自動撮影',
+            detail: `保存先: ${autoCapture.output?.directory || '(未設定)'}`,
+            discord: 'Discord投稿: ON / 送信先: 未設定'
+          })
+        }
       }
       return items
     },
@@ -414,6 +432,21 @@ createApp({
     },
     shouldWarnMissingPrimaryWebhook(config = this.state.config) {
       return Boolean(config?.output?.uploadDiscord && !String(config?.discord?.webhookUrl || '').trim())
+    },
+    effectiveWebhookURL(specificWebhookURL, primaryWebhookURL = this.state.config?.discord?.webhookUrl) {
+      return String(specificWebhookURL || primaryWebhookURL || '').trim()
+    },
+    webhookFallbackNote(specificWebhookURL, enabled = true) {
+      if (!enabled) return ''
+      const specific = String(specificWebhookURL || '').trim()
+      if (specific) return 'この欄のWebhook URLへ送信します。'
+      const primary = String(this.state.config?.discord?.webhookUrl || '').trim()
+      if (primary) return `空欄のため通常投稿用Webhook URL（${this.maskWebhook(primary)}）へ送信します。`
+      return '空欄です。通常投稿用Webhook URLも空の場合はDiscordへ投稿できません。'
+    },
+    webhookFallbackNoteClass(specificWebhookURL, enabled = true) {
+      if (!enabled) return 'muted'
+      return this.effectiveWebhookURL(specificWebhookURL) ? 'ok' : 'warning'
     },
     maskWebhook(value) {
       const text = String(value || '').trim()
@@ -1903,9 +1936,10 @@ createApp({
               <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.discord.enabled" /><span></span></label>
             </div>
             <div class="setting-row" :class="{ disabled: !autoCaptureSettings.discord.enabled }">
-              <div><strong>自動撮影用Webhook URL</strong><p>自動撮影の投稿先Webhook URLです。</p></div>
+              <div><strong>自動撮影用Webhook URL</strong><p>通常投稿とは別の投稿先にしたい場合だけ入力します。空の場合は通常投稿用Webhook URLへ投稿します。</p></div>
               <label>
-                <input type="password" v-model="autoCaptureSettings.discord.webhookUrl" placeholder="https://discord.com/api/webhooks/..." :disabled="!autoCaptureSettings.discord.enabled" />
+                <input type="password" v-model="autoCaptureSettings.discord.webhookUrl" placeholder="空なら通常投稿用Webhook URLを使用" :disabled="!autoCaptureSettings.discord.enabled" />
+                <p v-if="autoCaptureSettings.discord.enabled" :class="['setting-note', webhookFallbackNoteClass(autoCaptureSettings.discord.webhookUrl, autoCaptureSettings.discord.enabled)]">{{ webhookFallbackNote(autoCaptureSettings.discord.webhookUrl, autoCaptureSettings.discord.enabled) }}</p>
               </label>
             </div>
             <div class="setting-row" :class="{ disabled: !autoCaptureSettings.discord.enabled }">
@@ -1990,12 +2024,14 @@ createApp({
               <div><strong>VRChat写真用Webhook URL</strong><p>通常投稿とは別の投稿先にしたい場合だけ入力します。空の場合は通常投稿用Webhook URLへ投稿します。</p></div>
               <label>
                 <input type="password" v-model="state.config.autoPhoto.webhookUrl" placeholder="空なら通常投稿用Webhook URLを使用" :disabled="!state.config.output.uploadDiscord || !state.config.autoPhoto.enabled" />
+                <p v-if="state.config.output.uploadDiscord && state.config.autoPhoto.enabled" :class="['setting-note', webhookFallbackNoteClass(state.config.autoPhoto.webhookUrl, state.config.autoPhoto.enabled)]">{{ webhookFallbackNote(state.config.autoPhoto.webhookUrl, state.config.autoPhoto.enabled) }}</p>
               </label>
             </div>
             <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord || !state.config.screenshotAutoPost.enabled }">
               <div><strong>スクリーンショット用Webhook URL</strong><p>通常投稿とは別の投稿先にしたい場合だけ入力します。空の場合は通常投稿用Webhook URLへ投稿します。</p></div>
               <label>
                 <input type="password" v-model="state.config.screenshotAutoPost.webhookUrl" placeholder="空なら通常投稿用Webhook URLを使用" :disabled="!state.config.output.uploadDiscord || !state.config.screenshotAutoPost.enabled" />
+                <p v-if="state.config.output.uploadDiscord && state.config.screenshotAutoPost.enabled" :class="['setting-note', webhookFallbackNoteClass(state.config.screenshotAutoPost.webhookUrl, state.config.screenshotAutoPost.enabled)]">{{ webhookFallbackNote(state.config.screenshotAutoPost.webhookUrl, state.config.screenshotAutoPost.enabled) }}</p>
               </label>
             </div>
           </section>
@@ -2095,8 +2131,8 @@ createApp({
       </div>
       <div v-if="pendingAutoPostConfirmation" class="modal-backdrop" role="dialog" aria-modal="true">
         <div class="confirm-dialog">
-          <h2>自動処理の設定を確認してください</h2>
-          <p>保存すると、下記の自動処理が有効になり、条件に一致した画像が自動で処理されます。</p>
+          <h2>自動処理の送信先を確認してください</h2>
+          <p>Discord投稿がONですが、下記の自動処理は送信先Webhook URLが未設定です。専用Webhook URL、またはフォールバック先の通常投稿用Webhook URLを設定してください。</p>
           <ul class="confirmation-list">
             <li v-for="item in autoPostConfirmationItems" :key="item.label">
               <strong>{{ item.label }}</strong>
@@ -2104,7 +2140,7 @@ createApp({
               <span>{{ item.discord }}</span>
             </li>
           </ul>
-          <p>意図しない送信を避けるため、Discord投稿タブでWebhook URLと送信先を確認してから保存してください。</p>
+          <p>通常投稿用Webhook URLが設定済みの場合、専用Webhook URLが空でもこの確認は表示されません。</p>
           <p v-if="error" class="error">{{ error }}</p>
           <div class="button-row dialog-actions">
             <button @click="confirmAutoPostSettings" :disabled="saving">{{ saving ? '保存中' : '確認して保存' }}</button>
