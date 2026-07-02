@@ -9,8 +9,8 @@ YL-ATGはMIT Licenseだが、Prefab、FBX、Material、構成、パラメータ�
 
 ## 期待する挙動
 
-ClipForVRChat用のアバターギミックを、アプリ本体と分かりやすく分離したUnity package sourceとしてリポジトリに配置する。
-利用者が生成済み `.unitypackage` をUnityへimportすると、Assetは次のようなパスへ入る。
+ClipForVRChat用のアバターギミックを、アプリ本体と分かりやすく分離したUnity asset sourceとしてリポジトリに配置する。
+CIは元ファイルzipを配布し、リリース担当者が手作業で作成した `.unitypackage` をUnityへimportすると、Assetは次のようなパスへ入る。
 
 ```text
 Assets/PoppoWorks/ClipForVRChatAvatarOSCBasis/...
@@ -66,7 +66,7 @@ Assets/YozoLab/YL-ATG_ForAvatar/YL-ATG_ForAvatar.prefab
 
 ### リポジトリ配置
 
-Issue #175 のCI生成方針と合わせ、初期候補は次の構造にする。
+Issue #175 のCI元ファイルzip配布方針と合わせ、初期候補は次の構造にする。
 
 ```text
 avatar-gimmicks/
@@ -79,9 +79,6 @@ avatar-gimmicks/
           README.md
           LICENSES/
             YL-ATG-MIT.txt
-    ProjectSettings/
-    Packages/
-    Assets/Editor/ExportUnityPackage.cs
 ```
 
 `Assets/YozoLab/...` をClipForVRChat配布packageの公開import pathにはしない。
@@ -120,15 +117,15 @@ ClipForVRChat専用Prefabでは、次のparameterを既定にする。
 
 - YL-ATGのMIT License全文を `LICENSES/YL-ATG-MIT.txt` などへ保存する。
 - ClipForVRChat側READMEに、YozoraKurage/YL-ATG、URL、MIT License、利用または改変範囲を書く。
-- `.unitypackage` 内にもライセンスまたはNOTICEを含める。
-- Release通常配布zipのライセンス/NOTICEにYL-ATG由来部分を含める。
+- 手動作成する `.unitypackage` 内にもライセンスまたはNOTICEを含める。
+- CI生成元ファイルzip、手動作成 `.unitypackage`、Release配布物のライセンス/NOTICEにYL-ATG由来部分を含める。
 - PrefabやAssetのメタ情報、README、NOTICEなど、実務上確認しやすい場所に由来を残す。
 
 コピーせず新規作成した場合でも、実装PRまたはチケット追記で「何を参考にし、何をコピーしていないか」を明記する。
 
 ## 受け入れ条件
 
-- [ ] リポジトリ内に、ClipForVRChat用アバターギミックのUnity package sourceを追加する。
+- [ ] リポジトリ内に、ClipForVRChat用アバターギミックのUnity asset sourceを追加する。
 - [ ] 配布packageのimport先が `Assets/PoppoWorks/ClipForVRChatAvatarOSCBasis/...` になる。
 - [ ] アバターへ導入できるPrefabを用意し、追跡対象TransformまたはBoneを設定できる。
 - [ ] 既定の追跡対象をHead相当にし、Head基準でありplayer root基準ではないことをREADMEに明記する。
@@ -137,9 +134,9 @@ ClipForVRChat専用Prefabでは、次のparameterを既定にする。
 - [ ] Unity上でimportし、`Assets/PoppoWorks/ClipForVRChatAvatarOSCBasis/...` に展開されることを確認する。
 - [ ] ClipForVRChatが実機VRChatから新鮮なposition/yawを受信し、`player_local` 構図の追従撮影に使えることを確認する。
 - [ ] YL-ATGからコピー・改変した部分の有無と範囲を記録する。
-- [ ] YL-ATG由来部分がある場合、MIT License全文、著作権表示、NOTICE/README表記をソース、`.unitypackage`、Release通常配布zipへ含める。
-- [ ] #175 のCI生成対象として、このアバターギミックpackageを出力できる。
-- [ ] #174 の通常配布zipへ、生成した `.unitypackage`、README、ライセンスを同梱できる。
+- [ ] YL-ATG由来部分がある場合、MIT License全文、著作権表示、NOTICE/README表記をソース、CI生成元ファイルzip、手動作成 `.unitypackage`、Release配布物へ含める。
+- [ ] #175 のCI生成対象として、このアバターギミックの元ファイルzipを出力できる。
+- [ ] 手動作成した `.unitypackage` を #174 のRelease導線から利用者へ案内できる。
 
 ## 非対象
 
