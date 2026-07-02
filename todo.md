@@ -7,4 +7,4 @@
 - [x] rc16実機でAvatarBeaconからOSCが送信されない原因を調査する
 - [x] Go/frontend/docsの整合性を検証する
 - [x] AvatarBeaconの既定BoneをHipsへ変更し、デバッグ用OSC送信メニューを追加する
-- [ ] 必要なRelease Asset確認用のRCを作成する
+- [x] 必要なRelease Asset確認用のRCを作成する
