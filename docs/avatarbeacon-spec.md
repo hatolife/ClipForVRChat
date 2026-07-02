@@ -31,23 +31,24 @@ ClipForVRChat 側では `coord/*` から復元した位置を `player_local` bas
 VRChatから外部へ送られるOSC addressは `/avatar/parameters/` が付いた形になります。
 Prefab内のparameter名はその下の相対名です。
 
-| 用途 | Avatar parameter | OSC address |
-| --- | --- | --- |
-| position X magnitude | `coord/x` | `/avatar/parameters/coord/x` |
-| position X sign | `coord/xSign` | `/avatar/parameters/coord/xSign` |
-| position Y magnitude | `coord/y` | `/avatar/parameters/coord/y` |
-| position Y sign | `coord/ySign` | `/avatar/parameters/coord/ySign` |
-| position Z magnitude | `coord/z` | `/avatar/parameters/coord/z` |
-| position Z sign | `coord/zSign` | `/avatar/parameters/coord/zSign` |
-| forward X magnitude | `forward/x` | `/avatar/parameters/forward/x` |
-| forward X sign | `forward/xSign` | `/avatar/parameters/forward/xSign` |
-| forward Y magnitude | `forward/y` | `/avatar/parameters/forward/y` |
-| forward Y sign | `forward/ySign` | `/avatar/parameters/forward/ySign` |
-| forward Z magnitude | `forward/z` | `/avatar/parameters/forward/z` |
-| forward Z sign | `forward/zSign` | `/avatar/parameters/forward/zSign` |
-| internal save/control | `avatar_beacon/save` | `/avatar/parameters/avatar_beacon/save` |
+| 用途 | Avatar parameter | OSC address | 詳細 |
+| --- | --- | --- | --- |
+| position X magnitude | `coord/x` | `/avatar/parameters/coord/x` | 追跡対象 `point` のworld X座標の絶対値側。ClipForVRChatは既定で `1 - value` に `1000` を掛けて復元する。 |
+| position X sign | `coord/xSign` | `/avatar/parameters/coord/xSign` | X座標の符号。既定では `0` 以下を負、`0` より大きい値を正として扱う。 |
+| position Y magnitude | `coord/y` | `/avatar/parameters/coord/y` | 追跡対象 `point` のworld Y座標の絶対値側。高さ方向のbasis位置に使う。 |
+| position Y sign | `coord/ySign` | `/avatar/parameters/coord/ySign` | Y座標の符号。復元時に `coord/y` と組み合わせる。 |
+| position Z magnitude | `coord/z` | `/avatar/parameters/coord/z` | 追跡対象 `point` のworld Z座標の絶対値側。前後方向のbasis位置に使う。 |
+| position Z sign | `coord/zSign` | `/avatar/parameters/coord/zSign` | Z座標の符号。復元時に `coord/z` と組み合わせる。 |
+| forward X magnitude | `forward/x` | `/avatar/parameters/forward/x` | 追跡対象の向きから作るforward vectorのX成分の絶対値側。yaw算出に使う。 |
+| forward X sign | `forward/xSign` | `/avatar/parameters/forward/xSign` | forward X成分の符号。yaw算出前に `forward/x` と組み合わせる。 |
+| forward Y magnitude | `forward/y` | `/avatar/parameters/forward/y` | forward vectorのY成分の絶対値側。ClipForVRChatでは受信完全性の確認に使い、yaw計算には直接使わない。 |
+| forward Y sign | `forward/ySign` | `/avatar/parameters/forward/ySign` | forward Y成分の符号。`forward/y` と組み合わせて完全なforward vectorとして復元できるように残す。 |
+| forward Z magnitude | `forward/z` | `/avatar/parameters/forward/z` | forward vectorのZ成分の絶対値側。yaw算出に使う。 |
+| forward Z sign | `forward/zSign` | `/avatar/parameters/forward/zSign` | forward Z成分の符号。yaw算出前に `forward/z` と組み合わせる。 |
+| internal save/control | `avatar_beacon/save` | `/avatar/parameters/avatar_beacon/save` | YL-ATG由来の保存/制御用補助parameter。basis復元には使わない。Unity実機で不要と確認できた場合の削除候補。 |
 
-`coord/*` と `forward/*` は float、`*Sign` と `avatar_beacon/save` はbool相当の制御値として扱います。
+`coord/*` と `forward/*` のmagnitudeは float、`*Sign` と `avatar_beacon/save` はbool相当の制御値として扱います。
+magnitudeだけでは正負が分からないため、各軸は必ずmagnitude parameterとsign parameterを組み合わせて復元します。
 現Prefabでは Modular Avatar Parameters に全13個を `localOnly` として登録しています。
 
 ## 値の復元
