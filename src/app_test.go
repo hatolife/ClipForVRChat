@@ -384,6 +384,24 @@ func TestAppLatestPlayerLocalBasisAvatarOSC(t *testing.T) {
 	}
 }
 
+func TestAppAvatarOSCBasisStatusIgnoresManualBasisMissing(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceManual
+	app.state.Config.AutoCapture.PlayerLocal.Calibrated = false
+
+	got := app.GetAvatarOSCBasisStatus()
+	if got.Source != "avatar_osc" || got.Status != "missing" {
+		t.Fatalf("snapshot = %+v, want missing avatar_osc", got)
+	}
+	if strings.Contains(got.Error, "プレイヤー基準Pose") {
+		t.Fatalf("error = %q, want avatar OSC diagnostic", got.Error)
+	}
+	if !strings.Contains(got.Error, "avatar OSC parameter") || !strings.Contains(got.Error, "avatar_beacon/debug/ping") {
+		t.Fatalf("error = %q, want debug ping guidance", got.Error)
+	}
+}
+
 func TestAppPrepareAutoCaptureConfigRejectsStaleAvatarOSCBasis(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})

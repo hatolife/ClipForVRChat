@@ -1668,7 +1668,7 @@ createApp({
             <div class="settings-explainer">
               <strong>VRChatのUser CameraをOSCで操作し、指定間隔で写真を撮影する機能です。</strong>
               <p>VRChat側でOSCを有効にし、Stream方式ではVRChatのStream Camera(Spout)映像を直接受信して静止画として保存します。Photo方式はVRChat標準写真を使うフォールバックです。</p>
-              <p>player_local の basis は manual と avatar_osc を切り替えられます。avatar_osc は専用アバターギミックが必要で、標準OSCだけでは動かず、head/avatar基準で player root 基準ではありません。</p>
+              <p>player_local の basis は manual と avatar_osc を切り替えられます。avatar_osc は専用アバターギミックが必要で、標準OSCだけでは動かず、Hips/avatar基準で player root そのものではありません。</p>
               <p>正面、背後、斜めの初期構図にはプレーヤーを写す想定のPoseと拡大率が入っています。構図ごとのテスト撮影で見え方を確認できます。</p>
               <p>v0.1.8では撮影時の解像度変更は行わず、VRChat側の現在のカメラ解像度設定で保存します。</p>
             </div>
@@ -1690,7 +1690,7 @@ createApp({
                 <span v-if="autoCaptureSettings.playerLocal.updatedAt"> / {{ autoCaptureSettings.playerLocal.updatedAt }}</span>
               </p>
               <div class="setting-row">
-                <div><strong>プレイヤー基準の取得元</strong><p>manual は手動保存した基準Pose、avatar_osc は専用アバターギミックから受けるOSC基準Poseです。標準OSCだけでは使えず、head/avatar基準で player root 基準ではありません。</p></div>
+                <div><strong>プレイヤー基準の取得元</strong><p>manual は手動保存した基準Pose、avatar_osc は専用アバターギミックから受けるOSC基準Poseです。標準OSCだけでは使えず、Hips/avatar基準で player root そのものではありません。</p></div>
                 <label>
                   <select v-model="autoCaptureSettings.playerLocal.basisSource">
                     <option value="manual">manual</option>
@@ -1712,7 +1712,7 @@ createApp({
                   <p class="setting-note">最終受信: {{ avatarOscBasisStatus?.lastReceivedAt || '未受信' }} / raw: {{ avatarOscBasisStatus?.rawSampleCount || 0 }}<span v-if="avatarOscBasisStatus?.lastReceivedAddress"> / last: {{ avatarOscBasisStatus.lastReceivedAddress }}</span></p>
                   <p class="setting-note">position: {{ formatAvatarOSCBasisPosition() }} / yaw: {{ formatAvatarOSCBasisYaw() }}</p>
                   <p v-if="avatarOscBasisStatus?.error" class="setting-note warning">エラー: {{ avatarOscBasisStatus.error }}</p>
-                  <p v-else class="setting-note">専用ギミック未導入、OSC無効、parameter欠落、鮮度切れでは自動追従できません。</p>
+                  <p v-else class="setting-note">Debug OSC Pingは `/avatar/parameters/avatar_beacon/debug/ping` がraw/lastに出るかで確認します。専用ギミック未導入、OSC無効、parameter欠落、鮮度切れでは自動追従できません。</p>
                 </div>
               </div>
               <div v-if="autoCaptureViews.length" class="view-list">

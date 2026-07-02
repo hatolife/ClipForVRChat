@@ -17,6 +17,7 @@
 - 専用アバターギミックからOSC Avatar Parametersで送られるHips/avatar基準Poseを `player_local` のbasisに使う `avatar_osc` 取得元を追加しました。標準OSC単体では動作せず、専用アバターギミック導入済みアバターでの実機確認が必要です。
 - AvatarBeacon を `avatar_osc` basis 確認用の汎用アバターギミックとして整理しました。OSC parameterは `coord/*` と `forward/*` を既定にし、CI は source zip だけを作成します。Unity で作る `.unitypackage` はリリース担当者が手作業で作成して GitHub Release に手動添付します。source zip は `Assets/PoppoWorks/AvatarBeacon/...` に展開できる形です。
 - VRChat写真、スクリーンショット、自動撮影の専用Webhook URLが空欄の場合に通常投稿用Webhook URLへフォールバックすることを設定画面で明示し、通常投稿用Webhook URLが設定済みなら専用Webhook未設定だけでは保存時確認を出さないようにしました。
+- `avatar_osc` 受信状態で、Avatar OSC未受信時にmanual基準Pose未設定エラーが表示されないようにし、Debug OSC Pingの確認先を表示するようにしました。
 
 ### 既知の制限
 

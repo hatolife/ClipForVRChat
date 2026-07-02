@@ -181,6 +181,7 @@
 | 175 | [CIでアバターギミック元ファイルzipを配布する](175-package-avatar-gimmick-source-zip.md) | 要確認 | `v0.1.8-rc17` | `Assets/PoppoWorks/AvatarBeacon/...` に配置したPrefab等をCIで元ファイルzip化し、`.unitypackage` は手作業で作成してGitHub Releaseへ添付する。 |
 | 176 | [YL-ATGを参考にAvatarBeaconアバターギミックを作成する](176-create-clipforvrchat-avatar-gimmick-from-yl-atg-reference.md) | 要確認 | `v0.1.8-rc17` | ユーザー配置済みのATG_ForAvatar packageを参考に汎用アバターギミックAvatarBeaconを作成し、`coord/*` と `forward/*` の汎用OSC parameter、YL-ATG由来部分のMITライセンス表記を正しく扱う。 |
 | 177 | [自動処理Webhookの通常投稿フォールバックを明確にする](177-clarify-discord-webhook-fallback-for-auto-processing.md) | 要確認 | `v0.1.8` | 自動処理専用Webhookが空欄の場合に通常投稿用Webhookへフォールバックする表示と保存前確認条件を整理する。 |
+| 178 | [avatar_osc受信状態でmanual基準Pose未設定エラーが出る](178-fix-avatar-osc-status-misleading-manual-basis-error.md) | 要確認 | `v0.1.8` | Avatar OSC未受信時にmanual基準Pose未設定エラーが出る表示を修正し、Debug OSC Pingの確認先を分かりやすくする。 |
 
 ## 状態の意味
 

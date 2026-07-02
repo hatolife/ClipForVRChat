@@ -441,7 +441,9 @@ func (a *App) GetLatestPlayerLocalBasis() PlayerLocalBasisSnapshot {
 }
 
 func (a *App) GetAvatarOSCBasisStatus() PlayerLocalBasisSnapshot {
-	return a.GetLatestPlayerLocalBasis()
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.latestAvatarOSCBasisSnapshotLocked(a.state.Config, time.Now())
 }
 
 func (a *App) SaveCurrentCameraPoseToView(viewID string) (appcore.Config, error) {
@@ -1624,7 +1626,7 @@ func (a *App) latestAvatarOSCBasisSnapshotLocked(cfg appcore.Config, now time.Ti
 			}
 			snapshot.Error = err.Error()
 		} else {
-			snapshot.Error = "avatar OSC basisがまだ受信されていません。専用アバターギミックを有効にしたアバターを使用してください"
+			snapshot.Error = "avatar OSC parameterをまだ受信していません。VRChatのOSCを有効にし、AvatarBeacon導入済みアバターで /avatar/parameters/avatar_beacon/debug/ping または coord/* / forward/* が送信されるか確認してください"
 		}
 		snapshot.Pose = a.latestAvatarOSCBasis.Pose
 		if !a.latestAvatarOSCBasis.UpdatedAt.IsZero() {
