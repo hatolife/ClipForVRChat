@@ -110,6 +110,8 @@ Stream方式で `Spout helperが見つかりません`、`Spout helperは見つ�
 
 プレイヤー基準構図は、通常の `manual` basis では「現在Poseをプレイヤー基準に保存」で保存した手動基準Poseを使います。専用アバターギミックを導入した場合は `avatar_osc` basis に切り替えられますが、標準OSCだけでは動かず、head/avatar基準で player root 基準ではありません。確認手順は `docs/v0.1.9-avatar-osc-basis-verification.md` と `docs/v0.1.8-player-local-verification.md` を参照してください。
 
+AvatarBeacon は `avatar_osc` basis 確認用の汎用アバターギミックで、ClipForVRChat専用ではありません。CIは `AvatarBeacon-vX.Y.Z-source.zip` と `AvatarBeacon-vX.Y.Z-source.zip.sha256` の元ファイルzipだけを作成し、Unityで作る `.unitypackage` はリリース担当者が手作業で作成してGitHub Releaseへ手動添付します。source zipをUnity projectへ展開すると `Assets/PoppoWorks/AvatarBeacon/...` になる形を想定しています。
+
 RC確認時の詳しい確認手順は、`docs/v0.1.8-stream-spout-verification.md`、`docs/v0.1.8-player-local-verification.md`、`docs/v0.1.8-embedded-metadata-verification.md` を参照してください。
 
 ### 11. コマンドラインで確認する

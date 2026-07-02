@@ -174,6 +174,8 @@ ONの場合、縮小画像をファイルとして保存します。
 v0.1.8では、設定画面の「自動撮影」タブからVRChat User CameraをOSCで操作し、構図ごとに撮影します。
 `player_local` の basis は `manual` と `avatar_osc` を選べます。`avatar_osc` は専用アバターギミックからOSC Avatar Parametersを受信する実験的な経路で、標準OSCだけでは動きません。
 
+AvatarBeacon は `avatar_osc` basis の確認に使う汎用アバターギミックであり、ClipForVRChat専用ではありません。CIでは `AvatarBeacon-vX.Y.Z-source.zip` と `AvatarBeacon-vX.Y.Z-source.zip.sha256` の元ファイルzipだけを作成し、Unityで作る `.unitypackage` はリリース担当者が手作業で作成してGitHub Releaseへ手動添付します。source zipをUnity projectへ展開すると `Assets/PoppoWorks/AvatarBeacon/...` になる形を想定します。
+
 ### 撮影方式
 
 - Stream方式: VRChat Stream CameraのSpout senderを内蔵の `spout-capture.exe` で受信し、静止画として保存します。通常版exeでは `spout-capture.exe` と `SpoutLibrary.dll` を本体に埋め込み、実行時に管理フォルダへ展開してからClipForVRChat本体が起動します。分離版zipでは両ファイルを `ClipForVRChat.exe` と同じフォルダに置きます。

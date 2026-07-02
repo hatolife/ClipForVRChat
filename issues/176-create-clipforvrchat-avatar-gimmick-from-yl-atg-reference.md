@@ -126,17 +126,17 @@ AvatarBeaconでは、ClipForVRChat v0.1.8-rc時点の受信実装と互換にす
 
 ## 受け入れ条件
 
-- [ ] リポジトリ内に、AvatarBeaconのUnity asset sourceを追加する。
-- [ ] 配布packageのimport先が `Assets/PoppoWorks/AvatarBeacon/...` になる。
-- [ ] アバターへ導入できるPrefabを用意し、追跡対象TransformまたはBoneを設定できる。
-- [ ] 既定の追跡対象をHead相当にし、Head基準でありplayer root基準ではないことをREADMEに明記する。
-- [ ] Prefabが `CFVRC/basis/*` のposition/forward情報をOSC Avatar Parametersへ出せる。
-- [ ] Expression Parameter枠、Contact数、Modular Avatar/VRCSDK依存、Performance Rankへの影響をREADMEに書く。
+- [x] リポジトリ内に、AvatarBeaconのUnity asset sourceを追加する。
+- [x] 配布packageのimport先が `Assets/PoppoWorks/AvatarBeacon/...` になる。
+- [x] アバターへ導入できるPrefabを用意し、追跡対象TransformまたはBoneを設定できる。
+- [x] 既定の追跡対象をHead相当にし、Head基準でありplayer root基準ではないことをREADMEに明記する。
+- [x] Prefabが `CFVRC/basis/*` のposition/forward情報をOSC Avatar Parametersへ出せる。
+- [x] Expression Parameter枠、Contact数、Modular Avatar/VRCSDK依存、Performance Rankへの影響をREADMEに書く。
 - [ ] Unity上でimportし、`Assets/PoppoWorks/AvatarBeacon/...` に展開されることを確認する。
 - [ ] ClipForVRChatが実機VRChatから新鮮なposition/yawを受信し、`player_local` 構図の追従撮影に使えることを確認する。
-- [ ] YL-ATGからコピー・改変した部分の有無と範囲を記録する。
-- [ ] YL-ATG由来部分がある場合、MIT License全文、著作権表示、NOTICE/README表記をソース、CI生成元ファイルzip、手動作成 `.unitypackage`、Release配布物へ含める。
-- [ ] #175 のCI生成対象として、このアバターギミックの元ファイルzipを出力できる。
+- [x] YL-ATGからコピー・改変した部分の有無と範囲を記録する。
+- [x] YL-ATG由来部分がある場合、MIT License全文、著作権表示、NOTICE/README表記をソース、CI生成元ファイルzip、手動作成 `.unitypackage`、Release配布物へ含める。
+- [x] #175 のCI生成対象として、このアバターギミックの元ファイルzipを出力できる。
 - [ ] 手動作成した `.unitypackage` を #174 のRelease導線から利用者へ案内できる。
 
 ## 非対象
@@ -148,6 +148,6 @@ AvatarBeaconでは、ClipForVRChat v0.1.8-rc時点の受信実装と互換にす
 
 ## メモ
 
-- 現時点ではissue化のみ。アバターギミック本体の作成は未実施。
+- AvatarBeacon元ファイルは作成済み。Unity/VRChat実機確認は未実施。
 - 実装時は、まずユーザー配置済みpackageを参照して挙動と構成を再確認する。
 - YL-ATG由来Assetを直接取り込む場合、MIT License上の再配布条件を満たすだけでなく、ClipForVRChat側の配布物から利用者が由来を確認できる状態にする。

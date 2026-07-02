@@ -2,19 +2,20 @@
 
 ## 問題
 
-`avatar_osc` は専用アバターギミックが必要だが、このリポジトリには現時点でアバター側のPrefabやUnity package sourceが存在しない。
+`avatar_osc` は専用アバターギミックが必要だが、GitHub Actions上でUnity Editorを使った `.unitypackage` 自動生成を行うには運用負荷が大きい。
 当初はCIで `.unitypackage` を生成する案を検討したが、GitHub Actions上でUnity Editor、Unity license、VRCSDK、Modular Avatar依存を扱う必要があり、運用負荷と失敗要因が大きい。
 
-そのため、CIではアバターギミックに必要な元ファイル群をzip化して配布し、`.unitypackage` 化はリリース担当者がUnity上で手作業で行い、GitHub Releaseへ手動添付する方針へ変更する。
+そのため、CIでは `avatar-gimmicks/AvatarBeacon` から元ファイルzipを作成し、`.unitypackage` 化はリリース担当者がUnity上で手作業で行ってGitHub Releaseへ手動添付する方針へ変更する。
 アバターギミック本体の作成とYL-ATG由来部分のライセンス整理は #176 で扱う。
 
 ## 期待する挙動
 
-アバターギミックのデータをリポジトリ内でアプリ本体と分かりやすく分離し、CIで `AvatarBeacon-vX.Y.Z-source.zip` のような元ファイルzipを生成できる。
+アバターギミックのデータをリポジトリ内でアプリ本体と分かりやすく分離し、CIで `AvatarBeacon-ci-source.zip` のような元ファイルzipを生成できる。
 
-zip内には、Unityへコピーまたはimportして手作業で `.unitypackage` を作るために必要なowned asset、README、ライセンス/NOTICEを含める。
+zip内には、Unityへコピーまたはimportして手作業で `.unitypackage` を作るために必要な owned asset、README、ライセンス/NOTICE を含める。Unity projectへ展開したときに `Assets/PoppoWorks/AvatarBeacon/...` になる。
 CIではUnity Editorを起動せず、zipの中身、ファイル名、sha256、不要ファイル混入を検証する。
 
+リリース時は `AvatarBeacon-${TAG_NAME}-source.zip` と `AvatarBeacon-${TAG_NAME}-source.zip.sha256` をRelease AssetとGitHub Release upload対象へ追加する。
 リリース担当者は、そのzipを元にUnity上で `.unitypackage` を作成し、GitHub Release Assetへ手動で配置する。
 Release本文と通常配布導線では、CI生成zipと手動添付 `.unitypackage` の違いが利用者に分かるようにする。
 
@@ -45,8 +46,9 @@ Assets/PoppoWorks/<アバターギミック名>/<アバターギミックのデ�
 
 ### 現在のリポジトリ内配置
 
-2026-07-02時点で、リポジトリ内に `.prefab`、`.unitypackage`、Unity `Assets/`、`ProjectSettings/`、`Packages/` は存在しない。
-`avatar_osc` の受信・復元ロジックと検証手順はあるが、プレイヤー位置座標をOSCで送信するアバターギミックそのものはまだ配置されていない。
+2026-07-02時点で、`avatar-gimmicks/AvatarBeacon` にアバターギミック元ファイルを配置した。
+CI/Releaseでは `.unitypackage` を生成せず、`AvatarBeacon-*-source.zip` とsha256を生成・検証する。
+Unity上でのimport確認、手動 `.unitypackage` 作成、VRChat実機確認は未実施。
 
 関連する既存実装・文書:
 
@@ -79,17 +81,18 @@ CIの対象はUnity project全体ではなく、配布対象のowned asset root�
 
 ## 受け入れ条件
 
-- [ ] リポジトリ内に、アプリ本体と分離したアバターギミック用Unity asset sourceを配置する。
-- [ ] Unity上のアセットパスが `Assets/PoppoWorks/<アバターギミック名>/...` になる。
-- [ ] プレイヤー位置座標をOSC Avatar Parametersへ出すPrefab等のアバターギミックデータを配置する。
-- [ ] CIで `.unitypackage` は生成しない。
-- [ ] CIでアバターギミック元ファイルzipを生成し、Release artifact / Release Assetへ含める。
-- [ ] CIで元ファイルzipの存在、ファイル名、sha256、zip内ファイル一覧を検証する。
-- [ ] zip内に `Assets/PoppoWorks/<アバターギミック名>/...`、README、必要なライセンス/NOTICEが含まれる。
-- [ ] zip内にUnity `Library/`、`Temp/`、不要な外部依存、VRCSDK、Modular Avatar本体が混入しない。
-- [ ] `.unitypackage` はリリース担当者がUnity上で手作業作成し、GitHub Release Assetへ手動添付する運用をREADMEまたはリリース手順に書く。
-- [ ] 手動作成した `.unitypackage` のファイル名、配置、sha256確認手順をリリース手順に書く。
-- [ ] VRCSDK、Modular Avatar、その他外部依存を同梱しない方針なら、READMEに導入前提を明記する。
+- [x] リポジトリ内に、アプリ本体と分離した `avatar-gimmicks/AvatarBeacon` を配置する。
+- [x] Unity上のアセットパスが `Assets/PoppoWorks/AvatarBeacon/...` になる。
+- [x] プレイヤー位置座標をOSC Avatar Parametersへ出すPrefab等のアバターギミックデータを配置する。
+- [x] CIで `.unitypackage` は生成しない。
+- [x] CIでアバターギミック元ファイルzipを生成し、Release artifactへ含める。
+- [x] CIで元ファイルzipの存在、ファイル名、sha256、zip内ファイル一覧を検証する。
+- [x] zip内に `Assets/PoppoWorks/AvatarBeacon/...`、README、必要なライセンス/NOTICEが含まれる。
+- [x] zip内にUnity `Library/`、`Temp/`、不要な外部依存、VRCSDK、Modular Avatar本体、`.unitypackage` が混入しない。
+- [x] リリース時に `AvatarBeacon-${TAG_NAME}-source.zip` と `AvatarBeacon-${TAG_NAME}-source.zip.sha256` をRelease Asset / GitHub Release upload対象へ追加する。
+- [x] `.unitypackage` はリリース担当者がUnity上で手作業作成し、GitHub Release Assetへ手動添付する運用をREADMEまたはリリース手順に書く。
+- [x] 手動作成した `.unitypackage` のファイル名、配置、sha256確認手順をリリース手順に書く。
+- [x] VRCSDK、Modular Avatar、その他外部依存を同梱しない方針なら、READMEに導入前提を明記する。
 - [ ] 外部依存を同梱する方針に変える場合は、ライセンスと再配布可否を確認し、Release配布物のライセンス/NOTICEへ反映する。
 - [ ] #174 のRelease導線で、CI生成元ファイルzipと手動添付 `.unitypackage` の関係が分かる。
 
@@ -104,7 +107,8 @@ CIの対象はUnity project全体ではなく、配布対象のowned asset root�
 
 ## メモ
 
-- 現時点では方針更新のみ。アバターギミック本体とCI実装は未実施。
+- AvatarBeacon元ファイルとCI/Release source zip生成は実装済み。
 - アバターギミック名は `AvatarBeacon` とする。ClipForVRChat専用ではなく、同じOSC parameterを受信できる他ツールでも使える汎用アバターギミックとして扱う。
 - `.unitypackage` はAsset pathを保持するため、source側も最初から `Assets/PoppoWorks/<アバターギミック名>/...` に置くのが安全。
 - CIでUnityを動かさないため、Unity import確認と `.unitypackage` 作成確認は手作業のリリースチェックに寄せる。
+- Unity/VRChat実機確認は未実施のため、RCで確認する。

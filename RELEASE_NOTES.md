@@ -15,11 +15,13 @@
 - 構図カード内に「現在Poseから追加」と「このPoseへカメラ移動」を追加し、設定済みPoseをゲーム内カメラへ送れるようにしました。
 - User Camera関連OSCをfalse/Offへ戻す「カメラOSCをリセット」ボタンを自動撮影タブに追加しました。
 - 実験機能として、専用アバターギミックからOSC Avatar Parametersで送られるhead/avatar基準Poseを `player_local` のbasisに使う `avatar_osc` 取得元を追加しました。標準OSC単体では動作せず、専用アバターギミック導入済みアバターでの実機確認が必要です。
+- AvatarBeacon を `avatar_osc` basis 確認用の汎用アバターギミックとして整理しました。CI は source zip だけを作成し、Unity で作る `.unitypackage` はリリース担当者が手作業で作成して GitHub Release に手動添付します。source zip は `Assets/PoppoWorks/AvatarBeacon/...` に展開できる形です。
 
 ### 既知の制限
 
 - player_local構図は標準OSCだけでプレイヤーrootを自動取得できないため、手動で保存したプレイヤー基準Poseを使います。
 - `avatar_osc` basisはhead/avatar基準であり、player root基準そのものではありません。専用アバターギミック未導入、OSC無効、parameter欠落、鮮度切れの場合は撮影前に失敗します。
+- AvatarBeacon の `.unitypackage` は CI では作らず、手作業で作成して Release に添付します。source zip は再生成・検証用の配布物です。
 - output log由来のユーザー一覧やworld/instance情報は、VRChatログの内容によって取得できない場合があります。
 - Camera Dolly Multi、解像度一時変更、SQLiteローカルDB、OSCQuery自動検出はv0.1.8の対象外です。v0.1.8ではsidecar JSONと履歴JSONを正本/索引として扱います。
 
