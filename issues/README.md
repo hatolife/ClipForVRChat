@@ -176,7 +176,7 @@
 | 170 | [Spout同梱バイナリを単一exe配布に戻せるか調査する](170-investigate-single-exe-distribution-for-spout.md) | 完了 | 調査のみ | v0.1.8-rc13で増えた `spout-capture.exe` / `SpoutLibrary.dll` を利用者から見て単一exeへ寄せられるか調査した。 |
 | 171 | [Spout helperを本体exeへ埋め込み単一exe配布にする](171-embed-spout-helper-single-exe-release.md) | 要確認 | `v0.1.8` | C案採用に基づき、通常利用者向けReleaseを単一exe主導線へ戻し、分離版zipも検証用に残す。 |
 | 172 | [player_local基準Poseの挙動を見直す](172-clarify-or-redesign-player-local-basis-behavior.md) | 未着手 | 未定 | `player_local` が自動追従ではなく手動基準Pose方式であるため、初期構図とUI説明の期待ズレを解消する。 |
-| 173 | [専用アバターギミックOSCでhead/avatar基準Poseを自動取得する](173-implement-avatar-osc-basis-bridge.md) | 未着手 | 未定 | YL-ATG方式を参考に、専用アバターギミックからOSCでhead/avatar基準Poseを受け取り `player_local` basisへ使う実験機能を実装する。 |
+| 173 | [専用アバターギミックOSCでhead/avatar基準Poseを自動取得する](173-implement-avatar-osc-basis-bridge.md) | 要確認 | `v0.1.8` | YL-ATG方式を参考に、専用アバターギミックからOSCでhead/avatar基準Poseを受け取り `player_local` basisへ使う実験機能を実装する。 |
 
 ## 状態の意味
 

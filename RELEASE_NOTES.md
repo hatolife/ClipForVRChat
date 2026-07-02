@@ -14,10 +14,12 @@
 - 埋め込みメタデータ書き込みに失敗した場合も、sidecar JSON、Discord投稿、履歴追加は可能な限り継続し、警告として記録します。
 - 構図カード内に「現在Poseから追加」と「このPoseへカメラ移動」を追加し、設定済みPoseをゲーム内カメラへ送れるようにしました。
 - User Camera関連OSCをfalse/Offへ戻す「カメラOSCをリセット」ボタンを自動撮影タブに追加しました。
+- 実験機能として、専用アバターギミックからOSC Avatar Parametersで送られるhead/avatar基準Poseを `player_local` のbasisに使う `avatar_osc` 取得元を追加しました。標準OSC単体では動作せず、専用アバターギミック導入済みアバターでの実機確認が必要です。
 
 ### 既知の制限
 
 - player_local構図は標準OSCだけでプレイヤーrootを自動取得できないため、手動で保存したプレイヤー基準Poseを使います。
+- `avatar_osc` basisはhead/avatar基準であり、player root基準そのものではありません。専用アバターギミック未導入、OSC無効、parameter欠落、鮮度切れの場合は撮影前に失敗します。
 - output log由来のユーザー一覧やworld/instance情報は、VRChatログの内容によって取得できない場合があります。
 - Camera Dolly Multi、解像度一時変更、SQLiteローカルDB、OSCQuery自動検出はv0.1.8の対象外です。v0.1.8ではsidecar JSONと履歴JSONを正本/索引として扱います。
 
