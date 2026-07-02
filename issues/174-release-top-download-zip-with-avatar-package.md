@@ -33,4 +33,5 @@ GitHub Release本文の一番上に、通常利用者向けの最優先導線と
 
 - 現時点ではissue化のみ。実装は行わない。
 - アバターギミック用 `unitypackage` の生成元、ファイル名、ライセンス表記、同梱可否は実装時に確定する。
+- `unitypackage` のCI生成とアバターギミック配置は [#175](175-build-avatar-gimmick-unitypackage-in-ci.md) で扱う。
 - 通常配布zipを主導線にする場合でも、改竄確認の導線が分かりにくくならないよう、zip sha256や署名対象を合わせて整理する。
