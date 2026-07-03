@@ -22,6 +22,7 @@
 - GUI起動の切り分け用に、Wails起動/DOM準備/frontend初期化/手動終了/shutdownの診断ログと、起動中の簡易進捗表示を追加しました。
 - 自動撮影タブの説明文がfrontendのtemplate literalを壊し、起動時に `avatar is not defined` が出る問題を修正しました。同種の混入をCI/Releaseで検出する検査も追加しました。
 - `avatar_osc` が `stale` の場合に、内部エラー名ではなく、AvatarBeaconの `coord/*` / `forward/*` 更新停止、最後に受信したparameter、OSC config resetやContact確認へ誘導する診断文を表示するようにしました。
+- AvatarBeacon切り分けのため、受信したOSC packetを対象外parameterも含めて診断ログへ出すようにしました。address、type tag、値、送信元、bytes、payload hex previewを確認できます。
 
 ### 既知の制限
 

@@ -1,6 +1,6 @@
-# avatar_osc stale診断の改善
+# OSC受信ログの詳細化
 
-- [x] #176 に `stale / last: Ahoge_Angle` の実機確認結果を追記する
-- [x] `stale avatar OSC basis` の表示を日本語の診断文へ置き換える
-- [x] UIと確認手順にstale時の切り分けを追記する
-- [x] テストとフロントエンド検査を実行する
+- [x] #176 にOSC全受信ログ追加方針を追記する
+- [x] 対象外parameterを含むOSC受信内容を診断ログへ出す
+- [x] parse不能packetもbytes/hex previewを診断ログへ出す
+- [x] テストを追加して検査する

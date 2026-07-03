@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"image"
@@ -543,6 +544,29 @@ func TestAppAvatarOSCBasisAddressAffectsBasisOnlyForConfiguredAxes(t *testing.T)
 		if app.avatarOSCBasisAddressAffectsBasisLocked(address, cfg) {
 			t.Fatalf("%s should not affect AvatarBeacon basis", address)
 		}
+	}
+}
+
+func TestFormatOSCLogValuesIncludesUnsupportedAndRemainingPayload(t *testing.T) {
+	payload := make([]byte, 0, 24)
+	payload = binary.BigEndian.AppendUint32(payload, math.Float32bits(0.4))
+	negativeTwo := int32(-2)
+	payload = binary.BigEndian.AppendUint32(payload, uint32(negativeTwo))
+	payload = append(payload, []byte("hello\x00\x00\x00")...)
+	payload = append(payload, 0xaa, 0xbb)
+
+	got := formatOSCLogValues(",fisTz", payload)
+	for _, want := range []string{"0.4", "-2", `"hello"`, "true", "<unsupported:z>", "remaining_hex=aabb"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("formatOSCLogValues = %q, want %q", got, want)
+		}
+	}
+}
+
+func TestHexPreviewTruncatesLongPayload(t *testing.T) {
+	got := hexPreview([]byte{0x00, 0x11, 0x22, 0x33}, 2)
+	if got != "0011..." {
+		t.Fatalf("hexPreview = %q", got)
 	}
 }
 

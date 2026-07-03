@@ -166,3 +166,4 @@ AvatarBeaconでは、ClipForVRChat専用名を避け、次の汎用parameterを�
 - 2026-07-02: `point` はMA Bone Proxy付きの追跡アンカーであり、複数のConstraintが参照するため残す。`arrow` mesh/materialは可視化用途のみでOSC送信に直接関与しないため削除する。
 - 2026-07-02: YL-ATGの座標取得方式を `docs/avatarbeacon-spec.md` に追記した。VRChat clientやワールドAPIから座標を直接読むのではなく、Constraintで配置したContact Sender/ReceiverのProximity値を使い、magnitude/sign parameterへ分解してOSC Avatar Parametersとして外部へ出す方式。
 - 2026-07-04: ユーザー実機確認で `avatar_osc 受信状態: stale / prefix: coord`、`raw: 55 / last: Ahoge_Angle`、position/yawが0、エラー `stale avatar OSC basis` の報告あり。VRChat OSC自体は他Avatar Parameterを受信できているが、AvatarBeaconの `coord/*` / `forward/*` が鮮度切れになっている状態と判断する。次の修正では、内部エラー名ではなく、AvatarBeacon座標parameterが止まっていること、OSC config reset、アバター再読み込み、Avatar Dynamics Contact / Avatar Interactions確認へ誘導する表示にする。
+- 2026-07-04: AvatarBeacon実機切り分けのため、basis対象外も含めOSC受信内容をすべて診断ログへ出す。parseできたpacketはaddress/type/value/source/bytes、parse不能packetはbytesとhex previewを出す。

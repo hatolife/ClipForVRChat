@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"net"
@@ -1478,7 +1479,7 @@ func (a *App) runCameraPoseReceiver(ctx context.Context, host string, port int, 
 	}()
 	buf := make([]byte, 2048)
 	for {
-		n, _, err := conn.ReadFromUDP(buf)
+		n, remoteAddr, err := conn.ReadFromUDP(buf)
 		if err != nil {
 			if ctx.Err() != nil {
 				appcore.AppendDiagnosticLog(logPath, "auto-capture osc receiver stop: err=%v", ctx.Err())
@@ -1490,8 +1491,10 @@ func (a *App) runCameraPoseReceiver(ctx context.Context, host string, port int, 
 		packet := append([]byte(nil), buf[:n]...)
 		address, typeTags, payload, ok := appcore.ParseOSCPacket(packet)
 		if !ok {
+			appcore.AppendDiagnosticLog(logPath, "auto-capture osc received invalid: remote=%q bytes=%d hex_preview=%q", oscRemoteAddrString(remoteAddr), n, hexPreview(packet, 96))
 			continue
 		}
+		appcore.AppendDiagnosticLog(logPath, "auto-capture osc received: remote=%q bytes=%d address=%q type_tags=%q values=%q payload_hex_preview=%q", oscRemoteAddrString(remoteAddr), n, address, typeTags, formatOSCLogValues(typeTags, payload), hexPreview(payload, 96))
 		now := time.Now()
 		if pose, ok := appcore.ParseOSCPose(packet); ok {
 			a.mu.Lock()
@@ -1521,6 +1524,100 @@ func (a *App) runCameraPoseReceiver(ctx context.Context, host string, port int, 
 			a.mu.Unlock()
 		}
 	}
+}
+
+func oscRemoteAddrString(addr *net.UDPAddr) string {
+	if addr == nil {
+		return ""
+	}
+	return addr.String()
+}
+
+func formatOSCLogValues(typeTags string, payload []byte) string {
+	tags := strings.TrimPrefix(typeTags, ",")
+	if tags == "" {
+		return "[]"
+	}
+	values := make([]string, 0, len(tags))
+	offset := 0
+	for _, tag := range tags {
+		switch tag {
+		case 'f':
+			if offset+4 > len(payload) {
+				values = append(values, "<short-float32>")
+				continue
+			}
+			values = append(values, fmt.Sprintf("%g", math.Float32frombits(binary.BigEndian.Uint32(payload[offset:offset+4]))))
+			offset += 4
+		case 'd':
+			if offset+8 > len(payload) {
+				values = append(values, "<short-float64>")
+				continue
+			}
+			values = append(values, fmt.Sprintf("%g", math.Float64frombits(binary.BigEndian.Uint64(payload[offset:offset+8]))))
+			offset += 8
+		case 'i':
+			if offset+4 > len(payload) {
+				values = append(values, "<short-int32>")
+				continue
+			}
+			values = append(values, fmt.Sprintf("%d", int32(binary.BigEndian.Uint32(payload[offset:offset+4]))))
+			offset += 4
+		case 'h':
+			if offset+8 > len(payload) {
+				values = append(values, "<short-int64>")
+				continue
+			}
+			values = append(values, fmt.Sprintf("%d", int64(binary.BigEndian.Uint64(payload[offset:offset+8]))))
+			offset += 8
+		case 's':
+			value, next, ok := readOSCLogString(payload, offset)
+			if !ok {
+				values = append(values, "<invalid-string>")
+				continue
+			}
+			values = append(values, fmt.Sprintf("%q", value))
+			offset = next
+		case 'T':
+			values = append(values, "true")
+		case 'F':
+			values = append(values, "false")
+		default:
+			values = append(values, fmt.Sprintf("<unsupported:%c>", tag))
+		}
+	}
+	if offset < len(payload) {
+		values = append(values, "remaining_hex="+hexPreview(payload[offset:], 48))
+	}
+	return "[" + strings.Join(values, ", ") + "]"
+}
+
+func readOSCLogString(data []byte, offset int) (string, int, bool) {
+	if offset < 0 || offset >= len(data) {
+		return "", offset, false
+	}
+	end := offset
+	for end < len(data) && data[end] != 0 {
+		end++
+	}
+	if end >= len(data) {
+		return "", offset, false
+	}
+	next := end + 1
+	for next%4 != 0 {
+		next++
+	}
+	if next > len(data) {
+		return "", offset, false
+	}
+	return string(data[offset:end]), next, true
+}
+
+func hexPreview(data []byte, maxBytes int) string {
+	if maxBytes <= 0 || len(data) <= maxBytes {
+		return hex.EncodeToString(data)
+	}
+	return hex.EncodeToString(data[:maxBytes]) + "..."
 }
 
 func (a *App) latestCameraPoseLocked(cfg appcore.Config) appcore.CameraPoseSnapshot {
