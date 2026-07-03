@@ -87,6 +87,9 @@ jobs:
         working-directory: src/frontend
         run: npm run build
 
+      - name: Check frontend template literals
+        run: node scripts/check-frontend-template-literals.mjs
+
       - name: Test Go packages
         working-directory: src
         run: go test ./...

@@ -20,6 +20,7 @@
 - `avatar_osc` 受信状態で、Avatar OSC未受信時にmanual基準Pose未設定エラーが表示されないようにし、Debug OSC Pingの確認先を表示するようにしました。
 - `avatar_osc` 受信処理がVRChatのAvatar Parameter受信ごとに大量ログを出し、起動直後のGUI表示を阻害する場合がある問題を修正しました。
 - GUI起動の切り分け用に、Wails起動/DOM準備/frontend初期化/手動終了/shutdownの診断ログと、起動中の簡易進捗表示を追加しました。
+- 自動撮影タブの説明文がfrontendのtemplate literalを壊し、起動時に `avatar is not defined` が出る問題を修正しました。同種の混入をCI/Releaseで検出する検査も追加しました。
 
 ### 既知の制限
 

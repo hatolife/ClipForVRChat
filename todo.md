@@ -1,6 +1,6 @@
-# rc20作成チェックリスト
+# rc20 frontend起動エラー修正チェックリスト
 
-- [x] #179 の対応バージョンを `v0.1.8-rc20` へ更新する
-- [x] `v0.1.8-rc20` の署名付きタグを作成する
-- [x] Release workflowの成功を確認する
-- [x] Release assetとzip内容を確認する
+- [x] rc20ログと `avatar is not defined` の発生箇所を確認する
+- [x] Vue template内の説明文バッククォートを除去する
+- [x] template内バッククォート混入を検出するCI/Release検査を追加する
+- [x] frontend build、静的検査、Goテストを実行する

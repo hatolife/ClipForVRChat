@@ -16,6 +16,8 @@
 - `avatar osc basis resolve error` がループで大量出力されない。
 - Wails起動、DOM準備、frontend初期化、初期状態取得、手動終了開始、shutdown完了が診断ログで追える。
 - WebViewがHTML表示まで進んだ場合は、Vue初期化前でも簡易的な起動進捗が表示される。
+- frontend template内の説明文でJS template literalを壊さず、起動時に `avatar is not defined` などのReferenceErrorが出ない。
+- 同種のtemplate内バッククォート混入をCI/Releaseで検出できる。
 - `go test ./...` とフロントエンドビルドが通る。
 - 必要なら次RCで修正を確認できる。
 
@@ -41,3 +43,9 @@
 - `index.html` に静的な起動画面を入れ、JSやVue mount前にWebView表示まで進んでいるかを視覚的に確認できるようにする。
 - Vue初期化中も起動オーバーレイを出し、Go API取得で時間がかかっているのか、表示処理自体が止まっているのかを切り分ける。
 - 過去の同種確認として `issues/003-main-window-ui-and-about.md` に「通常起動時に空白画面にならない」要件がある。現状の `index.html` は空の `#app` のため、JS実行前に空白になり得る点は同根のUX不足として扱う。一方で `issues/048` はGUI subsystem exeの標準出力問題、`issues/105` はGoテスト中のWailsイベント送信問題であり、今回のウィンドウ表示停止とは直接同根ではなさそう。
+
+## rc20再現ログ
+
+- `v0.1.8-rc20` separated版で、簡易起動画面に `フロントエンドエラー: Uncaught ReferenceError: avatar is not defined at http://wails.localhost/assets/index-DvTLSiJp.js:397:68` が表示された。
+- 診断ログでは `frontend_script_loaded api=available` の直後に同じ `frontend_error` が出ており、Wails APIとHTML表示までは到達している。
+- 該当箇所はVue `template: \`...\`` 内の説明文 `Debug OSC Pingは \`/avatar/parameters/avatar_beacon/debug/ping\`` で、説明用バッククォートがJS template literalを途中で閉じ、`/avatar/...` が不正に評価されてReferenceErrorになっていた。
