@@ -26,8 +26,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 448617561426496783}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.0000049622186, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 1.6654454e-15, y: 0, z: 0}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -111,8 +111,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 491871944873609954}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.0000049622186, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -0.00084715284}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -197,7 +197,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 856071819521952918}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -307,7 +307,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1246223224485854335}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.0049575167, y: -0, z: -0, w: 0.9999877}
+  m_LocalRotation: {x: 0.0049575167, y: 0, z: 0, w: 0.9999877}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -605,8 +605,6 @@ GameObject:
   m_Component:
   - component: {fileID: 2902941087723332167}
   - component: {fileID: 2467320044933366665}
-  - component: {fileID: 4208794303331174148}
-  - component: {fileID: 4353541313494072459}
   m_Layer: 0
   m_Name: AvatarBeacon
   m_TagString: Untagged
@@ -629,7 +627,6 @@ Transform:
   m_Children:
   - {fileID: 2571729785052195177}
   - {fileID: 7427406105501419169}
-  - {fileID: 8303796797655761081}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &2467320044933366665
@@ -765,162 +762,6 @@ MonoBehaviour:
     saved: 0
     hasExplicitDefaultValue: 0
     m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: avatar_beacon/debug/ping
-    remapTo: 
-    internalParameter: 0
-    isPrefix: 0
-    syncType: 3
-    localOnly: 1
-    defaultValue: 0
-    saved: 0
-    hasExplicitDefaultValue: 0
-    m_overrideAnimatorDefaults: 0
---- !u!114 &4208794303331174148
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5404809299889866057}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7ef83cb0c23d4d7c9d41021e544a1978, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  menuToAppend: {fileID: 0}
-  installTargetMenu: {fileID: 0}
---- !u!114 &4353541313494072459
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5404809299889866057}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 97e46a47dd8a425eb4ce9411defe313d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  targetObject: {fileID: 0}
---- !u!1 &5654875131272142356
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 8303796797655761081}
-  - component: {fileID: 3755701711973944423}
-  m_Layer: 0
-  m_Name: AvatarBeacon Debug
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &8303796797655761081
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5654875131272142356}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 7609960276402323565}
-  m_Father: {fileID: 2902941087723332167}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &3755701711973944423
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5654875131272142356}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3b29d45007c5493d926d2cd45a489529, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  Control:
-    name: AvatarBeacon Debug
-    icon: {fileID: 0}
-    type: 103
-    parameter:
-      name: 
-    value: 1
-    style: 0
-    subMenu: {fileID: 0}
-    subParameters: []
-    labels: []
-  MenuSource: 1
-  menuSource_otherObjectChildren: {fileID: 0}
-  isSynced: 1
-  isSaved: 0
---- !u!1 &7149249781053256091
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 7609960276402323565}
-  - component: {fileID: 1135126201420891150}
-  m_Layer: 0
-  m_Name: Debug OSC Ping
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &7609960276402323565
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7149249781053256091}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 8303796797655761081}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1135126201420891150
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7149249781053256091}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3b29d45007c5493d926d2cd45a489529, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
-  Control:
-    name: Debug OSC Ping
-    icon: {fileID: 0}
-    type: 101
-    parameter:
-      name: avatar_beacon/debug/ping
-    value: 1
-    style: 0
-    subMenu: {fileID: 0}
-    subParameters: []
-    labels: []
-  MenuSource: 0
-  menuSource_otherObjectChildren: {fileID: 0}
-  isSynced: 1
-  isSaved: 0
 --- !u!1 &6937262563406762609
 GameObject:
   m_ObjectHideFlags: 0
@@ -1136,8 +977,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 9124242601001485458}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.0000049622186, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.0008521478, z: 0}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1212,7 +1053,7 @@ GameObject:
   - component: {fileID: 5596991193576000830}
   - component: {fileID: 3285151922791795018}
   m_Layer: 0
-  m_Name: WorldC
+  m_Name: WorldOriginAnchor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

@@ -1823,7 +1823,7 @@ func (a *App) latestAvatarOSCBasisSnapshotLocked(cfg appcore.Config, now time.Ti
 			}
 			snapshot.Error = err.Error()
 		} else {
-			snapshot.Error = "avatar OSC parameterをまだ受信していません。VRChatのOSCを有効にし、AvatarBeacon導入済みアバターで /avatar/parameters/avatar_beacon/debug/ping または coord/* / forward/* が送信されるか確認してください"
+			snapshot.Error = "avatar OSC parameterをまだ受信していません。VRChatのOSCを有効にし、AvatarBeacon導入済みアバターで coord/* / forward/* が送信されるか確認してください"
 		}
 		snapshot.Pose = a.latestAvatarOSCBasis.Pose
 		if !a.latestAvatarOSCBasis.UpdatedAt.IsZero() {
@@ -2040,13 +2040,12 @@ func (a *App) lookupAvatarOSCBasisRawSample(address string) (avatarOSCBasisSampl
 func (a *App) formatAvatarOSCBasisValuesLocked(cfg appcore.Config) string {
 	cfg.AutoCapture.PlayerLocal.AvatarOSC.Normalize()
 	_, positionRoot, forwardRoot, signSuffix := avatarOSCBasisAddressScheme(cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix)
-	keys := make([]string, 0, 13)
+	keys := make([]string, 0, 12)
 	for _, root := range []string{positionRoot, forwardRoot} {
 		for _, axis := range []string{"x", "y", "z"} {
 			keys = append(keys, root+"/"+axis, root+"/"+axis+signSuffix)
 		}
 	}
-	keys = append(keys, "avatar_beacon/debug/ping")
 
 	parts := make([]string, 0, len(keys))
 	for _, key := range keys {

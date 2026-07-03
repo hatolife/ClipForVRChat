@@ -1812,7 +1812,7 @@ const vueApp = createApp({
                   <p class="setting-note">position: {{ formatAvatarOSCBasisPosition() }} / yaw: {{ formatAvatarOSCBasisYaw() }}</p>
                   <p v-if="avatarOscBasisStatus?.error" class="setting-note warning">エラー: {{ avatarOscBasisStatus.error }}</p>
                   <p v-if="avatarOscBasisStatus?.state === 'stale'" class="setting-note warning">staleは、AvatarBeaconの <code>coord/*</code> と <code>forward/*</code> が鮮度切れの状態です。lastがAvatarBeacon以外のparameterなら、OSC経路は動いていますが座標parameterが更新されていません。</p>
-                  <p v-else-if="!avatarOscBasisStatus?.error" class="setting-note">Debug OSC Pingは <code>/avatar/parameters/avatar_beacon/debug/ping</code> がraw/lastに出るかで確認します。専用ギミック未導入、OSC無効、parameter欠落、鮮度切れでは自動追従できません。</p>
+                  <p v-else-if="!avatarOscBasisStatus?.error" class="setting-note"><code>coord/*</code> と <code>forward/*</code> がraw/lastまたはログsummaryに出るかで確認します。専用ギミック未導入、OSC無効、parameter欠落、鮮度切れでは自動追従できません。</p>
                 </div>
               </div>
               <div v-if="autoCaptureViews.length" class="view-list">

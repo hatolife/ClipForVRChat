@@ -15,6 +15,7 @@ ClipForVRChat は `coord/*` と `forward/*` 形式の受信側ツールのひと
 Unity プロジェクトへ import すると、配布先は `Assets/PoppoWorks/AvatarBeacon` になります。
 導入用 Prefab は `Assets/PoppoWorks/AvatarBeacon/Prefabs/AvatarBeacon.prefab` です。
 Prefab内GameObjectの役割と削除判断は、リポジトリ側の `docs/avatarbeacon-spec.md` に記録しています。
+座標測定の基準GameObjectは `WorldOriginAnchor` です。これは原点基準のContact Receiver群であり、手動で移動・回転させないでください。
 
 ## 使い方
 
@@ -41,14 +42,9 @@ Prefab内GameObjectの役割と削除判断は、リポジトリ側の `docs/ava
 - `forward/z`
 - `forward/zSign`
 
-デバッグ用に次の OSC parameter も追加します。
-VRChat Expressions Menu の `AvatarBeacon Debug > Debug OSC Ping` を押すと、OSC疎通確認用に値が変化します。
-
-- `avatar_beacon/debug/ping`
-
 ## 前提コスト
 
-- basis 用に Expression Parameter 枠を 12 個、デバッグ用に 1 個使います。
+- basis 用に Expression Parameter 枠を 12 個使います。
 - Contact / Constraint / Animator の追加分だけ、Avatar Performance Rank に影響します。
 - Modular Avatar と VRChat SDK の依存が必要です。
 
@@ -60,7 +56,7 @@ VRChat Expressions Menu の `AvatarBeacon Debug > Debug OSC Ping` を押すと�
 4. 値が古い、欠落している、または別アバターへ切り替えた場合は、追従しないことを確認します。
 
 OSCが届かない場合は、VRChatの `Options > OSC > Reset OSC Config` を実行し、avatar IDごとのOSC config JSONに `coord/*` と `forward/*` の `output.address` があるか確認してください。
-まず `AvatarBeacon Debug > Debug OSC Ping` を押して、ClipForVRChatの `raw` と `last` に `/avatar/parameters/avatar_beacon/debug/ping` が出るか確認すると、OSC送信経路そのものを切り分けやすくなります。
+ClipForVRChatの `raw` と `last` に `coord/*` または `forward/*` が出るか確認すると、OSC送信経路とAvatarBeaconのbasis parameter出力を切り分けやすくなります。
 Avatar Dynamics Contact / Avatar Interactions が無効な場合も値が変化しない可能性があります。
 
 ## 検証限界
@@ -87,5 +83,7 @@ Avatar Dynamics Contact / Avatar Interactions が無効な場合も値が変化�
 - ClipForVRChatのbasis復元に使わない `ATG/SaveObject` / menu item を削除
 - 既定の Bone Proxy target を Head から Hips へ変更
 - `point` の可視化だけに使われていた `arrow` mesh / material を削除
-- OSC疎通確認用の `AvatarBeacon Debug > Debug OSC Ping` menu item を追加
+- basis復元に使わない `AvatarBeacon Debug` / `Debug OSC Ping` menu item を削除
+- 座標基準GameObject名を `WorldC` から `WorldOriginAnchor` に変更
+- 誤差に見える微小なTransform値を正規化
 - 既定送信名を ClipForVRChat 側の受信実装に合わせて整理

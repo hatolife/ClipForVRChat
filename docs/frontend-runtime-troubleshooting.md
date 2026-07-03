@@ -26,7 +26,7 @@
 
 ```js
 template: `
-  <p>Debug OSC Pingは `/avatar/parameters/avatar_beacon/debug/ping` を送信します。</p>
+  <p>AvatarBeaconは `/avatar/parameters/coord/x` を送信します。</p>
 `
 ```
 

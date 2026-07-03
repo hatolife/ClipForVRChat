@@ -12,7 +12,8 @@ Modifications in this tree:
 - Renamed public asset path from `Assets/YozoLab/YL-ATG_ForAvatar` to `Assets/PoppoWorks/AvatarBeacon`.
 - Renamed position parameters from `ATG/p/*` to `coord/*`.
 - Renamed forward/rotation-vector parameters from `ATG/r/*` to `forward/*`.
-- Replaced auxiliary `ATG/SaveObject` menu item with `avatar_beacon/debug/ping` for OSC diagnostics.
+- Removed auxiliary `ATG/SaveObject` and debug-only menu parameters that are not used for basis reconstruction.
 - Changed the default Bone Proxy target from Head to Hips.
 - Removed the visual-only arrow mesh/material assets.
+- Normalized near-zero serialized Transform values in the prefab while preserving Contact/Constraint values used by the sensor graph.
 - Adjusted prefab naming to `AvatarBeacon`.

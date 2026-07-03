@@ -426,8 +426,8 @@ func TestAppAvatarOSCBasisStatusIgnoresManualBasisMissing(t *testing.T) {
 	if strings.Contains(got.Error, "プレイヤー基準Pose") {
 		t.Fatalf("error = %q, want avatar OSC diagnostic", got.Error)
 	}
-	if !strings.Contains(got.Error, "avatar OSC parameter") || !strings.Contains(got.Error, "avatar_beacon/debug/ping") {
-		t.Fatalf("error = %q, want debug ping guidance", got.Error)
+	if !strings.Contains(got.Error, "avatar OSC parameter") || !strings.Contains(got.Error, "coord/* / forward/*") {
+		t.Fatalf("error = %q, want AvatarBeacon basis guidance", got.Error)
 	}
 }
 
@@ -569,7 +569,6 @@ func TestAppAvatarOSCBasisAddressAffectsBasisOnlyForConfiguredAxes(t *testing.T)
 		}
 	}
 	for _, address := range []string{
-		"/avatar/parameters/avatar_beacon/debug/ping",
 		"/avatar/parameters/GestureLeft",
 		"/avatar/parameters/Viseme",
 		"/avatar/parameters/coord/debug",

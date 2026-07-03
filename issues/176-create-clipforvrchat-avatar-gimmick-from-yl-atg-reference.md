@@ -132,7 +132,7 @@ AvatarBeaconでは、ClipForVRChat専用名を避け、次の汎用parameterを�
 - [x] 配布packageのimport先が `Assets/PoppoWorks/AvatarBeacon/...` になる。
 - [x] アバターへ導入できるPrefabを用意し、追跡対象TransformまたはBoneを設定できる。
 - [x] 既定の追跡対象をHips相当にし、player rootそのものではないがHeadよりプレイヤー位置に近いbasisであることをREADMEに明記する。
-- [x] VRChat Expressions Menuから手動でOSC疎通確認できるデバッグ用parameter/menuを追加する。
+- [x] VRChat Expressions Menuから手動でOSC疎通確認できるデバッグ用parameter/menuを追加しない。AvatarBeaconはbasis送信用の `coord/*` / `forward/*` のみに絞る。
 - [x] Prefabが `coord/*` と `forward/*` のposition/forward情報をOSC Avatar Parametersへ出せる。
 - [x] AvatarBeacon Prefab内GameObjectの役割、必要性、削除判断を仕様書に記録する。
 - [x] Expression Parameter枠、Contact数、Modular Avatar/VRCSDK依存、Performance Rankへの影響をREADMEに書く。
@@ -161,7 +161,7 @@ AvatarBeaconでは、ClipForVRChat専用名を避け、次の汎用parameterを�
 - 2026-07-02: `docs/avatarbeacon-spec.md` にPrefab構造、GameObjectごとの役割、削除候補、Unity実機確認なしに削るべきでない要素を記録した。
 - 2026-07-02: ユーザー実機確認で `v0.1.8-rc16` のAvatarBeaconからOSCが送信されていないように見えるとの報告あり。`localOnly` parameter、Expression Parameters登録、VRChat OSC config生成、Contact receiverの動作条件を優先して調査する。
 - 2026-07-02: VRChat公式OSC仕様ではPublished AvatarのOSC config JSONにある `output.address` が値変化時に送信される。実機切り分けでは `Reset OSC Config`、avatar ID別JSONの `coord/*` / `forward/*` 出力、Avatar Dynamics Contact / Avatar Interactions有効化、ClipForVRChatのraw受信件数を確認する。
-- 2026-07-02: rc16時点の `SaveObject` はPrefab上、`avatar_beacon/save` を操作するMA Menu Itemであり、`coord/*` / `forward/*` のContact経路やClipForVRChatのbasis復元から参照されていない。用途不明な名前のまま残さず、OSC疎通確認用のデバッグメニューとして作り直す。
+- 2026-07-02: rc16時点の `SaveObject` はPrefab上、`avatar_beacon/save` を操作するMA Menu Itemであり、`coord/*` / `forward/*` のContact経路やClipForVRChatのbasis復元から参照されていない。用途不明な名前のまま残さない。
 - 2026-07-02: `player_local` basis用途ではHeadよりHipsの方がプレイヤー位置に近いため、`point` の既定MA Bone ProxyをHeadからHipsへ変更する。
 - 2026-07-02: `point` はMA Bone Proxy付きの追跡アンカーであり、複数のConstraintが参照するため残す。`arrow` mesh/materialは可視化用途のみでOSC送信に直接関与しないため削除する。
 - 2026-07-02: YL-ATGの座標取得方式を `docs/avatarbeacon-spec.md` に追記した。VRChat clientやワールドAPIから座標を直接読むのではなく、Constraintで配置したContact Sender/ReceiverのProximity値を使い、magnitude/sign parameterへ分解してOSC Avatar Parametersとして外部へ出す方式。
@@ -172,4 +172,7 @@ AvatarBeaconでは、ClipForVRChat専用名を避け、次の汎用parameterを�
 - 2026-07-04: AvatarBeaconをv0.1.8で使う前提にするため、新規設定、空文字、basisSource欠落設定のプレイヤー基準取得元初期値を `avatar_osc` に変更する。未知値のfallbackは従来通り `manual` とし、壊れたconfigを暗黙にOSC依存へ切り替えない。
 - 2026-07-04: `v0.1.8-rc23` Release workflow成功。Releaseはprerelease、添付8件、exe/separated zip/AvatarBeacon source zipのsha256一致、exe署名Good signature、分離版zipは想定7ファイル、AvatarBeacon source zipは `Assets/PoppoWorks/AvatarBeacon/...` に展開できる12ファイルであることを確認した。
 - 2026-07-04: rc23実機ログでは `coord/x,y,z` と `forward/x,y,z`、`forward/xSign/ySign/zSign` を受信できており、positionは復元値とUI表示が一致していた。一方、06:32:14直前の `forward/x,z` からはyaw約45度を復元できる値が来ているのにUIは0度表示だった。原因はfrontendが `pose.position` は見るが `pose.rotation.y` をyaw候補に含めていないため、Go APIが返す `pose.rotation.y` を表示していなかったこと。
-- 2026-07-04: `avatar_osc` 受信状態は更新ボタンなしでも自動撮影タブ表示中に数秒間隔で自動更新する。Debug Pingやbasis受信確認はUIのraw/lastへ寄せ、診断ログは全OSC packet連続出力をやめ、invalid/error、User Camera Pose、basis resolve状態変化、10秒ごとのAvatar OSC summaryを中心に絞る。summaryにはstatus、raw、last、position/yaw、`coord/*` / `forward/*` / debug ping の最新値と受信時刻を出す。
+- 2026-07-04: `avatar_osc` 受信状態は更新ボタンなしでも自動撮影タブ表示中に数秒間隔で自動更新する。basis受信確認はUIのraw/lastへ寄せ、診断ログは全OSC packet連続出力をやめ、invalid/error、User Camera Pose、basis resolve状態変化、10秒ごとのAvatar OSC summaryを中心に絞る。summaryにはstatus、raw、last、position/yaw、`coord/*` / `forward/*` の最新値と受信時刻を出す。
+- 2026-07-04: AvatarBeaconから `AvatarBeacon Debug` / `Debug OSC Ping` / `avatar_beacon/debug/ping` を削除する。basis復元に使わないデバッグ専用menu/parameterでExpression Parameter枠を余分に使うため、配布ギミックは `coord/*` / `forward/*` の12parameterだけに絞る。OSC疎通確認はClipForVRChatのraw/lastと10秒summaryに出る `coord/*` / `forward/*` の受信有無で行う。
+- 2026-07-04: AvatarBeacon Prefab内の子GameObjectに残っている `1e-15` 相当の座標値、`-0`、ほぼ0のQuaternion成分など、Unity YAML上の誤差に見える値を正規化する。Contact Receiverの符号判定位置やConstraintの実値は機能に関わるため、見た目だけで0にしない。
+- 2026-07-04: 座標基準GameObject名 `WorldC` は役割が分かりにくいため、ワールド原点基準のアンカーであることが伝わる `WorldOriginAnchor` へ変更する。

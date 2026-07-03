@@ -27,7 +27,7 @@ READMEの手順では Modular Avatar の Bone Proxy target を `AvatarBeacon/poi
 ClipForVRChat 側では `coord/*` から復元した位置を `player_local` basis の位置、`forward/*` から復元した水平forward vectorを basis yaw として使います。
 
 `point` は単なる見た目用オブジェクトではありません。
-MA Bone Proxyの付いた追跡アンカーであり、`WorldC`、`const_x`、`const_z` などのConstraintがこのTransformを参照して座標エンコードの基準にします。
+MA Bone Proxyの付いた追跡アンカーであり、`WorldOriginAnchor`、`const_x`、`const_z` などのConstraintがこのTransformを参照して座標エンコードの基準にします。
 そのため `point` 自体は必要です。
 
 ## OSC Parameter
@@ -49,11 +49,10 @@ Prefab内のparameter名はその下の相対名です。
 | forward Y sign | `forward/ySign` | `/avatar/parameters/forward/ySign` | forward Y成分の符号。`forward/y` と組み合わせて完全なforward vectorとして復元できるように残す。 |
 | forward Z magnitude | `forward/z` | `/avatar/parameters/forward/z` | forward vectorのZ成分の絶対値側。yaw算出に使う。 |
 | forward Z sign | `forward/zSign` | `/avatar/parameters/forward/zSign` | forward Z成分の符号。yaw算出前に `forward/z` と組み合わせる。 |
-| debug ping | `avatar_beacon/debug/ping` | `/avatar/parameters/avatar_beacon/debug/ping` | OSC疎通確認用のbool parameter。Expressions Menuの `AvatarBeacon Debug > Debug OSC Ping` から手動で値を変化させ、VRChat OSC config、送信ポート、ClipForVRChat raw受信を切り分ける。 |
 
-`coord/*` と `forward/*` のmagnitudeは float、`*Sign` と `avatar_beacon/debug/ping` はbool相当の制御値として扱います。
+`coord/*` と `forward/*` のmagnitudeは float、`*Sign` はbool相当の制御値として扱います。
 magnitudeだけでは正負が分からないため、各軸は必ずmagnitude parameterとsign parameterを組み合わせて復元します。
-現Prefabでは Modular Avatar Parameters に全13個を `localOnly` として登録しています。
+現Prefabでは Modular Avatar Parameters に全12個を `localOnly` として登録しています。
 
 ## 値の復元
 
@@ -85,8 +84,8 @@ VRChat のOSC Avatar ParametersはそのExpression Parameterを外部へ送る�
 YL-ATG のPrefabでは、これを利用して次のような変換をしています。
 
 1. `point` を MA Bone Proxy でHeadなどのアバターBoneへ追従させる。
-2. `WorldC` を座標の受け側にし、`ATG/p/x`、`ATG/p/y`、`ATG/p/z` の Proximity Receiver を置く。
-3. `const_x`、`const_y`、`const_z` を `point` と `WorldC` の間にConstraintで配置し、対応するContact Sender tagを出す。
+2. `WorldOriginAnchor` を座標の受け側にし、`ATG/p/x`、`ATG/p/y`、`ATG/p/z` の Proximity Receiver を置く。
+3. `const_x`、`const_y`、`const_z` を `point` と `WorldOriginAnchor` の間にConstraintで配置し、対応するContact Sender tagを出す。
 4. ReceiverのProximity値を `ATG/p/*` のmagnitudeとして使う。
 5. 同じ軸の `ATG/p/x+`、`ATG/p/y+`、`ATG/p/z+` を符号判定用parameterとして使う。
 6. `rot`、`offset_rot`、`get_rot`、`Rot_flag` で同じ仕組みを回転方向に適用し、`ATG/r/*` と `ATG/r/*+` を出す。
@@ -123,9 +122,7 @@ AvatarBeacon では、この仕組み自体は維持しつつ、公開parameter�
 
 ```text
 AvatarBeacon
-├── AvatarBeacon Debug
-│   └── Debug OSC Ping
-├── WorldC
+├── WorldOriginAnchor
 │   ├── const_x
 │   ├── const_y
 │   ├── const_z
@@ -143,8 +140,7 @@ AvatarBeacon
 ### Root `AvatarBeacon`
 
 Prefab rootです。
-Modular Avatar Parameters相当のComponentで、`coord/*`、`forward/*`、`avatar_beacon/debug/ping` をAvatar Expression Parameterへ登録します。
-同じroot上に、デバッグメニューをExpressions Menuへ入れるためのModular Avatar系menu/install補助Componentも付いています。
+Modular Avatar Parameters相当のComponentで、`coord/*` と `forward/*` をAvatar Expression Parameterへ登録します。
 
 このrootを削るとparameter登録とPrefab導入単位が壊れるため必須です。
 
@@ -156,19 +152,20 @@ Modular Avatar Bone Proxy相当のComponentを持ち、既定ではHipsへ追従
 
 このオブジェクトがないと、どのアバターTransformを座標出力対象にするかを指定できないため必須です。
 
-### `WorldC`
+### `WorldOriginAnchor`
 
 position出力の中心です。
 `coord/x,y,z` と `coord/xSign,ySign,zSign` のContact receiver相当Componentを持ち、`point` 由来の位置を magnitude/sign に分けてAvatar Parameterへ書き込みます。
+Transformは原点、無回転、scale 1 を保つ前提です。
 
 このオブジェクトを削ると `coord/*` が出なくなるため必須です。
 
 ### `const_x` / `const_y` / `const_z`
 
 各軸の基準点を作る補助Transformです。
-ParentConstraint と Contact sender相当Componentを持ち、`WorldC` 側のContact receiverへ衝突タグを渡す役割と推定しています。
+ParentConstraint と Contact sender相当Componentを持ち、`WorldOriginAnchor` 側のContact receiverへ衝突タグを渡す役割と推定しています。
 
-単体では出力parameterを直接持ちませんが、`WorldC` の軸magnitude/sign算出に使われるため、Unity/VRChat実機で代替確認するまでは削除しません。
+単体では出力parameterを直接持ちませんが、`WorldOriginAnchor` の軸magnitude/sign算出に使われるため、Unity/VRChat実機で代替確認するまでは削除しません。
 
 ### `rot`
 
@@ -199,17 +196,11 @@ Prefab YAML上は直接parameter名を持ちませんが、`rot`、`get_rot`、`
 
 YL-ATG由来の座標変換グラフの一部であり、削るとforwardの符号や向きが変わる可能性があるため、実機検証前には削除しません。
 
-### `AvatarBeacon Debug` / `Debug OSC Ping`
-
-OSC疎通確認用のExpressions Menu階層です。
-`Debug OSC Ping` はMA Menu ItemのButtonで、`avatar_beacon/debug/ping` を操作します。
-
-このparameterはClipForVRChatのbasis復元には使いません。
-`coord/*` / `forward/*` が出ない場合でも、`avatar_beacon/debug/ping` がClipForVRChatの `raw` / `last` に見えれば、VRChatから外部アプリへのOSC送信経路は動いていると判断できます。
-逆に `avatar_beacon/debug/ping` も見えない場合は、OSC有効化、送信ポート、avatar ID別OSC config JSON、メニュー導入状態を優先して確認します。
+### 削除したデバッグメニュー
 
 YL-ATG由来の `ATG/SaveObject` は、Prefab上ではMA Menu Itemで保存/制御用parameterを操作するだけで、`coord/*` / `forward/*` のContact経路やClipForVRChatのbasis復元には使われていません。
-AvatarBeaconでは用途が曖昧な `SaveObject` としては残さず、明示的なデバッグ用 `avatar_beacon/debug/ping` に置き換えます。
+AvatarBeaconでは用途が曖昧な `SaveObject` を残さず、basis復元に使わない `AvatarBeacon Debug` / `Debug OSC Ping` も削除します。
+OSC疎通確認は、ClipForVRChatの `raw` / `last` と10秒summaryに `coord/*` / `forward/*` が出るかで行います。
 
 ### `arrow` mesh
 
@@ -235,7 +226,7 @@ v0.1.8では、不要機能を追加しないことよりも、YL-ATGで成立�
 - Unity import後、`Assets/PoppoWorks/AvatarBeacon/...` として配置される。
 - `AvatarBeacon.prefab` をアバターroot配下へ置ける。
 - `point` をHips基準に設定できる。
-- Expressions Menuの `AvatarBeacon Debug > Debug OSC Ping` を押すと、ClipForVRChatの `avatar_osc` raw/lastに `/avatar/parameters/avatar_beacon/debug/ping` が表示される。
+- ClipForVRChatの `avatar_osc` raw/lastまたは10秒summaryに `coord/*` / `forward/*` が表示される。
 - VRChat OSCで `/avatar/parameters/coord/*` と `/avatar/parameters/forward/*` が更新される。
 - 前後左右移動で `coord/*` が変化する。
 - yaw回転で `forward/*` が変化する。
