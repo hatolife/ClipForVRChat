@@ -20,6 +20,9 @@ func TestDefaultAutoCaptureConfig(t *testing.T) {
 	if cfg.AutoCapture.OSC.Host != "127.0.0.1" || cfg.AutoCapture.OSC.SendPort != 9000 || cfg.AutoCapture.OSC.ReceivePort != 9001 {
 		t.Fatalf("unexpected osc defaults: %+v", cfg.AutoCapture.OSC)
 	}
+	if cfg.AutoCapture.PlayerLocal.BasisSource != PlayerLocalBasisSourceAvatarOSC {
+		t.Fatalf("PlayerLocal.BasisSource = %q, want avatar_osc", cfg.AutoCapture.PlayerLocal.BasisSource)
+	}
 	if len(cfg.AutoCapture.Views) != 3 {
 		t.Fatalf("default views = %d, want 3", len(cfg.AutoCapture.Views))
 	}

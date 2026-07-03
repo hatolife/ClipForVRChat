@@ -248,7 +248,7 @@ func DefaultAutoCaptureConfig() AutoCaptureConfig {
 			PoseFreshnessSec: 3,
 		},
 		PlayerLocal: AutoCapturePlayerLocalConfig{
-			BasisSource: PlayerLocalBasisSourceManual,
+			BasisSource: PlayerLocalBasisSourceAvatarOSC,
 			AvatarOSC:   defaultAutoCapturePlayerLocalAvatarOSCConfig(),
 		},
 		Schedule: AutoCaptureScheduleConfig{
@@ -537,7 +537,9 @@ func (c *AutoCapturePlayerLocalConfig) Normalize() {
 
 func normalizePlayerLocalBasisSource(source string) string {
 	switch strings.ToLower(strings.TrimSpace(source)) {
-	case "", PlayerLocalBasisSourceManual:
+	case "":
+		return PlayerLocalBasisSourceAvatarOSC
+	case PlayerLocalBasisSourceManual:
 		return PlayerLocalBasisSourceManual
 	case PlayerLocalBasisSourceAvatarOSC:
 		return PlayerLocalBasisSourceAvatarOSC

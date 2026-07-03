@@ -16,6 +16,7 @@
 - User Camera関連OSCをfalse/Offへ戻す「カメラOSCをリセット」ボタンを自動撮影タブに追加しました。
 - 専用アバターギミックからOSC Avatar Parametersで送られるHips/avatar基準Poseを `player_local` のbasisに使う `avatar_osc` 取得元を追加しました。標準OSC単体では動作せず、専用アバターギミック導入済みアバターでの実機確認が必要です。
 - AvatarBeacon を `avatar_osc` basis 確認用の汎用アバターギミックとして整理しました。OSC parameterは `coord/*` と `forward/*` を既定にし、CI は source zip だけを作成します。Unity で作る `.unitypackage` はリリース担当者が手作業で作成して GitHub Release に手動添付します。source zip は `Assets/PoppoWorks/AvatarBeacon/...` に展開できる形です。
+- プレイヤー基準の取得元の初期値を `avatar_osc` に変更しました。新規設定、または `basisSource` が未保存の設定では、AvatarBeaconからのOSC basis受信を既定で使います。
 - VRChat写真、スクリーンショット、自動撮影の専用Webhook URLが空欄の場合に通常投稿用Webhook URLへフォールバックすることを設定画面で明示し、通常投稿用Webhook URLが設定済みなら専用Webhook未設定だけでは保存時確認を出さないようにしました。
 - `avatar_osc` 受信状態で、Avatar OSC未受信時にmanual基準Pose未設定エラーが表示されないようにし、Debug OSC Pingの確認先を表示するようにしました。
 - `avatar_osc` 受信処理がVRChatのAvatar Parameter受信ごとに大量ログを出し、起動直後のGUI表示を阻害する場合がある問題を修正しました。
@@ -23,6 +24,8 @@
 - 自動撮影タブの説明文がfrontendのtemplate literalを壊し、起動時に `avatar is not defined` が出る問題を修正しました。同種の混入をCI/Releaseで検出する検査も追加しました。
 - `avatar_osc` が `stale` の場合に、内部エラー名ではなく、AvatarBeaconの `coord/*` / `forward/*` 更新停止、最後に受信したparameter、OSC config resetやContact確認へ誘導する診断文を表示するようにしました。
 - AvatarBeacon切り分けのため、受信したOSC packetを対象外parameterも含めて診断ログへ出すようにしました。address、type tag、値、送信元、bytes、payload hex previewを確認できます。
+- 設定画面を開いたときに同じOSC受信ポートへ再bindして失敗し、`avatar_osc` 受信器が止まって `stale` になる問題を修正しました。同じhost/port/log pathでは既存の受信器を維持します。
+- `avatar_osc` の鮮度判定を、basis対象parameterの最古受信時刻ではなく最新受信時刻で見るようにしました。VRChat OSCが値変化時だけ送る挙動でも、変化していない軸だけを理由にstaleになりにくくなります。
 
 ### 既知の制限
 

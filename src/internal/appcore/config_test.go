@@ -60,8 +60,8 @@ func TestConfigNormalizeAppliesDefaultsAndTrimsQuotes(t *testing.T) {
 	if cfg.AutoPhoto.ScanIntervalSeconds != 2 {
 		t.Fatalf("ScanIntervalSeconds = %d, want 2", cfg.AutoPhoto.ScanIntervalSeconds)
 	}
-	if cfg.AutoCapture.PlayerLocal.BasisSource != PlayerLocalBasisSourceManual {
-		t.Fatalf("PlayerLocal.BasisSource = %q, want manual", cfg.AutoCapture.PlayerLocal.BasisSource)
+	if cfg.AutoCapture.PlayerLocal.BasisSource != PlayerLocalBasisSourceAvatarOSC {
+		t.Fatalf("PlayerLocal.BasisSource = %q, want avatar_osc", cfg.AutoCapture.PlayerLocal.BasisSource)
 	}
 	if cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix != "coord" {
 		t.Fatalf("PlayerLocal.AvatarOSC.ParameterPrefix = %q", cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix)
@@ -132,7 +132,6 @@ func TestConfigNormalizeTrimsSpoutHelperPathWithoutResettingCustomPath(t *testin
 
 func TestAutoCapturePlayerLocalNormalizeDefaultsAndSourceFallback(t *testing.T) {
 	cfg := AutoCapturePlayerLocalConfig{
-		BasisSource: "unknown",
 		AvatarOSC: AutoCapturePlayerLocalAvatarOSCConfig{
 			ParameterPrefix:       ` "  " `,
 			PositionScale:         0,
@@ -143,6 +142,12 @@ func TestAutoCapturePlayerLocalNormalizeDefaultsAndSourceFallback(t *testing.T) 
 			FreshnessSec:          0,
 		},
 	}
+	cfg.Normalize()
+	if cfg.BasisSource != PlayerLocalBasisSourceAvatarOSC {
+		t.Fatalf("BasisSource = %q, want avatar_osc", cfg.BasisSource)
+	}
+
+	cfg.BasisSource = "unknown"
 	cfg.Normalize()
 	if cfg.BasisSource != PlayerLocalBasisSourceManual {
 		t.Fatalf("BasisSource = %q, want manual", cfg.BasisSource)
