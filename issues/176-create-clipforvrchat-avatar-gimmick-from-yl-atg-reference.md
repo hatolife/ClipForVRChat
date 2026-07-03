@@ -178,3 +178,4 @@ AvatarBeaconでは、ClipForVRChat専用名を避け、次の汎用parameterを�
 - 2026-07-04: 座標基準GameObject名 `WorldC` は役割が分かりにくいため、ワールド原点基準のアンカーであることが伝わる `WorldOriginAnchor` へ変更する。
 - 2026-07-04: Avatar OSC summary logからも `avatar_beacon/debug/ping=<missing>` を出さない。summaryは `coord/*` / `forward/*` のbasis parameterだけを対象にする。
 - 2026-07-04: `avatar_osc 受信状態` は自動更新されるため、手動の「更新」ボタンを削除する。
+- 2026-07-04: `avatar_osc 受信状態` の最終受信表示は時刻だけにし、raw/lastの詳細確認は10秒summaryログへ寄せる。
