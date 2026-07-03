@@ -132,13 +132,14 @@ AvatarBeaconでは、ClipForVRChat専用名を避け、次の汎用parameterを�
 - [x] 配布packageのimport先が `Assets/PoppoWorks/AvatarBeacon/...` になる。
 - [x] アバターへ導入できるPrefabを用意し、追跡対象TransformまたはBoneを設定できる。
 - [x] 既定の追跡対象をHips相当にし、player rootそのものではないがHeadよりプレイヤー位置に近いbasisであることをREADMEに明記する。
+- [x] positionはHips基準、yaw/forwardはHead基準としてAvatarBeaconから送信できるようにする。
 - [x] VRChat Expressions Menuから手動でOSC疎通確認できるデバッグ用parameter/menuを追加しない。AvatarBeaconはbasis送信用の `coord/*` / `forward/*` のみに絞る。
 - [x] Prefabが `coord/*` と `forward/*` のposition/forward情報をOSC Avatar Parametersへ出せる。
 - [x] AvatarBeacon Prefab内GameObjectの役割、必要性、削除判断を仕様書に記録する。
 - [x] Expression Parameter枠、Contact数、Modular Avatar/VRCSDK依存、Performance Rankへの影響をREADMEに書く。
 - [ ] Unity上でimportし、`Assets/PoppoWorks/AvatarBeacon/...` に展開されることを確認する。
 - [ ] `v0.1.8-rc16` でOSCが送信されない原因を特定し、Prefab/導入手順/VRChat OSC設定のいずれが原因か切り分ける。
-- [x] `avatar_osc` statusにraw受信件数と最後に受けたAvatar Parameter addressを表示し、OSC未送信とparameter不一致を切り分けられるようにする。
+- [x] `avatar_osc` statusと10秒summary logでOSC未送信とparameter不一致を切り分けられるようにする。
 - [ ] ClipForVRChatが実機VRChatから新鮮なposition/yawを受信し、`player_local` 構図の追従撮影に使えることを確認する。
 - [x] YL-ATGからコピー・改変した部分の有無と範囲を記録する。
 - [x] YL-ATG由来部分がある場合、MIT License全文、著作権表示、NOTICE/README表記をソース、CI生成元ファイルzip、手動作成 `.unitypackage`、Release配布物へ含める。
@@ -179,3 +180,5 @@ AvatarBeaconでは、ClipForVRChat専用名を避け、次の汎用parameterを�
 - 2026-07-04: Avatar OSC summary logからも `avatar_beacon/debug/ping=<missing>` を出さない。summaryは `coord/*` / `forward/*` のbasis parameterだけを対象にする。
 - 2026-07-04: `avatar_osc 受信状態` は自動更新されるため、手動の「更新」ボタンを削除する。
 - 2026-07-04: `avatar_osc 受信状態` の最終受信表示は時刻だけにし、raw/lastの詳細確認は10秒summaryログへ寄せる。
+- 2026-07-04: positionはHips追従の `point` から維持し、yaw/forwardはHead追従の専用アンカーから取得する。アプリ側OSC parameterは `coord/*` / `forward/*` のまま変えない。
+- 2026-07-04: 自動撮影UIはAvatarBeacon導入を基本導線にし、manual basisは専用ギミックなしのフォールバック/高度設定として扱う。

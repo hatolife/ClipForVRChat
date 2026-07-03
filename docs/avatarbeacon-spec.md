@@ -20,15 +20,19 @@ Unity側で `.unitypackage` を手作業作成するときも、外部依存本�
 
 ## 追跡対象
 
-Prefab root直下の `point` が追跡対象です。
-READMEの手順では Modular Avatar の Bone Proxy target を `AvatarBeacon/point` に設定し、既定は Hips 相当として扱います。
+Prefab root直下の `point` が位置用の追跡対象、`HeadForwardAnchor` が向き用の追跡対象です。
+READMEの手順では Modular Avatar の Bone Proxy target を `AvatarBeacon/point` にHips、`AvatarBeacon/HeadForwardAnchor` にHeadを設定します。
 
-これは player root そのものではありませんが、Headよりプレイヤー位置に近いbasisとして扱います。
-ClipForVRChat 側では `coord/*` から復元した位置を `player_local` basis の位置、`forward/*` から復元した水平forward vectorを basis yaw として使います。
+これは player root そのものではありませんが、HipsはHeadよりプレイヤー位置に近いbasisとして扱います。
+ClipForVRChat 側では `coord/*` から復元したHips基準位置を `player_local` basis の位置、`forward/*` から復元したHead基準の水平forward vectorを basis yaw として使います。
 
 `point` は単なる見た目用オブジェクトではありません。
 MA Bone Proxyの付いた追跡アンカーであり、`WorldOriginAnchor`、`const_x`、`const_z` などのConstraintがこのTransformを参照して座標エンコードの基準にします。
 そのため `point` 自体は必要です。
+
+`HeadForwardAnchor` もMA Bone Proxyの付いた追跡アンカーです。
+`offset_rot` のRotationConstraintがこのTransformを参照し、`forward/*` の生成元になります。
+そのため、位置はHips、yawはHeadという分離を保つには必須です。
 
 ## OSC Parameter
 
@@ -43,11 +47,11 @@ Prefab内のparameter名はその下の相対名です。
 | position Y sign | `coord/ySign` | `/avatar/parameters/coord/ySign` | Y座標の符号。復元時に `coord/y` と組み合わせる。 |
 | position Z magnitude | `coord/z` | `/avatar/parameters/coord/z` | 追跡対象 `point` のworld Z座標の絶対値側。前後方向のbasis位置に使う。 |
 | position Z sign | `coord/zSign` | `/avatar/parameters/coord/zSign` | Z座標の符号。復元時に `coord/z` と組み合わせる。 |
-| forward X magnitude | `forward/x` | `/avatar/parameters/forward/x` | 追跡対象の向きから作るforward vectorのX成分の絶対値側。yaw算出に使う。 |
+| forward X magnitude | `forward/x` | `/avatar/parameters/forward/x` | `HeadForwardAnchor` の向きから作るforward vectorのX成分の絶対値側。yaw算出に使う。 |
 | forward X sign | `forward/xSign` | `/avatar/parameters/forward/xSign` | forward X成分の符号。yaw算出前に `forward/x` と組み合わせる。 |
-| forward Y magnitude | `forward/y` | `/avatar/parameters/forward/y` | forward vectorのY成分の絶対値側。ClipForVRChatでは受信完全性の確認に使い、yaw計算には直接使わない。 |
+| forward Y magnitude | `forward/y` | `/avatar/parameters/forward/y` | Head基準forward vectorのY成分の絶対値側。ClipForVRChatでは受信完全性の確認に使い、yaw計算には直接使わない。 |
 | forward Y sign | `forward/ySign` | `/avatar/parameters/forward/ySign` | forward Y成分の符号。`forward/y` と組み合わせて完全なforward vectorとして復元できるように残す。 |
-| forward Z magnitude | `forward/z` | `/avatar/parameters/forward/z` | forward vectorのZ成分の絶対値側。yaw算出に使う。 |
+| forward Z magnitude | `forward/z` | `/avatar/parameters/forward/z` | Head基準forward vectorのZ成分の絶対値側。yaw算出に使う。 |
 | forward Z sign | `forward/zSign` | `/avatar/parameters/forward/zSign` | forward Z成分の符号。yaw算出前に `forward/z` と組み合わせる。 |
 
 `coord/*` と `forward/*` のmagnitudeは float、`*Sign` はbool相当の制御値として扱います。
@@ -61,8 +65,8 @@ ClipForVRChat 側の既定復元は次の通りです。
 
 - `value = (1 - magnitude) * 1000`
 - `sign > 0` なら正、それ以外なら負
-- positionは `coord/x,y,z` を使う
-- yawは `forward/x,z` から `atan2(forward.x, forward.z)` で求める
+- positionはHips基準の `coord/x,y,z` を使う
+- yawはHead基準の `forward/x,z` から `atan2(forward.x, forward.z)` で求める
 - `forward/y` は受信完全性の確認には使うが、`player_local` のyaw計算には直接使わない
 
 `ATG/*` 互換受信は、既存YL-ATGとの切り分け用にClipForVRChat側へ残します。
@@ -135,6 +139,7 @@ AvatarBeacon
 │       │   └── Z
 │       └── Rot_flag
 ├── point
+├── HeadForwardAnchor
 ```
 
 ### Root `AvatarBeacon`
@@ -146,11 +151,19 @@ Modular Avatar Parameters相当のComponentで、`coord/*` と `forward/*` をAv
 
 ### `point`
 
-追跡対象の基準Transformです。
+位置追跡対象の基準Transformです。
 Modular Avatar Bone Proxy相当のComponentを持ち、既定ではHipsへ追従します。
-必要に応じてHeadなど任意のBone/Transformへ差し替えられます。
+必要に応じて任意のBone/Transformへ差し替えられます。
 
 このオブジェクトがないと、どのアバターTransformを座標出力対象にするかを指定できないため必須です。
+
+### `HeadForwardAnchor`
+
+yaw/forward追跡対象の基準Transformです。
+Modular Avatar Bone Proxy相当のComponentを持ち、既定ではHeadへ追従します。
+
+`offset_rot` のRotationConstraintがこのTransformを参照し、`forward/*` のContact経路へHead基準の向きを渡します。
+このオブジェクトがないと、位置をHips基準にしたまま向きだけHead基準に分離できないため必須です。
 
 ### `WorldOriginAnchor`
 
@@ -172,6 +185,7 @@ ParentConstraint と Contact sender相当Componentを持ち、`WorldOriginAnchor
 forward vector出力の中心です。
 `forward/x,y,z` のContact receiver相当Componentを持ちます。
 ClipForVRChat はこのうち水平成分 `forward/x,z` からyawを復元します。
+入力元の向きは `HeadForwardAnchor` です。
 
 このオブジェクトを削ると `forward/*` が出なくなるため必須です。
 
@@ -200,7 +214,7 @@ YL-ATG由来の座標変換グラフの一部であり、削るとforwardの符�
 
 YL-ATG由来の `ATG/SaveObject` は、Prefab上ではMA Menu Itemで保存/制御用parameterを操作するだけで、`coord/*` / `forward/*` のContact経路やClipForVRChatのbasis復元には使われていません。
 AvatarBeaconでは用途が曖昧な `SaveObject` を残さず、basis復元に使わない `AvatarBeacon Debug` / `Debug OSC Ping` も削除します。
-OSC疎通確認は、ClipForVRChatの `raw` / `last` と10秒summaryに `coord/*` / `forward/*` が出るかで行います。
+OSC疎通確認は、ClipForVRChatの10秒summaryに `coord/*` / `forward/*` が出るかで行います。
 
 ### `arrow` mesh
 
@@ -225,11 +239,11 @@ v0.1.8では、不要機能を追加しないことよりも、YL-ATGで成立�
 
 - Unity import後、`Assets/PoppoWorks/AvatarBeacon/...` として配置される。
 - `AvatarBeacon.prefab` をアバターroot配下へ置ける。
-- `point` をHips基準に設定できる。
-- ClipForVRChatの `avatar_osc` raw/lastまたは10秒summaryに `coord/*` / `forward/*` が表示される。
+- `point` をHips基準、`HeadForwardAnchor` をHead基準に設定できる。
+- ClipForVRChatの `avatar_osc` 受信状態または10秒summaryに `coord/*` / `forward/*` が表示される。
 - VRChat OSCで `/avatar/parameters/coord/*` と `/avatar/parameters/forward/*` が更新される。
 - 前後左右移動で `coord/*` が変化する。
-- yaw回転で `forward/*` が変化する。
+- Headのyaw回転で `forward/*` が変化する。
 - アバター切り替えやOSC停止時にClipForVRChat側が鮮度切れとして扱う。
 
 ## OSC送信されない場合の確認
@@ -242,7 +256,7 @@ v0.1.8では、不要機能を追加しないことよりも、YL-ATGで成立�
 - `coord/*` と `forward/*` に `output.address` があるか。
 - VRChat Action Menuの `Reset OSC Config` 後にアバターを再読み込みしても変わらないか。
 - Avatar Dynamics Contact / Avatar Interactions が有効か。
-- ClipForVRChatの `avatar_osc` raw受信件数が0か、他parameterだけ届いているか。
+- ClipForVRChatの10秒summaryが出ているか、他parameterだけ届いているか。
 
-raw受信件数が0なら、Prefabの復元ロジック以前にVRChatからOSC packetが出ていない。
-raw受信件数があるのに `coord/*` / `forward/*` が欠けるなら、OSC configまたはPrefab parameter名の不一致を疑う。
+summaryが出ないなら、Prefabの復元ロジック以前にVRChatからOSC packetが出ていない。
+summaryが出ているのに `coord/*` / `forward/*` が欠けるなら、OSC configまたはPrefab parameter名の不一致を疑う。

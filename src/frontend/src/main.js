@@ -1766,8 +1766,9 @@ const vueApp = createApp({
             <h3>自動撮影</h3>
             <div class="settings-explainer">
               <strong>VRChatのUser CameraをOSCで操作し、指定間隔で写真を撮影する機能です。</strong>
-              <p>VRChat側でOSCを有効にし、Stream方式ではVRChatのStream Camera(Spout)映像を直接受信して静止画として保存します。Photo方式はVRChat標準写真を使うフォールバックです。</p>
-              <p>player_local の basis は manual と avatar_osc を切り替えられます。avatar_osc は専用アバターギミックが必要で、標準OSCだけでは動かず、Hips/avatar基準で player root そのものではありません。</p>
+              <p>VRChat側でOSCを有効にし、AvatarBeacon導入済みアバターから受け取る avatar_osc basis を使って player_local 構図を撮影します。</p>
+              <p>Stream方式ではVRChatのStream Camera(Spout)映像を直接受信して静止画として保存します。Photo方式はVRChat標準写真を使うフォールバックです。</p>
+              <p>AvatarBeaconはpositionをHips基準、yawをHead基準で送ります。標準OSCだけではプレイヤー位置を自動取得できないため、manual basis は専用ギミックなしのフォールバックです。</p>
               <p>正面、背後、斜めの初期構図にはプレーヤーを写す想定のPoseと拡大率が入っています。構図ごとのテスト撮影で見え方を確認できます。</p>
               <p>v0.1.8では撮影時の解像度変更は行わず、VRChat側の現在のカメラ解像度設定で保存します。</p>
             </div>
@@ -1776,29 +1777,29 @@ const vueApp = createApp({
                 <div>
                   <h4>構図プリセット</h4>
                   <p>「撮影する」がONの構図を上から順番に撮影します。</p>
-                  <p>プレイヤー基準構図を使う場合は、基準にしたい位置でカメラPoseを受信してから基準Poseを保存してください。</p>
+                  <p>プレイヤー基準構図はAvatarBeaconの受信状態がreadyのときに自動追従します。</p>
                 </div>
                 <div class="button-row">
-                  <button type="button" class="secondary" @click="saveCurrentCameraPoseAsPlayerBasis">現在Poseをプレイヤー基準に保存</button>
+                  <button v-if="autoCaptureSettings.playerLocal.basisSource === 'manual'" type="button" class="secondary" @click="saveCurrentCameraPoseAsPlayerBasis">現在Poseをmanual基準に保存</button>
                   <button type="button" class="secondary" @click="resetCameraViewsToDefaults">初期3構図に戻す</button>
                   <button type="button" class="secondary" @click="resetCameraOSC">カメラOSCをリセット</button>
                 </div>
               </div>
-              <p class="setting-note" :class="autoCaptureSettings.playerLocal.calibrated ? 'ok' : 'warning'">
-                プレイヤー基準Pose: {{ autoCaptureSettings.playerLocal.calibrated ? '保存済み' : '未設定' }}
+              <p v-if="autoCaptureSettings.playerLocal.basisSource === 'manual'" class="setting-note" :class="autoCaptureSettings.playerLocal.calibrated ? 'ok' : 'warning'">
+                manual基準Pose: {{ autoCaptureSettings.playerLocal.calibrated ? '保存済み' : '未設定' }}
                 <span v-if="autoCaptureSettings.playerLocal.updatedAt"> / {{ autoCaptureSettings.playerLocal.updatedAt }}</span>
               </p>
               <div class="setting-row">
-                <div><strong>プレイヤー基準の取得元</strong><p>manual は手動保存した基準Pose、avatar_osc は専用アバターギミックから受けるOSC基準Poseです。標準OSCだけでは使えず、Hips/avatar基準で player root そのものではありません。</p></div>
+                <div><strong>プレイヤー基準の取得元</strong><p>AvatarBeaconを使う avatar_osc が通常の取得元です。manual は専用ギミックなしで手動保存した基準Poseを使うフォールバックです。</p></div>
                 <label>
                   <select v-model="autoCaptureSettings.playerLocal.basisSource">
-                    <option value="manual">manual</option>
-                    <option value="avatar_osc">avatar_osc</option>
+                    <option value="avatar_osc">AvatarBeacon / avatar_osc</option>
+                    <option value="manual">manual fallback</option>
                   </select>
                 </label>
               </div>
               <div class="setting-row" :class="{ disabled: autoCaptureSettings.playerLocal.basisSource !== 'avatar_osc' }">
-                <div><strong>avatar_osc 受信状態</strong><p>専用アバターギミックが送る基準Poseの受信状態、最終受信、position/yaw、エラーを表示します。</p></div>
+                <div><strong>AvatarBeacon受信状態</strong><p>Hips基準position、Head基準yaw、最終受信、エラーを表示します。</p></div>
                 <div class="settings-control-stack">
                   <div class="inline-actions">
                     <span class="status-pill" :class="avatarOSCBasisStatusClass()">{{ avatarOSCBasisStatusLabel() }}</span>

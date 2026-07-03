@@ -20,10 +20,11 @@ Prefab内GameObjectの役割と削除判断は、リポジトリ側の `docs/ava
 ## 使い方
 
 1. アバターの root 配下に `AvatarBeacon.prefab` を配置します。
-2. Modular Avatar の Bone Proxy target は `AvatarBeacon/point` を Hips 基準で割り当てます。
+2. Modular Avatar の Bone Proxy target は `AvatarBeacon/point` を Hips 基準、`AvatarBeacon/HeadForwardAnchor` を Head 基準で割り当てます。
    - これは player root そのものではありません。
-   - 既定の追跡対象は Hips 相当で、Headよりプレイヤー位置に近いbasisとして扱います。
-3. 必要に応じて、対象 Transform を Hips 以外へ差し替えます。
+   - `point` は位置用で、Headよりプレイヤー位置に近いbasisとして扱います。
+   - `HeadForwardAnchor` はyaw/forward用で、顔の向きに近いbasisとして扱います。
+3. 必要に応じて、位置対象または向き対象の Transform を差し替えます。
 
 ## 送信 parameter
 
@@ -52,11 +53,11 @@ Prefab内GameObjectの役割と削除判断は、リポジトリ側の `docs/ava
 
 1. VRChat を起動し、このギミックを入れたアバターを選びます。
 2. ClipForVRChat 側で avatar OSC basis の受信状態を確認します。
-3. 新鮮な `coord/*` と `forward/*` の値が入った状態で `player_local` 撮影を行い、前後左右移動と yaw 回転に追従することを確認します。
+3. 新鮮な `coord/*` と `forward/*` の値が入った状態で `player_local` 撮影を行い、前後左右移動はHips基準、yaw回転はHead基準に追従することを確認します。
 4. 値が古い、欠落している、または別アバターへ切り替えた場合は、追従しないことを確認します。
 
 OSCが届かない場合は、VRChatの `Options > OSC > Reset OSC Config` を実行し、avatar IDごとのOSC config JSONに `coord/*` と `forward/*` の `output.address` があるか確認してください。
-ClipForVRChatの `raw` と `last` に `coord/*` または `forward/*` が出るか確認すると、OSC送信経路とAvatarBeaconのbasis parameter出力を切り分けやすくなります。
+ClipForVRChatのログsummaryに `coord/*` または `forward/*` が出るか確認すると、OSC送信経路とAvatarBeaconのbasis parameter出力を切り分けやすくなります。
 Avatar Dynamics Contact / Avatar Interactions が無効な場合も値が変化しない可能性があります。
 
 ## 検証限界
@@ -81,7 +82,8 @@ Avatar Dynamics Contact / Avatar Interactions が無効な場合も値が変化�
 - `ATG/p/*` を `coord/*` に置換
 - `ATG/r/*` を `forward/*` に置換
 - ClipForVRChatのbasis復元に使わない `ATG/SaveObject` / menu item を削除
-- 既定の Bone Proxy target を Head から Hips へ変更
+- position用の既定 Bone Proxy target を Head から Hips へ変更
+- yaw/forward用の `HeadForwardAnchor` を追加し、Head基準の向きを `forward/*` へ出す構成に変更
 - `point` の可視化だけに使われていた `arrow` mesh / material を削除
 - basis復元に使わない `AvatarBeacon Debug` / `Debug OSC Ping` menu item を削除
 - 座標基準GameObject名を `WorldC` から `WorldOriginAnchor` に変更

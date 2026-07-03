@@ -14,13 +14,14 @@
 - 埋め込みメタデータ書き込みに失敗した場合も、sidecar JSON、Discord投稿、履歴追加は可能な限り継続し、警告として記録します。
 - 構図カード内に「現在Poseから追加」と「このPoseへカメラ移動」を追加し、設定済みPoseをゲーム内カメラへ送れるようにしました。
 - User Camera関連OSCをfalse/Offへ戻す「カメラOSCをリセット」ボタンを自動撮影タブに追加しました。
-- 専用アバターギミックからOSC Avatar Parametersで送られるHips/avatar基準Poseを `player_local` のbasisに使う `avatar_osc` 取得元を追加しました。標準OSC単体では動作せず、専用アバターギミック導入済みアバターでの実機確認が必要です。
+- 専用アバターギミックからOSC Avatar Parametersで送られるPoseを `player_local` のbasisに使う `avatar_osc` 取得元を追加しました。標準OSC単体では動作せず、専用アバターギミック導入済みアバターでの実機確認が必要です。
 - AvatarBeacon を `avatar_osc` basis 確認用の汎用アバターギミックとして整理しました。OSC parameterは `coord/*` と `forward/*` を既定にし、CI は source zip だけを作成します。Unity で作る `.unitypackage` はリリース担当者が手作業で作成して GitHub Release に手動添付します。source zip は `Assets/PoppoWorks/AvatarBeacon/...` に展開できる形です。
+- AvatarBeaconのbasisを、positionはHips基準、yaw/forwardはHead基準で送る構成にしました。プレイヤー位置はHips寄り、向きは顔の向き寄りとして扱います。
 - プレイヤー基準の取得元の初期値を `avatar_osc` に変更しました。新規設定、または `basisSource` が未保存の設定では、AvatarBeaconからのOSC basis受信を既定で使います。
 - VRChat写真、スクリーンショット、自動撮影の専用Webhook URLが空欄の場合に通常投稿用Webhook URLへフォールバックすることを設定画面で明示し、通常投稿用Webhook URLが設定済みなら専用Webhook未設定だけでは保存時確認を出さないようにしました。
 - `avatar_osc` 受信状態で、Avatar OSC未受信時にmanual基準Pose未設定エラーが表示されないようにし、AvatarBeaconの `coord/*` / `forward/*` 受信確認先を表示するようにしました。
 - `avatar_osc` 受信処理がVRChatのAvatar Parameter受信ごとに大量ログを出し、起動直後のGUI表示を阻害する場合がある問題を修正しました。
-- `avatar_osc` 受信状態を自動撮影タブ表示中に数秒間隔で自動更新するようにしました。更新ボタンを押さなくてもraw/last、position、yawを確認できます。
+- 自動撮影タブの `avatar_osc` 受信状態を自動更新にし、手動更新ボタンを削除しました。最終受信、position、yawを確認できます。
 - `avatar_osc` 受信状態のyaw表示がGo APIの `pose.rotation.y` を読んでおらず0度に見える問題を修正しました。yawはAvatarBeaconの `forward/*` から復元した現在の向きです。
 - GUI起動の切り分け用に、Wails起動/DOM準備/frontend初期化/手動終了/shutdownの診断ログと、起動中の簡易進捗表示を追加しました。
 - 自動撮影タブの説明文がfrontendのtemplate literalを壊し、起動時に `avatar is not defined` が出る問題を修正しました。同種の混入をCI/Releaseで検出する検査も追加しました。
@@ -31,8 +32,8 @@
 
 ### 既知の制限
 
-- player_local構図は標準OSCだけでプレイヤーrootを自動取得できないため、手動で保存したプレイヤー基準Poseを使います。
-- `avatar_osc` basisはHips/avatar基準であり、player root基準そのものではありません。専用アバターギミック未導入、OSC無効、parameter欠落、鮮度切れの場合は撮影前に失敗します。
+- player_local構図は標準OSCだけでプレイヤーrootを自動取得できないため、AvatarBeacon導入済みアバターからの `avatar_osc` basisを基本にします。専用ギミックなしの場合は、手動で保存したmanual基準Poseをフォールバックとして使います。
+- `avatar_osc` basisはpositionがHips基準、yawがHead基準であり、player root基準そのものではありません。専用アバターギミック未導入、OSC無効、parameter欠落、鮮度切れの場合は撮影前に失敗します。
 - AvatarBeacon の `.unitypackage` は CI では作らず、手作業で作成して Release に添付します。source zip は再生成・検証用の配布物です。
 - output log由来のユーザー一覧やworld/instance情報は、VRChatログの内容によって取得できない場合があります。
 - Camera Dolly Multi、解像度一時変更、SQLiteローカルDB、OSCQuery自動検出はv0.1.8の対象外です。v0.1.8ではsidecar JSONと履歴JSONを正本/索引として扱います。

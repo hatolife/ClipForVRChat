@@ -13,7 +13,8 @@ Modifications in this tree:
 - Renamed position parameters from `ATG/p/*` to `coord/*`.
 - Renamed forward/rotation-vector parameters from `ATG/r/*` to `forward/*`.
 - Removed auxiliary `ATG/SaveObject` and debug-only menu parameters that are not used for basis reconstruction.
-- Changed the default Bone Proxy target from Head to Hips.
+- Changed the position Bone Proxy target from Head to Hips.
+- Added `HeadForwardAnchor` so forward/yaw can remain Head-based while position is Hips-based.
 - Removed the visual-only arrow mesh/material assets.
 - Normalized near-zero serialized Transform values in the prefab while preserving Contact/Constraint values used by the sensor graph.
 - Adjusted prefab naming to `AvatarBeacon`.
