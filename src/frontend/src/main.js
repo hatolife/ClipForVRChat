@@ -75,6 +75,7 @@ const vueApp = createApp({
       spoutSendersLoading: false,
       avatarOscBasisStatus: null,
       avatarOscStatusLoading: false,
+      avatarOscStatusPollTimer: null,
       startupLoading: true,
       startupStatus: 'フロントエンドを初期化しています。',
       startupError: ''
@@ -172,7 +173,7 @@ const vueApp = createApp({
       autoCapture.schedule ||= {}
       autoCapture.osc ||= {}
       autoCapture.playerLocal ||= {}
-      autoCapture.playerLocal.basisSource ||= 'manual'
+      autoCapture.playerLocal.basisSource ||= 'avatar_osc'
       autoCapture.playerLocal.avatarOsc ||= {}
       autoCapture.capture ||= {}
       autoCapture.stream ||= {}
@@ -304,6 +305,7 @@ const vueApp = createApp({
     }
   },
   unmounted() {
+    this.stopAvatarOSCBasisStatusPolling()
     window.removeEventListener('keydown', this.handleKeyDown)
     window.removeEventListener('mousemove', this.updateHistoryDragSelect)
     window.removeEventListener('mouseup', this.finishHistoryDragSelect)
@@ -359,6 +361,7 @@ const vueApp = createApp({
     async performSettingsLeave(action) {
       this.error = ''
       if (this.isSettings) {
+        this.stopAvatarOSCBasisStatusPolling()
         this.state = await api.CloseSettings()
         this.resetSettingsBaseline()
       }
@@ -473,7 +476,7 @@ const vueApp = createApp({
         this.state = await api.OpenSettings('')
         this.rememberSettingsBaseline()
         if (this.settingsTab === 'autoCapture') {
-          void this.refreshAvatarOSCBasisStatus(true)
+          this.startAvatarOSCBasisStatusPolling()
         }
       } catch (err) {
         this.error = String(err)
@@ -487,7 +490,9 @@ const vueApp = createApp({
       this.logUserAction('button_click', `settings_tab ${tabId}`)
       this.settingsTab = tabId
       if (tabId === 'autoCapture') {
-        void this.refreshAvatarOSCBasisStatus(true)
+        this.startAvatarOSCBasisStatusPolling()
+      } else {
+        this.stopAvatarOSCBasisStatusPolling()
       }
     },
     shouldWarnMissingPrimaryWebhook(config = this.state.config) {
@@ -1256,7 +1261,7 @@ const vueApp = createApp({
             z: pickNumber(position.z)
           }
         : null
-      const yaw = pickNumber(status?.yaw ?? status?.rotationYaw ?? status?.basisPose?.rotation?.y)
+      const yaw = pickNumber(status?.yaw ?? status?.rotationYaw ?? status?.basisPose?.rotation?.y ?? status?.pose?.rotation?.y)
       const state = String(status?.state || status?.receiverState || status?.status || '').trim()
       return {
         available: status?.available ?? status?.enabled ?? status?.receiving ?? status?.fresh ?? state === 'ready',
@@ -1311,6 +1316,9 @@ const vueApp = createApp({
         }
         return
       }
+      if (this.avatarOscStatusLoading) {
+        return
+      }
       if (!silent) {
         this.error = ''
       }
@@ -1334,6 +1342,30 @@ const vueApp = createApp({
       } finally {
         this.avatarOscStatusLoading = false
       }
+    },
+    shouldPollAvatarOSCBasisStatus() {
+      return this.isSettings && this.settingsTab === 'autoCapture'
+    },
+    startAvatarOSCBasisStatusPolling() {
+      if (!this.shouldPollAvatarOSCBasisStatus()) {
+        this.stopAvatarOSCBasisStatusPolling()
+        return
+      }
+      if (!this.avatarOscStatusPollTimer) {
+        this.avatarOscStatusPollTimer = window.setInterval(() => {
+          if (!this.shouldPollAvatarOSCBasisStatus()) {
+            this.stopAvatarOSCBasisStatusPolling()
+            return
+          }
+          void this.refreshAvatarOSCBasisStatus(true)
+        }, 2000)
+      }
+      void this.refreshAvatarOSCBasisStatus(true)
+    },
+    stopAvatarOSCBasisStatusPolling() {
+      if (!this.avatarOscStatusPollTimer) return
+      window.clearInterval(this.avatarOscStatusPollTimer)
+      this.avatarOscStatusPollTimer = null
     },
     async checkForUpdate() {
       if (!api?.CheckForUpdate || this.updateSettings.checkEnabled === false) {

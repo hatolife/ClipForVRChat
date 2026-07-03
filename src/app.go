@@ -1506,6 +1506,7 @@ func (a *App) runCameraPoseReceiver(ctx context.Context, seq uint64, host string
 		_ = conn.Close()
 	}()
 	buf := make([]byte, 2048)
+	var nextAvatarOSCSummaryAt time.Time
 	for {
 		n, remoteAddr, err := conn.ReadFromUDP(buf)
 		if err != nil {
@@ -1522,7 +1523,6 @@ func (a *App) runCameraPoseReceiver(ctx context.Context, seq uint64, host string
 			appcore.AppendDiagnosticLog(logPath, "auto-capture osc received invalid: remote=%q bytes=%d hex_preview=%q", oscRemoteAddrString(remoteAddr), n, hexPreview(packet, 96))
 			continue
 		}
-		appcore.AppendDiagnosticLog(logPath, "auto-capture osc received: remote=%q bytes=%d address=%q type_tags=%q values=%q payload_hex_preview=%q", oscRemoteAddrString(remoteAddr), n, address, typeTags, formatOSCLogValues(typeTags, payload), hexPreview(payload, 96))
 		now := time.Now()
 		if pose, ok := appcore.ParseOSCPose(packet); ok {
 			a.mu.Lock()
@@ -1546,12 +1546,37 @@ func (a *App) runCameraPoseReceiver(ctx context.Context, seq uint64, host string
 				a.avatarOSCBasisSamples = make(map[string]avatarOSCBasisSample)
 			}
 			a.avatarOSCBasisSamples[canonicalAddress] = sample
-			if a.avatarOSCBasisAddressAffectsBasisLocked(canonicalAddress, a.state.Config) {
+			affectsBasis := a.avatarOSCBasisAddressAffectsBasisLocked(canonicalAddress, a.state.Config)
+			if affectsBasis {
 				a.rebuildAvatarOSCBasisLocked(now, logPath)
+			}
+			if nextAvatarOSCSummaryAt.IsZero() || !now.Before(nextAvatarOSCSummaryAt) {
+				a.appendAvatarOSCSummaryLocked(logPath, now)
+				nextAvatarOSCSummaryAt = now.Add(10 * time.Second)
 			}
 			a.mu.Unlock()
 		}
 	}
+}
+
+func (a *App) appendAvatarOSCSummaryLocked(logPath string, now time.Time) {
+	snapshot := a.latestAvatarOSCBasisSnapshotLocked(a.state.Config, now)
+	appcore.AppendDiagnosticLog(
+		logPath,
+		"auto-capture avatar osc summary: status=%q raw=%d last=%q last_at=%q prefix=%q position=(x=%.3f y=%.3f z=%.3f) yaw=%.3f age_ms=%d err=%q values=%q",
+		snapshot.Status,
+		snapshot.RawSampleCount,
+		snapshot.LastReceivedAddress,
+		snapshot.LastReceivedAt,
+		snapshot.ParameterPrefix,
+		snapshot.Pose.Position.X,
+		snapshot.Pose.Position.Y,
+		snapshot.Pose.Position.Z,
+		snapshot.Pose.Rotation.Y,
+		snapshot.AgeMS,
+		snapshot.Error,
+		a.formatAvatarOSCBasisValuesLocked(a.state.Config),
+	)
 }
 
 func (a *App) finishCameraPoseReceiver(seq uint64) {
@@ -2010,6 +2035,46 @@ func (a *App) lookupAvatarOSCBasisRawSample(address string) (avatarOSCBasisSampl
 		return sample, true
 	}
 	return avatarOSCBasisSample{}, false
+}
+
+func (a *App) formatAvatarOSCBasisValuesLocked(cfg appcore.Config) string {
+	cfg.AutoCapture.PlayerLocal.AvatarOSC.Normalize()
+	_, positionRoot, forwardRoot, signSuffix := avatarOSCBasisAddressScheme(cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix)
+	keys := make([]string, 0, 13)
+	for _, root := range []string{positionRoot, forwardRoot} {
+		for _, axis := range []string{"x", "y", "z"} {
+			keys = append(keys, root+"/"+axis, root+"/"+axis+signSuffix)
+		}
+	}
+	keys = append(keys, "avatar_beacon/debug/ping")
+
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		sample, ok := a.lookupAvatarOSCBasisRawSample(key)
+		if !ok {
+			parts = append(parts, key+"=<missing>")
+			continue
+		}
+		parts = append(parts, key+"="+formatAvatarOSCBasisSampleValue(sample))
+	}
+	return strings.Join(parts, " ")
+}
+
+func formatAvatarOSCBasisSampleValue(sample avatarOSCBasisSample) string {
+	value := "<invalid>"
+	if sample.HasFloat {
+		value = fmt.Sprintf("%.6g", sample.Float)
+	} else if sample.HasBool {
+		if sample.Bool {
+			value = "true"
+		} else {
+			value = "false"
+		}
+	}
+	if sample.ReceivedAt.IsZero() {
+		return value
+	}
+	return value + "@" + sample.ReceivedAt.Format("15:04:05")
 }
 
 func latestAvatarOSCSampleTime(samples map[string]avatarOSCBasisSample, roots ...string) time.Time {
