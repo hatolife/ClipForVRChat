@@ -49,3 +49,11 @@
 - `v0.1.8-rc20` separated版で、簡易起動画面に `フロントエンドエラー: Uncaught ReferenceError: avatar is not defined at http://wails.localhost/assets/index-DvTLSiJp.js:397:68` が表示された。
 - 診断ログでは `frontend_script_loaded api=available` の直後に同じ `frontend_error` が出ており、Wails APIとHTML表示までは到達している。
 - 該当箇所はVue `template: \`...\`` 内の説明文 `Debug OSC Pingは \`/avatar/parameters/avatar_beacon/debug/ping\`` で、説明用バッククォートがJS template literalを途中で閉じ、`/avatar/...` が不正に評価されてReferenceErrorになっていた。
+
+## rc21確認と再発防止
+
+- `v0.1.8-rc21` でGUIが表示されることを確認した。
+- 直接原因は `src/frontend/src/main.js` のVue template literal内に、説明文用の生バッククォートを入れたことだった。
+- 原因同定は、簡易起動画面の `フロントエンドエラー` 表示、診断ログの `frontend_script_loaded api=available` 直後の `frontend_error`、ビルド済みassetの該当行を組み合わせて行えた。
+- 同種の不具合をCI/Releaseで検出するため、`scripts/check-frontend-template-literals.mjs` を追加した。
+- 再発時に最初に確認する資料として、`docs/frontend-runtime-troubleshooting.md` に原因、同定方法、対処方法、確認コマンドをまとめる。
