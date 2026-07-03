@@ -1678,6 +1678,8 @@ func (a *App) latestAvatarOSCBasisSnapshotLocked(cfg appcore.Config, now time.Ti
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "stale") {
 			snapshot.Status = "stale"
+			snapshot.Error = avatarOSCBasisStaleError(snapshot, cfg.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec, a.avatarOSCBasisAddressAffectsBasisLocked(snapshot.LastReceivedAddress, cfg))
+			return snapshot
 		} else if strings.Contains(strings.ToLower(err.Error()), "partial") {
 			snapshot.Status = "partial"
 		} else {
@@ -1692,6 +1694,24 @@ func (a *App) latestAvatarOSCBasisSnapshotLocked(cfg appcore.Config, now time.Ti
 		snapshot.Error = ""
 	}
 	return snapshot
+}
+
+func avatarOSCBasisStaleError(snapshot PlayerLocalBasisSnapshot, freshnessSec int, lastReceivedAffectsBasis bool) string {
+	age := "不明"
+	if snapshot.AgeMS > 0 {
+		age = fmt.Sprintf("%.1f秒", float64(snapshot.AgeMS)/1000)
+	}
+	if freshnessSec <= 0 {
+		freshnessSec = appcore.DefaultConfig().AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec
+	}
+	message := fmt.Sprintf("AvatarBeaconの coord/* / forward/* が更新されていません。basis age=%s / freshness=%d秒です。AvatarBeacon導入アバターを選び直し、VRChatのOSC Reset Config後にアバターを再読み込みし、Avatar Dynamics Contact / Avatar Interactionsが有効か確認してください。", age, freshnessSec)
+	if snapshot.LastReceivedAddress == "" {
+		return message
+	}
+	if lastReceivedAffectsBasis {
+		return message + fmt.Sprintf(" 最後に受信したbasis parameter: %s", snapshot.LastReceivedAddress)
+	}
+	return message + fmt.Sprintf(" 最後に受信したAvatar Parameterは %s で、AvatarBeaconのbasis parameterではありません。VRChat OSC経路自体は動いていますが、専用ギミックの座標parameterが止まっている可能性があります。", snapshot.LastReceivedAddress)
 }
 
 func (a *App) rebuildAvatarOSCBasisLocked(now time.Time, logPath string) {

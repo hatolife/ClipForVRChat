@@ -461,6 +461,43 @@ func TestAppAvatarOSCBasisStatusResolvesEvenWhenManualBasisMissing(t *testing.T)
 	}
 }
 
+func TestAppAvatarOSCBasisStatusExplainsStaleWithNonBasisLastParameter(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+	now := time.Date(2026, 7, 4, 4, 35, 50, 0, time.UTC)
+	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
+	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
+	staleAt := now.Add(-10 * time.Second)
+	app.avatarOSCBasisSamples = map[string]avatarOSCBasisSample{
+		"coord/x":       {Float: 0.8, HasFloat: true, ReceivedAt: staleAt},
+		"coord/xSign":   {Float: 1, HasFloat: true, ReceivedAt: staleAt},
+		"coord/y":       {Float: 0.5, HasFloat: true, ReceivedAt: staleAt},
+		"coord/ySign":   {Float: 1, HasFloat: true, ReceivedAt: staleAt},
+		"coord/z":       {Float: 0.2, HasFloat: true, ReceivedAt: staleAt},
+		"coord/zSign":   {Float: 1, HasFloat: true, ReceivedAt: staleAt},
+		"forward/x":     {Float: 1, HasFloat: true, ReceivedAt: staleAt},
+		"forward/xSign": {Float: 1, HasFloat: true, ReceivedAt: staleAt},
+		"forward/y":     {Float: 0, HasFloat: true, ReceivedAt: staleAt},
+		"forward/ySign": {Float: 1, HasFloat: true, ReceivedAt: staleAt},
+		"forward/z":     {Float: 0, HasFloat: true, ReceivedAt: staleAt},
+		"forward/zSign": {Float: 1, HasFloat: true, ReceivedAt: staleAt},
+		"Ahoge_Angle":   {Float: 0.4, HasFloat: true, ReceivedAt: now},
+	}
+
+	got := app.latestAvatarOSCBasisSnapshotLocked(app.state.Config, now)
+	if got.Status != "stale" || got.Fresh {
+		t.Fatalf("snapshot = %+v, want stale", got)
+	}
+	if got.LastReceivedAddress != "Ahoge_Angle" {
+		t.Fatalf("last address = %q, want Ahoge_Angle", got.LastReceivedAddress)
+	}
+	for _, want := range []string{"coord/* / forward/*", "AvatarBeaconのbasis parameterではありません", "Ahoge_Angle"} {
+		if !strings.Contains(got.Error, want) {
+			t.Fatalf("error = %q, want %q", got.Error, want)
+		}
+	}
+}
+
 func TestAppRebuildAvatarOSCBasisDoesNotRepeatPartialLog(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.json")
