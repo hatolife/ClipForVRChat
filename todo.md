@@ -1,8 +1,7 @@
-# AvatarBeacon Head yaw対応チェックリスト
+# rc25 Spout PNG保存失敗 / AvatarBeacon表示修正チェックリスト
 
-- [x] issueへHead yaw方針とUI方針を追記する
-- [x] AvatarBeacon Prefabでposition用Hipsアンカーとyaw用Headアンカーを分離する
-- [x] README/仕様書/Release Notesを更新する
-- [x] 自動撮影UIをAvatarBeacon前提の導線へ変更する
+- [x] issueを作成し、問題と受け入れ条件を記録する
+- [x] AvatarBeacon受信状態の不要な常時説明を削除する
+- [x] Spout helperのPNG書き出しをWIC互換のpixel formatへ修正する
 - [x] テストと静的チェックを実行する
-- [x] 変更をコミットしてpushする
+- [ ] 変更をコミットしてpushする

@@ -4,6 +4,7 @@
 #include <chrono>
 #include <algorithm>
 #include <cctype>
+#include <cstddef>
 #include <cstdint>
 #include <ctime>
 #include <filesystem>
@@ -249,16 +250,49 @@ bool write_png_wic(const std::filesystem::path &path, unsigned int width, unsign
     *error = "PNG frame initialization failed";
     return false;
   }
-  WICPixelFormatGUID format = GUID_WICPixelFormat32bppRGBA;
+  WICPixelFormatGUID format = GUID_WICPixelFormat32bppBGRA;
   hr = frame->SetPixelFormat(&format);
-  if (FAILED(hr) || format != GUID_WICPixelFormat32bppRGBA) {
+  if (FAILED(hr)) {
     cleanup();
-    *error = "PNG encoder does not support RGBA";
+    *error = "PNG encoder pixel format setup failed";
     return false;
   }
-  const UINT stride = width * 4;
+  std::vector<BYTE> encoded;
+  UINT stride = 0;
+  if (format == GUID_WICPixelFormat32bppBGRA) {
+    stride = width * 4;
+    encoded.resize(rgba.size());
+    for (size_t i = 0; i + 3 < rgba.size(); i += 4) {
+      encoded[i] = rgba[i + 2];
+      encoded[i + 1] = rgba[i + 1];
+      encoded[i + 2] = rgba[i];
+      encoded[i + 3] = rgba[i + 3];
+    }
+  } else if (format == GUID_WICPixelFormat32bppPBGRA) {
+    stride = width * 4;
+    encoded.resize(rgba.size());
+    for (size_t i = 0; i + 3 < rgba.size(); i += 4) {
+      const unsigned int alpha = rgba[i + 3];
+      encoded[i] = static_cast<BYTE>((static_cast<unsigned int>(rgba[i + 2]) * alpha + 127) / 255);
+      encoded[i + 1] = static_cast<BYTE>((static_cast<unsigned int>(rgba[i + 1]) * alpha + 127) / 255);
+      encoded[i + 2] = static_cast<BYTE>((static_cast<unsigned int>(rgba[i]) * alpha + 127) / 255);
+      encoded[i + 3] = rgba[i + 3];
+    }
+  } else if (format == GUID_WICPixelFormat24bppBGR) {
+    stride = width * 3;
+    encoded.resize(static_cast<size_t>(stride) * height);
+    for (size_t src = 0, dst = 0; src + 3 < rgba.size() && dst + 2 < encoded.size(); src += 4, dst += 3) {
+      encoded[dst] = rgba[src + 2];
+      encoded[dst + 1] = rgba[src + 1];
+      encoded[dst + 2] = rgba[src];
+    }
+  } else {
+    cleanup();
+    *error = "PNG encoder does not support required pixel format";
+    return false;
+  }
   const UINT size = stride * height;
-  hr = frame->WritePixels(height, stride, size, const_cast<BYTE *>(rgba.data()));
+  hr = frame->WritePixels(height, stride, size, encoded.data());
   if (FAILED(hr) || FAILED(frame->Commit()) || FAILED(encoder->Commit())) {
     cleanup();
     *error = "PNG writing failed";

@@ -29,6 +29,8 @@
 - AvatarBeacon切り分け用のOSC診断ログを、全packet連続出力から10秒ごとのsummaryへ変更しました。status、raw、last、position/yaw、`coord/*` / `forward/*` の最新値と受信時刻を確認できます。
 - 設定画面を開いたときに同じOSC受信ポートへ再bindして失敗し、`avatar_osc` 受信器が止まって `stale` になる問題を修正しました。同じhost/port/log pathでは既存の受信器を維持します。
 - `avatar_osc` の鮮度判定を、basis対象parameterの最古受信時刻ではなく最新受信時刻で見るようにしました。VRChat OSCが値変化時だけ送る挙動でも、変化していない軸だけを理由にstaleになりにくくなります。
+- 自動撮影タブのAvatarBeacon受信状態から、ログsummary確認を促す常時説明文を削除しました。
+- Spout helperのPNG書き出しでWindows WIC PNG encoderがRGBA pixel formatを受け付けず、Stream方式テスト撮影が `PNG encoder does not support RGBA` で失敗する問題を修正しました。
 
 ### 既知の制限
 
