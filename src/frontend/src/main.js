@@ -1802,7 +1802,6 @@ const vueApp = createApp({
                 <div class="settings-control-stack">
                   <div class="inline-actions">
                     <span class="status-pill" :class="avatarOSCBasisStatusClass()">{{ avatarOSCBasisStatusLabel() }}</span>
-                    <button type="button" class="secondary" @click="refreshAvatarOSCBasisStatus" :disabled="avatarOscStatusLoading">{{ avatarOscStatusLoading ? '更新中' : '更新' }}</button>
                   </div>
                   <p class="setting-note">
                     受信状態: {{ avatarOscBasisStatus?.state || avatarOscBasisStatus?.message || '未取得' }}

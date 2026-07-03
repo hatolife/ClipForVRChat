@@ -579,6 +579,21 @@ func TestAppAvatarOSCBasisAddressAffectsBasisOnlyForConfiguredAxes(t *testing.T)
 	}
 }
 
+func TestAppFormatAvatarOSCBasisValuesOmitsDebugPing(t *testing.T) {
+	app := NewApp(filepath.Join(t.TempDir(), "config.json"), appcore.UIState{Mode: appcore.ModeResults})
+	cfg := appcore.DefaultConfig()
+	got := app.formatAvatarOSCBasisValuesLocked(cfg)
+
+	if strings.Contains(got, "avatar_beacon/debug/ping") {
+		t.Fatalf("summary values include removed debug ping: %q", got)
+	}
+	for _, want := range []string{"coord/x=<missing>", "forward/zSign=<missing>"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("summary values = %q, want %q", got, want)
+		}
+	}
+}
+
 func TestLatestAvatarOSCSampleTimeUsesLatestBasisParameter(t *testing.T) {
 	now := time.Date(2026, 7, 4, 6, 0, 0, 0, time.UTC)
 	got := latestAvatarOSCSampleTime(map[string]avatarOSCBasisSample{

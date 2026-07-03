@@ -176,3 +176,5 @@ AvatarBeaconでは、ClipForVRChat専用名を避け、次の汎用parameterを�
 - 2026-07-04: AvatarBeaconから `AvatarBeacon Debug` / `Debug OSC Ping` / `avatar_beacon/debug/ping` を削除する。basis復元に使わないデバッグ専用menu/parameterでExpression Parameter枠を余分に使うため、配布ギミックは `coord/*` / `forward/*` の12parameterだけに絞る。OSC疎通確認はClipForVRChatのraw/lastと10秒summaryに出る `coord/*` / `forward/*` の受信有無で行う。
 - 2026-07-04: AvatarBeacon Prefab内の子GameObjectに残っている `1e-15` 相当の座標値、`-0`、ほぼ0のQuaternion成分など、Unity YAML上の誤差に見える値を正規化する。Contact Receiverの符号判定位置やConstraintの実値は機能に関わるため、見た目だけで0にしない。
 - 2026-07-04: 座標基準GameObject名 `WorldC` は役割が分かりにくいため、ワールド原点基準のアンカーであることが伝わる `WorldOriginAnchor` へ変更する。
+- 2026-07-04: Avatar OSC summary logからも `avatar_beacon/debug/ping=<missing>` を出さない。summaryは `coord/*` / `forward/*` のbasis parameterだけを対象にする。
+- 2026-07-04: `avatar_osc 受信状態` は自動更新されるため、手動の「更新」ボタンを削除する。
