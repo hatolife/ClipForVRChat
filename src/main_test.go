@@ -143,3 +143,10 @@ func TestHandleCLIArgsLeavesExistingPositionalArgsAlone(t *testing.T) {
 		t.Fatalf("stdout=%q stderr=%q", stdout.String(), stderr.String())
 	}
 }
+
+func TestFrontendAssetSummaryReportsEmbeddedIndex(t *testing.T) {
+	got := frontendAssetSummary()
+	if !strings.Contains(got, "index_html=true") {
+		t.Fatalf("frontendAssetSummary() = %q, want embedded index.html", got)
+	}
+}

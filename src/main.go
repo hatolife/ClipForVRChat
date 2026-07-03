@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	arg "github.com/alexflint/go-arg"
@@ -203,6 +204,22 @@ func hasErrors(results []appcore.Result) bool {
 
 func runUI(configPath string, state appcore.UIState) {
 	app := NewApp(configPath, state)
+	logPath := appcore.DiagnosticLogPath(configPath)
+	appcore.AppendDiagnosticLog(
+		logPath,
+		"ui wails run begin: app_version=%q revision=%q channel=%q goos=%q goarch=%q args=%q cwd=%q config=%q initial_mode=%q frontend_assets=%q icon_bytes=%d",
+		appVersion(),
+		revision,
+		buildChannel,
+		runtime.GOOS,
+		runtime.GOARCH,
+		os.Args,
+		mustGetwd(),
+		configPath,
+		state.Mode,
+		frontendAssetSummary(),
+		len(icon),
+	)
 	err := wails.Run(&options.App{
 		Title:  fmt.Sprintf("ClipForVRChat %s", appVersion()),
 		Width:  900,
@@ -210,8 +227,10 @@ func runUI(configPath string, state appcore.UIState) {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		OnStartup:  app.startup,
-		OnShutdown: app.shutdown,
+		OnStartup:     app.startup,
+		OnDomReady:    app.domReady,
+		OnBeforeClose: app.beforeClose,
+		OnShutdown:    app.shutdown,
 		DragAndDrop: &options.DragAndDrop{
 			EnableFileDrop:     true,
 			DisableWebViewDrop: true,
@@ -221,7 +240,29 @@ func runUI(configPath string, state appcore.UIState) {
 		},
 	})
 	if err != nil {
+		appcore.AppendDiagnosticLog(logPath, "ui wails run error: %v", err)
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	appcore.AppendDiagnosticLog(logPath, "ui wails run returned: err=nil")
+}
+
+func mustGetwd() string {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "error:" + err.Error()
+	}
+	return wd
+}
+
+func frontendAssetSummary() string {
+	entries, err := assets.ReadDir("frontend/dist")
+	if err != nil {
+		return fmt.Sprintf("read_dir_error=%v", err)
+	}
+	indexExists := true
+	if _, err := assets.ReadFile("frontend/dist/index.html"); err != nil {
+		indexExists = false
+	}
+	return fmt.Sprintf("root_entries=%d index_html=%t", len(entries), indexExists)
 }

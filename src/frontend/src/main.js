@@ -3,7 +3,38 @@ import './style.css'
 
 const api = window.go?.main?.App
 
-createApp({
+function startupErrorMessage(error) {
+  if (!error) return ''
+  return String(error.stack || error.message || error)
+}
+
+function setBootStatus(message) {
+  const status = document.getElementById('boot-status')
+  if (status) status.textContent = message
+}
+
+function logFrontendDiagnostic(action, detail = '') {
+  const logger = window.go?.main?.App?.LogUserAction
+  if (!logger) return
+  void logger(String(action || ''), String(detail || '')).catch(() => {})
+}
+
+setBootStatus('フロントエンドスクリプトを読み込みました。Vueを初期化しています。')
+logFrontendDiagnostic('frontend_script_loaded', `readyState=${document.readyState} api=${api ? 'available' : 'missing'}`)
+
+window.addEventListener('error', (event) => {
+  const detail = `${event.message || 'error'} at ${event.filename || ''}:${event.lineno || 0}:${event.colno || 0}`
+  setBootStatus(`フロントエンドエラー: ${detail}`)
+  logFrontendDiagnostic('frontend_error', detail)
+})
+
+window.addEventListener('unhandledrejection', (event) => {
+  const detail = startupErrorMessage(event.reason)
+  setBootStatus(`フロントエンドエラー: ${detail}`)
+  logFrontendDiagnostic('frontend_unhandledrejection', detail)
+})
+
+const vueApp = createApp({
   data() {
     return {
       info: { name: 'ClipForVRChat', version: 'dev', github: 'https://github.com/hatolife/ClipForVRChat' },
@@ -43,7 +74,10 @@ createApp({
       spoutChecking: false,
       spoutSendersLoading: false,
       avatarOscBasisStatus: null,
-      avatarOscStatusLoading: false
+      avatarOscStatusLoading: false,
+      startupLoading: true,
+      startupStatus: 'フロントエンドを初期化しています。',
+      startupError: ''
     }
   },
   computed: {
@@ -225,28 +259,49 @@ createApp({
     }
   },
   async mounted() {
-    this.info = await api.GetAppInfo()
-    this.state = await api.GetInitialState()
-    this.licenses = await api.GetOSSLicenses()
-    window.runtime?.EventsOn?.('process:progress', (event) => {
-      this.applyProgress(event)
-    })
-    window.runtime?.EventsOn?.('auto-photo:result', (event) => {
-      this.applyAutoPhotoResult(event)
-    })
-    window.runtime?.OnFileDrop?.(async (_x, _y, paths) => {
-      this.dragging = false
-      await this.handleDrop(paths || [])
-    }, false)
-    window.addEventListener('dragenter', this.showDropOverlay)
-    window.addEventListener('dragover', this.showDropOverlay)
-    window.addEventListener('dragleave', this.hideDropOverlay)
-    window.addEventListener('drop', () => {
-      this.dragging = false
-    })
-    window.addEventListener('keydown', this.handleKeyDown)
-    void this.checkForUpdate()
-    void this.refreshAvatarOSCBasisStatus(true)
+    try {
+      this.setStartupStatus('Wails APIを確認しています。')
+      if (!api) {
+        throw new Error('Wails APIが利用できません。window.go.main.App が見つかりません。')
+      }
+      this.setStartupStatus('アプリ情報を取得しています。')
+      this.info = await api.GetAppInfo()
+      this.setStartupStatus('初期状態を取得しています。')
+      this.state = await api.GetInitialState()
+      this.setStartupStatus('ライセンス情報を取得しています。')
+      this.licenses = await api.GetOSSLicenses()
+      this.setStartupStatus('イベント受信を登録しています。')
+      window.runtime?.EventsOn?.('process:progress', (event) => {
+        this.applyProgress(event)
+      })
+      window.runtime?.EventsOn?.('auto-photo:result', (event) => {
+        this.applyAutoPhotoResult(event)
+      })
+      window.runtime?.OnFileDrop?.(async (_x, _y, paths) => {
+        this.dragging = false
+        await this.handleDrop(paths || [])
+      }, false)
+      window.addEventListener('dragenter', this.showDropOverlay)
+      window.addEventListener('dragover', this.showDropOverlay)
+      window.addEventListener('dragleave', this.hideDropOverlay)
+      window.addEventListener('drop', () => {
+        this.dragging = false
+      })
+      window.addEventListener('keydown', this.handleKeyDown)
+      this.setStartupStatus('起動後の状態確認を開始しています。')
+      void this.checkForUpdate()
+      void this.refreshAvatarOSCBasisStatus(true)
+      this.setStartupStatus('表示準備が完了しました。')
+      this.logUserAction('frontend_mounted_complete', `mode=${this.state.mode || ''} view=${this.view}`)
+      this.startupLoading = false
+    } catch (error) {
+      const detail = startupErrorMessage(error)
+      this.startupError = detail || '不明なエラー'
+      this.error = `起動中にエラーが発生しました: ${this.startupError}`
+      this.startupLoading = false
+      setBootStatus(this.error)
+      logFrontendDiagnostic('frontend_mounted_error', this.startupError)
+    }
   },
   unmounted() {
     window.removeEventListener('keydown', this.handleKeyDown)
@@ -254,6 +309,11 @@ createApp({
     window.removeEventListener('mouseup', this.finishHistoryDragSelect)
   },
   methods: {
+    setStartupStatus(message) {
+      this.startupStatus = message
+      setBootStatus(message)
+      logFrontendDiagnostic('frontend_startup_progress', message)
+    },
     logUserAction(action, detail = '') {
       if (!api?.LogUserAction) return
       void api.LogUserAction(String(action || ''), String(detail || '')).catch(() => {})
@@ -1376,6 +1436,13 @@ createApp({
   },
   template: `
     <main class="shell">
+      <div v-if="startupLoading || startupError" class="startup-backdrop" :class="{ 'startup-backdrop-error': startupError }" role="status" aria-live="polite">
+        <div class="busy-dialog startup-dialog">
+          <h2>{{ startupError ? '起動中にエラーが発生しました' : '起動中' }}</h2>
+          <p>{{ startupError || startupStatus }}</p>
+          <div v-if="!startupError" class="indeterminate-progress"><span></span></div>
+        </div>
+      </div>
       <header>
         <div>
           <h1>{{ info.name }}</h1>
@@ -2159,4 +2226,16 @@ createApp({
       <div v-if="toast" class="toast">{{ toast }}</div>
     </main>
   `
-}).mount('#app')
+})
+
+try {
+  setBootStatus('Vueをマウントしています。')
+  logFrontendDiagnostic('frontend_mount_begin', `readyState=${document.readyState}`)
+  vueApp.mount('#app')
+  logFrontendDiagnostic('frontend_mount_complete', `readyState=${document.readyState}`)
+} catch (error) {
+  const detail = startupErrorMessage(error)
+  setBootStatus(`Vueのマウントに失敗しました: ${detail}`)
+  logFrontendDiagnostic('frontend_mount_error', detail)
+  throw error
+}

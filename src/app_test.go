@@ -248,6 +248,34 @@ func TestAppLogUserActionWritesDiagnosticLog(t *testing.T) {
 	}
 }
 
+func TestAppLifecycleLogsCloseAndShutdown(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.json")
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+
+	app.domReady(context.Background())
+	if prevent := app.beforeClose(context.Background()); prevent {
+		t.Fatal("beforeClose should allow the window to close")
+	}
+	app.shutdown(context.Background())
+
+	data, err := os.ReadFile(appcore.DiagnosticLogPath(configPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, want := range []string{
+		"ui lifecycle dom_ready",
+		"ui lifecycle before_close: allowing close",
+		"ui lifecycle shutdown begin",
+		"ui lifecycle shutdown complete",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("diagnostic log = %q, want %q", text, want)
+		}
+	}
+}
+
 func TestTrustedExternalURL(t *testing.T) {
 	tests := []struct {
 		name string

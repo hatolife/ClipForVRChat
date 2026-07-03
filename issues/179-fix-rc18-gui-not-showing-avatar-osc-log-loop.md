@@ -14,6 +14,8 @@
 
 - rc18相当の設定/OSC受信状態でもGUI表示を阻害しない。
 - `avatar osc basis resolve error` がループで大量出力されない。
+- Wails起動、DOM準備、frontend初期化、初期状態取得、手動終了開始、shutdown完了が診断ログで追える。
+- WebViewがHTML表示まで進んだ場合は、Vue初期化前でも簡易的な起動進捗が表示される。
 - `go test ./...` とフロントエンドビルドが通る。
 - 必要なら次RCで修正を確認できる。
 
@@ -23,3 +25,19 @@
 - `basis_source="manual"` でもAvatar OSC受信処理が全Avatar Parameter受信ごとにbasis再構築を試みていた。
 - `latestAvatarOSCBasisSnapshotLocked` がmanual設定のまま `ResolvePlayerLocalBasisPose` を呼び、manual基準Pose未設定エラーをAvatar OSC診断にも混ぜていた。
 - 対策として、Avatar OSC診断snapshotでは復元時だけ `BasisSource=avatar_osc` を強制し、basisに関係するOSC address以外では再構築しない。非readyログも状態変化時だけに抑制する。
+
+## rc19再現ログ
+
+- `v0.1.8-rc19` separated版でもGUIが表示されない。
+- ログは6行のみで、大量ログは解消している。
+- 20:31:17にstartupし、20:31:22に `auto-capture osc receiver stop: err=context canceled` で終了している。ユーザー操作で手動終了した可能性があるため、この終了時刻だけで自動終了とは判断しない。
+- Avatar OSC basisは20:31:20にready化しており、Avatar OSC処理自体は停止原因ではなさそう。
+- 次の調査対象はWailsウィンドウ生成、起動オプション、Windows GUI subsystem、またはfrontend asset読み込み失敗。
+
+## 追加デバッグ方針
+
+- `runUI` 開始/終了、embedded frontend asset概要、Wails `OnStartup` / `OnDomReady` / `OnBeforeClose` / `OnShutdown` を診断ログへ出す。
+- frontend側はscript load、Vue mount開始、mounted開始、各Wails API呼び出し、mounted完了、JS error/unhandled rejectionを `LogUserAction` 経由で診断ログへ出す。
+- `index.html` に静的な起動画面を入れ、JSやVue mount前にWebView表示まで進んでいるかを視覚的に確認できるようにする。
+- Vue初期化中も起動オーバーレイを出し、Go API取得で時間がかかっているのか、表示処理自体が止まっているのかを切り分ける。
+- 過去の同種確認として `issues/003-main-window-ui-and-about.md` に「通常起動時に空白画面にならない」要件がある。現状の `index.html` は空の `#app` のため、JS実行前に空白になり得る点は同根のUX不足として扱う。一方で `issues/048` はGUI subsystem exeの標準出力問題、`issues/105` はGoテスト中のWailsイベント送信問題であり、今回のウィンドウ表示停止とは直接同根ではなさそう。

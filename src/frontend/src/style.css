@@ -1350,6 +1350,24 @@ small {
   background: rgba(23, 33, 43, 0.42);
 }
 
+.startup-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(237, 243, 247, 0.94);
+}
+
+.startup-dialog {
+  width: min(460px, 100%);
+}
+
+.startup-backdrop-error .startup-dialog {
+  border-color: #c44d4d;
+}
+
 .busy-dialog {
   width: min(420px, 100%);
   display: grid;

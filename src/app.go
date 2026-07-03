@@ -113,17 +113,36 @@ func (a *App) startup(ctx context.Context) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.ctx = ctx
+	a.logLifecycleLocked("startup begin: mode=%q config_path=%q", a.state.Mode, a.configPath)
 	a.logStartupLocked()
 	a.restartCameraPoseReceiverLocked(a.state.Config)
 	if a.state.Mode == appcore.ModeResults {
 		a.restartAutoPhotoWatcher(a.state.Config)
 	}
+	a.logLifecycleLocked("startup complete: mode=%q auto_capture_osc=%t auto_photo=%t", a.state.Mode, a.oscCancel != nil, a.autoCancel != nil)
+}
+
+func (a *App) domReady(ctx context.Context) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.ctx = ctx
+	a.logLifecycleLocked("dom_ready")
+}
+
+func (a *App) beforeClose(ctx context.Context) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.ctx = ctx
+	a.logLifecycleLocked("before_close: allowing close")
+	return false
 }
 
 func (a *App) shutdown(ctx context.Context) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	a.logLifecycleLocked("shutdown begin: auto_capture_osc=%t auto_photo=%t", a.oscCancel != nil, a.autoCancel != nil)
 	a.stopBackgroundTasksLocked()
+	a.logLifecycleLocked("shutdown complete")
 }
 
 func (a *App) stopBackgroundTasksLocked() {
@@ -140,11 +159,20 @@ func (a *App) stopBackgroundTasksLocked() {
 func (a *App) GetInitialState() appcore.UIState {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	a.logLifecycleLocked("api GetInitialState begin")
 	a.refreshHistory()
+	a.logLifecycleLocked(
+		"api GetInitialState complete: mode=%q results=%d history=%d message=%q",
+		a.state.Mode,
+		len(a.state.Results),
+		len(a.state.History),
+		a.state.Message,
+	)
 	return a.state
 }
 
 func (a *App) GetAppInfo() AppInfo {
+	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "ui lifecycle api GetAppInfo")
 	return AppInfo{
 		Name:    "ClipForVRChat",
 		Version: appVersion(),
@@ -194,6 +222,10 @@ func (a *App) CreateEncryptedDiagnosticPackage() (string, error) {
 
 func (a *App) logUserActionLocked(action string, detail string) {
 	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "ui action=%q detail=%q", strings.TrimSpace(action), strings.TrimSpace(detail))
+}
+
+func (a *App) logLifecycleLocked(format string, args ...any) {
+	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "ui lifecycle "+format, args...)
 }
 
 func (a *App) RevealFileInExplorer(path string) error {

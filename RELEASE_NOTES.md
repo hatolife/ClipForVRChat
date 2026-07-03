@@ -19,6 +19,7 @@
 - VRChat写真、スクリーンショット、自動撮影の専用Webhook URLが空欄の場合に通常投稿用Webhook URLへフォールバックすることを設定画面で明示し、通常投稿用Webhook URLが設定済みなら専用Webhook未設定だけでは保存時確認を出さないようにしました。
 - `avatar_osc` 受信状態で、Avatar OSC未受信時にmanual基準Pose未設定エラーが表示されないようにし、Debug OSC Pingの確認先を表示するようにしました。
 - `avatar_osc` 受信処理がVRChatのAvatar Parameter受信ごとに大量ログを出し、起動直後のGUI表示を阻害する場合がある問題を修正しました。
+- GUI起動の切り分け用に、Wails起動/DOM準備/frontend初期化/手動終了/shutdownの診断ログと、起動中の簡易進捗表示を追加しました。
 
 ### 既知の制限
 
