@@ -1483,7 +1483,9 @@ func (a *App) runCameraPoseReceiver(ctx context.Context, host string, port int, 
 				a.avatarOSCBasisSamples = make(map[string]avatarOSCBasisSample)
 			}
 			a.avatarOSCBasisSamples[canonicalAddress] = sample
-			a.rebuildAvatarOSCBasisLocked(now, logPath)
+			if a.avatarOSCBasisAddressAffectsBasisLocked(canonicalAddress, a.state.Config) {
+				a.rebuildAvatarOSCBasisLocked(now, logPath)
+			}
 			a.mu.Unlock()
 		}
 	}
@@ -1635,7 +1637,9 @@ func (a *App) latestAvatarOSCBasisSnapshotLocked(cfg appcore.Config, now time.Ti
 		}
 		return snapshot
 	}
-	pose, err := appcore.ResolvePlayerLocalBasisPose(cfg.AutoCapture, sample, now)
+	avatarOSCCfg := cfg.AutoCapture
+	avatarOSCCfg.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
+	pose, err := appcore.ResolvePlayerLocalBasisPose(avatarOSCCfg, sample, now)
 	snapshot.Pose = pose
 	snapshot.UpdatedAt = sample.ReceivedAt.Format(time.RFC3339Nano)
 	snapshot.AgeMS = now.Sub(sample.ReceivedAt).Milliseconds()
@@ -1659,6 +1663,7 @@ func (a *App) latestAvatarOSCBasisSnapshotLocked(cfg appcore.Config, now time.Ti
 }
 
 func (a *App) rebuildAvatarOSCBasisLocked(now time.Time, logPath string) {
+	previousStatus := a.latestAvatarOSCBasis.Status
 	snapshot := a.latestAvatarOSCBasisSnapshotLocked(a.state.Config, now)
 	a.latestAvatarOSCBasis.Source = snapshot.Source
 	a.latestAvatarOSCBasis.Status = snapshot.Status
@@ -1683,10 +1688,14 @@ func (a *App) rebuildAvatarOSCBasisLocked(now time.Time, logPath string) {
 		}
 	}
 	if snapshot.Status != "ready" {
-		appcore.AppendDiagnosticLog(logPath, "avatar osc basis resolve error: status=%q err=%q", snapshot.Status, snapshot.Error)
+		if previousStatus != snapshot.Status {
+			appcore.AppendDiagnosticLog(logPath, "avatar osc basis resolve status: status=%q err=%q", snapshot.Status, snapshot.Error)
+		}
 		return
 	}
-	appcore.AppendDiagnosticLog(logPath, "avatar osc basis resolved: source=%q updated_at=%q age_ms=%d pose=%+v", snapshot.Source, snapshot.UpdatedAt, snapshot.AgeMS, snapshot.Pose)
+	if previousStatus != snapshot.Status {
+		appcore.AppendDiagnosticLog(logPath, "avatar osc basis resolved: source=%q updated_at=%q age_ms=%d pose=%+v", snapshot.Source, snapshot.UpdatedAt, snapshot.AgeMS, snapshot.Pose)
+	}
 }
 
 func normalizePlayerLocalBasisSource(value string) string {
@@ -1703,25 +1712,7 @@ func (a *App) buildAvatarOSCBasisSampleLocked(cfg appcore.Config) (appcore.Avata
 	if len(a.avatarOSCBasisSamples) == 0 {
 		return appcore.AvatarOSCBasisSample{}, "", false, nil
 	}
-	prefix := canonicalAvatarOSCBasisAddress(cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix)
-	if prefix == "" {
-		prefix = "coord"
-	}
-	scheme := "custom"
-	positionRoot := strings.TrimSuffix(prefix, "/") + "/p"
-	forwardRoot := strings.TrimSuffix(prefix, "/") + "/f"
-	signSuffix := "Sign"
-	switch {
-	case strings.EqualFold(prefix, "coord"):
-		scheme = "AvatarBeacon"
-		positionRoot = "coord"
-		forwardRoot = "forward"
-	case strings.EqualFold(prefix, "ATG") || strings.HasPrefix(strings.ToUpper(prefix), "ATG/"):
-		scheme = "ATG"
-		positionRoot = strings.TrimSuffix(prefix, "/") + "/p"
-		forwardRoot = strings.TrimSuffix(prefix, "/") + "/r"
-		signSuffix = "+"
-	}
+	scheme, positionRoot, forwardRoot, signSuffix := avatarOSCBasisAddressScheme(cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix)
 	sample := appcore.AvatarOSCBasisSample{}
 	ok, err := a.fillAvatarOSCBasisVector(&sample.Position, positionRoot, signSuffix)
 	if err != nil || !ok {
@@ -1733,6 +1724,45 @@ func (a *App) buildAvatarOSCBasisSampleLocked(cfg appcore.Config) (appcore.Avata
 	}
 	sample.ReceivedAt = latestAvatarOSCSampleTime(a.avatarOSCBasisSamples, positionRoot, forwardRoot, signSuffix)
 	return sample, scheme, true, nil
+}
+
+func (a *App) avatarOSCBasisAddressAffectsBasisLocked(address string, cfg appcore.Config) bool {
+	canonicalAddress := canonicalAvatarOSCBasisAddress(address)
+	if canonicalAddress == "" {
+		return false
+	}
+	_, positionRoot, forwardRoot, signSuffix := avatarOSCBasisAddressScheme(cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix)
+	for _, root := range []string{positionRoot, forwardRoot} {
+		for _, axis := range []string{"x", "y", "z"} {
+			if canonicalAddress == root+"/"+axis || canonicalAddress == root+"/"+axis+signSuffix {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func avatarOSCBasisAddressScheme(prefix string) (scheme string, positionRoot string, forwardRoot string, signSuffix string) {
+	prefix = canonicalAvatarOSCBasisAddress(prefix)
+	if prefix == "" {
+		prefix = "coord"
+	}
+	scheme = "custom"
+	positionRoot = strings.TrimSuffix(prefix, "/") + "/p"
+	forwardRoot = strings.TrimSuffix(prefix, "/") + "/f"
+	signSuffix = "Sign"
+	switch {
+	case strings.EqualFold(prefix, "coord"):
+		scheme = "AvatarBeacon"
+		positionRoot = "coord"
+		forwardRoot = "forward"
+	case strings.EqualFold(prefix, "ATG") || strings.HasPrefix(strings.ToUpper(prefix), "ATG/"):
+		scheme = "ATG"
+		positionRoot = strings.TrimSuffix(prefix, "/") + "/p"
+		forwardRoot = strings.TrimSuffix(prefix, "/") + "/r"
+		signSuffix = "+"
+	}
+	return scheme, positionRoot, forwardRoot, signSuffix
 }
 
 func (a *App) fillAvatarOSCBasisVector(target *appcore.AvatarOSCBasisVectorSample, root string, signSuffix string) (bool, error) {

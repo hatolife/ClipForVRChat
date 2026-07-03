@@ -182,6 +182,7 @@
 | 176 | [YL-ATGを参考にAvatarBeaconアバターギミックを作成する](176-create-clipforvrchat-avatar-gimmick-from-yl-atg-reference.md) | 要確認 | `v0.1.8-rc17` | ユーザー配置済みのATG_ForAvatar packageを参考に汎用アバターギミックAvatarBeaconを作成し、`coord/*` と `forward/*` の汎用OSC parameter、YL-ATG由来部分のMITライセンス表記を正しく扱う。 |
 | 177 | [自動処理Webhookの通常投稿フォールバックを明確にする](177-clarify-discord-webhook-fallback-for-auto-processing.md) | 要確認 | `v0.1.8-rc18` | 自動処理専用Webhookが空欄の場合に通常投稿用Webhookへフォールバックする表示と保存前確認条件を整理する。 |
 | 178 | [avatar_osc受信状態でmanual基準Pose未設定エラーが出る](178-fix-avatar-osc-status-misleading-manual-basis-error.md) | 要確認 | `v0.1.8-rc18` | Avatar OSC未受信時にmanual基準Pose未設定エラーが出る表示を修正し、Debug OSC Pingの確認先を分かりやすくする。 |
+| 179 | [rc18でGUIが表示されずavatar_oscエラーが大量出力される](179-fix-rc18-gui-not-showing-avatar-osc-log-loop.md) | 要確認 | 未定 | rc18起動直後にAvatar OSC受信処理が大量ログを出し、GUI表示を阻害する問題を修正する。 |
 
 ## 状態の意味
 

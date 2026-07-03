@@ -402,6 +402,85 @@ func TestAppAvatarOSCBasisStatusIgnoresManualBasisMissing(t *testing.T) {
 	}
 }
 
+func TestAppAvatarOSCBasisStatusResolvesEvenWhenManualBasisMissing(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+	now := time.Date(2026, 7, 3, 12, 0, 0, 0, time.UTC)
+	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceManual
+	app.state.Config.AutoCapture.PlayerLocal.Calibrated = false
+	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
+	app.avatarOSCBasisSamples = map[string]avatarOSCBasisSample{
+		"coord/x":       {Float: 0.8, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"coord/xSign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"coord/y":       {Float: 0.5, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"coord/ySign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"coord/z":       {Float: 0.2, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"coord/zSign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"forward/x":     {Float: 0, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"forward/xSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"forward/y":     {Float: 0, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"forward/ySign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"forward/z":     {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"forward/zSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+	}
+
+	got := app.latestAvatarOSCBasisSnapshotLocked(app.state.Config, now)
+	if got.Source != "avatar_osc" || got.Status != "ready" || !got.Fresh {
+		t.Fatalf("snapshot = %+v, want ready avatar_osc", got)
+	}
+	if strings.Contains(got.Error, "プレイヤー基準Pose") {
+		t.Fatalf("error = %q, want no manual basis error", got.Error)
+	}
+}
+
+func TestAppRebuildAvatarOSCBasisDoesNotRepeatPartialLog(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.json")
+	logPath := appcore.DiagnosticLogPath(configPath)
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+	now := time.Date(2026, 7, 3, 12, 0, 0, 0, time.UTC)
+	app.avatarOSCBasisSamples = map[string]avatarOSCBasisSample{
+		"coord/x": {Float: 0.8, HasFloat: true, ReceivedAt: now},
+	}
+
+	app.rebuildAvatarOSCBasisLocked(now, logPath)
+	app.rebuildAvatarOSCBasisLocked(now.Add(10*time.Millisecond), logPath)
+
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Count(string(data), "avatar osc basis resolve status"); got != 1 {
+		t.Fatalf("partial log count = %d, want 1; log=%s", got, string(data))
+	}
+}
+
+func TestAppAvatarOSCBasisAddressAffectsBasisOnlyForConfiguredAxes(t *testing.T) {
+	app := NewApp(filepath.Join(t.TempDir(), "config.json"), appcore.UIState{Mode: appcore.ModeResults})
+	cfg := appcore.DefaultConfig()
+
+	for _, address := range []string{
+		"/avatar/parameters/coord/x",
+		"/avatar/parameters/coord/xSign",
+		"/avatar/parameters/forward/z",
+		"/avatar/parameters/forward/zSign",
+	} {
+		if !app.avatarOSCBasisAddressAffectsBasisLocked(address, cfg) {
+			t.Fatalf("%s should affect AvatarBeacon basis", address)
+		}
+	}
+	for _, address := range []string{
+		"/avatar/parameters/avatar_beacon/debug/ping",
+		"/avatar/parameters/GestureLeft",
+		"/avatar/parameters/Viseme",
+		"/avatar/parameters/coord/debug",
+	} {
+		if app.avatarOSCBasisAddressAffectsBasisLocked(address, cfg) {
+			t.Fatalf("%s should not affect AvatarBeacon basis", address)
+		}
+	}
+}
+
 func TestAppPrepareAutoCaptureConfigRejectsStaleAvatarOSCBasis(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
