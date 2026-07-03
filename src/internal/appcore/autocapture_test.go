@@ -29,6 +29,9 @@ func TestDefaultAutoCaptureConfig(t *testing.T) {
 	if cfg.AutoCapture.Capture.Mode != "stream" || cfg.AutoCapture.Stream.SpoutHelperPath == "" || !cfg.AutoCapture.Stream.SpoutAutoSelect {
 		t.Fatalf("unexpected stream defaults: capture=%+v stream=%+v", cfg.AutoCapture.Capture, cfg.AutoCapture.Stream)
 	}
+	if !cfg.AutoCapture.Restore.Enabled || !cfg.AutoCapture.Restore.PreferSnapshot || cfg.AutoCapture.Restore.SnapshotFreshnessSec != 10 {
+		t.Fatalf("unexpected restore defaults: %+v", cfg.AutoCapture.Restore)
+	}
 	if cfg.AutoCapture.Views[0].ID != "front" || cfg.AutoCapture.Views[0].Calibrated || cfg.AutoCapture.Views[0].Zoom == nil {
 		t.Fatalf("unexpected first view: %+v", cfg.AutoCapture.Views[0])
 	}
@@ -60,6 +63,9 @@ func TestAutoCaptureConfigNormalize(t *testing.T) {
 	}
 	if cfg.AutoCapture.Stream.SpoutHelperPath != "spout-capture.exe" || !cfg.AutoCapture.Stream.SpoutAutoSelect || cfg.AutoCapture.Stream.CaptureTimeoutMS != 10000 {
 		t.Fatalf("stream normalize failed: %+v", cfg.AutoCapture.Stream)
+	}
+	if !cfg.AutoCapture.Restore.Enabled || !cfg.AutoCapture.Restore.PreferSnapshot || cfg.AutoCapture.Restore.Fallback.Zoom != 45 {
+		t.Fatalf("restore normalize failed: %+v", cfg.AutoCapture.Restore)
 	}
 }
 
@@ -225,6 +231,66 @@ func TestParseOSCPose(t *testing.T) {
 	}
 	if pose.Position.X != 1.25 || pose.Position.Y != 2.5 || pose.Position.Z != -3.75 || pose.Rotation.X != 10 || pose.Rotation.Y != 20 || pose.Rotation.Z != 30 {
 		t.Fatalf("pose = %+v", pose)
+	}
+}
+
+func TestParseOSCUserCameraSample(t *testing.T) {
+	modePacket := buildOSCPacket("/usercamera/Mode", ",i", func(buf []byte) []byte {
+		var raw [4]byte
+		binary.BigEndian.PutUint32(raw[:], uint32(2))
+		return append(buf, raw[:]...)
+	})
+	mode, ok := ParseOSCUserCameraSample(modePacket)
+	if !ok || !mode.HasInt || mode.Int != 2 {
+		t.Fatalf("mode sample = %+v ok=%t", mode, ok)
+	}
+
+	streamingPacket := buildOSCPacket("/usercamera/Streaming", ",T", func(buf []byte) []byte { return buf })
+	streaming, ok := ParseOSCUserCameraSample(streamingPacket)
+	if !ok || !streaming.HasBool || !streaming.Bool {
+		t.Fatalf("streaming sample = %+v ok=%t", streaming, ok)
+	}
+
+	zoomPacket := buildOSCPacket("/usercamera/Zoom", ",f", func(buf []byte) []byte {
+		var raw [4]byte
+		binary.BigEndian.PutUint32(raw[:], math.Float32bits(72.5))
+		return append(buf, raw[:]...)
+	})
+	zoom, ok := ParseOSCUserCameraSample(zoomPacket)
+	if !ok || !zoom.HasFloat || math.Abs(zoom.Float-72.5) > 0.001 {
+		t.Fatalf("zoom sample = %+v ok=%t", zoom, ok)
+	}
+}
+
+func TestMergeUserCameraRestoreStatePrefersSnapshot(t *testing.T) {
+	restore := defaultAutoCaptureRestoreConfig()
+	restore.Snapshot = AutoCaptureUserCameraState{
+		Mode:      intStatePtr(2),
+		Streaming: boolStatePtr(true),
+		Zoom:      floatStatePtr(80),
+	}
+	target := mergeUserCameraRestoreState(restore)
+	if target.Mode == nil || *target.Mode != 2 {
+		t.Fatalf("mode = %v, want snapshot 2", target.Mode)
+	}
+	if target.Streaming == nil || !*target.Streaming {
+		t.Fatalf("streaming = %v, want snapshot true", target.Streaming)
+	}
+	if target.Zoom == nil || *target.Zoom != 80 {
+		t.Fatalf("zoom = %v, want snapshot 80", target.Zoom)
+	}
+	if target.Exposure == nil || *target.Exposure != 4 {
+		t.Fatalf("exposure = %v, want fallback 4", target.Exposure)
+	}
+}
+
+func TestMergeUserCameraRestoreStateCanIgnoreSnapshot(t *testing.T) {
+	restore := defaultAutoCaptureRestoreConfig()
+	restore.PreferSnapshot = false
+	restore.Snapshot = AutoCaptureUserCameraState{Mode: intStatePtr(2)}
+	target := mergeUserCameraRestoreState(restore)
+	if target.Mode == nil || *target.Mode != 0 {
+		t.Fatalf("mode = %v, want fallback 0", target.Mode)
 	}
 }
 

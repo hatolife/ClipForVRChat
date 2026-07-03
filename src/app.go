@@ -49,9 +49,15 @@ type App struct {
 	oscReceiverSeq        uint64
 	latestPose            appcore.CameraPoseConfig
 	poseAt                time.Time
+	userCameraSamples     map[string]userCameraOSCSample
 	latestAvatarOSCBasis  avatarOSCBasisState
 	avatarOSCBasisSamples map[string]avatarOSCBasisSample
 	mu                    sync.Mutex
+}
+
+type userCameraOSCSample struct {
+	appcore.UserCameraOSCSample
+	ReceivedAt time.Time
 }
 
 type avatarOSCBasisSample struct {
@@ -1524,12 +1530,21 @@ func (a *App) runCameraPoseReceiver(ctx context.Context, seq uint64, host string
 			continue
 		}
 		now := time.Now()
-		if pose, ok := appcore.ParseOSCPose(packet); ok {
+		if sample, ok := appcore.DecodeOSCUserCameraSample(address, typeTags, payload); ok {
 			a.mu.Lock()
-			a.latestPose = pose
-			a.poseAt = now
+			if a.userCameraSamples == nil {
+				a.userCameraSamples = make(map[string]userCameraOSCSample)
+			}
+			a.userCameraSamples[sample.Address] = userCameraOSCSample{UserCameraOSCSample: sample, ReceivedAt: now}
+			if sample.HasPose {
+				a.latestPose = sample.Pose
+				a.poseAt = now
+			}
 			a.mu.Unlock()
-			appcore.AppendDiagnosticLog(logPath, "auto-capture pose received: x=%.3f y=%.3f z=%.3f rx=%.3f ry=%.3f rz=%.3f", pose.Position.X, pose.Position.Y, pose.Position.Z, pose.Rotation.X, pose.Rotation.Y, pose.Rotation.Z)
+			if sample.HasPose {
+				pose := sample.Pose
+				appcore.AppendDiagnosticLog(logPath, "auto-capture pose received: x=%.3f y=%.3f z=%.3f rx=%.3f ry=%.3f rz=%.3f", pose.Position.X, pose.Position.Y, pose.Position.Z, pose.Rotation.X, pose.Rotation.Y, pose.Rotation.Z)
+			}
 		}
 		if strings.HasPrefix(address, "/avatar/parameters/") {
 			sample, ok := decodeAvatarOSCBasisSample(typeTags, payload)
@@ -1705,6 +1720,75 @@ func (a *App) latestCameraPoseLocked(cfg appcore.Config) appcore.CameraPoseSnaps
 	}
 }
 
+func (a *App) latestUserCameraStateLocked(cfg appcore.Config, now time.Time) appcore.AutoCaptureUserCameraState {
+	cfg.Normalize()
+	freshness := time.Duration(cfg.AutoCapture.Restore.SnapshotFreshnessSec) * time.Second
+	if freshness <= 0 {
+		freshness = 10 * time.Second
+	}
+	freshSample := func(address string) (userCameraOSCSample, bool) {
+		sample, ok := a.userCameraSamples[address]
+		if !ok || sample.ReceivedAt.IsZero() || now.Sub(sample.ReceivedAt) > freshness {
+			return userCameraOSCSample{}, false
+		}
+		return sample, true
+	}
+	var state appcore.AutoCaptureUserCameraState
+	if sample, ok := freshSample("/usercamera/Mode"); ok && sample.HasInt {
+		value := sample.Int
+		state.Mode = &value
+	}
+	if sample, ok := freshSample("/usercamera/Pose"); ok && sample.HasPose {
+		value := sample.Pose
+		state.Pose = &value
+	}
+	setBool := func(target **bool, address string) {
+		if sample, ok := freshSample(address); ok && sample.HasBool {
+			value := sample.Bool
+			*target = &value
+		}
+	}
+	setFloat := func(target **float64, address string) {
+		if sample, ok := freshSample(address); ok && sample.HasFloat {
+			value := sample.Float
+			*target = &value
+		}
+	}
+	setBool(&state.Streaming, "/usercamera/Streaming")
+	setBool(&state.SmoothMovement, "/usercamera/SmoothMovement")
+	setBool(&state.ShowUIInCamera, "/usercamera/ShowUIInCamera")
+	setBool(&state.Lock, "/usercamera/Lock")
+	setBool(&state.LocalPlayer, "/usercamera/LocalPlayer")
+	setBool(&state.RemotePlayer, "/usercamera/RemotePlayer")
+	setBool(&state.Environment, "/usercamera/Environment")
+	setBool(&state.GreenScreen, "/usercamera/GreenScreen")
+	setBool(&state.LookAtMe, "/usercamera/LookAtMe")
+	setBool(&state.AutoLevelRoll, "/usercamera/AutoLevelRoll")
+	setBool(&state.AutoLevelPitch, "/usercamera/AutoLevelPitch")
+	setBool(&state.Flying, "/usercamera/Flying")
+	setBool(&state.TriggerTakesPhotos, "/usercamera/TriggerTakesPhotos")
+	setBool(&state.DollyPathsStayVisible, "/usercamera/DollyPathsStayVisible")
+	setBool(&state.CameraEars, "/usercamera/CameraEars")
+	setBool(&state.ShowFocus, "/usercamera/ShowFocus")
+	setBool(&state.RollWhileFlying, "/usercamera/RollWhileFlying")
+	setBool(&state.OrientationIsLandscape, "/usercamera/OrientationIsLandscape")
+	setFloat(&state.Zoom, "/usercamera/Zoom")
+	setFloat(&state.Exposure, "/usercamera/Exposure")
+	setFloat(&state.FocalDistance, "/usercamera/FocalDistance")
+	setFloat(&state.Aperture, "/usercamera/Aperture")
+	setFloat(&state.Hue, "/usercamera/Hue")
+	setFloat(&state.Saturation, "/usercamera/Saturation")
+	setFloat(&state.Lightness, "/usercamera/Lightness")
+	setFloat(&state.LookAtMeXOffset, "/usercamera/LookAtMeXOffset")
+	setFloat(&state.LookAtMeYOffset, "/usercamera/LookAtMeYOffset")
+	setFloat(&state.FlySpeed, "/usercamera/FlySpeed")
+	setFloat(&state.TurnSpeed, "/usercamera/TurnSpeed")
+	setFloat(&state.SmoothingStrength, "/usercamera/SmoothingStrength")
+	setFloat(&state.PhotoRate, "/usercamera/PhotoRate")
+	setFloat(&state.Duration, "/usercamera/Duration")
+	return state
+}
+
 func (a *App) freshCameraPoseLocked(cfg appcore.Config) (appcore.CameraPoseConfig, error) {
 	snapshot := a.latestCameraPoseLocked(cfg)
 	if snapshot.UpdatedAt == "" {
@@ -1772,6 +1856,10 @@ func (a *App) freshPlayerLocalBasisLocked(cfg appcore.Config) (appcore.CameraPos
 
 func (a *App) prepareAutoCaptureConfigForRunLocked(cfg appcore.Config) (appcore.Config, error) {
 	cfg.Normalize()
+	now := time.Now()
+	if cfg.AutoCapture.Restore.Enabled && cfg.AutoCapture.Restore.PreferSnapshot {
+		cfg.AutoCapture.Restore.Snapshot = a.latestUserCameraStateLocked(cfg, now)
+	}
 	source := normalizePlayerLocalBasisSource(cfg.AutoCapture.PlayerLocal.BasisSource)
 	if source != "avatar_osc" {
 		return cfg, nil
@@ -1783,10 +1871,10 @@ func (a *App) prepareAutoCaptureConfigForRunLocked(cfg appcore.Config) (appcore.
 	}
 	cfg.AutoCapture.PlayerLocal.BasisPose = pose
 	cfg.AutoCapture.PlayerLocal.Calibrated = true
-	if snapshot := a.latestPlayerLocalBasisLocked(cfg, time.Now()); snapshot.UpdatedAt != "" {
+	if snapshot := a.latestPlayerLocalBasisLocked(cfg, now); snapshot.UpdatedAt != "" {
 		cfg.AutoCapture.PlayerLocal.UpdatedAt = snapshot.UpdatedAt
 	} else {
-		cfg.AutoCapture.PlayerLocal.UpdatedAt = time.Now().Format(time.RFC3339)
+		cfg.AutoCapture.PlayerLocal.UpdatedAt = now.Format(time.RFC3339)
 	}
 	return cfg, nil
 }

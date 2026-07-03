@@ -78,6 +78,7 @@ type AutoCaptureConfig struct {
 	Schedule    AutoCaptureScheduleConfig    `json:"schedule"`
 	Capture     AutoCaptureCaptureConfig     `json:"capture"`
 	Stream      AutoCaptureStreamConfig      `json:"stream"`
+	Restore     AutoCaptureRestoreConfig     `json:"restore"`
 	Output      AutoCaptureOutputConfig      `json:"output"`
 	Presence    AutoCapturePresenceConfig    `json:"presence"`
 	Discord     AutoCaptureDiscordConfig     `json:"discord"`
@@ -137,6 +138,89 @@ type AutoCaptureStreamConfig struct {
 	StartDelayMS     int    `json:"startDelayMs"`
 	LegacyFFmpegPath string `json:"legacyFfmpegPath,omitempty"`
 	LegacyInputArgs  string `json:"legacyInputArgs,omitempty"`
+}
+
+type AutoCaptureRestoreConfig struct {
+	Enabled              bool                                `json:"enabled"`
+	PreferSnapshot       bool                                `json:"preferSnapshot"`
+	SnapshotFreshnessSec int                                 `json:"snapshotFreshnessSec"`
+	Fallback             AutoCaptureUserCameraFallbackConfig `json:"fallback"`
+	Snapshot             AutoCaptureUserCameraState          `json:"-"`
+}
+
+type AutoCaptureUserCameraFallbackConfig struct {
+	Mode                   int              `json:"mode"`
+	Streaming              bool             `json:"streaming"`
+	SmoothMovement         bool             `json:"smoothMovement"`
+	RestorePose            bool             `json:"restorePose"`
+	Pose                   CameraPoseConfig `json:"pose"`
+	Zoom                   float64          `json:"zoom"`
+	Exposure               float64          `json:"exposure"`
+	FocalDistance          float64          `json:"focalDistance"`
+	Aperture               float64          `json:"aperture"`
+	Hue                    float64          `json:"hue"`
+	Saturation             float64          `json:"saturation"`
+	Lightness              float64          `json:"lightness"`
+	LookAtMeXOffset        float64          `json:"lookAtMeXOffset"`
+	LookAtMeYOffset        float64          `json:"lookAtMeYOffset"`
+	FlySpeed               float64          `json:"flySpeed"`
+	TurnSpeed              float64          `json:"turnSpeed"`
+	SmoothingStrength      float64          `json:"smoothingStrength"`
+	PhotoRate              float64          `json:"photoRate"`
+	Duration               float64          `json:"duration"`
+	ShowUIInCamera         bool             `json:"showUiInCamera"`
+	Lock                   bool             `json:"lock"`
+	LocalPlayer            bool             `json:"localPlayer"`
+	RemotePlayer           bool             `json:"remotePlayer"`
+	Environment            bool             `json:"environment"`
+	GreenScreen            bool             `json:"greenScreen"`
+	LookAtMe               bool             `json:"lookAtMe"`
+	AutoLevelRoll          bool             `json:"autoLevelRoll"`
+	AutoLevelPitch         bool             `json:"autoLevelPitch"`
+	Flying                 bool             `json:"flying"`
+	TriggerTakesPhotos     bool             `json:"triggerTakesPhotos"`
+	DollyPathsStayVisible  bool             `json:"dollyPathsStayVisible"`
+	CameraEars             bool             `json:"cameraEars"`
+	ShowFocus              bool             `json:"showFocus"`
+	RollWhileFlying        bool             `json:"rollWhileFlying"`
+	OrientationIsLandscape bool             `json:"orientationIsLandscape"`
+}
+
+type AutoCaptureUserCameraState struct {
+	Mode                   *int              `json:"mode,omitempty"`
+	Pose                   *CameraPoseConfig `json:"pose,omitempty"`
+	Streaming              *bool             `json:"streaming,omitempty"`
+	SmoothMovement         *bool             `json:"smoothMovement,omitempty"`
+	Zoom                   *float64          `json:"zoom,omitempty"`
+	Exposure               *float64          `json:"exposure,omitempty"`
+	FocalDistance          *float64          `json:"focalDistance,omitempty"`
+	Aperture               *float64          `json:"aperture,omitempty"`
+	Hue                    *float64          `json:"hue,omitempty"`
+	Saturation             *float64          `json:"saturation,omitempty"`
+	Lightness              *float64          `json:"lightness,omitempty"`
+	LookAtMeXOffset        *float64          `json:"lookAtMeXOffset,omitempty"`
+	LookAtMeYOffset        *float64          `json:"lookAtMeYOffset,omitempty"`
+	FlySpeed               *float64          `json:"flySpeed,omitempty"`
+	TurnSpeed              *float64          `json:"turnSpeed,omitempty"`
+	SmoothingStrength      *float64          `json:"smoothingStrength,omitempty"`
+	PhotoRate              *float64          `json:"photoRate,omitempty"`
+	Duration               *float64          `json:"duration,omitempty"`
+	ShowUIInCamera         *bool             `json:"showUiInCamera,omitempty"`
+	Lock                   *bool             `json:"lock,omitempty"`
+	LocalPlayer            *bool             `json:"localPlayer,omitempty"`
+	RemotePlayer           *bool             `json:"remotePlayer,omitempty"`
+	Environment            *bool             `json:"environment,omitempty"`
+	GreenScreen            *bool             `json:"greenScreen,omitempty"`
+	LookAtMe               *bool             `json:"lookAtMe,omitempty"`
+	AutoLevelRoll          *bool             `json:"autoLevelRoll,omitempty"`
+	AutoLevelPitch         *bool             `json:"autoLevelPitch,omitempty"`
+	Flying                 *bool             `json:"flying,omitempty"`
+	TriggerTakesPhotos     *bool             `json:"triggerTakesPhotos,omitempty"`
+	DollyPathsStayVisible  *bool             `json:"dollyPathsStayVisible,omitempty"`
+	CameraEars             *bool             `json:"cameraEars,omitempty"`
+	ShowFocus              *bool             `json:"showFocus,omitempty"`
+	RollWhileFlying        *bool             `json:"rollWhileFlying,omitempty"`
+	OrientationIsLandscape *bool             `json:"orientationIsLandscape,omitempty"`
 }
 
 type AutoCaptureOutputConfig struct {
@@ -274,6 +358,7 @@ func DefaultAutoCaptureConfig() AutoCaptureConfig {
 			CaptureTimeoutMS: 10000,
 			StartDelayMS:     1000,
 		},
+		Restore: defaultAutoCaptureRestoreConfig(),
 		Output: AutoCaptureOutputConfig{
 			Directory:           DefaultAutoCaptureDirectory(),
 			ImageFormat:         "png",
@@ -483,6 +568,7 @@ func (c *AutoCaptureConfig) Normalize() {
 	if c.Stream.StartDelayMS > 10000 {
 		c.Stream.StartDelayMS = 10000
 	}
+	c.Restore.Normalize()
 	c.Output.Directory = strings.Trim(strings.TrimSpace(c.Output.Directory), `"`)
 	if c.Output.Directory == "" {
 		c.Output.Directory = DefaultAutoCaptureDirectory()
@@ -523,6 +609,142 @@ func (c *AutoCaptureConfig) Normalize() {
 			}
 		}
 	}
+}
+
+func defaultAutoCaptureRestoreConfig() AutoCaptureRestoreConfig {
+	return AutoCaptureRestoreConfig{
+		Enabled:              true,
+		PreferSnapshot:       true,
+		SnapshotFreshnessSec: 10,
+		Fallback:             defaultAutoCaptureUserCameraFallbackConfig(),
+	}
+}
+
+func defaultAutoCaptureUserCameraFallbackConfig() AutoCaptureUserCameraFallbackConfig {
+	return AutoCaptureUserCameraFallbackConfig{
+		Mode:                   0,
+		Streaming:              false,
+		SmoothMovement:         true,
+		RestorePose:            false,
+		Zoom:                   45,
+		Exposure:               4,
+		FocalDistance:          1.5,
+		Aperture:               15,
+		Hue:                    120,
+		Saturation:             100,
+		Lightness:              60,
+		LookAtMeXOffset:        0,
+		LookAtMeYOffset:        0,
+		FlySpeed:               3,
+		TurnSpeed:              1,
+		SmoothingStrength:      5,
+		PhotoRate:              1,
+		Duration:               2,
+		ShowUIInCamera:         false,
+		Lock:                   false,
+		LocalPlayer:            true,
+		RemotePlayer:           true,
+		Environment:            true,
+		GreenScreen:            false,
+		LookAtMe:               false,
+		AutoLevelRoll:          false,
+		AutoLevelPitch:         false,
+		Flying:                 false,
+		TriggerTakesPhotos:     false,
+		DollyPathsStayVisible:  false,
+		CameraEars:             false,
+		ShowFocus:              false,
+		RollWhileFlying:        false,
+		OrientationIsLandscape: true,
+	}
+}
+
+func (c *AutoCaptureRestoreConfig) Normalize() {
+	if c.isZero() {
+		*c = defaultAutoCaptureRestoreConfig()
+	}
+	if c.SnapshotFreshnessSec <= 0 {
+		c.SnapshotFreshnessSec = 10
+	}
+	if c.SnapshotFreshnessSec > 300 {
+		c.SnapshotFreshnessSec = 300
+	}
+	c.Fallback.Normalize()
+}
+
+func (c AutoCaptureRestoreConfig) isZero() bool {
+	return !c.Enabled &&
+		!c.PreferSnapshot &&
+		c.SnapshotFreshnessSec == 0 &&
+		c.Fallback.isZero()
+}
+
+func (c *AutoCaptureUserCameraFallbackConfig) Normalize() {
+	if c.isZero() {
+		*c = defaultAutoCaptureUserCameraFallbackConfig()
+	}
+	if c.Mode < 0 || c.Mode > 6 {
+		c.Mode = 0
+	}
+	c.Zoom = clampFiniteDefault(c.Zoom, 20, 150, 45)
+	c.Exposure = clampFiniteDefault(c.Exposure, 0, 10, 4)
+	c.FocalDistance = clampFiniteDefault(c.FocalDistance, 0, 10, 1.5)
+	c.Aperture = clampFiniteDefault(c.Aperture, 1.4, 32, 15)
+	c.Hue = clampFiniteDefault(c.Hue, 0, 360, 120)
+	c.Saturation = clampFiniteDefault(c.Saturation, 0, 100, 100)
+	c.Lightness = clampFiniteDefault(c.Lightness, 0, 50, 50)
+	c.LookAtMeXOffset = clampFiniteDefault(c.LookAtMeXOffset, -25, 25, 0)
+	c.LookAtMeYOffset = clampFiniteDefault(c.LookAtMeYOffset, -25, 25, 0)
+	c.FlySpeed = clampFiniteDefault(c.FlySpeed, 0.1, 15, 3)
+	c.TurnSpeed = clampFiniteDefault(c.TurnSpeed, 0.1, 5, 1)
+	c.SmoothingStrength = clampFiniteDefault(c.SmoothingStrength, 0.1, 10, 5)
+	c.PhotoRate = clampFiniteDefault(c.PhotoRate, 0.1, 2, 1)
+	c.Duration = clampFiniteDefault(c.Duration, 0.1, 60, 2)
+}
+
+func (c AutoCaptureUserCameraFallbackConfig) isZero() bool {
+	return c.Mode == 0 &&
+		!c.Streaming &&
+		!c.SmoothMovement &&
+		!c.RestorePose &&
+		c.Pose.isZero() &&
+		c.Zoom == 0 &&
+		c.Exposure == 0 &&
+		c.FocalDistance == 0 &&
+		c.Aperture == 0 &&
+		c.Hue == 0 &&
+		c.Saturation == 0 &&
+		c.Lightness == 0 &&
+		c.LookAtMeXOffset == 0 &&
+		c.LookAtMeYOffset == 0 &&
+		c.FlySpeed == 0 &&
+		c.TurnSpeed == 0 &&
+		c.SmoothingStrength == 0 &&
+		c.PhotoRate == 0 &&
+		c.Duration == 0 &&
+		!c.ShowUIInCamera &&
+		!c.Lock &&
+		!c.LocalPlayer &&
+		!c.RemotePlayer &&
+		!c.Environment &&
+		!c.GreenScreen &&
+		!c.LookAtMe &&
+		!c.AutoLevelRoll &&
+		!c.AutoLevelPitch &&
+		!c.Flying &&
+		!c.TriggerTakesPhotos &&
+		!c.DollyPathsStayVisible &&
+		!c.CameraEars &&
+		!c.ShowFocus &&
+		!c.RollWhileFlying &&
+		!c.OrientationIsLandscape
+}
+
+func clampFiniteDefault(value float64, min float64, max float64, fallback float64) float64 {
+	if !isFiniteFloat64(value) || value < min || value > max {
+		return fallback
+	}
+	return value
 }
 
 const (

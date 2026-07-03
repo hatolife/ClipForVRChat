@@ -49,6 +49,18 @@ type CameraPoseSnapshot struct {
 	Configured bool             `json:"configured"`
 }
 
+type UserCameraOSCSample struct {
+	Address  string
+	Bool     bool
+	HasBool  bool
+	Int      int
+	HasInt   bool
+	Float    float64
+	HasFloat bool
+	Pose     CameraPoseConfig
+	HasPose  bool
+}
+
 func MoveUserCameraToView(ctx context.Context, cfg Config, viewID string) error {
 	if ctx == nil {
 		ctx = context.Background()
@@ -192,6 +204,9 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 		return nil, err
 	}
 	defer client.close()
+	if ac.Restore.Enabled {
+		defer r.restoreUserCameraState(client)
+	}
 	diagAutoCapture(logPath, "osc open success: target=%s:%d", ac.OSC.Host, ac.OSC.SendPort)
 	cameraMode := 1
 	if ac.Capture.Mode == "stream" {
@@ -211,6 +226,12 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 	}
 	diagAutoCapture(logPath, "camera mode wait complete")
 	if ac.Capture.Mode == "stream" {
+		diagAutoCapture(logPath, "osc send begin: address=%q value=%t detail=%q", "/usercamera/SmoothMovement", true, "stream_prepare")
+		if err := client.sendBool("/usercamera/SmoothMovement", true); err != nil {
+			diagAutoCapture(logPath, "osc send error: address=%q detail=%q err=%v", "/usercamera/SmoothMovement", "stream_prepare", err)
+			return nil, err
+		}
+		diagAutoCapture(logPath, "osc send success: address=%q value=%t detail=%q", "/usercamera/SmoothMovement", true, "stream_prepare")
 		diagAutoCapture(logPath, "osc button press begin: address=%q detail=%q", "/usercamera/Streaming", "stream_start")
 		if err := client.sendBool("/usercamera/Streaming", true); err != nil {
 			diagAutoCapture(logPath, "osc button press error: address=%q detail=%q err=%v", "/usercamera/Streaming", "stream_start", err)
@@ -272,6 +293,386 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 	}
 	diagAutoCapture(logPath, "run_once complete: batch_id=%q results=%d", batchID, len(results))
 	return results, nil
+}
+
+func (r AutoCaptureRunner) restoreUserCameraState(client oscClient) {
+	cfg := r.Config.AutoCapture
+	restore := cfg.Restore
+	logPath := r.Config.DiagnosticLogPath
+	if !restore.Enabled {
+		diagAutoCapture(logPath, "camera restore skipped: enabled=false")
+		return
+	}
+	target := mergeUserCameraRestoreState(restore)
+	modeSummary := "<missing>"
+	if target.Mode != nil {
+		modeSummary = fmt.Sprintf("%d", *target.Mode)
+	}
+	streamingSummary := "<missing>"
+	if target.Streaming != nil {
+		streamingSummary = fmt.Sprintf("%t", *target.Streaming)
+	}
+	diagAutoCapture(
+		logPath,
+		"camera restore begin: prefer_snapshot=%t snapshot_values=%d fallback_values=%d target_values=%d mode=%s streaming=%s pose=%t snapshot=%q fallback=%q target=%q",
+		restore.PreferSnapshot,
+		countUserCameraStateValues(restore.Snapshot),
+		countUserCameraStateValues(userCameraFallbackState(restore.Fallback)),
+		countUserCameraStateValues(target),
+		modeSummary,
+		streamingSummary,
+		target.Pose != nil,
+		formatUserCameraStateValues(restore.Snapshot),
+		formatUserCameraStateValues(userCameraFallbackState(restore.Fallback)),
+		formatUserCameraStateValues(target),
+	)
+	if target.Streaming != nil && !*target.Streaming {
+		sendRestoreBool(client, logPath, "/usercamera/Streaming", *target.Streaming)
+	}
+	if target.Mode != nil {
+		sendRestoreInt(client, logPath, "/usercamera/Mode", *target.Mode)
+		time.Sleep(150 * time.Millisecond)
+	}
+	if target.Pose != nil && shouldRestoreCameraParameters(target.Mode) {
+		pose := *target.Pose
+		diagAutoCapture(logPath, "camera restore send begin: address=%q", "/usercamera/Pose")
+		if err := client.sendFloats("/usercamera/Pose", []float32{
+			float32(pose.Position.X), float32(pose.Position.Y), float32(pose.Position.Z),
+			float32(pose.Rotation.X), float32(pose.Rotation.Y), float32(pose.Rotation.Z),
+		}); err != nil {
+			diagAutoCapture(logPath, "camera restore send error: address=%q err=%v", "/usercamera/Pose", err)
+		} else {
+			diagAutoCapture(logPath, "camera restore send success: address=%q", "/usercamera/Pose")
+		}
+	}
+	if shouldRestoreCameraParameters(target.Mode) {
+		for _, item := range []struct {
+			address string
+			value   *float64
+		}{
+			{"/usercamera/Zoom", target.Zoom},
+			{"/usercamera/Exposure", target.Exposure},
+			{"/usercamera/FocalDistance", target.FocalDistance},
+			{"/usercamera/Aperture", target.Aperture},
+			{"/usercamera/Hue", target.Hue},
+			{"/usercamera/Saturation", target.Saturation},
+			{"/usercamera/Lightness", target.Lightness},
+			{"/usercamera/LookAtMeXOffset", target.LookAtMeXOffset},
+			{"/usercamera/LookAtMeYOffset", target.LookAtMeYOffset},
+			{"/usercamera/FlySpeed", target.FlySpeed},
+			{"/usercamera/TurnSpeed", target.TurnSpeed},
+			{"/usercamera/SmoothingStrength", target.SmoothingStrength},
+			{"/usercamera/PhotoRate", target.PhotoRate},
+			{"/usercamera/Duration", target.Duration},
+		} {
+			if item.value != nil {
+				sendRestoreFloat(client, logPath, item.address, *item.value)
+			}
+		}
+		for _, item := range []struct {
+			address string
+			value   *bool
+		}{
+			{"/usercamera/SmoothMovement", target.SmoothMovement},
+			{"/usercamera/ShowUIInCamera", target.ShowUIInCamera},
+			{"/usercamera/Lock", target.Lock},
+			{"/usercamera/LocalPlayer", target.LocalPlayer},
+			{"/usercamera/RemotePlayer", target.RemotePlayer},
+			{"/usercamera/Environment", target.Environment},
+			{"/usercamera/GreenScreen", target.GreenScreen},
+			{"/usercamera/LookAtMe", target.LookAtMe},
+			{"/usercamera/AutoLevelRoll", target.AutoLevelRoll},
+			{"/usercamera/AutoLevelPitch", target.AutoLevelPitch},
+			{"/usercamera/Flying", target.Flying},
+			{"/usercamera/TriggerTakesPhotos", target.TriggerTakesPhotos},
+			{"/usercamera/DollyPathsStayVisible", target.DollyPathsStayVisible},
+			{"/usercamera/CameraEars", target.CameraEars},
+			{"/usercamera/ShowFocus", target.ShowFocus},
+			{"/usercamera/RollWhileFlying", target.RollWhileFlying},
+			{"/usercamera/OrientationIsLandscape", target.OrientationIsLandscape},
+		} {
+			if item.value != nil {
+				sendRestoreBool(client, logPath, item.address, *item.value)
+			}
+		}
+	}
+	if target.Streaming != nil && *target.Streaming && target.Mode != nil && *target.Mode == 2 {
+		sendRestoreBool(client, logPath, "/usercamera/Streaming", *target.Streaming)
+	}
+	diagAutoCapture(logPath, "camera restore complete")
+}
+
+func shouldRestoreCameraParameters(mode *int) bool {
+	return mode == nil || *mode != 0
+}
+
+func sendRestoreInt(client oscClient, logPath string, address string, value int) {
+	diagAutoCapture(logPath, "camera restore send begin: address=%q value=%d", address, value)
+	if err := client.sendInt(address, int32(value)); err != nil {
+		diagAutoCapture(logPath, "camera restore send error: address=%q value=%d err=%v", address, value, err)
+		return
+	}
+	diagAutoCapture(logPath, "camera restore send success: address=%q value=%d", address, value)
+}
+
+func sendRestoreFloat(client oscClient, logPath string, address string, value float64) {
+	diagAutoCapture(logPath, "camera restore send begin: address=%q value=%.4f", address, value)
+	if err := client.sendFloat(address, float32(value)); err != nil {
+		diagAutoCapture(logPath, "camera restore send error: address=%q value=%.4f err=%v", address, value, err)
+		return
+	}
+	diagAutoCapture(logPath, "camera restore send success: address=%q value=%.4f", address, value)
+}
+
+func sendRestoreBool(client oscClient, logPath string, address string, value bool) {
+	diagAutoCapture(logPath, "camera restore send begin: address=%q value=%t", address, value)
+	if err := client.sendBool(address, value); err != nil {
+		diagAutoCapture(logPath, "camera restore send error: address=%q value=%t err=%v", address, value, err)
+		return
+	}
+	diagAutoCapture(logPath, "camera restore send success: address=%q value=%t", address, value)
+}
+
+func mergeUserCameraRestoreState(restore AutoCaptureRestoreConfig) AutoCaptureUserCameraState {
+	target := userCameraFallbackState(restore.Fallback)
+	if restore.PreferSnapshot {
+		overlayUserCameraState(&target, restore.Snapshot)
+	}
+	return target
+}
+
+func userCameraFallbackState(fallback AutoCaptureUserCameraFallbackConfig) AutoCaptureUserCameraState {
+	state := AutoCaptureUserCameraState{
+		Mode:                   intStatePtr(fallback.Mode),
+		Streaming:              boolStatePtr(fallback.Streaming),
+		SmoothMovement:         boolStatePtr(fallback.SmoothMovement),
+		Zoom:                   floatStatePtr(fallback.Zoom),
+		Exposure:               floatStatePtr(fallback.Exposure),
+		FocalDistance:          floatStatePtr(fallback.FocalDistance),
+		Aperture:               floatStatePtr(fallback.Aperture),
+		Hue:                    floatStatePtr(fallback.Hue),
+		Saturation:             floatStatePtr(fallback.Saturation),
+		Lightness:              floatStatePtr(fallback.Lightness),
+		LookAtMeXOffset:        floatStatePtr(fallback.LookAtMeXOffset),
+		LookAtMeYOffset:        floatStatePtr(fallback.LookAtMeYOffset),
+		FlySpeed:               floatStatePtr(fallback.FlySpeed),
+		TurnSpeed:              floatStatePtr(fallback.TurnSpeed),
+		SmoothingStrength:      floatStatePtr(fallback.SmoothingStrength),
+		PhotoRate:              floatStatePtr(fallback.PhotoRate),
+		Duration:               floatStatePtr(fallback.Duration),
+		ShowUIInCamera:         boolStatePtr(fallback.ShowUIInCamera),
+		Lock:                   boolStatePtr(fallback.Lock),
+		LocalPlayer:            boolStatePtr(fallback.LocalPlayer),
+		RemotePlayer:           boolStatePtr(fallback.RemotePlayer),
+		Environment:            boolStatePtr(fallback.Environment),
+		GreenScreen:            boolStatePtr(fallback.GreenScreen),
+		LookAtMe:               boolStatePtr(fallback.LookAtMe),
+		AutoLevelRoll:          boolStatePtr(fallback.AutoLevelRoll),
+		AutoLevelPitch:         boolStatePtr(fallback.AutoLevelPitch),
+		Flying:                 boolStatePtr(fallback.Flying),
+		TriggerTakesPhotos:     boolStatePtr(fallback.TriggerTakesPhotos),
+		DollyPathsStayVisible:  boolStatePtr(fallback.DollyPathsStayVisible),
+		CameraEars:             boolStatePtr(fallback.CameraEars),
+		ShowFocus:              boolStatePtr(fallback.ShowFocus),
+		RollWhileFlying:        boolStatePtr(fallback.RollWhileFlying),
+		OrientationIsLandscape: boolStatePtr(fallback.OrientationIsLandscape),
+	}
+	if fallback.RestorePose {
+		state.Pose = poseStatePtr(fallback.Pose)
+	}
+	return state
+}
+
+func overlayUserCameraState(target *AutoCaptureUserCameraState, snapshot AutoCaptureUserCameraState) {
+	overlayIntState(&target.Mode, snapshot.Mode)
+	overlayPoseState(&target.Pose, snapshot.Pose)
+	overlayBoolState(&target.Streaming, snapshot.Streaming)
+	overlayBoolState(&target.SmoothMovement, snapshot.SmoothMovement)
+	overlayFloatState(&target.Zoom, snapshot.Zoom)
+	overlayFloatState(&target.Exposure, snapshot.Exposure)
+	overlayFloatState(&target.FocalDistance, snapshot.FocalDistance)
+	overlayFloatState(&target.Aperture, snapshot.Aperture)
+	overlayFloatState(&target.Hue, snapshot.Hue)
+	overlayFloatState(&target.Saturation, snapshot.Saturation)
+	overlayFloatState(&target.Lightness, snapshot.Lightness)
+	overlayFloatState(&target.LookAtMeXOffset, snapshot.LookAtMeXOffset)
+	overlayFloatState(&target.LookAtMeYOffset, snapshot.LookAtMeYOffset)
+	overlayFloatState(&target.FlySpeed, snapshot.FlySpeed)
+	overlayFloatState(&target.TurnSpeed, snapshot.TurnSpeed)
+	overlayFloatState(&target.SmoothingStrength, snapshot.SmoothingStrength)
+	overlayFloatState(&target.PhotoRate, snapshot.PhotoRate)
+	overlayFloatState(&target.Duration, snapshot.Duration)
+	overlayBoolState(&target.ShowUIInCamera, snapshot.ShowUIInCamera)
+	overlayBoolState(&target.Lock, snapshot.Lock)
+	overlayBoolState(&target.LocalPlayer, snapshot.LocalPlayer)
+	overlayBoolState(&target.RemotePlayer, snapshot.RemotePlayer)
+	overlayBoolState(&target.Environment, snapshot.Environment)
+	overlayBoolState(&target.GreenScreen, snapshot.GreenScreen)
+	overlayBoolState(&target.LookAtMe, snapshot.LookAtMe)
+	overlayBoolState(&target.AutoLevelRoll, snapshot.AutoLevelRoll)
+	overlayBoolState(&target.AutoLevelPitch, snapshot.AutoLevelPitch)
+	overlayBoolState(&target.Flying, snapshot.Flying)
+	overlayBoolState(&target.TriggerTakesPhotos, snapshot.TriggerTakesPhotos)
+	overlayBoolState(&target.DollyPathsStayVisible, snapshot.DollyPathsStayVisible)
+	overlayBoolState(&target.CameraEars, snapshot.CameraEars)
+	overlayBoolState(&target.ShowFocus, snapshot.ShowFocus)
+	overlayBoolState(&target.RollWhileFlying, snapshot.RollWhileFlying)
+	overlayBoolState(&target.OrientationIsLandscape, snapshot.OrientationIsLandscape)
+}
+
+func countUserCameraStateValues(state AutoCaptureUserCameraState) int {
+	count := 0
+	if state.Mode != nil {
+		count++
+	}
+	if state.Pose != nil {
+		count++
+	}
+	for _, value := range []*bool{
+		state.Streaming,
+		state.SmoothMovement,
+		state.ShowUIInCamera,
+		state.Lock,
+		state.LocalPlayer,
+		state.RemotePlayer,
+		state.Environment,
+		state.GreenScreen,
+		state.LookAtMe,
+		state.AutoLevelRoll,
+		state.AutoLevelPitch,
+		state.Flying,
+		state.TriggerTakesPhotos,
+		state.DollyPathsStayVisible,
+		state.CameraEars,
+		state.ShowFocus,
+		state.RollWhileFlying,
+		state.OrientationIsLandscape,
+	} {
+		if value != nil {
+			count++
+		}
+	}
+	for _, value := range []*float64{
+		state.Zoom,
+		state.Exposure,
+		state.FocalDistance,
+		state.Aperture,
+		state.Hue,
+		state.Saturation,
+		state.Lightness,
+		state.LookAtMeXOffset,
+		state.LookAtMeYOffset,
+		state.FlySpeed,
+		state.TurnSpeed,
+		state.SmoothingStrength,
+		state.PhotoRate,
+		state.Duration,
+	} {
+		if value != nil {
+			count++
+		}
+	}
+	return count
+}
+
+func formatUserCameraStateValues(state AutoCaptureUserCameraState) string {
+	values := make([]string, 0, countUserCameraStateValues(state))
+	if state.Mode != nil {
+		values = append(values, fmt.Sprintf("Mode=%d", *state.Mode))
+	}
+	if state.Pose != nil {
+		values = append(values, "Pose=<set>")
+	}
+	appendBool := func(name string, value *bool) {
+		if value != nil {
+			values = append(values, fmt.Sprintf("%s=%t", name, *value))
+		}
+	}
+	appendFloat := func(name string, value *float64) {
+		if value != nil {
+			values = append(values, fmt.Sprintf("%s=%.4f", name, *value))
+		}
+	}
+	appendBool("Streaming", state.Streaming)
+	appendBool("SmoothMovement", state.SmoothMovement)
+	appendBool("ShowUIInCamera", state.ShowUIInCamera)
+	appendBool("Lock", state.Lock)
+	appendBool("LocalPlayer", state.LocalPlayer)
+	appendBool("RemotePlayer", state.RemotePlayer)
+	appendBool("Environment", state.Environment)
+	appendBool("GreenScreen", state.GreenScreen)
+	appendBool("LookAtMe", state.LookAtMe)
+	appendBool("AutoLevelRoll", state.AutoLevelRoll)
+	appendBool("AutoLevelPitch", state.AutoLevelPitch)
+	appendBool("Flying", state.Flying)
+	appendBool("TriggerTakesPhotos", state.TriggerTakesPhotos)
+	appendBool("DollyPathsStayVisible", state.DollyPathsStayVisible)
+	appendBool("CameraEars", state.CameraEars)
+	appendBool("ShowFocus", state.ShowFocus)
+	appendBool("RollWhileFlying", state.RollWhileFlying)
+	appendBool("OrientationIsLandscape", state.OrientationIsLandscape)
+	appendFloat("Zoom", state.Zoom)
+	appendFloat("Exposure", state.Exposure)
+	appendFloat("FocalDistance", state.FocalDistance)
+	appendFloat("Aperture", state.Aperture)
+	appendFloat("Hue", state.Hue)
+	appendFloat("Saturation", state.Saturation)
+	appendFloat("Lightness", state.Lightness)
+	appendFloat("LookAtMeXOffset", state.LookAtMeXOffset)
+	appendFloat("LookAtMeYOffset", state.LookAtMeYOffset)
+	appendFloat("FlySpeed", state.FlySpeed)
+	appendFloat("TurnSpeed", state.TurnSpeed)
+	appendFloat("SmoothingStrength", state.SmoothingStrength)
+	appendFloat("PhotoRate", state.PhotoRate)
+	appendFloat("Duration", state.Duration)
+	if len(values) == 0 {
+		return "<none>"
+	}
+	return strings.Join(values, ",")
+}
+
+func intStatePtr(value int) *int {
+	v := value
+	return &v
+}
+
+func boolStatePtr(value bool) *bool {
+	v := value
+	return &v
+}
+
+func floatStatePtr(value float64) *float64 {
+	v := value
+	return &v
+}
+
+func poseStatePtr(value CameraPoseConfig) *CameraPoseConfig {
+	v := value
+	return &v
+}
+
+func overlayIntState(target **int, value *int) {
+	if value != nil {
+		*target = intStatePtr(*value)
+	}
+}
+
+func overlayBoolState(target **bool, value *bool) {
+	if value != nil {
+		*target = boolStatePtr(*value)
+	}
+}
+
+func overlayFloatState(target **float64, value *float64) {
+	if value != nil {
+		*target = floatStatePtr(*value)
+	}
+}
+
+func overlayPoseState(target **CameraPoseConfig, value *CameraPoseConfig) {
+	if value != nil {
+		*target = poseStatePtr(*value)
+	}
 }
 
 func (r AutoCaptureRunner) capturePhotoShot(ctx context.Context, client oscClient, batchID string, shotID string, index int, view CameraViewConfig, photoDir string, before map[string]time.Time, sidecarUsers []PresenceUser, discordUsers []PresenceUser, confidence string, world AutoCaptureVRChatMetadata) Result {
@@ -1357,6 +1758,209 @@ func ParseOSCPose(packet []byte) (CameraPoseConfig, bool) {
 		Position: CameraVector3Config{X: float64(values[0]), Y: float64(values[1]), Z: float64(values[2])},
 		Rotation: CameraVector3Config{X: float64(values[3]), Y: float64(values[4]), Z: float64(values[5])},
 	}, true
+}
+
+func ParseOSCUserCameraSample(packet []byte) (UserCameraOSCSample, bool) {
+	address, typeTags, payload, ok := ParseOSCPacket(packet)
+	if !ok {
+		return UserCameraOSCSample{}, false
+	}
+	return DecodeOSCUserCameraSample(address, typeTags, payload)
+}
+
+func DecodeOSCUserCameraSample(address string, typeTags string, payload []byte) (UserCameraOSCSample, bool) {
+	if !strings.HasPrefix(address, "/usercamera/") {
+		return UserCameraOSCSample{}, false
+	}
+	if address == "/usercamera/Pose" {
+		pose, ok := decodeUserCameraPose(typeTags, payload)
+		if !ok {
+			return UserCameraOSCSample{}, false
+		}
+		return UserCameraOSCSample{Address: address, Pose: pose, HasPose: true}, true
+	}
+	if address == "/usercamera/Mode" {
+		value, ok := decodeOSCFirstInt(typeTags, payload)
+		if !ok {
+			return UserCameraOSCSample{}, false
+		}
+		return UserCameraOSCSample{Address: address, Int: value, HasInt: true}, true
+	}
+	if userCameraBoolAddress(address) {
+		value, ok := decodeOSCFirstBool(typeTags, payload)
+		if !ok {
+			return UserCameraOSCSample{}, false
+		}
+		return UserCameraOSCSample{Address: address, Bool: value, HasBool: true}, true
+	}
+	if userCameraFloatAddress(address) {
+		value, ok := decodeOSCFirstFloat(typeTags, payload)
+		if !ok {
+			return UserCameraOSCSample{}, false
+		}
+		return UserCameraOSCSample{Address: address, Float: value, HasFloat: true}, true
+	}
+	return UserCameraOSCSample{}, false
+}
+
+func decodeUserCameraPose(typeTags string, payload []byte) (CameraPoseConfig, bool) {
+	typeTags = strings.TrimPrefix(typeTags, ",")
+	if len(typeTags) < 6 {
+		return CameraPoseConfig{}, false
+	}
+	values := make([]float32, 0, 6)
+	offset := 0
+	for _, tag := range typeTags {
+		if len(values) == 6 {
+			break
+		}
+		switch tag {
+		case 'f':
+			if offset+4 > len(payload) {
+				return CameraPoseConfig{}, false
+			}
+			values = append(values, math.Float32frombits(binary.BigEndian.Uint32(payload[offset:offset+4])))
+			offset += 4
+		case 'i':
+			if offset+4 > len(payload) {
+				return CameraPoseConfig{}, false
+			}
+			values = append(values, float32(int32(binary.BigEndian.Uint32(payload[offset:offset+4]))))
+			offset += 4
+		default:
+			return CameraPoseConfig{}, false
+		}
+	}
+	if len(values) != 6 {
+		return CameraPoseConfig{}, false
+	}
+	return CameraPoseConfig{
+		Position: CameraVector3Config{X: float64(values[0]), Y: float64(values[1]), Z: float64(values[2])},
+		Rotation: CameraVector3Config{X: float64(values[3]), Y: float64(values[4]), Z: float64(values[5])},
+	}, true
+}
+
+func decodeOSCFirstInt(typeTags string, payload []byte) (int, bool) {
+	tag, ok := firstOSCTag(typeTags)
+	if !ok {
+		return 0, false
+	}
+	switch tag {
+	case 'i':
+		if len(payload) < 4 {
+			return 0, false
+		}
+		return int(int32(binary.BigEndian.Uint32(payload[:4]))), true
+	case 'f':
+		if len(payload) < 4 {
+			return 0, false
+		}
+		return int(math.Round(float64(math.Float32frombits(binary.BigEndian.Uint32(payload[:4]))))), true
+	default:
+		return 0, false
+	}
+}
+
+func decodeOSCFirstFloat(typeTags string, payload []byte) (float64, bool) {
+	tag, ok := firstOSCTag(typeTags)
+	if !ok {
+		return 0, false
+	}
+	switch tag {
+	case 'f':
+		if len(payload) < 4 {
+			return 0, false
+		}
+		return float64(math.Float32frombits(binary.BigEndian.Uint32(payload[:4]))), true
+	case 'i':
+		if len(payload) < 4 {
+			return 0, false
+		}
+		return float64(int32(binary.BigEndian.Uint32(payload[:4]))), true
+	default:
+		return 0, false
+	}
+}
+
+func decodeOSCFirstBool(typeTags string, payload []byte) (bool, bool) {
+	tag, ok := firstOSCTag(typeTags)
+	if !ok {
+		return false, false
+	}
+	switch tag {
+	case 'T':
+		return true, true
+	case 'F':
+		return false, true
+	case 'i':
+		if len(payload) < 4 {
+			return false, false
+		}
+		return int32(binary.BigEndian.Uint32(payload[:4])) != 0, true
+	case 'f':
+		if len(payload) < 4 {
+			return false, false
+		}
+		return math.Float32frombits(binary.BigEndian.Uint32(payload[:4])) != 0, true
+	default:
+		return false, false
+	}
+}
+
+func firstOSCTag(typeTags string) (rune, bool) {
+	typeTags = strings.TrimPrefix(typeTags, ",")
+	for _, tag := range typeTags {
+		return tag, true
+	}
+	return 0, false
+}
+
+func userCameraBoolAddress(address string) bool {
+	switch address {
+	case "/usercamera/ShowUIInCamera",
+		"/usercamera/Lock",
+		"/usercamera/LocalPlayer",
+		"/usercamera/RemotePlayer",
+		"/usercamera/Environment",
+		"/usercamera/GreenScreen",
+		"/usercamera/SmoothMovement",
+		"/usercamera/LookAtMe",
+		"/usercamera/AutoLevelRoll",
+		"/usercamera/AutoLevelPitch",
+		"/usercamera/Flying",
+		"/usercamera/TriggerTakesPhotos",
+		"/usercamera/DollyPathsStayVisible",
+		"/usercamera/CameraEars",
+		"/usercamera/ShowFocus",
+		"/usercamera/Streaming",
+		"/usercamera/RollWhileFlying",
+		"/usercamera/OrientationIsLandscape":
+		return true
+	default:
+		return false
+	}
+}
+
+func userCameraFloatAddress(address string) bool {
+	switch address {
+	case "/usercamera/Zoom",
+		"/usercamera/Exposure",
+		"/usercamera/FocalDistance",
+		"/usercamera/Aperture",
+		"/usercamera/Hue",
+		"/usercamera/Saturation",
+		"/usercamera/Lightness",
+		"/usercamera/LookAtMeXOffset",
+		"/usercamera/LookAtMeYOffset",
+		"/usercamera/FlySpeed",
+		"/usercamera/TurnSpeed",
+		"/usercamera/SmoothingStrength",
+		"/usercamera/PhotoRate",
+		"/usercamera/Duration":
+		return true
+	default:
+		return false
+	}
 }
 
 type oscClient struct {

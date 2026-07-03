@@ -180,6 +180,35 @@ const vueApp = createApp({
       autoCapture.output ||= {}
       autoCapture.presence ||= {}
       autoCapture.discord ||= {}
+      autoCapture.restore ||= {}
+      autoCapture.restore.fallback ||= {}
+      if (autoCapture.restore.enabled === undefined) autoCapture.restore.enabled = true
+      if (autoCapture.restore.preferSnapshot === undefined) autoCapture.restore.preferSnapshot = true
+      if (!autoCapture.restore.snapshotFreshnessSec) autoCapture.restore.snapshotFreshnessSec = 10
+      const restoreFallback = autoCapture.restore.fallback
+      if (restoreFallback.mode === undefined) restoreFallback.mode = 0
+      if (restoreFallback.streaming === undefined) restoreFallback.streaming = false
+      if (restoreFallback.smoothMovement === undefined) restoreFallback.smoothMovement = true
+      if (restoreFallback.restorePose === undefined) restoreFallback.restorePose = false
+      restoreFallback.pose ||= {}
+      restoreFallback.pose.position ||= {}
+      restoreFallback.pose.rotation ||= {}
+      if (restoreFallback.pose.position.x === undefined) restoreFallback.pose.position.x = 0
+      if (restoreFallback.pose.position.y === undefined) restoreFallback.pose.position.y = 0
+      if (restoreFallback.pose.position.z === undefined) restoreFallback.pose.position.z = 0
+      if (restoreFallback.pose.rotation.x === undefined) restoreFallback.pose.rotation.x = 0
+      if (restoreFallback.pose.rotation.y === undefined) restoreFallback.pose.rotation.y = 0
+      if (restoreFallback.pose.rotation.z === undefined) restoreFallback.pose.rotation.z = 0
+      if (restoreFallback.zoom === undefined) restoreFallback.zoom = 45
+      if (restoreFallback.exposure === undefined) restoreFallback.exposure = 4
+      if (restoreFallback.focalDistance === undefined) restoreFallback.focalDistance = 1.5
+      if (restoreFallback.aperture === undefined) restoreFallback.aperture = 15
+      if (restoreFallback.showUiInCamera === undefined) restoreFallback.showUiInCamera = false
+      if (restoreFallback.lock === undefined) restoreFallback.lock = false
+      if (restoreFallback.localPlayer === undefined) restoreFallback.localPlayer = true
+      if (restoreFallback.remotePlayer === undefined) restoreFallback.remotePlayer = true
+      if (restoreFallback.environment === undefined) restoreFallback.environment = true
+      if (restoreFallback.greenScreen === undefined) restoreFallback.greenScreen = false
       autoCapture.views ||= []
       return autoCapture
     },
@@ -2043,6 +2072,84 @@ const vueApp = createApp({
             <div class="setting-row" :class="{ disabled: !autoCaptureSettings.discord.enabled }">
               <div><strong>Discordに画像を添付する</strong><p>OFFの場合は撮影情報の本文だけを投稿します。画像はローカル保存先とsidecar JSONで保持します。</p></div>
               <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.discord.includeImages" :disabled="!autoCaptureSettings.discord.enabled" /><span></span></label>
+            </div>
+            <div class="setting-row">
+              <div><strong>撮影後にCamera状態を戻す</strong><p>撮影前に受信したUser Camera OSC値を優先し、不足分は下の戻し先を使います。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.restore.enabled" /><span></span></label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.restore.enabled }">
+              <div><strong>撮影前の受信値を優先</strong><p>Mode、Pose、Streaming、Smooth、拡大率、露出、マスクなどを撮影直前の受信値へ戻します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.restore.preferSnapshot" :disabled="!autoCaptureSettings.restore.enabled" /><span></span></label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.restore.enabled || !autoCaptureSettings.restore.preferSnapshot }">
+              <div><strong>受信値の有効秒数</strong><p>この秒数以内にVRChatから受信したUser Camera OSC値だけを復元に使います。</p></div>
+              <label>
+                <input type="number" min="1" max="300" step="1" v-model.number="autoCaptureSettings.restore.snapshotFreshnessSec" :disabled="!autoCaptureSettings.restore.enabled || !autoCaptureSettings.restore.preferSnapshot" />
+              </label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.restore.enabled }">
+              <div><strong>戻し先 Camera Mode</strong><p>受信値がない場合の撮影後モードです。通常はOffに戻します。</p></div>
+              <label>
+                <select v-model.number="autoCaptureSettings.restore.fallback.mode" :disabled="!autoCaptureSettings.restore.enabled">
+                  <option :value="0">Off</option>
+                  <option :value="1">Photo</option>
+                  <option :value="2">Stream</option>
+                  <option :value="3">Emoji</option>
+                  <option :value="4">Multilayer</option>
+                  <option :value="5">Print</option>
+                  <option :value="6">Drone</option>
+                </select>
+              </label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.restore.enabled }">
+              <div><strong>戻し先 Streaming</strong><p>受信値がない場合にSpout StreamingをONへ戻すかです。通常はOFFです。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.restore.fallback.streaming" :disabled="!autoCaptureSettings.restore.enabled" /><span></span></label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.restore.enabled }">
+              <div><strong>戻し先 SmoothMovement</strong><p>受信値がない場合のSmooth設定です。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.restore.fallback.smoothMovement" :disabled="!autoCaptureSettings.restore.enabled" /><span></span></label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.restore.enabled }">
+              <div><strong>戻し先 Lock</strong><p>受信値がない場合のカメラ固定状態です。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.restore.fallback.lock" :disabled="!autoCaptureSettings.restore.enabled" /><span></span></label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.restore.enabled }">
+              <div><strong>戻し先 Poseを使う</strong><p>受信値がない場合でも指定Poseへ戻したい場合だけONにします。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.restore.fallback.restorePose" :disabled="!autoCaptureSettings.restore.enabled" /><span></span></label>
+            </div>
+            <div class="pose-grid" :class="{ disabled: !autoCaptureSettings.restore.enabled || !autoCaptureSettings.restore.fallback.restorePose }">
+              <label><small>戻し先 位置 X</small><input type="number" step="0.001" v-model.number="autoCaptureSettings.restore.fallback.pose.position.x" :disabled="!autoCaptureSettings.restore.enabled || !autoCaptureSettings.restore.fallback.restorePose" /></label>
+              <label><small>戻し先 位置 Y</small><input type="number" step="0.001" v-model.number="autoCaptureSettings.restore.fallback.pose.position.y" :disabled="!autoCaptureSettings.restore.enabled || !autoCaptureSettings.restore.fallback.restorePose" /></label>
+              <label><small>戻し先 位置 Z</small><input type="number" step="0.001" v-model.number="autoCaptureSettings.restore.fallback.pose.position.z" :disabled="!autoCaptureSettings.restore.enabled || !autoCaptureSettings.restore.fallback.restorePose" /></label>
+              <label><small>戻し先 回転 X</small><input type="number" step="0.001" v-model.number="autoCaptureSettings.restore.fallback.pose.rotation.x" :disabled="!autoCaptureSettings.restore.enabled || !autoCaptureSettings.restore.fallback.restorePose" /></label>
+              <label><small>戻し先 回転 Y</small><input type="number" step="0.001" v-model.number="autoCaptureSettings.restore.fallback.pose.rotation.y" :disabled="!autoCaptureSettings.restore.enabled || !autoCaptureSettings.restore.fallback.restorePose" /></label>
+              <label><small>戻し先 回転 Z</small><input type="number" step="0.001" v-model.number="autoCaptureSettings.restore.fallback.pose.rotation.z" :disabled="!autoCaptureSettings.restore.enabled || !autoCaptureSettings.restore.fallback.restorePose" /></label>
+            </div>
+            <div class="pose-grid" :class="{ disabled: !autoCaptureSettings.restore.enabled }">
+              <label><small>戻し先 拡大率</small><input type="number" min="20" max="150" step="0.1" v-model.number="autoCaptureSettings.restore.fallback.zoom" :disabled="!autoCaptureSettings.restore.enabled" /></label>
+              <label><small>戻し先 露出</small><input type="number" min="0" max="10" step="0.1" v-model.number="autoCaptureSettings.restore.fallback.exposure" :disabled="!autoCaptureSettings.restore.enabled" /></label>
+              <label><small>戻し先 焦点距離</small><input type="number" min="0" max="10" step="0.1" v-model.number="autoCaptureSettings.restore.fallback.focalDistance" :disabled="!autoCaptureSettings.restore.enabled" /></label>
+              <label><small>戻し先 絞り</small><input type="number" min="1.4" max="32" step="0.1" v-model.number="autoCaptureSettings.restore.fallback.aperture" :disabled="!autoCaptureSettings.restore.enabled" /></label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.restore.enabled }">
+              <div><strong>戻し先 Show UI</strong><p>受信値がない場合にカメラへUIを表示するかです。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.restore.fallback.showUiInCamera" :disabled="!autoCaptureSettings.restore.enabled" /><span></span></label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.restore.enabled }">
+              <div><strong>戻し先 Local Player</strong><p>受信値がない場合に自分をカメラに写すかです。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.restore.fallback.localPlayer" :disabled="!autoCaptureSettings.restore.enabled" /><span></span></label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.restore.enabled }">
+              <div><strong>戻し先 Remote Player</strong><p>受信値がない場合に他プレイヤーをカメラに写すかです。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.restore.fallback.remotePlayer" :disabled="!autoCaptureSettings.restore.enabled" /><span></span></label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.restore.enabled }">
+              <div><strong>戻し先 Environment</strong><p>受信値がない場合にワールドをカメラに写すかです。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.restore.fallback.environment" :disabled="!autoCaptureSettings.restore.enabled" /><span></span></label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.restore.enabled }">
+              <div><strong>戻し先 Green Screen</strong><p>受信値がない場合にグリーンスクリーンをONへ戻すかです。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.restore.fallback.greenScreen" :disabled="!autoCaptureSettings.restore.enabled" /><span></span></label>
             </div>
           </section>
 
