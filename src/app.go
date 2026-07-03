@@ -43,6 +43,10 @@ type App struct {
 	state                 appcore.UIState
 	autoCancel            context.CancelFunc
 	oscCancel             context.CancelFunc
+	oscReceiverHost       string
+	oscReceiverPort       int
+	oscReceiverLogPath    string
+	oscReceiverSeq        uint64
 	latestPose            appcore.CameraPoseConfig
 	poseAt                time.Time
 	latestAvatarOSCBasis  avatarOSCBasisState
@@ -151,10 +155,7 @@ func (a *App) stopBackgroundTasksLocked() {
 		a.autoCancel()
 		a.autoCancel = nil
 	}
-	if a.oscCancel != nil {
-		a.oscCancel()
-		a.oscCancel = nil
-	}
+	a.stopCameraPoseReceiverLocked()
 }
 
 func (a *App) GetInitialState() appcore.UIState {
@@ -1440,13 +1441,41 @@ func sleepWithContext(ctx context.Context, d time.Duration) bool {
 func (a *App) restartCameraPoseReceiverLocked(cfg appcore.Config) {
 	cfg.Normalize()
 	logPath := appcore.DiagnosticLogPath(a.configPath)
-	if a.oscCancel != nil {
-		a.oscCancel()
-		a.oscCancel = nil
+	host, port := cameraPoseReceiverEndpoint(cfg)
+	if a.oscCancel != nil &&
+		a.oscReceiverHost == host &&
+		a.oscReceiverPort == port &&
+		a.oscReceiverLogPath == logPath {
+		appcore.AppendDiagnosticLog(logPath, "auto-capture osc receiver keep: addr=%s:%d basis_source=%q", host, port, cfg.AutoCapture.PlayerLocal.BasisSource)
+		return
 	}
+	a.stopCameraPoseReceiverLocked()
 	if a.ctx == nil {
 		return
 	}
+	ctx, cancel := context.WithCancel(a.ctx)
+	a.oscCancel = cancel
+	a.oscReceiverHost = host
+	a.oscReceiverPort = port
+	a.oscReceiverLogPath = logPath
+	a.oscReceiverSeq++
+	seq := a.oscReceiverSeq
+	go a.runCameraPoseReceiver(ctx, seq, host, port, cfg.AutoCapture.PlayerLocal.BasisSource, logPath)
+}
+
+func (a *App) stopCameraPoseReceiverLocked() {
+	if a.oscCancel == nil {
+		return
+	}
+	a.oscCancel()
+	a.oscCancel = nil
+	a.oscReceiverHost = ""
+	a.oscReceiverPort = 0
+	a.oscReceiverLogPath = ""
+	a.oscReceiverSeq++
+}
+
+func cameraPoseReceiverEndpoint(cfg appcore.Config) (string, int) {
 	host := strings.TrimSpace(cfg.AutoCapture.OSC.Host)
 	if host == "" {
 		host = "127.0.0.1"
@@ -1455,12 +1484,11 @@ func (a *App) restartCameraPoseReceiverLocked(cfg appcore.Config) {
 	if port <= 0 || port > 65535 {
 		port = 9001
 	}
-	ctx, cancel := context.WithCancel(a.ctx)
-	a.oscCancel = cancel
-	go a.runCameraPoseReceiver(ctx, host, port, cfg.AutoCapture.PlayerLocal.BasisSource, logPath)
+	return host, port
 }
 
-func (a *App) runCameraPoseReceiver(ctx context.Context, host string, port int, basisSource string, logPath string) {
+func (a *App) runCameraPoseReceiver(ctx context.Context, seq uint64, host string, port int, basisSource string, logPath string) {
+	defer a.finishCameraPoseReceiver(seq)
 	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", host, port))
 	if err != nil {
 		appcore.AppendDiagnosticLog(logPath, "auto-capture osc receiver resolve error: %v", err)
@@ -1524,6 +1552,19 @@ func (a *App) runCameraPoseReceiver(ctx context.Context, host string, port int, 
 			a.mu.Unlock()
 		}
 	}
+}
+
+func (a *App) finishCameraPoseReceiver(seq uint64) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.oscReceiverSeq != seq {
+		return
+	}
+	a.oscCancel = nil
+	a.oscReceiverHost = ""
+	a.oscReceiverPort = 0
+	a.oscReceiverLogPath = ""
+	a.oscReceiverSeq++
 }
 
 func oscRemoteAddrString(addr *net.UDPAddr) string {
@@ -1972,21 +2013,21 @@ func (a *App) lookupAvatarOSCBasisRawSample(address string) (avatarOSCBasisSampl
 }
 
 func latestAvatarOSCSampleTime(samples map[string]avatarOSCBasisSample, roots ...string) time.Time {
-	var oldest time.Time
+	var latest time.Time
 	for address, sample := range samples {
 		canonicalAddress := canonicalAvatarOSCBasisAddress(address)
 		for _, root := range roots {
 			if strings.HasPrefix(canonicalAddress, canonicalAvatarOSCBasisAddress(root)) && !sample.ReceivedAt.IsZero() {
-				if oldest.IsZero() || sample.ReceivedAt.Before(oldest) {
-					oldest = sample.ReceivedAt
+				if latest.IsZero() || sample.ReceivedAt.After(latest) {
+					latest = sample.ReceivedAt
 				}
 			}
 		}
 	}
-	if oldest.IsZero() {
+	if latest.IsZero() {
 		return time.Now()
 	}
-	return oldest
+	return latest
 }
 
 func latestAvatarOSCParameterSample(samples map[string]avatarOSCBasisSample) (string, time.Time) {

@@ -521,6 +521,39 @@ func TestAppRebuildAvatarOSCBasisDoesNotRepeatPartialLog(t *testing.T) {
 	}
 }
 
+func TestAppRestartCameraPoseReceiverKeepsSameEndpoint(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.json")
+	logPath := appcore.DiagnosticLogPath(configPath)
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+	app.ctx = context.Background()
+	cfg := appcore.DefaultConfig()
+	cancelCalled := false
+	app.oscCancel = func() {
+		cancelCalled = true
+	}
+	app.oscReceiverHost = "127.0.0.1"
+	app.oscReceiverPort = 9001
+	app.oscReceiverLogPath = logPath
+	app.oscReceiverSeq = 7
+
+	app.restartCameraPoseReceiverLocked(cfg)
+
+	if cancelCalled {
+		t.Fatal("receiver was canceled for the same endpoint")
+	}
+	if app.oscCancel == nil || app.oscReceiverHost != "127.0.0.1" || app.oscReceiverPort != 9001 || app.oscReceiverSeq != 7 {
+		t.Fatalf("receiver state changed: cancel=%v host=%q port=%d seq=%d", app.oscCancel != nil, app.oscReceiverHost, app.oscReceiverPort, app.oscReceiverSeq)
+	}
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "auto-capture osc receiver keep") {
+		t.Fatalf("keep log missing: %s", string(data))
+	}
+}
+
 func TestAppAvatarOSCBasisAddressAffectsBasisOnlyForConfiguredAxes(t *testing.T) {
 	app := NewApp(filepath.Join(t.TempDir(), "config.json"), appcore.UIState{Mode: appcore.ModeResults})
 	cfg := appcore.DefaultConfig()
@@ -544,6 +577,20 @@ func TestAppAvatarOSCBasisAddressAffectsBasisOnlyForConfiguredAxes(t *testing.T)
 		if app.avatarOSCBasisAddressAffectsBasisLocked(address, cfg) {
 			t.Fatalf("%s should not affect AvatarBeacon basis", address)
 		}
+	}
+}
+
+func TestLatestAvatarOSCSampleTimeUsesLatestBasisParameter(t *testing.T) {
+	now := time.Date(2026, 7, 4, 6, 0, 0, 0, time.UTC)
+	got := latestAvatarOSCSampleTime(map[string]avatarOSCBasisSample{
+		"coord/x":     {Float: 1, HasFloat: true, ReceivedAt: now.Add(-30 * time.Second)},
+		"coord/y":     {Float: 1, HasFloat: true, ReceivedAt: now.Add(-20 * time.Second)},
+		"coord/z":     {Float: 1, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
+		"forward/y":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"Ahoge_Angle": {Float: 1, HasFloat: true, ReceivedAt: now},
+	}, "coord", "forward", "Sign")
+	if !got.Equal(now.Add(-time.Second)) {
+		t.Fatalf("latestAvatarOSCSampleTime = %s, want %s", got, now.Add(-time.Second))
 	}
 }
 
