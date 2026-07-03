@@ -788,6 +788,9 @@ func (r AutoCaptureRunner) captureStreamShot(ctx context.Context, client oscClie
 	if !r.waitCaptureDelay(ctx, view, name) {
 		return Result{Name: name, Error: "自動撮影が中断されました。"}
 	}
+	if err := r.ensureStreamCameraForSpoutCapture(ctx, client, view.ID); err != nil {
+		return Result{Name: name, Error: err.Error()}
+	}
 	outputPath, err := autoCaptureOutputPath(cfg, batchID, shotID, index, view)
 	if err != nil {
 		diagAutoCapture(logPath, "stream output path error: view_id=%q err=%v", view.ID, err)
@@ -811,6 +814,29 @@ func (r AutoCaptureRunner) captureStreamShot(ctx context.Context, client oscClie
 		diagAutoCapture(logPath, "stream convert success: view_id=%q capture_path=%q output=%q format=%q", view.ID, capturePath, outputPath, cfg.Output.ImageFormat)
 	}
 	return r.finalizeAutoCaptureImage(outputPath, batchID, shotID, view, sidecarUsers, discordUsers, confidence, world, streamInfo)
+}
+
+func (r AutoCaptureRunner) ensureStreamCameraForSpoutCapture(ctx context.Context, client oscClient, viewID string) error {
+	logPath := r.Config.DiagnosticLogPath
+	diagAutoCapture(logPath, "stream camera refresh begin: view_id=%q", viewID)
+	if err := client.sendInt("/usercamera/Mode", 2); err != nil {
+		diagAutoCapture(logPath, "stream camera refresh error: address=%q view_id=%q err=%v", "/usercamera/Mode", viewID, err)
+		return err
+	}
+	if err := client.sendBool("/usercamera/SmoothMovement", true); err != nil {
+		diagAutoCapture(logPath, "stream camera refresh error: address=%q view_id=%q err=%v", "/usercamera/SmoothMovement", viewID, err)
+		return err
+	}
+	if err := client.sendBool("/usercamera/Streaming", true); err != nil {
+		diagAutoCapture(logPath, "stream camera refresh error: address=%q view_id=%q err=%v", "/usercamera/Streaming", viewID, err)
+		return err
+	}
+	if !sleepContext(ctx, 500*time.Millisecond) {
+		diagAutoCapture(logPath, "stream camera refresh cancelled: view_id=%q err=%v", viewID, ctx.Err())
+		return ctx.Err()
+	}
+	diagAutoCapture(logPath, "stream camera refresh complete: view_id=%q wait_ms=%d", viewID, 500)
+	return nil
 }
 
 func (r AutoCaptureRunner) waitCaptureDelay(ctx context.Context, view CameraViewConfig, name string) bool {

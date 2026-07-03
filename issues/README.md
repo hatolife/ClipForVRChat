@@ -185,6 +185,7 @@
 | 179 | [rc18でGUIが表示されずavatar_oscエラーが大量出力される](179-fix-rc18-gui-not-showing-avatar-osc-log-loop.md) | 要確認 | `v0.1.8-rc21` | rc18起動直後にAvatar OSC受信処理が大量ログを出し、GUI表示を阻害する問題を修正し、GUI起動診断ログと起動進捗表示で切り分けやすくする。rc20で見つかったfrontend template由来の `avatar is not defined` も修正する。 |
 | 180 | [rc25でSpout PNG保存が失敗し、AvatarBeacon受信状態の説明が冗長](180-fix-rc25-spout-png-encoder-and-avatarbeacon-status-note.md) | 要確認 | `v0.1.8-rc26` | Spout helperのWIC PNG書き出しをRGBA非対応環境でも動く形式へ直し、AvatarBeacon受信状態の常時説明文を削除する。 |
 | 181 | [自動撮影後にUser Camera状態をできるだけ元へ戻す](181-restore-user-camera-state-after-auto-capture.md) | 要確認 | `v0.1.8-rc26` | 撮影前のUser Camera状態を可能な範囲で取得し、撮影後にMode/Streaming/Pose/Zoom/Exposure/mask類を復元する。取得できない項目は設定画面の復元用デフォルト値で戻せるようにする。 |
+| 182 | [Stream Camera起動直後にSpout senderが出る前に失敗する](182-wait-for-spout-sender-after-stream-camera-osc.md) | 要確認 | `v0.1.8-rc27` | Stream方式でOSC送信後、Spout sender生成をtimeout内で待ち、必要に応じてStream起動OSCを再送する。 |
 
 ## 状態の意味
 

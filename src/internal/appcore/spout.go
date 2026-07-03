@@ -326,7 +326,7 @@ func captureStreamFrameWithSpout(ctx context.Context, cfg AutoCaptureStreamConfi
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
 		return SpoutCaptureResult{}, err
 	}
-	commandCtx, cancel := context.WithTimeout(ctx, timeout)
+	commandCtx, cancel := context.WithTimeout(ctx, timeout+5*time.Second)
 	defer cancel()
 	args := []string{"--capture", "--output", outputPath, "--timeout-ms", fmt.Sprintf("%d", timeout.Milliseconds())}
 	if strings.TrimSpace(cfg.SpoutSenderName) != "" && !cfg.SpoutAutoSelect {

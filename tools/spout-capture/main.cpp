@@ -378,6 +378,31 @@ SenderSelection choose_sender(SPOUTHANDLE spout, const std::string &requested) {
   return selection;
 }
 
+SenderSelection wait_for_sender(SPOUTHANDLE spout, const std::string &requested,
+                                std::chrono::steady_clock::time_point deadline) {
+  SenderSelection selection;
+  while (std::chrono::steady_clock::now() < deadline) {
+    selection = choose_sender(spout, requested);
+    if (!selection.name.empty()) {
+      return selection;
+    }
+    if (selection.code != "sender_not_found") {
+      return selection;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  }
+  selection = choose_sender(spout, requested);
+  if (!selection.name.empty() || selection.code != "sender_not_found") {
+    return selection;
+  }
+  if (requested.empty()) {
+    selection.message = "Spout senderがありません。VRChatでStream Cameraを起動し、SpoutがONになるまで待ちましたが検出できませんでした。";
+  } else {
+    selection.message = "指定されたSpout senderが見つかりません。VRChatでStream Cameraを起動し、sender名を確認してください。";
+  }
+  return selection;
+}
+
 int list_senders(SPOUTHANDLE spout) {
   auto senders = sorted_senders(spout);
   std::cout << "{\"ok\":true,\"senders\":[";
@@ -394,14 +419,14 @@ int list_senders(SPOUTHANDLE spout) {
 }
 
 int capture(SPOUTHANDLE spout, const Options &options) {
-  SenderSelection selection = choose_sender(spout, options.sender);
+  auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(options.timeout_ms);
+  SenderSelection selection = wait_for_sender(spout, options.sender, deadline);
   if (selection.name.empty()) {
     print_error(selection.code.empty() ? "sender_not_selected" : selection.code,
                 selection.message, selection.senders);
     return 2;
   }
   spout->SetReceiverName(selection.name.c_str());
-  auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(options.timeout_ms);
   std::vector<unsigned char> pixels;
   unsigned int width = 0;
   unsigned int height = 0;
