@@ -252,7 +252,7 @@ FrameStats analyze_rgba_frame(const std::vector<unsigned char> &rgba, unsigned i
   }
   const double samples = static_cast<double>(stats.samples);
   stats.mean = sum / samples;
-  const double variance = std::max(0.0, (sum_sq / samples) - (stats.mean * stats.mean));
+  const double variance = (std::max)(0.0, (sum_sq / samples) - (stats.mean * stats.mean));
   stats.stddev = std::sqrt(variance);
   stats.near_white_ratio = near_white / samples;
   stats.near_black_ratio = near_black / samples;

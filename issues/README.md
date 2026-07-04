@@ -186,9 +186,9 @@
 | 180 | [rc25でSpout PNG保存が失敗し、AvatarBeacon受信状態の説明が冗長](180-fix-rc25-spout-png-encoder-and-avatarbeacon-status-note.md) | 要確認 | `v0.1.8-rc26` | Spout helperのWIC PNG書き出しをRGBA非対応環境でも動く形式へ直し、AvatarBeacon受信状態の常時説明文を削除する。 |
 | 181 | [自動撮影後にUser Camera状態をできるだけ元へ戻す](181-restore-user-camera-state-after-auto-capture.md) | 要確認 | `v0.1.8-rc26` | 撮影前のUser Camera状態を可能な範囲で取得し、撮影後にMode/Streaming/Pose/Zoom/Exposure/mask類を復元する。取得できない項目は設定画面の復元用デフォルト値で戻せるようにする。 |
 | 182 | [Stream Camera起動直後にSpout senderが出る前に失敗する](182-wait-for-spout-sender-after-stream-camera-osc.md) | 要確認 | `v0.1.8-rc27` | Stream方式でOSC送信後、Spout sender生成をtimeout内で待ち、必要に応じてStream起動OSCを再送する。 |
-| 183 | [Spout取得直後の空フレームが透明PNGとして保存される](183-wait-for-valid-spout-frame-and-avoid-failed-output.md) | 要確認 | `v0.1.8-rc28` | Stream方式でSpout起動直後の空フレームを保存せず、有効フレーム待機と失敗出力の隔離を行う。 |
-| 184 | [情報画面の他所取得ファイル注意文を削除する](184-remove-info-screen-third-party-file-warning.md) | 要確認 | `v0.1.8-rc28` | 情報画面の公式配布場所案内から、他所取得ファイルに関する責任否認文を削除する。 |
-| 185 | [診断zip暗号化テストの一時鍵時刻を安定化する](185-stabilize-diagnostic-encryption-test-key-time.md) | 要確認 | `v0.1.8-rc28` | 診断zip暗号化テストのOpenPGP一時鍵作成時刻を安定化し、ローカルgo testの時刻揺らぎ失敗を防ぐ。 |
+| 183 | [Spout取得直後の空フレームが透明PNGとして保存される](183-wait-for-valid-spout-frame-and-avoid-failed-output.md) | 要確認 | `v0.1.8-rc29` | Stream方式でSpout起動直後の空フレームを保存せず、有効フレーム待機と失敗出力の隔離を行う。 |
+| 184 | [情報画面の他所取得ファイル注意文を削除する](184-remove-info-screen-third-party-file-warning.md) | 要確認 | `v0.1.8-rc29` | 情報画面の公式配布場所案内から、他所取得ファイルに関する責任否認文を削除する。 |
+| 185 | [診断zip暗号化テストの一時鍵時刻を安定化する](185-stabilize-diagnostic-encryption-test-key-time.md) | 要確認 | `v0.1.8-rc29` | 診断zip暗号化テストのOpenPGP一時鍵作成時刻を安定化し、ローカルgo testの時刻揺らぎ失敗を防ぐ。 |
 
 ## 状態の意味
 

@@ -1,4 +1,4 @@
-# rc26透明Spoutフレーム修正チェックリスト
+# rc29透明Spoutフレーム修正チェックリスト
 
 - [x] 透明PNGの現物とログを確認する
 - [x] issueを作成する
@@ -8,5 +8,6 @@
 - [x] 情報画面の他所取得ファイル注意文を削除する
 - [x] 診断zip暗号化テストの時刻揺らぎを直す
 - [x] テストと静的チェックを実行する
+- [x] rc28 Release buildのMSVC macro衝突を直す
 - [ ] 変更をコミットしてpushする
-- [ ] rcを作成してRelease workflowを確認する
+- [ ] rc29を作成してRelease workflowを確認する

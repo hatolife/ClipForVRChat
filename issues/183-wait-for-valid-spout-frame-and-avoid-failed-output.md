@@ -35,4 +35,5 @@ Stream方式では、Spoutの `ReceiveImage` が成功しただけで終了せ�
 - 2026-07-04: Spout helperで受信フレームのluma統計を取り、全黒/全白に近い初期フレームはtimeout内で待ち直すようにした。
 - 2026-07-04: 保存前にalphaを255へ正規化し、RGBが有効なVRChat映像を透明PNGにしないようにした。
 - 2026-07-04: Go側は `.tmp` へhelper出力し、画像検証成功後だけ最終パスへrenameするようにした。
+- 2026-07-04: rc28のRelease workflowでMSVCの `max` macro衝突によりSpout helper buildが失敗したため、`(std::max)(...)` でmacro展開を避けるようにした。
 - ローカル検証: `go test ./...`、frontend build、template literal check、Wails API surface check、Spout helper object compile。
