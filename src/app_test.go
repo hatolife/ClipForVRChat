@@ -811,6 +811,83 @@ func TestAppPrepareAutoCaptureConfigRejectsStaleAvatarOSCBasis(t *testing.T) {
 	}
 }
 
+func readyAvatarOSCBasisSamples(now time.Time) map[string]avatarOSCBasisSample {
+	return map[string]avatarOSCBasisSample{
+		"coord/x":       {Float: 0.8, HasFloat: true, ReceivedAt: now},
+		"coord/xSign":   {Float: 1, HasFloat: true, ReceivedAt: now},
+		"coord/y":       {Float: 0.5, HasFloat: true, ReceivedAt: now},
+		"coord/ySign":   {Float: 1, HasFloat: true, ReceivedAt: now},
+		"coord/z":       {Float: 0.2, HasFloat: true, ReceivedAt: now},
+		"coord/zSign":   {Float: 1, HasFloat: true, ReceivedAt: now},
+		"forward/x":     {Float: 1, HasFloat: true, ReceivedAt: now},
+		"forward/xSign": {Float: 1, HasFloat: true, ReceivedAt: now},
+		"forward/y":     {Float: 0, HasFloat: true, ReceivedAt: now},
+		"forward/ySign": {Float: 1, HasFloat: true, ReceivedAt: now},
+		"forward/z":     {Float: 0, HasFloat: true, ReceivedAt: now},
+		"forward/zSign": {Float: 1, HasFloat: true, ReceivedAt: now},
+	}
+}
+
+func TestAppWaitForAutoCaptureStartReadinessWaitsForAvatarOSCBasis(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
+	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
+	app.state.Config.AutoCapture.Presence.WatchOutputLog = false
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	go func() {
+		time.Sleep(30 * time.Millisecond)
+		app.mu.Lock()
+		app.avatarOSCBasisSamples = readyAvatarOSCBasisSamples(time.Now())
+		app.mu.Unlock()
+	}()
+	start := time.Now()
+	if err := app.waitForAutoCaptureStartReadiness(ctx, app.state.Config, 500*time.Millisecond); err != nil {
+		t.Fatal(err)
+	}
+	if elapsed := time.Since(start); elapsed < 30*time.Millisecond {
+		t.Fatalf("wait returned too early: %s", elapsed)
+	}
+}
+
+func TestAppWaitForAutoCaptureStartReadinessTimesOutWithoutAvatarOSCBasis(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
+	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
+	ctx := context.Background()
+	start := time.Now()
+	err := app.waitForAutoCaptureStartReadiness(ctx, app.state.Config, 50*time.Millisecond)
+	if err == nil {
+		t.Fatal("expected readiness wait to time out")
+	}
+	if elapsed := time.Since(start); elapsed < 50*time.Millisecond {
+		t.Fatalf("timeout returned too early: %s", elapsed)
+	}
+	if !strings.Contains(err.Error(), "AvatarBeacon basis") {
+		t.Fatalf("err = %v, want AvatarBeacon basis timeout", err)
+	}
+}
+
+func TestAppWaitForAutoCaptureStartReadinessTimesOutWithoutWorldMetadata(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
+	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
+	app.state.Config.AutoCapture.Presence.WatchOutputLog = true
+	app.state.Config.AutoCapture.Presence.OutputLogDirectory = t.TempDir()
+	app.avatarOSCBasisSamples = readyAvatarOSCBasisSamples(time.Now())
+
+	err := app.waitForAutoCaptureStartReadiness(context.Background(), app.state.Config, 50*time.Millisecond)
+	if err == nil {
+		t.Fatal("expected readiness wait to time out without world metadata")
+	}
+	if !strings.Contains(err.Error(), "world情報") {
+		t.Fatalf("err = %v, want world metadata timeout", err)
+	}
+}
+
 func TestCreateEncryptedDiagnosticPackageEncryptsZip(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.json")

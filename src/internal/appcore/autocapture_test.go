@@ -19,6 +19,9 @@ func TestDefaultAutoCaptureConfig(t *testing.T) {
 	if cfg.AutoCapture.Schedule.Enabled {
 		t.Fatal("auto capture should be disabled by default")
 	}
+	if !cfg.AutoCapture.Schedule.CaptureOnStart {
+		t.Fatal("capture on start should be enabled by default")
+	}
 	if cfg.AutoCapture.OSC.Host != "127.0.0.1" || cfg.AutoCapture.OSC.SendPort != 9000 || cfg.AutoCapture.OSC.ReceivePort != 9001 {
 		t.Fatalf("unexpected osc defaults: %+v", cfg.AutoCapture.OSC)
 	}

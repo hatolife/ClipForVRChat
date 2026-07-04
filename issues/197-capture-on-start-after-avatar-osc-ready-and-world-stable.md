@@ -25,19 +25,19 @@ AvatarBeaconを前提にした `player_local` 構図では、撮影直後の位�
 
 ## 受け入れ条件
 
-- [ ] `AutoCaptureScheduleConfig.CaptureOnStart` の新規初期値をONにする。
-- [ ] 既存ユーザー設定の移行方針を決める。
+- [x] `AutoCaptureScheduleConfig.CaptureOnStart` の新規初期値をONにする。
+- [x] 既存ユーザー設定の移行方針を決める。
   - 既存configで明示的にOFFにしている場合は尊重する。
   - 古いconfigで未設定の場合だけONへ移行する案を優先する。
-- [ ] 開始時撮影は、自動撮影開始直後ではなく `avatar_osc` basis ready後に実行する。
-- [ ] `avatar_osc` basisがreadyにならない場合のtimeout、エラー表示、ログを決める。
-- [ ] ワールド移動中は開始時撮影を実行しない。
-- [ ] ワールド移動中の検出方法を実装する。
-- [ ] ワールド移動完了後、必要なら開始時撮影を延期実行する。
-- [ ] ワールド移動中に無効化された/延期されたことが診断ログで分かる。
-- [ ] UI上で「開始時に撮影」はOSC基準確定後に実行されることが分かる文言にする。
-- [ ] `node scripts/check-frontend-template-literals.mjs` と `node scripts/check-wails-api-surface.mjs` を実行する。
-- [ ] `cd src && GOCACHE=/tmp/clipforvrchat-go-cache go test ./...` を実行する。
+- [x] 開始時撮影は、自動撮影開始直後ではなく `avatar_osc` basis ready後に実行する。
+- [x] `avatar_osc` basisがreadyにならない場合のtimeout、エラー表示、ログを決める。
+- [x] ワールド移動中は開始時撮影を実行しない。
+- [x] ワールド移動中の検出方法を実装する。
+- [x] ワールド移動完了後、必要なら開始時撮影を延期実行する。
+- [x] ワールド移動中に無効化された/延期されたことが診断ログで分かる。
+- [x] UI上で「開始時に撮影」はOSC基準確定後に実行されることが分かる文言にする。
+- [x] `node scripts/check-frontend-template-literals.mjs` と `node scripts/check-wails-api-surface.mjs` を実行する。
+- [x] `cd src && GOCACHE=/tmp/clipforvrchat-go-cache go test ./...` を実行する。
 
 ## world ID / ワールド移動検出メモ
 
@@ -63,9 +63,9 @@ AvatarBeaconを前提にした `player_local` 構図では、撮影直後の位�
   - default: `DefaultConfig()` / `DefaultAutoCaptureConfig()` 周辺
   - load/save: `LoadConfig()` / `SaveConfig()`
   - 既存の `Normalize()` は `CaptureOnStart` を補正していない。
-- 必要ならconfig schema versionやmigration markerを追加して、未設定値だけをONへ移行する。
+- 既存の `LoadConfig()` は `DefaultConfig()` を土台に `json.Unmarshal` しているため、`CaptureOnStart` の default を ON に変更すれば、未設定は ON、明示 `false` は false のまま扱える。今回の最小実装ではこの経路を優先する。
 - 現在のスケジューラは `src/app.go` の `runAutoCaptureScheduler()` で `InitialDelaySec` 後に `CaptureOnStart` を見て即 `runAutoCaptureBatch()` を呼ぶ。
-- バッチ直前の `prepareAutoCaptureConfigForRunLocked()` と `freshPlayerLocalBasisLocked()` は、`avatar_osc` basisがready/freshでない場合にエラーにできる。開始時撮影では、ここで失敗させるだけでなく、初回専用のready待ちを挟む案を優先する。
+- バッチ直前の `prepareAutoCaptureConfigForRunLocked()` と `freshPlayerLocalBasisLocked()` は、`avatar_osc` basisがready/freshでない場合にエラーにできる。開始時撮影では、ここで失敗させるだけでなく、初回専用のready待ちを挟む最小実装を優先する。
 - `latestAvatarOSCBasisSnapshotLocked()` は `ready/stale/missing/partial/invalid`、鮮度、最終受信parameter、raw countを持つため、開始時撮影のready待ちに再利用できる。
 - `avatar_osc` basis ready待ちは、既存のAvatar OSC受信状態判定とfreshness設定を再利用する。
 - ワールド移動中判定は候補を比較する。
@@ -73,6 +73,10 @@ AvatarBeaconを前提にした `player_local` 構図では、撮影直後の位�
   - Presence user集合リセットの既存処理を使う。
   - world ID/instance IDの変化から一定秒数は不安定期間として扱う。
   - Avatar OSC basisが一定時間readyになったことを移動完了の補助条件にする。
+- 今回は world 安定判定を大規模化しすぎず、開始時撮影の待機ヘルパー内で `SnapshotVRChatWorld()` を使った診断・猶予判定から始める。
+- `WatchOutputLog` がONの場合は、VRChat output logから `WorldID` / `InstanceID` が取得でき、同じ値が3秒以上維持されるまで開始時撮影を待つ。
+- `WatchOutputLog` がONでworld metadataを取得できない場合は、危険なタイミングで即撮影せずtimeout時に開始時撮影をスキップし、診断ログとUIメッセージに理由を出す。
+- `WatchOutputLog` がOFFの場合は、world安定待ちは明示的に無効とみなし、`avatar_osc` basis ready/freshだけを開始時撮影条件にする。
 - ワールド移動中に自動撮影スケジュールが動いている場合、開始時撮影だけでなく定期撮影も抑止すべきかは別途判断する。
 
 ## 調査メモ（2026-07-04）

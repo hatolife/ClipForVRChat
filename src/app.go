@@ -1385,9 +1385,22 @@ func (a *App) runAutoCaptureScheduler(ctx context.Context, cfg appcore.Config) {
 			appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler skip: reason=%q batches=%d max_batches=%d", "max_batches_before_capture_on_start", batches, ac.Schedule.MaxBatches)
 			return
 		}
-		appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler trigger: reason=%q", "capture_on_start")
-		a.runAutoCaptureBatch(ctx, cfg)
-		batches++
+		appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait begin: reason=%q", "capture_on_start")
+		if err := a.waitForAutoCaptureStartReadiness(ctx, cfg, 30*time.Second); err != nil {
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait cancelled: reason=%q err=%v", "capture_on_start", err)
+				return
+			}
+			appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler skip: reason=%q err=%v", "capture_on_start_not_ready", err)
+			a.mu.Lock()
+			a.state.Message = "開始時撮影を見送りました: " + err.Error()
+			a.state.Mode = appcore.ModeResults
+			a.mu.Unlock()
+		} else {
+			appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler trigger: reason=%q", "capture_on_start")
+			a.runAutoCaptureBatch(ctx, cfg)
+			batches++
+		}
 	}
 	interval := time.Duration(ac.Schedule.CaptureIntervalSec) * time.Second
 	if interval <= 0 {
@@ -1409,6 +1422,74 @@ func (a *App) runAutoCaptureScheduler(ctx context.Context, cfg appcore.Config) {
 			appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler trigger: reason=%q batch_index=%d", "interval", batches+1)
 			a.runAutoCaptureBatch(ctx, cfg)
 			batches++
+		}
+	}
+}
+
+func (a *App) waitForAutoCaptureStartReadiness(ctx context.Context, cfg appcore.Config, timeout time.Duration) error {
+	cfg.Normalize()
+	logPath := appcore.DiagnosticLogPath(a.configPath)
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+	pollInterval := 250 * time.Millisecond
+	if timeout < pollInterval {
+		pollInterval = timeout
+	}
+	deadline := time.NewTimer(timeout)
+	defer deadline.Stop()
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+	var lastBasisStatus string
+	var worldCandidate appcore.AutoCaptureVRChatMetadata
+	var worldCandidateAt time.Time
+	waitForWorldStable := false
+	worldStableDuration := 3 * time.Second
+	basisReadySeen := false
+	for {
+		a.mu.Lock()
+		snapshot := a.latestAvatarOSCBasisSnapshotLocked(cfg, time.Now())
+		a.mu.Unlock()
+		if snapshot.Status != lastBasisStatus {
+			appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait: avatar_osc_status=%q fresh=%t age_ms=%d error=%q", snapshot.Status, snapshot.Fresh, snapshot.AgeMS, snapshot.Error)
+			lastBasisStatus = snapshot.Status
+		}
+		if snapshot.Status == "ready" && snapshot.Fresh {
+			basisReadySeen = true
+			if !cfg.AutoCapture.Presence.WatchOutputLog {
+				appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait complete: avatar_osc_ready=true world_metadata=disabled")
+				return nil
+			}
+			world := appcore.SnapshotVRChatWorld(cfg.AutoCapture.Presence.OutputLogDirectory)
+			if world.WorldID == "" && world.InstanceID == "" {
+				if !waitForWorldStable {
+					appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait: avatar_osc_ready=true world_metadata=unavailable")
+				}
+				waitForWorldStable = true
+				worldCandidate = appcore.AutoCaptureVRChatMetadata{}
+				worldCandidateAt = time.Time{}
+			} else if !waitForWorldStable || world.WorldID != worldCandidate.WorldID || world.InstanceID != worldCandidate.InstanceID {
+				worldCandidate = world
+				worldCandidateAt = time.Now()
+				waitForWorldStable = true
+				appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait: world_metadata candidate world_id=%q instance_id=%q stable_for_ms=0", world.WorldID, world.InstanceID)
+			} else if time.Since(worldCandidateAt) >= worldStableDuration {
+				appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait complete: avatar_osc_ready=true world_metadata_stable=true world_id=%q instance_id=%q stable_for_ms=%d", world.WorldID, world.InstanceID, time.Since(worldCandidateAt).Milliseconds())
+				return nil
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-deadline.C:
+			if !basisReadySeen {
+				return fmt.Errorf("AvatarBeacon basisがreadyにならず、開始時撮影を待機し続けました")
+			}
+			if cfg.AutoCapture.Presence.WatchOutputLog {
+				return fmt.Errorf("VRChat output_logから現在world情報を取得または安定確認できず、開始時撮影を待機し続けました")
+			}
+			return fmt.Errorf("開始時撮影の準備完了を待機し続けました")
+		case <-ticker.C:
 		}
 	}
 }

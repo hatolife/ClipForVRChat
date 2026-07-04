@@ -204,6 +204,34 @@ func TestLoadConfigDefaultsUpdateSettingsWhenMissing(t *testing.T) {
 	}
 }
 
+func TestLoadConfigDefaultsCaptureOnStartWhenMissing(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(`{"autoCapture":{"schedule":{"enabled":true}}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := LoadConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.AutoCapture.Schedule.CaptureOnStart {
+		t.Fatalf("CaptureOnStart = %t, want true when field is missing", got.AutoCapture.Schedule.CaptureOnStart)
+	}
+}
+
+func TestLoadConfigPreservesExplicitCaptureOnStartFalse(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(`{"autoCapture":{"schedule":{"enabled":true,"captureOnStart":false}}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := LoadConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.AutoCapture.Schedule.CaptureOnStart {
+		t.Fatalf("CaptureOnStart = %t, want false when field is explicit", got.AutoCapture.Schedule.CaptureOnStart)
+	}
+}
+
 func TestConfigPathUsesExecutableDirectory(t *testing.T) {
 	got := ConfigPath(filepath.Join("C:", "tools", "ClipForVRChat.exe"))
 	if filepath.Base(got) != "config.json" {

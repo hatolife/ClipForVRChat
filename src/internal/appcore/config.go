@@ -356,7 +356,7 @@ func DefaultAutoCaptureConfig() AutoCaptureConfig {
 			CaptureIntervalSec:         300,
 			InitialDelaySec:            0,
 			SkipIfPreviousBatchRunning: true,
-			CaptureOnStart:             false,
+			CaptureOnStart:             true,
 		},
 		Capture: AutoCaptureCaptureConfig{
 			Mode:                  "stream",
