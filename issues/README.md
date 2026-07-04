@@ -34,6 +34,7 @@
 | 189 | [VRChatから受信したOSCを他アプリ向けに別ポートへ転送できるようにする](189-forward-vrchat-osc-to-secondary-ports.md) | 要確認 | `v0.1.8` | ClipForVRChatが代表して受信したVRChat OSC packetを設定した別ポートへ転送し、他OSC受信アプリとのポート競合を避ける。 |
 | 191 | [UI上のすべてのボタンにマウスオーバー説明を追加する](191-add-hover-descriptions-to-all-ui-buttons.md) | 要対応 | 未定 | すべてのUIボタンに、機能・対象・注意点が分かるマウスオーバー説明を追加する。 |
 | 192 | [OSCタブに送受信OSCのリアルタイムログ表示を追加する](192-add-realtime-osc-log-panel-to-osc-tab.md) | 要確認 | `v0.1.8-rc34` | OSCタブ最下部に送受信/forwardの一時リアルタイムログを表示し、正規表現フィルタとコピー機能を追加する。 |
+| 195 | [AvatarBeaconのOSC送信頻度と負荷影響を評価し、送信頻度を設定可能にする](195-evaluate-avatarbeacon-osc-send-rate-and-rate-limit.md) | 要対応 | 未定 | AvatarBeaconの実OSC送信頻度、OSC大量送信の悪影響、1Hz/0.1Hzなど低頻度時の実用性を評価し、Unity Inspector上で送信頻度を変更できる設計を検討する。 |
 
 ## 状態の意味
 
