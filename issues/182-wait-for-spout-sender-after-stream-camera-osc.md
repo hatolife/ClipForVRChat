@@ -19,7 +19,7 @@ Stream方式では、OSCでStream CameraとSpoutをONにしたあと、Spout sen
 - [x] アプリ側のStream起動待機で、sender待機/再送の状況が診断ログに出る。
 - [x] timeout後だけ `Spout senderがありません` を返す。
 - [x] 既存の複数sender曖昧エラーは不要に長く待たず、候補を返す。
-- [ ] Go test、frontend check、Release/CIでSpout helperビルドが通る。
+- [x] Go test、frontend check、Release/CIでSpout helperビルドが通る。
 
 ## 実装メモ
 
