@@ -29,7 +29,8 @@
 | 184 | [情報画面の他所取得ファイル注意文を削除する](184-remove-info-screen-third-party-file-warning.md) | 要確認 | `v0.1.8-rc29` | 情報画面の公式配布場所案内から、他所取得ファイルに関する責任否認文を削除する。 |
 | 185 | [診断zip暗号化テストの一時鍵時刻を安定化する](185-stabilize-diagnostic-encryption-test-key-time.md) | 要確認 | `v0.1.8-rc29` | 診断zip暗号化テストのOpenPGP一時鍵作成時刻を安定化し、ローカルgo testの時刻揺らぎ失敗を防ぐ。 |
 | 187 | [カメラ未起動/起動直後のStream Camera Spout取得を安定化する](187-stream-camera-start-and-blank-spout-frame-diagnostics.md) | 要確認 | 未定 | Streamingの互換OSC送信とblank-frame統計ログで、Stream Camera/Spout取得失敗を切り分ける。 |
-| 188 | [別パス/別バージョンを含めてClipForVRChatを単一起動にする](188-global-single-instance-across-install-paths.md) | 要対応 | 未定 | OSC port競合を避けるため、配置パスやバージョンが違っても単一起動にし、既存を閉じる/アクティブ化する選択肢を出す。 |
+| 188 | [別パス/別バージョンを含めてClipForVRChatを単一起動にする](188-global-single-instance-across-install-paths.md) | 要確認 | `v0.1.8` | OSC port競合を避けるため、配置パスやバージョンが違っても単一起動にし、既存を閉じる/アクティブ化する選択肢を出す。 |
+| 189 | [VRChatから受信したOSCを他アプリ向けに別ポートへ転送できるようにする](189-forward-vrchat-osc-to-secondary-ports.md) | 要対応 | 未定 | ClipForVRChatが代表して受信したOSCを別ポートへ転送し、他OSC受信アプリとのポート競合を回避できるようにする。 |
 
 ## 状態の意味
 

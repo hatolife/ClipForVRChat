@@ -2,16 +2,18 @@ package main
 
 import (
 	"bytes"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hatolife/ClipForVRChat/internal/appcore"
 )
 
 func TestAcquireInstanceLockPreventsSecondLock(t *testing.T) {
-	configPath := filepath.Join(t.TempDir(), "config.json")
-	first, err := acquireInstanceLock(configPath)
+	withSingleInstanceTestDir(t)
+	first, err := acquireInstanceLock()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -19,7 +21,7 @@ func TestAcquireInstanceLockPreventsSecondLock(t *testing.T) {
 		_ = first.Unlock()
 	}()
 
-	second, err := acquireInstanceLock(configPath)
+	second, err := acquireInstanceLock()
 	if err == nil {
 		_ = second.Unlock()
 		t.Fatal("expected second lock to fail")
@@ -27,8 +29,8 @@ func TestAcquireInstanceLockPreventsSecondLock(t *testing.T) {
 }
 
 func TestAcquireInstanceLockAllowsAfterUnlock(t *testing.T) {
-	configPath := filepath.Join(t.TempDir(), "config.json")
-	first, err := acquireInstanceLock(configPath)
+	withSingleInstanceTestDir(t)
+	first, err := acquireInstanceLock()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,11 +38,86 @@ func TestAcquireInstanceLockAllowsAfterUnlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	second, err := acquireInstanceLock(configPath)
+	second, err := acquireInstanceLock()
 	if err != nil {
 		t.Fatal(err)
 	}
 	_ = second.Unlock()
+}
+
+func TestSingleInstanceStateRoundTrip(t *testing.T) {
+	dir := withSingleInstanceTestDir(t)
+	path := filepath.Join(dir, singleInstanceStateFile)
+	want := singleInstanceState{
+		PID:            123,
+		ExecutablePath: "/tmp/ClipForVRChat.exe",
+		Version:        "v1.2.3",
+		Revision:       "abcdef0",
+		Endpoint:       "127.0.0.1:12345",
+		Token:          strings.Repeat("a", 64),
+		StartedAt:      "2026-07-04T00:00:00Z",
+	}
+	if err := writeSingleInstanceState(path, want); err != nil {
+		t.Fatal(err)
+	}
+	got, err := readSingleInstanceState(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Fatalf("state = %+v, want %+v", got, want)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !info.Mode().IsRegular() {
+		t.Fatalf("state file mode = %v, want regular file", info.Mode())
+	}
+}
+
+func TestSingleInstanceServerCommands(t *testing.T) {
+	server, err := startSingleInstanceServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+
+	var activated bool
+	var shutdown bool
+	server.SetHandlers(func() error {
+		activated = true
+		return nil
+	}, func() error {
+		shutdown = true
+		return nil
+	})
+	state := singleInstanceState{Endpoint: server.Endpoint(), Token: server.Token()}
+	if err := sendSingleInstanceCommand(state, "ping", time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if err := sendSingleInstanceCommand(state, "activate", time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if err := sendSingleInstanceCommand(state, "shutdown", time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if !activated || !shutdown {
+		t.Fatalf("activated=%t shutdown=%t", activated, shutdown)
+	}
+}
+
+func withSingleInstanceTestDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	old := singleInstanceDirFunc
+	singleInstanceDirFunc = func() (string, error) {
+		return dir, nil
+	}
+	t.Cleanup(func() {
+		singleInstanceDirFunc = old
+	})
+	return dir
 }
 
 func TestShouldExitWithoutUI(t *testing.T) {

@@ -1,10 +1,10 @@
-# rc29後のStream Camera/Spout取得修正チェックリスト
+# issue 188 単一起動修正チェックリスト
 
-- [x] rc29ログでカメラ未起動時のMode/Streaming送信とsender状態を確認する
-- [x] rc29 separated2ログでsenderあり/blank-frame失敗を確認する
-- [x] issueを作成する
-- [x] StreamingのOSC bool送信にnumeric 1/0互換送信を追加する
-- [x] Spout helperのblank-frameエラーへフレーム統計を追加する
-- [x] Go側のhelper errorログへフレーム統計を追加する
+- [x] 既存の起動順とロック実装を確認する
+- [x] ユーザー固定パスの単一起動ロックへ変更する
+- [x] 既存インスタンス操作用IPCを追加する
+- [x] 管理者権限起動を本体初期化前に拒否する
+- [x] 既存を閉じる/アクティブ化する起動前ダイアログを追加する
+- [x] issueと検証項目を更新する
 - [x] テストと静的チェックを実行する
 - [x] 変更をコミットする

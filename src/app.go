@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math"
 	"net"
@@ -154,6 +155,32 @@ func (a *App) shutdown(ctx context.Context) {
 	a.logLifecycleLocked("shutdown begin: auto_capture_osc=%t auto_photo=%t", a.oscCancel != nil, a.autoCancel != nil)
 	a.stopBackgroundTasksLocked()
 	a.logLifecycleLocked("shutdown complete")
+}
+
+func (a *App) activateFromSingleInstance() error {
+	a.mu.Lock()
+	ctx := a.ctx
+	a.logLifecycleLocked("single_instance activate request: ctx_ready=%t", ctx != nil)
+	a.mu.Unlock()
+	if ctx == nil {
+		return errors.New("既存ウィンドウはまだ起動準備中です")
+	}
+	runtime.WindowShow(ctx)
+	runtime.WindowUnminimise(ctx)
+	runtime.Show(ctx)
+	return nil
+}
+
+func (a *App) shutdownFromSingleInstance() error {
+	a.mu.Lock()
+	ctx := a.ctx
+	a.logLifecycleLocked("single_instance shutdown request: ctx_ready=%t", ctx != nil)
+	a.mu.Unlock()
+	if ctx == nil {
+		return errors.New("既存ウィンドウはまだ起動準備中です")
+	}
+	go runtime.Quit(ctx)
+	return nil
 }
 
 func (a *App) stopBackgroundTasksLocked() {

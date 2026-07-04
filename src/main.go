@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	arg "github.com/alexflint/go-arg"
-	"github.com/gofrs/flock"
 	"github.com/hatolife/ClipForVRChat/internal/appcore"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -49,16 +48,17 @@ func main() {
 		return
 	}
 
-	configPath := defaultConfigPath()
-	instanceLock, err := acquireInstanceLock(configPath)
+	instance, err := initializeSingleInstance(stderr)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(stderr, err)
 		os.Exit(1)
 	}
-	defer func() {
-		_ = instanceLock.Unlock()
-	}()
+	if instance == nil {
+		return
+	}
+	defer instance.Close()
 
+	configPath := defaultConfigPath()
 	state := appcore.UIState{
 		Mode:       appcore.ModeResults,
 		ConfigPath: configPath,
@@ -70,7 +70,7 @@ func main() {
 		state.Mode = appcore.ModeError
 		state.Message = fmt.Sprintf("設定を読み込めませんでした: %v", err)
 		state.Config = appcore.DefaultConfig()
-		runUI(configPath, state)
+		runUI(configPath, state, instance)
 		return
 	}
 	state.Config = cfg
@@ -90,7 +90,7 @@ func main() {
 			state.Config = cfg
 			state.ConfigPath = configPath
 		}
-		runUI(configPath, state)
+		runUI(configPath, state, instance)
 		return
 	}
 
@@ -99,7 +99,7 @@ func main() {
 		state.Message = "初回起動です。設定を確認して保存すると、続けて通常処理を実行します。"
 		state.PendingPaths = args
 		state.ProcessOnSave = len(args) > 0
-		runUI(configPath, state)
+		runUI(configPath, state, instance)
 		return
 	}
 
@@ -107,13 +107,13 @@ func main() {
 		if strings.EqualFold(filepath.Ext(arg), ".json") {
 			state.Mode = appcore.ModeError
 			state.Message = "画像ファイルと設定ファイルが混在しています。設定編集と画像処理は別々に起動してください。"
-			runUI(configPath, state)
+			runUI(configPath, state, instance)
 			return
 		}
 	}
 
 	if len(args) == 0 {
-		runUI(configPath, state)
+		runUI(configPath, state, instance)
 		return
 	}
 
@@ -121,7 +121,7 @@ func main() {
 	if err != nil {
 		state.Mode = appcore.ModeError
 		state.Message = err.Error()
-		runUI(configPath, state)
+		runUI(configPath, state, instance)
 		return
 	}
 	copyErr := copySingleURLIfNeeded(cfg, results)
@@ -140,7 +140,7 @@ func main() {
 		state.Mode = appcore.ModeResults
 		state.Message = resultMessage(cfg, results, copyErr)
 	}
-	runUI(configPath, state)
+	runUI(configPath, state, instance)
 }
 
 func handleCLIArgs(args []string, stdout io.Writer, stderr io.Writer) (bool, int) {
@@ -162,19 +162,6 @@ func handleCLIArgs(args []string, stdout io.Writer, stderr io.Writer) (bool, int
 		return true, 0
 	}
 	return false, 0
-}
-
-func acquireInstanceLock(configPath string) (*flock.Flock, error) {
-	lockPath := filepath.Join(filepath.Dir(configPath), "ClipForVRChat.lock")
-	fileLock := flock.New(lockPath)
-	locked, err := fileLock.TryLock()
-	if err != nil {
-		return nil, fmt.Errorf("起動ロックを取得できませんでした: %w", err)
-	}
-	if !locked {
-		return nil, fmt.Errorf("ClipForVRChat はすでに起動しています。既存のウィンドウを確認してください。")
-	}
-	return fileLock, nil
 }
 
 func shouldExitWithoutUI(cfg appcore.Config, results []appcore.Result, copyErr error) bool {
@@ -202,8 +189,11 @@ func hasErrors(results []appcore.Result) bool {
 	return false
 }
 
-func runUI(configPath string, state appcore.UIState) {
+func runUI(configPath string, state appcore.UIState, instance *singleInstance) {
 	app := NewApp(configPath, state)
+	if instance != nil {
+		instance.BindApp(app)
+	}
 	logPath := appcore.DiagnosticLogPath(configPath)
 	appcore.AppendDiagnosticLog(
 		logPath,
