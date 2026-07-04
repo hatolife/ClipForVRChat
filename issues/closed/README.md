@@ -169,3 +169,4 @@
 | 190 | [カメラ撮影機能終了時に一時OSC状態を確実に解除する](190-make-camera-osc-reset-streaming-compat.md) | 完了 | `v0.1.8-rc31` | カメラOSCリセットと撮影終了時の `/usercamera/Streaming=false` などを通常のStream制御と同じbool+numeric互換送信に揃え、成否にかかわらず一時OSC状態を解除する。 |
 | 193 | [rc30 Release workflowのWindowsテストcleanup失敗を安定化する](193-stabilize-rc30-windows-release-test-cleanup.md) | 完了 | `v0.1.8-rc34` | Windows CIでOSC受信器テスト終了時の一時ディレクトリcleanupが診断ログ/UDP listener停止と競合しないよう、receiver終了待ちを追加した。 |
 | 194 | [CIのWails Build application工程が長時間完了しない](194-investigate-ci-wails-build-hang.md) | 完了 | `v0.1.8-rc34` | Windows `wails build` がbindings生成で止まる問題に対し、bindings生成skip、WebView2 strategy、mod同期抑止、timeout/verboseを追加した。 |
+| 198 | [world ID を Avatar OSC で送れるか調査する](198-world-id-avatar-osc-feasibility-investigation.md) | 断念 | `v0.1.8` | AvatarBeacon単体で現在world ID文字列をOSC送信する公式手段が確認できないため断念し、VRChat output log由来のworld/instance取得を代替とする。 |

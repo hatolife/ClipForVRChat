@@ -37,7 +37,6 @@
 | 195 | [AvatarBeaconのOSC送信頻度と負荷影響を評価し、送信頻度を設定可能にする](195-evaluate-avatarbeacon-osc-send-rate-and-rate-limit.md) | 要対応 | 未定 | AvatarBeaconの実OSC送信頻度、OSC大量送信の悪影響、1Hz/0.1Hzなど低頻度時の実用性を評価し、Unity Inspector上で送信頻度を変更できる設計を検討する。 |
 | 196 | [設定画面タブ内の項目を概要行と詳細設定画面へ整理する](196-reorganize-settings-tab-detail-screens.md) | 要確認 | `v0.1.8` | 自動撮影タブなど長くなった設定項目を、概要行と詳細設定画面へ分けて見通しを改善する。 |
 | 197 | [開始時に撮影を初期ONにし、OSC基準確定後かつワールド移動中でない時だけ実行する](197-capture-on-start-after-avatar-osc-ready-and-world-stable.md) | 要確認 | `v0.1.8` | 開始時撮影を初期ONにし、AvatarBeacon basis ready後、かつワールド移動中でない安定状態でだけ実行する。 |
-| 198 | [world ID を Avatar OSC で送れるか調査する](198-world-id-avatar-osc-feasibility-investigation.md) | 要確認 | `v0.1.8` | Avatar から現在の world ID を文字列で外部 OSC へ送れるか、公式手段と代替案、AvatarBeacon への実装範囲を調査する。 |
 
 ## 状態の意味
 

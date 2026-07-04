@@ -33,3 +33,9 @@ AvatarBeacon へ world ID 送信ギミックを追加できるか、また不可
 AvatarBeaconからworld IDをOSC送信する実装は、現時点では公式手段がなく不可と判断する。
 
 v0.1.8の開始時撮影・移動中判定では、AvatarBeaconのOSC basis ready/freshとVRChat output log由来のworld/instance安定判定を組み合わせる。
+
+## close理由
+
+調査の結果、AvatarBeacon単体で現在world ID文字列をOSC送信する公式手段が確認できなかったため、AvatarBeacon実装としては断念する。
+
+代替として、現在world/instance情報はVRChat output logから取得する既存経路を使う。
