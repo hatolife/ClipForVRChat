@@ -56,5 +56,5 @@ READMEと `src/SETTINGS_SPEC.md` は、通常画像処理、VRChat写真自動�
 
 確認方法:
 
-- README/SPEC/Release Notesが [#129](129-add-spout-capture-helper.md) から [#163](163-show-autocapture-test-results-in-settings.md) の実装済み範囲と一致する。
+- README/SPEC/Release Notesが [#129](../129-add-spout-capture-helper.md) から [#163](163-show-autocapture-test-results-in-settings.md) の実装済み範囲と一致する。
 - Release workflowの実際のzip内容とドキュメントの成果物一覧が一致する。

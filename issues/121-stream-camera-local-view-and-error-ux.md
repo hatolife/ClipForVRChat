@@ -35,13 +35,13 @@ Stream方式はダミーではなく、実際にVRChat Stream Cameraの映像か
 
 ## 再監査メモ
 
-- 2026-07-01: [#164](164-audit-v018-completed-items.md) の再監査で未達が見つかったため、完了扱いを取り消して `要対応` に戻した。
+- 2026-07-01: [#164](closed/164-audit-v018-completed-items.md) の再監査で未達が見つかったため、完了扱いを取り消して `要対応` に戻した。
 
 ## 実装前調査メモ
 
 実装方針:
 
-- このissueはv0.1.8自動撮影の統合確認issueとして扱う。実コードの主な修正は [#129](129-add-spout-capture-helper.md) から [#135](135-add-spout-stream-camera-verification-guide.md)、[#138](138-define-player-local-coordinate-spec.md)、[#140](140-implement-player-local-pose-transform.md)、[#141](141-integrate-player-local-coordinate-ui.md)、[#163](163-show-autocapture-test-results-in-settings.md) で行う。
+- このissueはv0.1.8自動撮影の統合確認issueとして扱う。実コードの主な修正は [#129](129-add-spout-capture-helper.md) から [#135](closed/135-add-spout-stream-camera-verification-guide.md)、[#138](closed/138-define-player-local-coordinate-spec.md)、[#140](closed/140-implement-player-local-pose-transform.md)、[#141](141-integrate-player-local-coordinate-ui.md)、[#163](closed/163-show-autocapture-test-results-in-settings.md) で行う。
 - VRChat公式ドキュメント上、Camera OSCは `/usercamera/Mode` で 2=Stream、`/usercamera/Streaming` でSpout stream toggle、`/usercamera/Pose` でカメラ位置/回転を操作する。現行実装のStream起動方向は維持しつつ、Spout取得、検証、UI結果表示、ローカル座標を完了させる。
 - `player_local` は標準OSCだけではローカルプレイヤーrootを自動取得できないため、v0.1.8では「手動保存したプレイヤー基準Pose」を基準にする。実装後のREADME/SPECでは、プレイヤー移動へ自動追従する機能ではないことを明記する。
 

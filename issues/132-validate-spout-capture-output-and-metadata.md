@@ -31,7 +31,7 @@ sidecar JSONやDiscord投稿にも、Stream方式で取得したsender情報を�
 
 ## 再監査メモ
 
-- 2026-07-01: [#164](164-audit-v018-completed-items.md) の再監査で未達が見つかったため、完了扱いを取り消して `要対応` に戻した。
+- 2026-07-01: [#164](closed/164-audit-v018-completed-items.md) の再監査で未達が見つかったため、完了扱いを取り消して `要対応` に戻した。
 
 ## 実装前調査メモ
 

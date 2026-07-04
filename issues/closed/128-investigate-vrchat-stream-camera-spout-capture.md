@@ -85,10 +85,10 @@ v0.1.8のStream方式は、FFmpeg/gdigrabの画面キャプチャ経路を主経
 
 ## 分割issue
 
-- [129](129-add-spout-capture-helper.md): Spout受信ヘルパーを追加する。
-- [130](130-add-spout-sender-settings-and-diagnostics.md): Spout sender設定と診断UIを追加する。
-- [131](131-integrate-spout-helper-into-auto-capture.md): 自動撮影Stream方式をSpoutヘルパーへ統合する。
-- [132](132-validate-spout-capture-output-and-metadata.md): Spout取得画像とメタデータを検証する。
+- [129](../129-add-spout-capture-helper.md): Spout受信ヘルパーを追加する。
+- [130](../130-add-spout-sender-settings-and-diagnostics.md): Spout sender設定と診断UIを追加する。
+- [131](../131-integrate-spout-helper-into-auto-capture.md): 自動撮影Stream方式をSpoutヘルパーへ統合する。
+- [132](../132-validate-spout-capture-output-and-metadata.md): Spout取得画像とメタデータを検証する。
 - [133](133-update-auto-capture-stream-ui-and-docs-for-spout.md): Stream方式UIとドキュメントをSpout前提へ更新する。
-- [134](134-package-spout-helper-in-ci-release.md): CI/ReleaseでSpoutヘルパーをビルド/同梱する。
+- [134](../134-package-spout-helper-in-ci-release.md): CI/ReleaseでSpoutヘルパーをビルド/同梱する。
 - [135](135-add-spout-stream-camera-verification-guide.md): Stream Camera/Spout方式の実機確認手順を整備する。
