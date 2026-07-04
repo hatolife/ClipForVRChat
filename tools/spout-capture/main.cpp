@@ -9,6 +9,7 @@
 #include <ctime>
 #include <filesystem>
 #include <iostream>
+#include <cmath>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -34,6 +35,14 @@ struct Options {
   std::string sender;
   std::filesystem::path output;
   int timeout_ms = 10000;
+};
+
+struct FrameStats {
+  int samples = 0;
+  double mean = 0.0;
+  double stddev = 0.0;
+  double near_white_ratio = 0.0;
+  double near_black_ratio = 0.0;
 };
 
 std::string json_escape(const std::string &value) {
@@ -196,6 +205,77 @@ std::string lower_copy(std::string value) {
     return static_cast<char>(std::tolower(c));
   });
   return value;
+}
+
+FrameStats analyze_rgba_frame(const std::vector<unsigned char> &rgba, unsigned int width, unsigned int height) {
+  FrameStats stats;
+  if (width == 0 || height == 0 || rgba.empty()) {
+    return stats;
+  }
+  unsigned int step_x = 1;
+  unsigned int step_y = 1;
+  const unsigned int max_samples = 16384;
+  while ((width / step_x) * (height / step_y) > max_samples) {
+    if (width / step_x >= height / step_y) {
+      step_x++;
+    } else {
+      step_y++;
+    }
+  }
+  double sum = 0.0;
+  double sum_sq = 0.0;
+  double near_white = 0.0;
+  double near_black = 0.0;
+  for (unsigned int y = 0; y < height; y += step_y) {
+    for (unsigned int x = 0; x < width; x += step_x) {
+      const size_t i = (static_cast<size_t>(y) * width + x) * 4;
+      if (i + 2 >= rgba.size()) {
+        continue;
+      }
+      const double r = static_cast<double>(rgba[i]);
+      const double g = static_cast<double>(rgba[i + 1]);
+      const double b = static_cast<double>(rgba[i + 2]);
+      const double luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      sum += luma;
+      sum_sq += luma * luma;
+      if (luma >= 250.0) {
+        near_white++;
+      }
+      if (luma <= 5.0) {
+        near_black++;
+      }
+      stats.samples++;
+    }
+  }
+  if (stats.samples == 0) {
+    return stats;
+  }
+  const double samples = static_cast<double>(stats.samples);
+  stats.mean = sum / samples;
+  const double variance = std::max(0.0, (sum_sq / samples) - (stats.mean * stats.mean));
+  stats.stddev = std::sqrt(variance);
+  stats.near_white_ratio = near_white / samples;
+  stats.near_black_ratio = near_black / samples;
+  return stats;
+}
+
+bool is_blank_frame(const FrameStats &stats) {
+  if (stats.samples == 0) {
+    return true;
+  }
+  if (stats.near_black_ratio > 0.99 && stats.stddev < 1.5) {
+    return true;
+  }
+  if (stats.near_white_ratio > 0.99 && stats.stddev < 1.5) {
+    return true;
+  }
+  return false;
+}
+
+void force_opaque_alpha(std::vector<unsigned char> &rgba) {
+  for (size_t i = 3; i < rgba.size(); i += 4) {
+    rgba[i] = 255;
+  }
 }
 
 bool write_png_wic(const std::filesystem::path &path, unsigned int width, unsigned int height,
@@ -432,7 +512,9 @@ int capture(SPOUTHANDLE spout, const Options &options) {
   unsigned int height = 0;
   HANDLE handle = nullptr;
   DWORD format = 0;
-  bool received = false;
+  bool received_any = false;
+  bool received_valid = false;
+  FrameStats last_stats;
   while (std::chrono::steady_clock::now() < deadline) {
     spout->GetSenderInfo(selection.name.c_str(), width, height, handle, format);
     if (width == 0 || height == 0) {
@@ -441,14 +523,25 @@ int capture(SPOUTHANDLE spout, const Options &options) {
     }
     pixels.assign(static_cast<size_t>(width) * static_cast<size_t>(height) * 4, 0);
     if (spout->ReceiveImage(pixels.data(), GL_RGBA, false, 0)) {
-      received = true;
-      break;
+      received_any = true;
+      last_stats = analyze_rgba_frame(pixels, width, height);
+      if (!is_blank_frame(last_stats)) {
+        force_opaque_alpha(pixels);
+        received_valid = true;
+        break;
+      }
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(30));
   }
-  if (!received) {
+  if (!received_any) {
     print_error("capture_timeout",
                 "Spoutフレームを取得できませんでした。VRChat Stream Cameraとsender設定を確認してください。",
+                selection.senders);
+    return 3;
+  }
+  if (!received_valid) {
+    print_error("capture_blank_frame",
+                "Spoutフレームは取得できましたが、timeout内に有効な映像になりませんでした。VRChat Stream Cameraの映像が表示されているか確認してください。",
                 selection.senders);
     return 3;
   }

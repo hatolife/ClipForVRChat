@@ -326,13 +326,21 @@ func captureStreamFrameWithSpout(ctx context.Context, cfg AutoCaptureStreamConfi
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
 		return SpoutCaptureResult{}, err
 	}
+	tempOutputPath := outputPath + ".tmp"
+	_ = os.Remove(tempOutputPath)
+	cleanupTemp := true
+	defer func() {
+		if cleanupTemp {
+			_ = os.Remove(tempOutputPath)
+		}
+	}()
 	commandCtx, cancel := context.WithTimeout(ctx, timeout+5*time.Second)
 	defer cancel()
-	args := []string{"--capture", "--output", outputPath, "--timeout-ms", fmt.Sprintf("%d", timeout.Milliseconds())}
+	args := []string{"--capture", "--output", tempOutputPath, "--timeout-ms", fmt.Sprintf("%d", timeout.Milliseconds())}
 	if strings.TrimSpace(cfg.SpoutSenderName) != "" && !cfg.SpoutAutoSelect {
 		args = append(args, "--sender", cfg.SpoutSenderName)
 	}
-	diagAutoCapture(logPath, "spout capture begin: helper=%q args=%q output=%q sender=%q auto_select=%t timeout_ms=%d os=%s", helper, strings.Join(args, " "), outputPath, cfg.SpoutSenderName, cfg.SpoutAutoSelect, timeout.Milliseconds(), runtime.GOOS)
+	diagAutoCapture(logPath, "spout capture begin: helper=%q args=%q output=%q temp_output=%q sender=%q auto_select=%t timeout_ms=%d os=%s", helper, strings.Join(args, " "), outputPath, tempOutputPath, cfg.SpoutSenderName, cfg.SpoutAutoSelect, timeout.Milliseconds(), runtime.GOOS)
 	cmd := exec.CommandContext(commandCtx, helper, args...) // #nosec G204 -- local helper path from config or release folder.
 	output, err := cmd.CombinedOutput()
 	trimmed := trimCommandOutput(output)
@@ -361,14 +369,22 @@ func captureStreamFrameWithSpout(ctx context.Context, cfg AutoCaptureStreamConfi
 		return result, errors.New(result.Message)
 	}
 	if result.OutputPath == "" {
-		result.OutputPath = outputPath
+		result.OutputPath = tempOutputPath
 	}
-	stats, err := validateCapturedImage(outputPath)
+	stats, err := validateCapturedImage(tempOutputPath)
 	if err != nil {
-		diagAutoCapture(logPath, "spout capture invalid image: output=%q err=%v", outputPath, err)
+		diagAutoCapture(logPath, "spout capture invalid image: output=%q temp_output=%q err=%v sender=%q width=%d height=%d frame=%d captured_at=%q stats_format=%q stats_width=%d stats_height=%d samples=%d mean=%.2f stddev=%.2f near_white=%.4f near_black=%.4f transparent=%.4f", outputPath, tempOutputPath, err, result.SenderName, result.Width, result.Height, result.Frame, result.CapturedAt, stats.Format, stats.Width, stats.Height, stats.Samples, stats.Mean, stats.Stddev, stats.NearWhiteRatio, stats.NearBlackRatio, stats.TransparentRatio)
 		return result, err
 	}
-	diagAutoCapture(logPath, "spout capture success: output=%q sender=%q width=%d height=%d frame=%d captured_at=%q stats_format=%q stats_width=%d stats_height=%d samples=%d mean=%.2f stddev=%.2f near_white=%.4f near_black=%.4f transparent=%.4f", outputPath, result.SenderName, result.Width, result.Height, result.Frame, result.CapturedAt, stats.Format, stats.Width, stats.Height, stats.Samples, stats.Mean, stats.Stddev, stats.NearWhiteRatio, stats.NearBlackRatio, stats.TransparentRatio)
+	if err := os.Remove(outputPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return result, fmt.Errorf("取得画像の保存先を更新できません: %w", err)
+	}
+	if err := os.Rename(tempOutputPath, outputPath); err != nil {
+		return result, fmt.Errorf("取得画像を確定できません: %w", err)
+	}
+	cleanupTemp = false
+	result.OutputPath = outputPath
+	diagAutoCapture(logPath, "spout capture success: output=%q temp_output=%q sender=%q width=%d height=%d frame=%d captured_at=%q stats_format=%q stats_width=%d stats_height=%d samples=%d mean=%.2f stddev=%.2f near_white=%.4f near_black=%.4f transparent=%.4f", outputPath, tempOutputPath, result.SenderName, result.Width, result.Height, result.Frame, result.CapturedAt, stats.Format, stats.Width, stats.Height, stats.Samples, stats.Mean, stats.Stddev, stats.NearWhiteRatio, stats.NearBlackRatio, stats.TransparentRatio)
 	return result, nil
 }
 

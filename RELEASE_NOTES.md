@@ -33,6 +33,7 @@
 - Spout helperのPNG書き出しでWindows WIC PNG encoderがRGBA pixel formatを受け付けず、Stream方式テスト撮影が `PNG encoder does not support RGBA` で失敗する問題を修正しました。
 - 自動撮影後にUser Cameraの状態をできるだけ元へ戻す復元処理を追加しました。撮影前に受信したUser Camera OSCのMode、Pose、Streaming、SmoothMovement、Zoom、Exposure、mask類などを優先し、受信できない項目は設定画面末尾付近のフォールバック値を使います。撮影失敗やキャンセルでも、OSC接続が開けた後なら復元処理を試みます。
 - Stream方式でVRChatへStream Camera/Spout ONを送った直後、Spout sender生成が間に合わず `Spout senderがありません` で即失敗する問題を修正しました。Spout helperはtimeout内でsender出現を待ち、自動撮影側も各shotのSpout取得直前にStream起動OSCを再送します。
+- Stream方式でSpout起動直後の空フレームを透明PNGとして保存し、`取得画像がほぼ透明です` で失敗する問題を修正しました。Spout helperは非空の有効フレームまでtimeout内で待ち、アプリ側は検証成功後だけ最終ファイル名へ確定するため、失敗画像が自動処理やDiscord投稿へ流れにくくなりました。
 
 ### 既知の制限
 

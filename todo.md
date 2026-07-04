@@ -1,8 +1,12 @@
-# rc26後のSpout sender待機修正チェックリスト
+# rc26透明Spoutフレーム修正チェックリスト
 
-- [x] Spout senderなし即失敗のissueを作成する
-- [x] Spout helperでsender出現をtimeout内で待つ
-- [x] Stream撮影直前にMode/Streamingを補助再送する
+- [x] 透明PNGの現物とログを確認する
+- [x] issueを作成する
+- [x] Spout helperで有効フレームまで待つ
+- [x] 取得画像を不透明PNGへ正規化する
+- [x] Go側で一時ファイル検証後に最終保存する
+- [x] 情報画面の他所取得ファイル注意文を削除する
+- [x] 診断zip暗号化テストの時刻揺らぎを直す
 - [x] テストと静的チェックを実行する
-- [x] 変更をコミットしてpushする
-- [x] rcを作成してRelease workflowを確認する
+- [ ] 変更をコミットしてpushする
+- [ ] rcを作成してRelease workflowを確認する

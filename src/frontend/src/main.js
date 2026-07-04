@@ -1582,7 +1582,7 @@ const vueApp = createApp({
         </dl>
         <section class="about-note">
           <h3>公式の配布場所</h3>
-          <p>公式の配布場所は下記のみです。他で取得したファイルについては、内容や安全性に責任を取れません。</p>
+          <p>公式の配布場所は下記のみです。</p>
           <ul>
             <li><button class="link-button inline" @click="openURL(latestReleaseUrl)">GitHub - https://github.com/hatolife/ClipForVRChat/releases/latest</button></li>
             <li><button class="link-button inline" @click="openURL(boothUrl)">BOOTH - https://hatolife.booth.pm/items/8531663</button></li>

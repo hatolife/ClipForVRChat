@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
+	"github.com/ProtonMail/go-crypto/openpgp/packet"
 	"github.com/hatolife/ClipForVRChat/internal/appcore"
 )
 
@@ -822,7 +823,9 @@ func TestDiagnosticZipDoesNotIncludeOutputImages(t *testing.T) {
 		}
 	}
 
-	entity, err := openpgp.NewEntity("Diagnostic Test", "", "diagnostic@example.test", nil)
+	entity, err := openpgp.NewEntity("Diagnostic Test", "", "diagnostic@example.test", &packet.Config{
+		Time: func() time.Time { return time.Now().Add(-time.Hour) },
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
