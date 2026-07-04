@@ -16,7 +16,6 @@
 | 141 | [自動撮影構図UIへ `player_local` を統合する](141-integrate-player-local-coordinate-ui.md) | 要確認 | `v0.1.8` | 構図設定、現在Pose保存/追加、リセット、移動、テスト撮影を座標系に対応させる。 |
 | 166 | [v0.1.8-rc13作成可能状態まで未完了項目を解消する](166-prepare-v018-rc13-readiness.md) | 要確認 | `v0.1.8` | RC13作成前に未完了issueを実装・検証し、残課題を再チケット化する。 |
 | 171 | [Spout helperを本体exeへ埋め込み単一exe配布にする](171-embed-spout-helper-single-exe-release.md) | 要確認 | `v0.1.8` | C案採用に基づき、通常利用者向けReleaseを単一exe主導線へ戻し、分離版zipも検証用に残す。 |
-| 172 | [player_local基準Poseの挙動を見直す](172-clarify-or-redesign-player-local-basis-behavior.md) | 要対応 | 未定 | `player_local` が自動追従ではなく手動基準Pose方式であるため、初期構図とUI説明の期待ズレを解消する。 |
 | 173 | [専用アバターギミックOSCでHips/avatar基準Poseを自動取得する](173-implement-avatar-osc-basis-bridge.md) | 要確認 | `v0.1.8` | YL-ATG方式を参考に、専用アバターギミックからOSCでHips/avatar基準Poseを受け取り `player_local` basisへ使う機能を実装する。 |
 | 175 | [CIでアバターギミック元ファイルzipを配布する](175-package-avatar-gimmick-source-zip.md) | 要確認 | `v0.1.8-rc17` | `Assets/PoppoWorks/AvatarBeacon/...` に配置したPrefab等をCIで元ファイルzip化し、`.unitypackage` は手作業で作成してGitHub Releaseへ添付する。 |
 | 176 | [YL-ATGを参考にAvatarBeaconアバターギミックを作成する](176-create-clipforvrchat-avatar-gimmick-from-yl-atg-reference.md) | 要確認 | `v0.1.8-rc24` | ユーザー配置済みのATG_ForAvatar packageを参考に汎用アバターギミックAvatarBeaconを作成し、`coord/*` と `forward/*` の汎用OSC parameter、YL-ATG由来部分のMITライセンス表記、stale診断、10秒ごとのOSC summaryログ、`avatar_osc` 初期値化、受信器維持、受信状態の自動更新とyaw表示を整備する。 |
@@ -32,11 +31,12 @@
 | 187 | [カメラ未起動/起動直後のStream Camera Spout取得を安定化する](187-stream-camera-start-and-blank-spout-frame-diagnostics.md) | 要確認 | 未定 | Streamingの互換OSC送信とblank-frame統計ログで、Stream Camera/Spout取得失敗を切り分ける。 |
 | 188 | [別パス/別バージョンを含めてClipForVRChatを単一起動にする](188-global-single-instance-across-install-paths.md) | 要確認 | `v0.1.8` | OSC port競合を避けるため、配置パスやバージョンが違っても単一起動にし、既存を閉じる/アクティブ化する選択肢を出す。 |
 | 189 | [VRChatから受信したOSCを他アプリ向けに別ポートへ転送できるようにする](189-forward-vrchat-osc-to-secondary-ports.md) | 要確認 | `v0.1.8` | ClipForVRChatが代表して受信したVRChat OSC packetを設定した別ポートへ転送し、他OSC受信アプリとのポート競合を避ける。 |
-| 191 | [UI上のすべてのボタンにマウスオーバー説明を追加する](191-add-hover-descriptions-to-all-ui-buttons.md) | 要対応 | 未定 | すべてのUIボタンに、機能・対象・注意点が分かるマウスオーバー説明を追加する。 |
+| 191 | [UI上のすべてのボタンにマウスオーバー説明を追加する](191-add-hover-descriptions-to-all-ui-buttons.md) | 要確認 | `v0.1.8` | すべてのUIボタンに、機能・対象・注意点が分かるマウスオーバー説明を追加する。 |
 | 192 | [OSCタブに送受信OSCのリアルタイムログ表示を追加する](192-add-realtime-osc-log-panel-to-osc-tab.md) | 要確認 | `v0.1.8-rc34` | OSCタブ最下部に送受信/forwardの一時リアルタイムログを表示し、正規表現フィルタとコピー機能を追加する。 |
-| 195 | [AvatarBeaconのOSC送信頻度と負荷影響を評価し、送信頻度を設定可能にする](195-evaluate-avatarbeacon-osc-send-rate-and-rate-limit.md) | 要対応 | 未定 | AvatarBeaconの実OSC送信頻度、OSC大量送信の悪影響、1Hz/0.1Hzなど低頻度時の実用性を評価し、Unity Inspector上で送信頻度を変更できる設計を検討する。 |
+| 195 | [AvatarBeaconのOSC送信頻度と負荷影響を評価し、送信頻度を設定可能にする](195-evaluate-avatarbeacon-osc-send-rate-and-rate-limit.md) | 要確認 | `v0.1.8` | 静的確認ではPrefab側に送信頻度/レート制限のInspector項目は見当たらず、実機計測と別実装の可否検討が必要。 |
 | 196 | [設定画面タブ内の項目を概要行と詳細設定画面へ整理する](196-reorganize-settings-tab-detail-screens.md) | 要確認 | `v0.1.8` | 自動撮影タブなど長くなった設定項目を、概要行と詳細設定画面へ分けて見通しを改善する。 |
 | 197 | [開始時に撮影を初期ONにし、OSC基準確定後かつワールド移動中でない時だけ実行する](197-capture-on-start-after-avatar-osc-ready-and-world-stable.md) | 要確認 | `v0.1.8` | 開始時撮影を初期ONにし、AvatarBeacon basis ready後、かつワールド移動中でない安定状態でだけ実行する。 |
+| 199 | [rc35でStream Camera起動済みでもSpout有効映像待ちがtimeoutする](199-rc35-spout-black-frame-timeout-with-stream-camera-active.md) | 要確認 | `v0.1.8` | Stream Camera/Spout ONでsenderと1920x1080フレームは取れるが、黒フレーム扱いのままtimeoutする問題を、frame進捗/receive状態/blank統計で切り分ける。 |
 
 ## 状態の意味
 

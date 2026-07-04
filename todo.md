@@ -1,11 +1,9 @@
-# rc34作成前チェックリスト
+# 要対応issue整理チェックリスト
 
-- [x] rc30 Release workflow失敗原因を確認する
-- [x] OSC受信器停止待ちをsleepから終了通知へ変更する
-- [x] issue 190/192/193の実装差分を検証する
-- [x] rc31のCI/ReleaseがWails Build applicationで長時間停止する問題をissue化して対策する
-- [x] issue一覧とチケット本文を更新する
-- [x] 変更をコミットする
-- [x] 変更をpushする
-- [x] v0.1.8-rc34タグを作成してRelease workflowを確認する
-- [x] 残issueの保留/継続方針を整理する
+- [x] issue 172 を現行AvatarBeacon/avatar_osc仕様に合わせて整理する
+- [x] issue 191 のUIボタンhover説明を追加する
+- [x] issue 195 のAvatarBeacon OSC送信頻度評価を仕様化する
+- [x] issue 199 のrc35 Spout黒フレームtimeoutを調査・修正する
+- [x] サブエージェント成果物を監査して統合する
+- [ ] frontend/Go/doc検証を実行する
+- [ ] 変更を意味単位でコミットする
