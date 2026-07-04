@@ -31,9 +31,9 @@
 | 187 | [カメラ未起動/起動直後のStream Camera Spout取得を安定化する](187-stream-camera-start-and-blank-spout-frame-diagnostics.md) | 要確認 | 未定 | Streamingの互換OSC送信とblank-frame統計ログで、Stream Camera/Spout取得失敗を切り分ける。 |
 | 188 | [別パス/別バージョンを含めてClipForVRChatを単一起動にする](188-global-single-instance-across-install-paths.md) | 要確認 | `v0.1.8` | OSC port競合を避けるため、配置パスやバージョンが違っても単一起動にし、既存を閉じる/アクティブ化する選択肢を出す。 |
 | 189 | [VRChatから受信したOSCを他アプリ向けに別ポートへ転送できるようにする](189-forward-vrchat-osc-to-secondary-ports.md) | 要確認 | `v0.1.8` | ClipForVRChatが代表して受信したVRChat OSC packetを設定した別ポートへ転送し、他OSC受信アプリとのポート競合を避ける。 |
-| 189 | [VRChatから受信したOSCを他アプリ向けに別ポートへ転送できるようにする](189-forward-vrchat-osc-to-secondary-ports.md) | 要対応 | 未定 | ClipForVRChatが代表して受信したOSCを別ポートへ転送し、他OSC受信アプリとのポート競合を回避できるようにする。 |
 | 190 | [カメラ撮影機能終了時に一時OSC状態を確実に解除する](190-make-camera-osc-reset-streaming-compat.md) | 要対応 | 未定 | カメラOSCリセットと撮影終了時の `/usercamera/Streaming=false` などを通常のStream制御と同じbool+numeric互換送信に揃え、成否にかかわらず一時OSC状態を解除する。 |
 | 191 | [UI上のすべてのボタンにマウスオーバー説明を追加する](191-add-hover-descriptions-to-all-ui-buttons.md) | 要対応 | 未定 | すべてのUIボタンに、機能・対象・注意点が分かるマウスオーバー説明を追加する。 |
+| 192 | [OSCタブに送受信OSCのリアルタイムログ表示を追加する](192-add-realtime-osc-log-panel-to-osc-tab.md) | 要対応 | 未定 | OSCタブ最下部に送受信/forwardの一時リアルタイムログを表示し、正規表現フィルタとコピー機能を追加する。 |
 
 ## 状態の意味
 
