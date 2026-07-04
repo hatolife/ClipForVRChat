@@ -9,5 +9,5 @@
 - [x] 診断zip暗号化テストの時刻揺らぎを直す
 - [x] テストと静的チェックを実行する
 - [x] rc28 Release buildのMSVC macro衝突を直す
-- [ ] 変更をコミットしてpushする
-- [ ] rc29を作成してRelease workflowを確認する
+- [x] 変更をコミットしてpushする
+- [x] rc29を作成してRelease workflowを確認する
