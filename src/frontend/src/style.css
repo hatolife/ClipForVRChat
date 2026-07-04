@@ -463,6 +463,35 @@ small {
   gap: 8px;
 }
 
+.settings-overview-controls {
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.settings-detail-view {
+  display: grid;
+  gap: 0;
+  padding-top: 8px;
+}
+
+.settings-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 0 0 12px;
+}
+
+.settings-detail-header p {
+  margin-top: 4px;
+  color: #5b6875;
+  line-height: 1.5;
+}
+
 .inline-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1529,6 +1558,15 @@ small {
   }
 
   .auto-capture-views-header {
+    display: grid;
+  }
+
+  .settings-overview-controls {
+    justify-self: start;
+    justify-content: flex-start;
+  }
+
+  .settings-detail-header {
     display: grid;
   }
 
