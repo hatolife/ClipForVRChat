@@ -164,6 +164,7 @@
 | 167 | [Codex Security findingsを現在HEADで再検証し修正する](167-remediate-codex-security-findings-2026-07-01.md) | 完了 | `v0.1.8` | Codex Security findingsを現在HEADで再検証し、未修正または部分修正の問題だけを安全に修正する。 |
 | 169 | [Spout同梱バイナリの必要性と安全性説明を追加する](169-document-spout-binary-necessity-and-safety.md) | 完了 | `v0.1.8` | `spout-capture.exe` と `SpoutLibrary.dll` の必要性、安全性の根拠、利用者の確認観点をREADME/SPEC/Release Notesへ追記する。 |
 | 170 | [Spout同梱バイナリを単一exe配布に戻せるか調査する](170-investigate-single-exe-distribution-for-spout.md) | 完了 | 調査のみ | v0.1.8-rc13で増えた `spout-capture.exe` / `SpoutLibrary.dll` を利用者から見て単一exeへ寄せられるか調査した。 |
+| 172 | [player_local基準Poseの挙動を見直す](172-clarify-or-redesign-player-local-basis-behavior.md) | 完了 | `v0.1.8` | `player_local` の basis source を AvatarBeacon の `avatar_osc` 既定と `manual` フォールバックで整理し、README/verification docsを更新した。 |
 | 174 | [Release本文先頭にダウンロード導線を置き、通常配布zipへ必要物をまとめる](174-release-top-download-zip-with-avatar-package.md) | 完了 | `v0.1.8` | Release本文の最上部に通常配布zipへの大きなダウンロードリンクを置き、手動添付するアバターギミック用unitypackageも利用者向けに案内する。 |
 | 186 | [完了済みissueをclosedディレクトリへ移動する](186-move-completed-issues-to-closed.md) | 完了 | 整理のみ | `issues/README.md` で完了扱いのissueを `issues/closed/` へ移動し、一覧リンクを更新する。 |
 | 190 | [カメラ撮影機能終了時に一時OSC状態を確実に解除する](190-make-camera-osc-reset-streaming-compat.md) | 完了 | `v0.1.8-rc31` | カメラOSCリセットと撮影終了時の `/usercamera/Streaming=false` などを通常のStream制御と同じbool+numeric互換送信に揃え、成否にかかわらず一時OSC状態を解除する。 |

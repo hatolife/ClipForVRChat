@@ -235,6 +235,17 @@ v0.1.8では、不要機能を追加しないことよりも、YL-ATGで成立�
 `arrow` meshと用途不明な `SaveObject` は削除または置換済みです。
 残っているGameObjectは、静的監査上はparameter登録、OSC疎通デバッグ、position/forwardのContact/Constraint経路、追跡アンカーのいずれかに分類できます。
 
+## 送信頻度の扱い
+
+静的確認の範囲では、`AvatarBeacon.prefab` に送信頻度・更新周期・rate limit を Inspector から調整する項目はありません。
+現在の構成は、Contact / Constraint の変化を VRChat の Expression Parameter と OSC 出力へ乗せる方式であり、Prefab 単体で send-rate knob を持つ設計ではありません。
+
+そのため、現行版の実用設定は「既定のまま使う」です。
+低頻度化を前提にしたい場合は、AvatarBeacon 側ではなく、別の更新ゲート層を追加するか、受信側の freshness 方針で吸収する必要があります。
+
+静的確認ベースの暫定目安としては、`1 Hz` は実機評価の下限候補、`0.1 Hz` は `avatar_osc` basis としては遅すぎるため非推奨です。
+本当に送信頻度を可変にするなら、別実装で rate を持たせたうえで再評価してください。
+
 ## 実機確認項目
 
 - Unity import後、`Assets/PoppoWorks/AvatarBeacon/...` として配置される。

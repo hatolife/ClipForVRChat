@@ -46,6 +46,18 @@ AvatarBeaconの実際のOSC送信頻度と負荷を把握できる。
 - ClipForVRChat側の `avatar_osc` freshnessは短すぎる送信間隔を前提にしすぎると低頻度設定でstaleになりやすい。低頻度対応をする場合は、送信頻度設定とfreshness設定の整合が必要。
 - 単に送信頻度を下げるだけだと、撮影直前のプレイヤー位置・Head yawが古い値になり、player_local構図がずれる可能性がある。
 
+## 静的確認結果
+
+- `AvatarBeacon.prefab` には `coord/*` と `forward/*` の Expression Parameter 登録と Contact / Constraint 構成はあるが、送信頻度・更新周期・rate limit を切り替える Inspector 項目は見当たらない。
+- 現行の AvatarBeacon は、Contact / Expression Parameter の変化を VRChat の OSC 出力へ載せる構成であり、Prefab だけで send-rate knob を露出する作りではない。
+- したがって、暫定の実用設定は「既定のまま使う」であり、0.1Hz のような低頻度化は `avatar_osc` basis の用途には不向きとみなす。
+- もし送信頻度を本当に可変にしたいなら、AvatarBeacon とは別の更新ゲート層を追加する、または受信側の freshness 方針で吸収する別実装が必要になる。
+
+## まず確定したこと
+
+- 現時点のローカル静的確認は完了した。
+- 実際の packet rate、VRChat 本体負荷、他 OSC 受信アプリへの影響、1Hz / 0.1Hz の実機適性は、VRChat 実機での測定が必要である。
+
 ## 検証観点
 
 - VRChat実機でOSC MonitorまたはClipForVRChatのOSCログUIを使い、1秒あたりの受信件数を測る。

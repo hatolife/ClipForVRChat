@@ -60,6 +60,17 @@ OSCが届かない場合は、VRChatの `Options > OSC > Reset OSC Config` を�
 ClipForVRChatのログsummaryに `coord/*` または `forward/*` が出るか確認すると、OSC送信経路とAvatarBeaconのbasis parameter出力を切り分けやすくなります。
 Avatar Dynamics Contact / Avatar Interactions が無効な場合も値が変化しない可能性があります。
 
+## 送信頻度
+
+静的確認の範囲では、このPrefabに送信頻度やrate limitを Inspector から変える項目はありません。
+現行の AvatarBeacon は、Contact / Constraint の変化を VRChat の Expression Parameter と OSC 出力へ流す構成であり、Prefab単体で送信周期を持つ設計ではありません。
+
+そのため、今の実用設定は「既定のまま使う」です。
+低頻度化を前提にするなら、AvatarBeacon ではなく別の更新ゲート層か、受信側の freshness 方針で調整してください。
+
+静的確認ベースの暫定目安としては、`1 Hz` は実機で試す下限候補、`0.1 Hz` は `avatar_osc` basis には遅すぎるため非推奨です。
+送信頻度を本当に可変にしたい場合は、Prefabとは別の実装を追加してから再評価してください。
+
 ## 検証限界
 
 この作業環境では Unity Editor / VRChat 実機を起動しての import と動作確認までは行っていません。
