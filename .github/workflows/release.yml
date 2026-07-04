@@ -154,7 +154,7 @@ jobs:
           APP_VERSION: ${{ steps.version.outputs.version }}
           APP_REVISION: ${{ steps.version.outputs.revision }}
           APP_RELEASE_TIME: ${{ steps.version.outputs.release_time }}
-        run: wails build -v 2 -webview2 browser -tags embeddedspout -ldflags "-X main.version=$env:APP_VERSION -X main.revision=$env:APP_REVISION -X main.releaseTime=$env:APP_RELEASE_TIME -X main.buildChannel=release"
+        run: wails build -v 2 -m -nosyncgomod -webview2 browser -tags embeddedspout -ldflags "-X main.version=$env:APP_VERSION -X main.revision=$env:APP_REVISION -X main.releaseTime=$env:APP_RELEASE_TIME -X main.buildChannel=release"
 
       - name: Prepare package directory
         shell: pwsh
