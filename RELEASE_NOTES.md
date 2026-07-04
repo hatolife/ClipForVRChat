@@ -39,6 +39,9 @@ AvatarBeaconを使う場合は、同じReleaseに手動添付される `AvatarBe
 - 自動撮影後にUser Cameraの状態をできるだけ元へ戻す復元処理を追加しました。撮影前に受信したUser Camera OSCのMode、Pose、Streaming、SmoothMovement、Zoom、Exposure、mask類などを優先し、受信できない項目は設定画面末尾付近のフォールバック値を使います。撮影失敗やキャンセルでも、OSC接続が開けた後なら復元処理を試みます。
 - Stream方式でVRChatへStream Camera/Spout ONを送った直後、Spout sender生成が間に合わず `Spout senderがありません` で即失敗する問題を修正しました。Spout helperはtimeout内でsender出現を待ち、自動撮影側も各shotのSpout取得直前にStream起動OSCを再送します。
 - Stream方式でSpout起動直後の空フレームを透明PNGとして保存し、`取得画像がほぼ透明です` で失敗する問題を修正しました。Spout helperは非空の有効フレームまでtimeout内で待ち、アプリ側は検証成功後だけ最終ファイル名へ確定するため、失敗画像が自動処理やDiscord投稿へ流れにくくなりました。
+- 別フォルダや別バージョンのClipForVRChatを同じWindowsユーザー環境で同時起動しようとした場合も、単一起動制御が働くようにしました。後から起動した側では、既存を閉じて新規起動するか、既存ウィンドウを表示して新規起動を終了するかを選べます。管理者権限での起動は本体初期化前に拒否します。
+- 設定画面に「OSC」タブを追加し、OSC送受信ポート、カメラOSCリセット、AvatarBeacon受信状態、player_local basis取得元をまとめました。
+- VRChatから受信したOSC packetを、他アプリ向けの別UDPポートへ転送できるようにしました。ClipForVRChatがVRChat出力OSCポートを代表してlistenし、他アプリ側は設定した転送先ポートをlistenすることでポート競合を避けられます。
 
 ### 既知の制限
 
@@ -46,6 +49,7 @@ AvatarBeaconを使う場合は、同じReleaseに手動添付される `AvatarBe
 - `avatar_osc` basisはpositionがHips基準、yawがHead基準であり、player root基準そのものではありません。専用アバターギミック未導入、OSC無効、parameter欠落、鮮度切れの場合は撮影前に失敗します。
 - AvatarBeacon の `.unitypackage` は CI では作らず、手作業で作成して Release に添付します。source zip は再生成・検証用の配布物です。
 - output log由来のユーザー一覧やworld/instance情報は、VRChatログの内容によって取得できない場合があります。
+- OSC転送は、他アプリ側の受信ポートを変更できる場合の競合回避策です。他アプリがVRChat標準の受信ポート固定で変更できない場合、この機能では競合を解消できません。UDP転送のため、転送先アプリが実際に受信したことまでは保証しません。
 - Camera Dolly Multi、解像度一時変更、SQLiteローカルDB、OSCQuery自動検出はv0.1.8の対象外です。v0.1.8ではsidecar JSONと履歴JSONを正本/索引として扱います。
 
 ### ダウンロード
