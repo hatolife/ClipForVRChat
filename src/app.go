@@ -51,11 +51,16 @@ type App struct {
 	oscReceiverLogPath    string
 	oscReceiverForwardKey string
 	oscReceiverSeq        uint64
+	oscReceiverDone       chan struct{}
 	latestPose            appcore.CameraPoseConfig
 	poseAt                time.Time
 	userCameraSamples     map[string]userCameraOSCSample
 	latestAvatarOSCBasis  avatarOSCBasisState
 	avatarOSCBasisSamples map[string]avatarOSCBasisSample
+	oscLogEntries         []OSCLogEntry
+	oscLogSeq             uint64
+	oscLogLastEmit        time.Time
+	oscTraceCleanup       func()
 	mu                    sync.Mutex
 }
 
@@ -97,6 +102,19 @@ type PlayerLocalBasisSnapshot struct {
 	LastReceivedAt      string                   `json:"lastReceivedAt,omitempty"`
 }
 
+type OSCLogEntry struct {
+	Seq       uint64 `json:"seq"`
+	Time      string `json:"time"`
+	Direction string `json:"direction"`
+	Address   string `json:"address,omitempty"`
+	TypeTags  string `json:"typeTags,omitempty"`
+	Values    string `json:"values,omitempty"`
+	Remote    string `json:"remote,omitempty"`
+	Target    string `json:"target,omitempty"`
+	Status    string `json:"status,omitempty"`
+	Error     string `json:"error,omitempty"`
+}
+
 type AppInfo struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
@@ -129,6 +147,7 @@ func (a *App) startup(ctx context.Context) {
 	defer a.mu.Unlock()
 	a.ctx = ctx
 	a.logLifecycleLocked("startup begin: mode=%q config_path=%q", a.state.Mode, a.configPath)
+	a.startOSCTraceLocked()
 	a.logStartupLocked()
 	a.restartCameraPoseReceiverLocked(a.state.Config)
 	if a.state.Mode == appcore.ModeResults {
@@ -157,6 +176,7 @@ func (a *App) shutdown(ctx context.Context) {
 	defer a.mu.Unlock()
 	a.logLifecycleLocked("shutdown begin: auto_capture_osc=%t auto_photo=%t", a.oscCancel != nil, a.autoCancel != nil)
 	a.stopBackgroundTasksLocked()
+	a.stopOSCTraceLocked()
 	a.logLifecycleLocked("shutdown complete")
 }
 
@@ -216,6 +236,12 @@ func (a *App) GetAppInfo() AppInfo {
 		Version: appVersion(),
 		GitHub:  githubURL,
 	}
+}
+
+func (a *App) GetOSCLogEntries() []OSCLogEntry {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return append([]OSCLogEntry(nil), a.oscLogEntries...)
 }
 
 func (a *App) OpenURL(rawURL string) error {
@@ -1499,7 +1525,9 @@ func (a *App) restartCameraPoseReceiverLocked(cfg appcore.Config) {
 	a.oscReceiverForwardKey = forwardKey
 	a.oscReceiverSeq++
 	seq := a.oscReceiverSeq
-	go a.runCameraPoseReceiver(ctx, seq, host, port, cfg.AutoCapture.PlayerLocal.BasisSource, logPath)
+	done := make(chan struct{})
+	a.oscReceiverDone = done
+	go a.runCameraPoseReceiver(ctx, seq, host, port, cfg.AutoCapture.PlayerLocal.BasisSource, logPath, done)
 }
 
 func (a *App) stopCameraPoseReceiverLocked() {
@@ -1512,6 +1540,7 @@ func (a *App) stopCameraPoseReceiverLocked() {
 	a.oscReceiverPort = 0
 	a.oscReceiverLogPath = ""
 	a.oscReceiverForwardKey = ""
+	a.oscReceiverDone = nil
 	a.oscReceiverSeq++
 }
 
@@ -1536,7 +1565,10 @@ func cameraPoseReceiverEndpoint(cfg appcore.Config) (string, int) {
 	return host, port
 }
 
-func (a *App) runCameraPoseReceiver(ctx context.Context, seq uint64, host string, port int, basisSource string, logPath string) {
+func (a *App) runCameraPoseReceiver(ctx context.Context, seq uint64, host string, port int, basisSource string, logPath string, done chan struct{}) {
+	if done != nil {
+		defer close(done)
+	}
 	defer a.finishCameraPoseReceiver(seq)
 	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", host, port))
 	if err != nil {
@@ -1550,7 +1582,7 @@ func (a *App) runCameraPoseReceiver(ctx context.Context, seq uint64, host string
 	}
 	defer conn.Close()
 	appcore.AppendDiagnosticLog(logPath, "auto-capture osc receiver start: addr=%s basis_source=%q", addr.String(), basisSource)
-	forwarder := newOSCForwarder(a.state.Config.AutoCapture.OSC, addr, logPath)
+	forwarder := newOSCForwarder(a.state.Config.AutoCapture.OSC, addr, logPath, a.recordOSCLogEvent)
 	defer forwarder.Close()
 	go func() {
 		<-ctx.Done()
@@ -1572,11 +1604,26 @@ func (a *App) runCameraPoseReceiver(ctx context.Context, seq uint64, host string
 		address, typeTags, payload, ok := appcore.ParseOSCPacket(packet)
 		if !ok {
 			appcore.AppendDiagnosticLog(logPath, "auto-capture osc received invalid: remote=%q bytes=%d hex_preview=%q", oscRemoteAddrString(remoteAddr), n, hexPreview(packet, 96))
+			a.recordOSCLogEvent(OSCLogEntry{
+				Direction: "receive",
+				Remote:    oscRemoteAddrString(remoteAddr),
+				Status:    "invalid",
+				Error:     "invalid OSC packet",
+				Values:    hexPreview(packet, 96),
+			})
 			forwarder.Forward(packet, "", false)
 			continue
 		}
 		now := time.Now()
 		handledByClipForVRChat := false
+		a.recordOSCLogEvent(OSCLogEntry{
+			Direction: "receive",
+			Address:   address,
+			TypeTags:  typeTags,
+			Values:    formatOSCLogValues(typeTags, payload),
+			Remote:    oscRemoteAddrString(remoteAddr),
+			Status:    "ok",
+		})
 		if sample, ok := appcore.DecodeOSCUserCameraSample(address, typeTags, payload); ok {
 			handledByClipForVRChat = true
 			a.mu.Lock()
@@ -1630,6 +1677,7 @@ type oscForwarder struct {
 	mode    string
 	targets []oscForwardTarget
 	logPath string
+	trace   func(OSCLogEntry)
 
 	forwarded uint64
 	errors    uint64
@@ -1643,11 +1691,12 @@ type oscForwardTarget struct {
 	conn  *net.UDPConn
 }
 
-func newOSCForwarder(cfg appcore.AutoCaptureOSCConfig, receiveAddr *net.UDPAddr, logPath string) *oscForwarder {
+func newOSCForwarder(cfg appcore.AutoCaptureOSCConfig, receiveAddr *net.UDPAddr, logPath string, trace func(OSCLogEntry)) *oscForwarder {
 	cfg.Forward.Normalize()
 	forwarder := &oscForwarder{
 		mode:    cfg.Forward.Mode,
 		logPath: logPath,
+		trace:   trace,
 	}
 	if !cfg.Forward.Enabled {
 		appcore.AppendDiagnosticLog(logPath, "auto-capture osc forward disabled")
@@ -1687,6 +1736,12 @@ func (f *oscForwarder) Forward(packet []byte, address string, handledByClipForVR
 		return
 	}
 	if f.mode == appcore.OSCForwardModeUnhandledOnly && handledByClipForVRChat {
+		f.emit(OSCLogEntry{
+			Direction: "forward",
+			Address:   address,
+			Status:    "skipped",
+			Error:     "handled_by_clipforvrchat",
+		})
 		f.logSummary(address)
 		return
 	}
@@ -1694,11 +1749,31 @@ func (f *oscForwarder) Forward(packet []byte, address string, handledByClipForVR
 		if _, err := target.conn.Write(packet); err != nil {
 			atomic.AddUint64(&f.errors, 1)
 			f.lastError.Store(fmt.Sprintf("target=%s address=%s err=%v", target.label, address, err))
+			f.emit(OSCLogEntry{
+				Direction: "forward",
+				Address:   address,
+				Target:    target.label,
+				Status:    "error",
+				Error:     err.Error(),
+			})
 			continue
 		}
 		atomic.AddUint64(&f.forwarded, 1)
+		f.emit(OSCLogEntry{
+			Direction: "forward",
+			Address:   address,
+			Target:    target.label,
+			Status:    "ok",
+		})
 	}
 	f.logSummary(address)
+}
+
+func (f *oscForwarder) emit(entry OSCLogEntry) {
+	if f == nil || f.trace == nil {
+		return
+	}
+	f.trace(entry)
 }
 
 func (f *oscForwarder) Close() {
@@ -1742,6 +1817,62 @@ func sameOSCForwardEndpoint(a *net.UDPAddr, b *net.UDPAddr) bool {
 	return a.IP.Equal(b.IP)
 }
 
+func (a *App) recordOSCLogEvent(entry OSCLogEntry) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.recordOSCLogEventLocked(entry)
+}
+
+func (a *App) recordOSCLogEventLocked(entry OSCLogEntry) {
+	a.oscLogSeq++
+	entry.Seq = a.oscLogSeq
+	if strings.TrimSpace(entry.Time) == "" {
+		entry.Time = time.Now().Format("15:04:05.000")
+	}
+	if strings.TrimSpace(entry.Status) == "" {
+		entry.Status = "ok"
+	}
+	a.oscLogEntries = append(a.oscLogEntries, entry)
+	const maxOSCLogEntries = 500
+	if len(a.oscLogEntries) > maxOSCLogEntries {
+		a.oscLogEntries = append([]OSCLogEntry(nil), a.oscLogEntries[len(a.oscLogEntries)-maxOSCLogEntries:]...)
+	}
+	if a.ctx == nil || runningGoTest {
+		return
+	}
+	now := time.Now()
+	if !a.oscLogLastEmit.IsZero() && now.Sub(a.oscLogLastEmit) < 250*time.Millisecond {
+		return
+	}
+	a.oscLogLastEmit = now
+	emitWailsEvent(a.ctx, "osc-log:entries", append([]OSCLogEntry(nil), a.oscLogEntries...))
+}
+
+func (a *App) startOSCTraceLocked() {
+	if a.oscTraceCleanup != nil {
+		return
+	}
+	a.oscTraceCleanup = appcore.SetOSCTraceHandler(func(event appcore.OSCTraceEvent) {
+		a.recordOSCLogEvent(OSCLogEntry{
+			Direction: event.Direction,
+			Address:   event.Address,
+			TypeTags:  event.TypeTags,
+			Values:    formatOSCLogValues(event.TypeTags, event.Payload),
+			Target:    event.Target,
+			Status:    event.Status,
+			Error:     event.Error,
+		})
+	})
+}
+
+func (a *App) stopOSCTraceLocked() {
+	if a.oscTraceCleanup == nil {
+		return
+	}
+	a.oscTraceCleanup()
+	a.oscTraceCleanup = nil
+}
+
 func (a *App) appendAvatarOSCSummaryLocked(logPath string, now time.Time) {
 	snapshot := a.latestAvatarOSCBasisSnapshotLocked(a.state.Config, now)
 	appcore.AppendDiagnosticLog(
@@ -1772,6 +1903,7 @@ func (a *App) finishCameraPoseReceiver(seq uint64) {
 	a.oscReceiverHost = ""
 	a.oscReceiverPort = 0
 	a.oscReceiverLogPath = ""
+	a.oscReceiverDone = nil
 	a.oscReceiverSeq++
 }
 

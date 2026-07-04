@@ -166,3 +166,4 @@
 | 170 | [Spout同梱バイナリを単一exe配布に戻せるか調査する](170-investigate-single-exe-distribution-for-spout.md) | 完了 | 調査のみ | v0.1.8-rc13で増えた `spout-capture.exe` / `SpoutLibrary.dll` を利用者から見て単一exeへ寄せられるか調査した。 |
 | 174 | [Release本文先頭にダウンロード導線を置き、通常配布zipへ必要物をまとめる](174-release-top-download-zip-with-avatar-package.md) | 完了 | `v0.1.8` | Release本文の最上部に通常配布zipへの大きなダウンロードリンクを置き、手動添付するアバターギミック用unitypackageも利用者向けに案内する。 |
 | 186 | [完了済みissueをclosedディレクトリへ移動する](186-move-completed-issues-to-closed.md) | 完了 | 整理のみ | `issues/README.md` で完了扱いのissueを `issues/closed/` へ移動し、一覧リンクを更新する。 |
+| 190 | [カメラ撮影機能終了時に一時OSC状態を確実に解除する](190-make-camera-osc-reset-streaming-compat.md) | 完了 | `v0.1.8-rc31` | カメラOSCリセットと撮影終了時の `/usercamera/Streaming=false` などを通常のStream制御と同じbool+numeric互換送信に揃え、成否にかかわらず一時OSC状態を解除する。 |

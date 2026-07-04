@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"math"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -151,6 +153,263 @@ func TestResetUserCameraOSCRejectsBadPort(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected OSC open error")
 	}
+}
+
+func TestResetUserCameraOSCUsesStreamingCompatAndKeepsOtherSettingsUntouched(t *testing.T) {
+	conn, port := listenOSCUserCameraPackets(t)
+	defer conn.Close()
+
+	cfg := DefaultConfig()
+	cfg.AutoCapture.OSC.Host = "127.0.0.1"
+	cfg.AutoCapture.OSC.SendPort = port
+
+	if err := ResetUserCameraOSC(nil, cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	samples := readOSCPacketSamples(t, conn)
+	if len(samples) != 5 {
+		t.Fatalf("packet count = %d, want 5: %+v", len(samples), samples)
+	}
+
+	want := []struct {
+		address string
+		boolVal *bool
+		intVal  *int
+	}{
+		{address: "/usercamera/Capture", boolVal: boolPtr(false)},
+		{address: "/usercamera/Close", boolVal: boolPtr(false)},
+		{address: "/usercamera/Streaming", boolVal: boolPtr(false)},
+		{address: "/usercamera/Streaming", intVal: intPtr(0)},
+		{address: "/usercamera/Mode", intVal: intPtr(0)},
+	}
+	for i, sample := range samples {
+		if sample.Address != want[i].address {
+			t.Fatalf("packet[%d].address = %q, want %q", i, sample.Address, want[i].address)
+		}
+		if want[i].boolVal != nil {
+			if !sample.HasBool || sample.Bool != *want[i].boolVal {
+				t.Fatalf("packet[%d] bool = %+v, want %t", i, sample, *want[i].boolVal)
+			}
+			continue
+		}
+		if !sample.HasInt || sample.Int != *want[i].intVal {
+			t.Fatalf("packet[%d] int = %+v, want %d", i, sample, *want[i].intVal)
+		}
+	}
+}
+
+func TestSendCameraButtonReleasesOnCancellation(t *testing.T) {
+	conn, port := listenOSCUserCameraPackets(t)
+	defer conn.Close()
+
+	client := oscClient{host: "127.0.0.1", port: port}
+	if err := client.open(); err != nil {
+		t.Fatal(err)
+	}
+	defer client.close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if err := sendCameraButton(ctx, client, "/usercamera/Capture", 25, "", "cancel_test"); err == nil {
+		t.Fatal("expected cancellation error")
+	}
+
+	samples := readOSCPacketSamples(t, conn)
+	if len(samples) != 2 {
+		t.Fatalf("packet count = %d, want 2: %+v", len(samples), samples)
+	}
+	if samples[0].Address != "/usercamera/Capture" || !samples[0].HasBool || !samples[0].Bool {
+		t.Fatalf("first packet = %+v, want press true", samples[0])
+	}
+	if samples[1].Address != "/usercamera/Capture" || !samples[1].HasBool || samples[1].Bool {
+		t.Fatalf("second packet = %+v, want release false", samples[1])
+	}
+}
+
+func TestOSCTraceHandlerCapturesSendPackets(t *testing.T) {
+	conn, port := listenOSCUserCameraPackets(t)
+	defer conn.Close()
+
+	events := make(chan OSCTraceEvent, 4)
+	cleanup := SetOSCTraceHandler(func(event OSCTraceEvent) {
+		events <- event
+	})
+	defer cleanup()
+
+	client := oscClient{host: "127.0.0.1", port: port}
+	if err := client.open(); err != nil {
+		t.Fatal(err)
+	}
+	defer client.close()
+
+	if err := client.sendBool("/usercamera/Streaming", true); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case event := <-events:
+		if event.Direction != "send" || event.Address != "/usercamera/Streaming" || event.TypeTags != ",T" || event.Status != "ok" {
+			t.Fatalf("unexpected trace event: %+v", event)
+		}
+		if event.Target != fmt.Sprintf("127.0.0.1:%d", port) {
+			t.Fatalf("target = %q, want port %d", event.Target, port)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("trace event was not captured")
+	}
+}
+
+func TestAutoCaptureRunnerRunOnceReleasesStreamingOnCancellation(t *testing.T) {
+	conn, port := listenOSCUserCameraPackets(t)
+	defer conn.Close()
+
+	cfg := DefaultConfig()
+	cfg.AutoCapture.OSC.Host = "127.0.0.1"
+	cfg.AutoCapture.OSC.SendPort = port
+	cfg.AutoCapture.Restore.Enabled = false
+	cfg.AutoCapture.Capture.Mode = "stream"
+	cfg.AutoCapture.Capture.CloseCameraAfterBatch = false
+	cfg.AutoCapture.Capture.SettleDelayMS = 1500
+	cfg.AutoCapture.Stream.StartDelayMS = 0
+	cfg.AutoCapture.Stream.SpoutHelperPath = filepath.Join(t.TempDir(), "missing-spout-capture.exe")
+	cfg.AutoCapture.Output.Directory = t.TempDir()
+	cfg.AutoCapture.Presence.WatchOutputLog = false
+	cfg.AutoCapture.Views = []CameraViewConfig{{
+		ID:              "front",
+		Name:            "front",
+		Enabled:         true,
+		CoordinateSpace: "world",
+		Calibrated:      true,
+		SettleDelayMS:   2000,
+	}, {
+		ID:              "side",
+		Name:            "side",
+		Enabled:         true,
+		CoordinateSpace: "world",
+		Calibrated:      true,
+	}}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(2700*time.Millisecond, cancel)
+
+	results, err := (AutoCaptureRunner{Config: cfg}).RunOnce(ctx)
+	if err == nil {
+		t.Fatalf("RunOnce error = nil, results=%+v", results)
+	}
+	if len(results) == 0 {
+		t.Fatal("expected at least one shot result before cancellation")
+	}
+
+	samples := readOSCPacketSamples(t, conn)
+	hasStreamStart := false
+	hasStreamStop := false
+	hasStreamStartInt := false
+	hasStreamStopInt := false
+	for _, sample := range samples {
+		if sample.Address != "/usercamera/Streaming" {
+			continue
+		}
+		if sample.HasBool {
+			if sample.Bool {
+				hasStreamStart = true
+			} else {
+				hasStreamStop = true
+			}
+		}
+		if sample.HasInt {
+			switch sample.Int {
+			case 1:
+				hasStreamStartInt = true
+			case 0:
+				hasStreamStopInt = true
+			}
+		}
+	}
+	if !hasStreamStart {
+		t.Fatalf("stream start packet not found: %+v", samples)
+	}
+	if !hasStreamStop {
+		t.Fatalf("stream stop packet not found: %+v", samples)
+	}
+	if !hasStreamStartInt {
+		t.Fatalf("stream start compat int packet not found: %+v", samples)
+	}
+	if !hasStreamStopInt {
+		t.Fatalf("stream stop compat int packet not found: %+v", samples)
+	}
+}
+
+func listenOSCUserCameraPackets(t *testing.T) (net.PacketConn, int) {
+	t.Helper()
+	conn, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := conn.LocalAddr().(*net.UDPAddr)
+	return conn, addr.Port
+}
+
+type oscPacketSample struct {
+	Address  string
+	TypeTags string
+	Bool     bool
+	HasBool  bool
+	Int      int
+	HasInt   bool
+}
+
+func readOSCPacketSamples(t *testing.T, conn net.PacketConn) []oscPacketSample {
+	t.Helper()
+	samples := make([]oscPacketSample, 0, 16)
+	buf := make([]byte, 2048)
+	for {
+		if err := conn.SetReadDeadline(time.Now().Add(150 * time.Millisecond)); err != nil {
+			t.Fatal(err)
+		}
+		n, _, err := conn.ReadFrom(buf)
+		if err != nil {
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				break
+			}
+			t.Fatal(err)
+		}
+		address, typeTags, payload, ok := ParseOSCPacket(append([]byte(nil), buf[:n]...))
+		if !ok {
+			t.Fatalf("failed to parse OSC packet: %v", buf[:n])
+		}
+		sample := oscPacketSample{Address: address, TypeTags: typeTags}
+		typeTag, _ := firstOSCTag(typeTags)
+		if typeTag != 0 {
+			switch typeTag {
+			case 'T':
+				sample.HasBool = true
+				sample.Bool = true
+			case 'F':
+				sample.HasBool = true
+				sample.Bool = false
+			case 'i':
+				sample.HasInt = true
+				if len(payload) < 4 {
+					t.Fatalf("OSC int packet too short: %v", buf[:n])
+				}
+				sample.Int = int(int32(binary.BigEndian.Uint32(payload[:4])))
+			}
+		}
+		samples = append(samples, sample)
+	}
+	return samples
+}
+
+func boolPtr(value bool) *bool {
+	v := value
+	return &v
+}
+
+func intPtr(value int) *int {
+	v := value
+	return &v
 }
 
 func TestAutoCaptureOutputPath(t *testing.T) {

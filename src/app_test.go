@@ -530,7 +530,7 @@ func TestOSCForwarderForwardsPacket(t *testing.T) {
 	cfg.Forward.Mode = appcore.OSCForwardModeAll
 	cfg.Forward.Targets = []appcore.OSCForwardTarget{{Host: "127.0.0.1", Port: receiver.LocalAddr().(*net.UDPAddr).Port}}
 
-	forwarder := newOSCForwarder(cfg, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 9001}, appcore.DiagnosticLogPath(filepath.Join(t.TempDir(), "config.json")))
+	forwarder := newOSCForwarder(cfg, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 9001}, appcore.DiagnosticLogPath(filepath.Join(t.TempDir(), "config.json")), nil)
 	defer forwarder.Close()
 
 	packet := []byte("/avatar/parameters/test\x00\x00\x00\x00,T\x00\x00")
@@ -549,7 +549,7 @@ func TestOSCForwarderUnhandledOnlySkipsHandledPacket(t *testing.T) {
 	cfg.Forward.Mode = appcore.OSCForwardModeUnhandledOnly
 	cfg.Forward.Targets = []appcore.OSCForwardTarget{{Host: "127.0.0.1", Port: receiver.LocalAddr().(*net.UDPAddr).Port}}
 
-	forwarder := newOSCForwarder(cfg, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 9001}, appcore.DiagnosticLogPath(filepath.Join(t.TempDir(), "config.json")))
+	forwarder := newOSCForwarder(cfg, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 9001}, appcore.DiagnosticLogPath(filepath.Join(t.TempDir(), "config.json")), nil)
 	defer forwarder.Close()
 
 	forwarder.Forward([]byte("/avatar/parameters/test\x00\x00\x00\x00,T\x00\x00"), "/avatar/parameters/test", true)
@@ -565,11 +565,25 @@ func TestOSCForwarderSkipsSelfTarget(t *testing.T) {
 	cfg.Forward.Enabled = true
 	cfg.Forward.Targets = []appcore.OSCForwardTarget{{Host: "127.0.0.1", Port: 9001}}
 
-	forwarder := newOSCForwarder(cfg, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 9001}, appcore.DiagnosticLogPath(filepath.Join(t.TempDir(), "config.json")))
+	forwarder := newOSCForwarder(cfg, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 9001}, appcore.DiagnosticLogPath(filepath.Join(t.TempDir(), "config.json")), nil)
 	defer forwarder.Close()
 
 	if len(forwarder.targets) != 0 {
 		t.Fatalf("targets = %d, want 0", len(forwarder.targets))
+	}
+}
+
+func TestAppOSCLogEntriesAreBounded(t *testing.T) {
+	app := NewApp(filepath.Join(t.TempDir(), "config.json"), appcore.UIState{Mode: appcore.ModeResults})
+	for i := 0; i < 550; i++ {
+		app.recordOSCLogEvent(OSCLogEntry{Direction: "receive", Address: fmt.Sprintf("/test/%d", i)})
+	}
+	got := app.GetOSCLogEntries()
+	if len(got) != 500 {
+		t.Fatalf("entries = %d, want 500", len(got))
+	}
+	if got[0].Address != "/test/50" || got[len(got)-1].Address != "/test/549" {
+		t.Fatalf("unexpected ring contents: first=%q last=%q", got[0].Address, got[len(got)-1].Address)
 	}
 }
 
@@ -666,13 +680,28 @@ func TestAppRestartCameraPoseReceiverRestartsWhenForwardConfigChanges(t *testing
 	cfg.AutoCapture.OSC.Forward.Enabled = true
 	cfg.AutoCapture.OSC.Forward.Targets = []appcore.OSCForwardTarget{{Host: "127.0.0.1", Port: 9101}}
 	app.restartCameraPoseReceiverLocked(cfg)
-	defer app.stopCameraPoseReceiverLocked()
+	defer stopCameraPoseReceiverForTest(app)
 
 	if !cancelCalled {
 		t.Fatal("receiver was not canceled after forward config changed")
 	}
 	if app.oscReceiverForwardKey != oscForwardConfigKey(cfg.AutoCapture.OSC.Forward) {
 		t.Fatal("forward config key was not updated")
+	}
+}
+
+func stopCameraPoseReceiverForTest(app *App) {
+	app.mu.Lock()
+	done := app.oscReceiverDone
+	app.stopCameraPoseReceiverLocked()
+	app.mu.Unlock()
+	if done == nil {
+		return
+	}
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		panic("camera pose receiver did not stop")
 	}
 }
 

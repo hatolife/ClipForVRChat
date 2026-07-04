@@ -60,13 +60,23 @@ OSCタブの最下部に、ClipForVRChatが送受信したOSCをリアルタイ�
 - ログファイルへ出さない要件があるため、既存の `AppendDiagnosticLog` をそのまま使わない。
 - forward機能のデバッグには有用だが、送信先アプリが実際に受信したことまでは保証できない。
 
+## 実装状況
+
+- OSC送受信/forwardイベントをバックエンドのメモリリングバッファへ保持する。
+- OSCタブ表示中だけWails eventを購読し、正規表現フィルタとコピー操作をUIへ追加する。
+- User Camera OSC送信も `AppendDiagnosticLog` ではなく一時ログとして表示できるよう、appcore側にOSC trace hookを追加する。
+- 高頻度更新対策として、バックエンドからのイベント送信を250ms間隔で間引く。
+
 ## 検証観点
 
-- OSCタブを開いた状態で、AvatarBeaconのOSCやUser Camera OSCがリアルタイムに表示される。
-- OSC forward有効時に、転送先と成功/失敗が表示される。
-- OSCタブ以外にいる状態で高頻度OSCを受けてもUIが重くならない。
-- 不正な正規表現を入力してもフロントエンドエラーにならない。
-- 正規表現に一致する行だけ表示される。
-- コピーした内容が表示中のフィルタ済みログと一致する。
-- 通常の診断ログファイルにOSCイベントの逐次ログが出力されない。
-- 診断zipに一時OSCログが含まれない。
+- [ ] OSCタブを開いた状態で、AvatarBeaconのOSCやUser Camera OSCがリアルタイムに表示される。
+- [ ] OSC forward有効時に、転送先と成功/失敗が表示される。
+- [ ] OSCタブ以外にいる状態で高頻度OSCを受けてもUIが重くならない。
+- [ ] 不正な正規表現を入力してもフロントエンドエラーにならない。
+- [ ] 正規表現に一致する行だけ表示される。
+- [ ] コピーした内容が表示中のフィルタ済みログと一致する。
+- [x] 通常の診断ログファイルにOSCイベントの逐次ログが出力されない。
+- [x] 診断zipに一時OSCログが含まれない。
+- [x] `cd src && GOCACHE=/tmp/clipforvrchat-go-cache go test ./...`
+- [x] `node scripts/check-frontend-template-literals.mjs`
+- [x] `node scripts/check-wails-api-surface.mjs`

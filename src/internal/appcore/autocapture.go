@@ -15,8 +15,50 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
+
+type OSCTraceEvent struct {
+	Direction string
+	Address   string
+	TypeTags  string
+	Payload   []byte
+	Target    string
+	Status    string
+	Error     string
+}
+
+var oscTraceMu sync.RWMutex
+var oscTraceHandler func(OSCTraceEvent)
+var oscTraceHandlerID uint64
+
+func SetOSCTraceHandler(handler func(OSCTraceEvent)) func() {
+	oscTraceMu.Lock()
+	previous := oscTraceHandler
+	previousID := oscTraceHandlerID
+	oscTraceHandlerID++
+	id := oscTraceHandlerID
+	oscTraceHandler = handler
+	oscTraceMu.Unlock()
+	return func() {
+		oscTraceMu.Lock()
+		if oscTraceHandlerID == id {
+			oscTraceHandler = previous
+			oscTraceHandlerID = previousID
+		}
+		oscTraceMu.Unlock()
+	}
+}
+
+func emitOSCTrace(event OSCTraceEvent) {
+	oscTraceMu.RLock()
+	handler := oscTraceHandler
+	oscTraceMu.RUnlock()
+	if handler != nil {
+		handler(event)
+	}
+}
 
 type AutoCaptureEvent struct {
 	BatchID string `json:"batchId"`
@@ -130,7 +172,7 @@ func ResetUserCameraOSC(ctx context.Context, cfg Config) error {
 		return err
 	}
 	defer client.close()
-	for _, address := range []string{"/usercamera/Capture", "/usercamera/Close", "/usercamera/Streaming"} {
+	for _, address := range []string{"/usercamera/Capture", "/usercamera/Close"} {
 		if err := client.sendBool(address, false); err != nil {
 			diagAutoCapture(logPath, "osc recovery bool error: address=%q err=%v", address, err)
 			return err
@@ -140,6 +182,9 @@ func ResetUserCameraOSC(ctx context.Context, cfg Config) error {
 			return ctx.Err()
 		}
 	}
+	if err := sendCameraBoolCompat(client, logPath, "/usercamera/Streaming", false, "osc_recovery"); err != nil {
+		return err
+	}
 	if err := client.sendInt("/usercamera/Mode", 0); err != nil {
 		diagAutoCapture(logPath, "osc recovery mode error: err=%v", err)
 		return err
@@ -148,7 +193,7 @@ func ResetUserCameraOSC(ctx context.Context, cfg Config) error {
 	return nil
 }
 
-func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
+func (r AutoCaptureRunner) RunOnce(ctx context.Context) (results []Result, err error) {
 	cfg := r.Config
 	cfg.Normalize()
 	ac := cfg.AutoCapture
@@ -204,9 +249,21 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 		return nil, err
 	}
 	defer client.close()
+	streamStarted := false
 	if ac.Restore.Enabled {
 		defer r.restoreUserCameraState(client)
 	}
+	defer func() {
+		if err == nil || !streamStarted {
+			return
+		}
+		diagAutoCapture(logPath, "stream cleanup begin: reason=%q", "run_once_error")
+		if cleanupErr := sendCameraBoolCompat(client, logPath, "/usercamera/Streaming", false, "run_once_cleanup"); cleanupErr != nil {
+			diagAutoCapture(logPath, "stream cleanup failed: err=%v", cleanupErr)
+			return
+		}
+		diagAutoCapture(logPath, "stream cleanup success: reason=%q", "run_once_error")
+	}()
 	diagAutoCapture(logPath, "osc open success: target=%s:%d", ac.OSC.Host, ac.OSC.SendPort)
 	cameraMode := 1
 	if ac.Capture.Mode == "stream" {
@@ -236,6 +293,7 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 		if err := sendCameraBoolCompat(client, logPath, "/usercamera/Streaming", true, "stream_start"); err != nil {
 			return nil, err
 		}
+		streamStarted = true
 		diagAutoCapture(logPath, "osc button press success: address=%q detail=%q", "/usercamera/Streaming", "stream_start")
 		startDelay := time.Duration(ac.Stream.StartDelayMS) * time.Millisecond
 		if startDelay > 0 {
@@ -247,7 +305,7 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 			diagAutoCapture(logPath, "stream start wait complete")
 		}
 	}
-	results := make([]Result, 0, len(views))
+	results = make([]Result, 0, len(views))
 	for i, view := range views {
 		if err := ctx.Err(); err != nil {
 			diagAutoCapture(logPath, "run_once cancelled before shot: index=%d err=%v", i+1, err)
@@ -1713,6 +1771,18 @@ func sendCameraButton(ctx context.Context, client oscClient, address string, rel
 		return err
 	}
 	diagAutoCapture(logPath, "osc button press success: address=%q detail=%q", address, detail)
+	released := false
+	defer func() {
+		if released {
+			return
+		}
+		diagAutoCapture(logPath, "osc button release begin: address=%q detail=%q reason=%q", address, detail, "cleanup")
+		if err := client.sendBool(address, false); err != nil {
+			diagAutoCapture(logPath, "osc button release error: address=%q detail=%q reason=%q err=%v", address, detail, "cleanup", err)
+			return
+		}
+		diagAutoCapture(logPath, "osc button release success: address=%q detail=%q reason=%q", address, detail, "cleanup")
+	}()
 	diagAutoCapture(logPath, "button_release wait begin: address=%q detail=%q duration_ms=%d", address, detail, releaseDelayMS)
 	if !sleepContext(ctx, time.Duration(releaseDelayMS)*time.Millisecond) {
 		diagAutoCapture(logPath, "button_release wait cancelled: address=%q detail=%q err=%v", address, detail, ctx.Err())
@@ -1724,6 +1794,7 @@ func sendCameraButton(ctx context.Context, client oscClient, address string, rel
 		return err
 	}
 	diagAutoCapture(logPath, "osc button release success: address=%q detail=%q", address, detail)
+	released = true
 	return nil
 }
 
@@ -2084,7 +2155,24 @@ func (c oscClient) send(address string, typeTags string, appendArgs func([]byte)
 	if c.conn == nil {
 		return fmt.Errorf("OSC接続が開かれていません")
 	}
-	_, err := c.conn.Write(buildOSCPacket(address, typeTags, appendArgs))
+	packet := buildOSCPacket(address, typeTags, appendArgs)
+	_, err := c.conn.Write(packet)
+	status := "ok"
+	errText := ""
+	if err != nil {
+		status = "error"
+		errText = err.Error()
+	}
+	_, _, payload, _ := ParseOSCPacket(packet)
+	emitOSCTrace(OSCTraceEvent{
+		Direction: "send",
+		Address:   address,
+		TypeTags:  typeTags,
+		Payload:   append([]byte(nil), payload...),
+		Target:    fmt.Sprintf("%s:%d", c.host, c.port),
+		Status:    status,
+		Error:     errText,
+	})
 	return err
 }
 

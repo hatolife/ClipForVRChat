@@ -3,6 +3,7 @@
 このディレクトリは、実装タスクや調査タスクを Markdown で管理するためのものです。
 
 状態はリポジトリ上の実装状況をもとに整理しています。実機確認が必要なものは「要確認」としています。
+作業が完了したチケットはこの一覧から外し、チケットファイルを `issues/closed/` へ移動して `issues/closed/README.md` に状態 `完了` の行として追加します。
 
 | No. | Issue | 状態 | 対応バージョン | 概要 |
 | --- | --- | --- | --- | --- |
@@ -15,7 +16,7 @@
 | 141 | [自動撮影構図UIへ `player_local` を統合する](141-integrate-player-local-coordinate-ui.md) | 要確認 | `v0.1.8` | 構図設定、現在Pose保存/追加、リセット、移動、テスト撮影を座標系に対応させる。 |
 | 166 | [v0.1.8-rc13作成可能状態まで未完了項目を解消する](166-prepare-v018-rc13-readiness.md) | 要確認 | `v0.1.8` | RC13作成前に未完了issueを実装・検証し、残課題を再チケット化する。 |
 | 171 | [Spout helperを本体exeへ埋め込み単一exe配布にする](171-embed-spout-helper-single-exe-release.md) | 要確認 | `v0.1.8` | C案採用に基づき、通常利用者向けReleaseを単一exe主導線へ戻し、分離版zipも検証用に残す。 |
-| 172 | [player_local基準Poseの挙動を見直す](172-clarify-or-redesign-player-local-basis-behavior.md) | 未着手 | 未定 | `player_local` が自動追従ではなく手動基準Pose方式であるため、初期構図とUI説明の期待ズレを解消する。 |
+| 172 | [player_local基準Poseの挙動を見直す](172-clarify-or-redesign-player-local-basis-behavior.md) | 要対応 | 未定 | `player_local` が自動追従ではなく手動基準Pose方式であるため、初期構図とUI説明の期待ズレを解消する。 |
 | 173 | [専用アバターギミックOSCでHips/avatar基準Poseを自動取得する](173-implement-avatar-osc-basis-bridge.md) | 要確認 | `v0.1.8` | YL-ATG方式を参考に、専用アバターギミックからOSCでHips/avatar基準Poseを受け取り `player_local` basisへ使う機能を実装する。 |
 | 175 | [CIでアバターギミック元ファイルzipを配布する](175-package-avatar-gimmick-source-zip.md) | 要確認 | `v0.1.8-rc17` | `Assets/PoppoWorks/AvatarBeacon/...` に配置したPrefab等をCIで元ファイルzip化し、`.unitypackage` は手作業で作成してGitHub Releaseへ添付する。 |
 | 176 | [YL-ATGを参考にAvatarBeaconアバターギミックを作成する](176-create-clipforvrchat-avatar-gimmick-from-yl-atg-reference.md) | 要確認 | `v0.1.8-rc24` | ユーザー配置済みのATG_ForAvatar packageを参考に汎用アバターギミックAvatarBeaconを作成し、`coord/*` と `forward/*` の汎用OSC parameter、YL-ATG由来部分のMITライセンス表記、stale診断、10秒ごとのOSC summaryログ、`avatar_osc` 初期値化、受信器維持、受信状態の自動更新とyaw表示を整備する。 |
@@ -31,9 +32,9 @@
 | 187 | [カメラ未起動/起動直後のStream Camera Spout取得を安定化する](187-stream-camera-start-and-blank-spout-frame-diagnostics.md) | 要確認 | 未定 | Streamingの互換OSC送信とblank-frame統計ログで、Stream Camera/Spout取得失敗を切り分ける。 |
 | 188 | [別パス/別バージョンを含めてClipForVRChatを単一起動にする](188-global-single-instance-across-install-paths.md) | 要確認 | `v0.1.8` | OSC port競合を避けるため、配置パスやバージョンが違っても単一起動にし、既存を閉じる/アクティブ化する選択肢を出す。 |
 | 189 | [VRChatから受信したOSCを他アプリ向けに別ポートへ転送できるようにする](189-forward-vrchat-osc-to-secondary-ports.md) | 要確認 | `v0.1.8` | ClipForVRChatが代表して受信したVRChat OSC packetを設定した別ポートへ転送し、他OSC受信アプリとのポート競合を避ける。 |
-| 190 | [カメラ撮影機能終了時に一時OSC状態を確実に解除する](190-make-camera-osc-reset-streaming-compat.md) | 要対応 | 未定 | カメラOSCリセットと撮影終了時の `/usercamera/Streaming=false` などを通常のStream制御と同じbool+numeric互換送信に揃え、成否にかかわらず一時OSC状態を解除する。 |
 | 191 | [UI上のすべてのボタンにマウスオーバー説明を追加する](191-add-hover-descriptions-to-all-ui-buttons.md) | 要対応 | 未定 | すべてのUIボタンに、機能・対象・注意点が分かるマウスオーバー説明を追加する。 |
-| 192 | [OSCタブに送受信OSCのリアルタイムログ表示を追加する](192-add-realtime-osc-log-panel-to-osc-tab.md) | 要対応 | 未定 | OSCタブ最下部に送受信/forwardの一時リアルタイムログを表示し、正規表現フィルタとコピー機能を追加する。 |
+| 192 | [OSCタブに送受信OSCのリアルタイムログ表示を追加する](192-add-realtime-osc-log-panel-to-osc-tab.md) | 要確認 | `v0.1.8-rc31` | OSCタブ最下部に送受信/forwardの一時リアルタイムログを表示し、正規表現フィルタとコピー機能を追加する。 |
+| 193 | [rc30 Release workflowのWindowsテストcleanup失敗を安定化する](193-stabilize-rc30-windows-release-test-cleanup.md) | 要確認 | `v0.1.8-rc31` | Windows CIでOSC受信器テスト終了時の一時ディレクトリcleanupが診断ログ/UDP listener停止と競合しないよう、receiver終了待ちを追加する。 |
 
 ## 状態の意味
 

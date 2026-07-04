@@ -76,6 +76,9 @@ const vueApp = createApp({
       avatarOscBasisStatus: null,
       avatarOscStatusLoading: false,
       avatarOscStatusPollTimer: null,
+      oscLogEntries: [],
+      oscLogFilter: '',
+      oscLogUnsubscribe: null,
       startupLoading: true,
       startupStatus: 'フロントエンドを初期化しています。',
       startupError: ''
@@ -291,6 +294,28 @@ const vueApp = createApp({
     },
     shouldConfirmAutoPostSettings() {
       return this.autoPostConfirmationItems.length > 0
+    },
+    oscLogFilterError() {
+      const query = String(this.oscLogFilter || '').trim()
+      if (!query) return ''
+      try {
+        new RegExp(query)
+        return ''
+      } catch (err) {
+        return String(err.message || err)
+      }
+    },
+    filteredOSCLogEntries() {
+      const entries = this.oscLogEntries || []
+      const query = String(this.oscLogFilter || '').trim()
+      if (!query) return entries
+      let re
+      try {
+        re = new RegExp(query)
+      } catch {
+        return []
+      }
+      return entries.filter((entry) => re.test(this.formatOSCLogLine(entry)))
     }
   },
   async mounted() {
@@ -396,6 +421,7 @@ const vueApp = createApp({
       this.error = ''
       if (this.isSettings) {
         this.stopAvatarOSCBasisStatusPolling()
+        this.stopOSCLogSubscription()
         this.state = await api.CloseSettings()
         this.resetSettingsBaseline()
       }
@@ -509,9 +535,7 @@ const vueApp = createApp({
       try {
         this.state = await api.OpenSettings('')
         this.rememberSettingsBaseline()
-        if (this.settingsTab === 'osc') {
-          this.startAvatarOSCBasisStatusPolling()
-        }
+        this.syncSettingsTabRuntime()
       } catch (err) {
         this.error = String(err)
       }
@@ -523,11 +547,7 @@ const vueApp = createApp({
     selectSettingsTab(tabId) {
       this.logUserAction('button_click', `settings_tab ${tabId}`)
       this.settingsTab = tabId
-      if (tabId === 'osc') {
-        this.startAvatarOSCBasisStatusPolling()
-      } else {
-        this.stopAvatarOSCBasisStatusPolling()
-      }
+      this.syncSettingsTabRuntime()
     },
     shouldWarnMissingPrimaryWebhook(config = this.state.config) {
       return Boolean(config?.output?.uploadDiscord && !String(config?.discord?.webhookUrl || '').trim())
@@ -1397,6 +1417,15 @@ const vueApp = createApp({
     shouldPollAvatarOSCBasisStatus() {
       return this.isSettings && this.settingsTab === 'osc'
     },
+    syncSettingsTabRuntime() {
+      if (this.settingsTab === 'osc') {
+        this.startAvatarOSCBasisStatusPolling()
+        void this.startOSCLogSubscription()
+      } else {
+        this.stopAvatarOSCBasisStatusPolling()
+        this.stopOSCLogSubscription()
+      }
+    },
     startAvatarOSCBasisStatusPolling() {
       if (!this.shouldPollAvatarOSCBasisStatus()) {
         this.stopAvatarOSCBasisStatusPolling()
@@ -1417,6 +1446,65 @@ const vueApp = createApp({
       if (!this.avatarOscStatusPollTimer) return
       window.clearInterval(this.avatarOscStatusPollTimer)
       this.avatarOscStatusPollTimer = null
+    },
+    async startOSCLogSubscription() {
+      if (!this.isSettings || this.settingsTab !== 'osc') {
+        this.stopOSCLogSubscription()
+        return
+      }
+      if (api?.GetOSCLogEntries) {
+        try {
+          this.oscLogEntries = await api.GetOSCLogEntries()
+        } catch {
+          this.oscLogEntries = []
+        }
+      }
+      if (this.oscLogUnsubscribe || !window.runtime?.EventsOn) return
+      this.oscLogUnsubscribe = window.runtime.EventsOn('osc-log:entries', (entries) => {
+        if (!this.isSettings || this.settingsTab !== 'osc') return
+        this.oscLogEntries = Array.isArray(entries) ? entries : []
+      })
+    },
+    stopOSCLogSubscription() {
+      if (this.oscLogUnsubscribe) {
+        this.oscLogUnsubscribe()
+        this.oscLogUnsubscribe = null
+      }
+    },
+    oscLogDirectionLabel(direction) {
+      switch (direction) {
+        case 'receive':
+          return '受信'
+        case 'send':
+          return '送信'
+        case 'forward':
+          return '転送'
+        default:
+          return direction || '-'
+      }
+    },
+    formatOSCLogLine(entry) {
+      if (!entry) return ''
+      const parts = [
+        entry.time || '',
+        this.oscLogDirectionLabel(entry.direction),
+        entry.status || '',
+        entry.address || '',
+        entry.typeTags || '',
+        entry.values || '',
+        entry.remote ? `remote=${entry.remote}` : '',
+        entry.target ? `target=${entry.target}` : '',
+        entry.error ? `error=${entry.error}` : ''
+      ].filter(Boolean)
+      return parts.join(' | ')
+    },
+    async copyVisibleOSCLog() {
+      const text = this.filteredOSCLogEntries.map((entry) => this.formatOSCLogLine(entry)).join('\n')
+      await this.copy(text)
+      this.toast = '表示中のOSCログをコピーしました'
+      setTimeout(() => {
+        this.toast = ''
+      }, 3000)
     },
     async checkForUpdate() {
       if (!api?.CheckForUpdate || this.updateSettings.checkEnabled === false) {
@@ -2218,6 +2306,28 @@ const vueApp = createApp({
                 <button type="button" class="secondary" @click="addOSCForwardTarget" :disabled="!autoCaptureSettings.osc.forward.enabled">転送先を追加</button>
               </div>
             </div>
+            <section class="osc-log-panel" aria-label="OSCログ">
+              <div class="osc-log-header">
+                <div>
+                  <h4>OSCログ</h4>
+                  <p>送受信とforwardの一時ログです。通常の診断ログファイルには保存されません。</p>
+                </div>
+                <button type="button" class="secondary" @click="copyVisibleOSCLog" :disabled="filteredOSCLogEntries.length === 0">表示中ログをコピー</button>
+              </div>
+              <label>
+                <small>正規表現フィルタ</small>
+                <input v-model="oscLogFilter" placeholder="/avatar/parameters/coord|forward|usercamera" />
+              </label>
+              <p v-if="oscLogFilterError" class="setting-note warning">正規表現エラー: {{ oscLogFilterError }}</p>
+              <div class="osc-log-list" role="log" aria-live="polite">
+                <div v-for="entry in filteredOSCLogEntries" :key="entry.seq" class="osc-log-row">
+                  <span class="osc-log-time">{{ entry.time || '-' }}</span>
+                  <span :class="['status-pill', entry.status === 'error' || entry.status === 'invalid' ? 'warning' : entry.status === 'skipped' ? 'muted' : 'ok']">{{ oscLogDirectionLabel(entry.direction) }}</span>
+                  <span class="osc-log-main">{{ formatOSCLogLine(entry) }}</span>
+                </div>
+                <p v-if="filteredOSCLogEntries.length === 0" class="empty">表示できるOSCログはありません。</p>
+              </div>
+            </section>
           </section>
 
           <section v-if="settingsTab === 'process'" class="settings-group" role="tabpanel">
