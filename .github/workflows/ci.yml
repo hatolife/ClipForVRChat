@@ -142,7 +142,7 @@ jobs:
           $releaseTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
           node ../scripts/write-wails-info.mjs "ci" wails.json
           node ../scripts/write-wails-windows-info.mjs "ci" $shortSha build/windows/info.json
-          wails build -v 2 -m -nosyncgomod -webview2 browser -tags embeddedspout -ldflags "-X main.version=ci -X main.revision=$shortSha -X main.releaseTime=$releaseTime -X main.buildChannel=ci"
+          wails build -v 2 -m -nosyncgomod -skipbindings -webview2 browser -tags embeddedspout -ldflags "-X main.version=ci -X main.revision=$shortSha -X main.releaseTime=$releaseTime -X main.buildChannel=ci"
 
       - name: Check executable
         working-directory: src

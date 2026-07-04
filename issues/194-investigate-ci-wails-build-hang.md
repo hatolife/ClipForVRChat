@@ -25,6 +25,7 @@ Windows CI/Release workflowの `wails build` が通常時間内に完了し、�
 - 公式ドキュメント上、`download` はアプリ実行時に公式bootstrapperのダウンロード/実行を提示し、`browser` は公式WebView2ページをブラウザで開く方式。
 - CI上の `wails build` が長時間無出力で止まっているため、bootstrapper処理や外部取得の影響を避ける目的で `-webview2 browser` を明示する。
 - ローカル検証で `wails build` が `go.mod` を同期する副作用を出したため、CIでは事前の `go test` / `govulncheck` を信頼し、Wails build側は `-m -nosyncgomod` でmod同期/整理を行わない。
+- rc33の失敗ログで、20分timeout時点の停止箇所が `Generating bindings` と判明した。フロントエンドは生成bindingsをimportせず `window.go.main.App` を直接使い、CIでは `check-wails-api-surface` も実行しているため、Wails build側は `-skipbindings` でWindows上のbindings生成を避ける。
 - `wails build` に `-v 2` を付け、CI stepへ `timeout-minutes: 20` を追加して、再発時に無期限進行中にならないようにする。
 
 ## 検証観点
@@ -34,4 +35,4 @@ Windows CI/Release workflowの `wails build` が通常時間内に完了し、�
   - rc31 branch CI: `28691252927`
   - rc31 Release: `28691253567`
 - [x] ローカル `wails build` はbindings/frontend生成まで進み、Linuxの `webkit2gtk-4.0` 不足で明示的に失敗するため、bindings生成の停止ではない。
-- [ ] CIで `wails build -v 2 -m -nosyncgomod -webview2 browser -tags embeddedspout ...` が完了するか。
+- [ ] CIで `wails build -v 2 -m -nosyncgomod -skipbindings -webview2 browser -tags embeddedspout ...` が完了するか。

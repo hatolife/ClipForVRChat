@@ -35,7 +35,7 @@
 | 191 | [UI上のすべてのボタンにマウスオーバー説明を追加する](191-add-hover-descriptions-to-all-ui-buttons.md) | 要対応 | 未定 | すべてのUIボタンに、機能・対象・注意点が分かるマウスオーバー説明を追加する。 |
 | 192 | [OSCタブに送受信OSCのリアルタイムログ表示を追加する](192-add-realtime-osc-log-panel-to-osc-tab.md) | 要確認 | `v0.1.8-rc31` | OSCタブ最下部に送受信/forwardの一時リアルタイムログを表示し、正規表現フィルタとコピー機能を追加する。 |
 | 193 | [rc30 Release workflowのWindowsテストcleanup失敗を安定化する](193-stabilize-rc30-windows-release-test-cleanup.md) | 要確認 | `v0.1.8-rc31` | Windows CIでOSC受信器テスト終了時の一時ディレクトリcleanupが診断ログ/UDP listener停止と競合しないよう、receiver終了待ちを追加する。 |
-| 194 | [CIのWails Build application工程が長時間完了しない](194-investigate-ci-wails-build-hang.md) | 要確認 | `v0.1.8-rc33` | rc30/rc31のbranch CIとrc31 ReleaseでWindows `wails build` が長時間完了しない原因を切り分け、WebView2 strategy、mod同期抑止、timeout/verboseを追加する。 |
+| 194 | [CIのWails Build application工程が長時間完了しない](194-investigate-ci-wails-build-hang.md) | 要確認 | `v0.1.8-rc34` | rc30/rc31のbranch CIとrc31 ReleaseでWindows `wails build` が長時間完了しない原因を切り分け、Windows bindings生成skip、WebView2 strategy、mod同期抑止、timeout/verboseを追加する。 |
 
 ## 状態の意味
 
