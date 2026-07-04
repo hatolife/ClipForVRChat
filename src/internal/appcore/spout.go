@@ -43,25 +43,32 @@ type SpoutListResult struct {
 }
 
 type SpoutCaptureResult struct {
-	OK         bool              `json:"ok"`
-	Code       string            `json:"code,omitempty"`
-	Message    string            `json:"message,omitempty"`
-	SenderName string            `json:"senderName,omitempty"`
-	Width      int               `json:"width,omitempty"`
-	Height     int               `json:"height,omitempty"`
-	Frame      int64             `json:"frame,omitempty"`
-	FrameStats *SpoutFrameStats  `json:"frameStats,omitempty"`
-	CapturedAt string            `json:"capturedAt,omitempty"`
-	OutputPath string            `json:"outputPath,omitempty"`
-	Senders    []SpoutSenderInfo `json:"senders,omitempty"`
+	OK                bool              `json:"ok"`
+	Code              string            `json:"code,omitempty"`
+	Message           string            `json:"message,omitempty"`
+	SenderName        string            `json:"senderName,omitempty"`
+	Width             int               `json:"width,omitempty"`
+	Height            int               `json:"height,omitempty"`
+	Frame             int64             `json:"frame,omitempty"`
+	FrameState        string            `json:"frameState,omitempty"`
+	ReceiveAttempts   int               `json:"receiveAttempts,omitempty"`
+	ReceiveSuccesses  int               `json:"receiveSuccesses,omitempty"`
+	FirstFrame        int64             `json:"firstFrame,omitempty"`
+	LastReceivedFrame int64             `json:"lastReceivedFrame,omitempty"`
+	FrameStats        *SpoutFrameStats  `json:"frameStats,omitempty"`
+	FrameStatsText    string            `json:"frameStatsText,omitempty"`
+	CapturedAt        string            `json:"capturedAt,omitempty"`
+	OutputPath        string            `json:"outputPath,omitempty"`
+	Senders           []SpoutSenderInfo `json:"senders,omitempty"`
 }
 
 type SpoutFrameStats struct {
-	Samples        int     `json:"samples,omitempty"`
-	Mean           float64 `json:"mean,omitempty"`
-	Stddev         float64 `json:"stddev,omitempty"`
-	NearWhiteRatio float64 `json:"nearWhiteRatio,omitempty"`
-	NearBlackRatio float64 `json:"nearBlackRatio,omitempty"`
+	Samples          int     `json:"samples,omitempty"`
+	Mean             float64 `json:"mean,omitempty"`
+	Stddev           float64 `json:"stddev,omitempty"`
+	NearWhiteRatio   float64 `json:"nearWhiteRatio,omitempty"`
+	NearBlackRatio   float64 `json:"nearBlackRatio,omitempty"`
+	TransparentRatio float64 `json:"transparentRatio,omitempty"`
 }
 
 type SpoutHelperStatus struct {
@@ -365,25 +372,23 @@ func captureStreamFrameWithSpout(ctx context.Context, cfg AutoCaptureStreamConfi
 		return SpoutCaptureResult{}, fmt.Errorf("Spout helperの取得結果JSONを解析できません: %w %s", parseErr, trimmed)
 	}
 	if err != nil {
-		if result.Message == "" {
-			result.Message = result.Code
-		}
-		diagAutoCapture(logPath, "spout capture helper error: code=%q message=%q sender=%q width=%d height=%d frame=%d frame_stats=%s senders=%d output=%q", result.Code, result.Message, result.SenderName, result.Width, result.Height, result.Frame, formatSpoutFrameStats(result.FrameStats), len(result.Senders), trimmed)
-		return result, fmt.Errorf("Spout取得に失敗しました: %s", result.Message)
+		kind, message := classifySpoutCaptureFailure(result)
+		diagAutoCapture(logPath, "spout capture helper error: kind=%q code=%q frame_state=%q message=%q sender=%q width=%d height=%d frame=%d first_frame=%d last_received_frame=%d receive_attempts=%d receive_successes=%d frame_stats=%s senders=%d raw_output=%q", kind, result.Code, result.FrameState, message, result.SenderName, result.Width, result.Height, result.Frame, result.FirstFrame, result.LastReceivedFrame, result.ReceiveAttempts, result.ReceiveSuccesses, formatSpoutFrameStats(result.FrameStats), len(result.Senders), trimmed)
+		return result, fmt.Errorf("Spout取得に失敗しました: %s", message)
 	}
 	if !result.OK {
-		if result.Message == "" {
-			result.Message = result.Code
-		}
-		return result, errors.New(result.Message)
+		kind, message := classifySpoutCaptureFailure(result)
+		diagAutoCapture(logPath, "spout capture helper rejected: kind=%q code=%q frame_state=%q message=%q sender=%q width=%d height=%d frame=%d first_frame=%d last_received_frame=%d receive_attempts=%d receive_successes=%d frame_stats=%s senders=%d", kind, result.Code, result.FrameState, message, result.SenderName, result.Width, result.Height, result.Frame, result.FirstFrame, result.LastReceivedFrame, result.ReceiveAttempts, result.ReceiveSuccesses, formatSpoutFrameStats(result.FrameStats), len(result.Senders))
+		return result, fmt.Errorf("Spout取得に失敗しました: %s", message)
 	}
 	if result.OutputPath == "" {
 		result.OutputPath = tempOutputPath
 	}
 	stats, err := validateCapturedImage(tempOutputPath)
 	if err != nil {
-		diagAutoCapture(logPath, "spout capture invalid image: output=%q temp_output=%q err=%v sender=%q width=%d height=%d frame=%d captured_at=%q stats_format=%q stats_width=%d stats_height=%d samples=%d mean=%.2f stddev=%.2f near_white=%.4f near_black=%.4f transparent=%.4f", outputPath, tempOutputPath, err, result.SenderName, result.Width, result.Height, result.Frame, result.CapturedAt, stats.Format, stats.Width, stats.Height, stats.Samples, stats.Mean, stats.Stddev, stats.NearWhiteRatio, stats.NearBlackRatio, stats.TransparentRatio)
-		return result, err
+		kind, message := classifyCapturedImageValidationFailure(stats, err)
+		diagAutoCapture(logPath, "spout capture invalid image: kind=%q output=%q temp_output=%q err=%v sender=%q width=%d height=%d frame=%d captured_at=%q stats_format=%q stats_width=%d stats_height=%d samples=%d mean=%.2f stddev=%.2f near_white=%.4f near_black=%.4f transparent=%.4f", kind, outputPath, tempOutputPath, err, result.SenderName, result.Width, result.Height, result.Frame, result.CapturedAt, stats.Format, stats.Width, stats.Height, stats.Samples, stats.Mean, stats.Stddev, stats.NearWhiteRatio, stats.NearBlackRatio, stats.TransparentRatio)
+		return result, fmt.Errorf("Spout取得に失敗しました: %s", message)
 	}
 	if err := os.Remove(outputPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return result, fmt.Errorf("取得画像の保存先を更新できません: %w", err)
@@ -401,7 +406,99 @@ func formatSpoutFrameStats(stats *SpoutFrameStats) string {
 	if stats == nil {
 		return "<none>"
 	}
-	return fmt.Sprintf("samples=%d mean=%.2f stddev=%.2f near_white=%.4f near_black=%.4f", stats.Samples, stats.Mean, stats.Stddev, stats.NearWhiteRatio, stats.NearBlackRatio)
+	return fmt.Sprintf("samples=%d mean=%.2f stddev=%.2f near_white=%.4f near_black=%.4f transparent=%.4f", stats.Samples, stats.Mean, stats.Stddev, stats.NearWhiteRatio, stats.NearBlackRatio, stats.TransparentRatio)
+}
+
+type spoutCaptureFailureKind string
+
+const (
+	spoutCaptureFailureKindUnknown          spoutCaptureFailureKind = "unknown"
+	spoutCaptureFailureKindSenderMissing    spoutCaptureFailureKind = "sender_missing"
+	spoutCaptureFailureKindSenderAmbiguous  spoutCaptureFailureKind = "sender_ambiguous"
+	spoutCaptureFailureKindNoNewFrame       spoutCaptureFailureKind = "no_new_frame"
+	spoutCaptureFailureKindReceiveStalled   spoutCaptureFailureKind = "receive_stalled"
+	spoutCaptureFailureKindBlackFrame       spoutCaptureFailureKind = "black_frame"
+	spoutCaptureFailureKindWhiteFrame       spoutCaptureFailureKind = "white_frame"
+	spoutCaptureFailureKindTransparentFrame spoutCaptureFailureKind = "transparent_frame"
+	spoutCaptureFailureKindInvalidImage     spoutCaptureFailureKind = "invalid_image"
+)
+
+func classifySpoutCaptureFailure(result SpoutCaptureResult) (spoutCaptureFailureKind, string) {
+	code := strings.TrimSpace(result.Code)
+	message := strings.TrimSpace(result.Message)
+	switch code {
+	case "sender_not_found":
+		if message == "" {
+			message = "Spout senderがありません。VRChatでStream Cameraを起動してください。"
+		}
+		return spoutCaptureFailureKindSenderMissing, message
+	case "sender_ambiguous":
+		if message == "" {
+			message = "複数のSpout senderがあり自動選択できません。sender名を選択してください。"
+		}
+		return spoutCaptureFailureKindSenderAmbiguous, message
+	case "capture_timeout", "capture_no_new_frame":
+		if message == "" {
+			message = "Spout senderは見つかりましたが、timeout内に新しいフレームを受信できませんでした。VRChat Stream Cameraが更新されているか確認してください。"
+		}
+		return spoutCaptureFailureKindNoNewFrame, message
+	case "capture_receive_stalled":
+		if message == "" {
+			message = "Spout senderのフレーム番号は進みましたが、画像を受信できませんでした。VRChat Stream CameraとSpout受信状態を確認してください。"
+		}
+		return spoutCaptureFailureKindReceiveStalled, message
+	case "capture_blank_frame":
+		switch {
+		case isLikelyTransparentSpoutFrame(result.FrameStats):
+			return spoutCaptureFailureKindTransparentFrame, "Spoutフレームは取得できましたが、ほぼ透明です。VRChat Stream Cameraの映像ではない可能性があります。"
+		case isLikelyBlackSpoutFrame(result.FrameStats):
+			return spoutCaptureFailureKindBlackFrame, "Spoutフレームは取得できましたが、ほぼ黒一色です。VRChat Stream Cameraの映像が黒くないか、初期フレームのまま更新されていないか確認してください。"
+		case isLikelyWhiteSpoutFrame(result.FrameStats):
+			return spoutCaptureFailureKindWhiteFrame, "Spoutフレームは取得できましたが、ほぼ白一色です。VRChat Stream Cameraの映像がまだ安定していない可能性があります。"
+		default:
+			if message == "" {
+				message = "Spoutフレームは取得できましたが、有効な映像になりませんでした。VRChat Stream Cameraの映像が表示されているか確認してください。"
+			}
+			return spoutCaptureFailureKindUnknown, message
+		}
+	default:
+		if message == "" {
+			if code != "" {
+				message = code
+			} else {
+				message = "Spout取得に失敗しました。"
+			}
+		}
+		return spoutCaptureFailureKindUnknown, message
+	}
+}
+
+func classifyCapturedImageValidationFailure(stats capturedImageStats, err error) (spoutCaptureFailureKind, string) {
+	if err == nil {
+		return spoutCaptureFailureKindUnknown, ""
+	}
+	switch {
+	case stats.TransparentRatio > 0.99:
+		return spoutCaptureFailureKindTransparentFrame, "取得画像がほぼ透明です。VRChat Stream Cameraの映像ではない可能性があります。"
+	case stats.NearBlackRatio > 0.99 && stats.Stddev < 1.5:
+		return spoutCaptureFailureKindBlackFrame, "取得画像がほぼ黒一色です。VRChat Stream Cameraの映像ではない可能性があります。"
+	case stats.NearWhiteRatio > 0.99 && stats.Stddev < 1.5:
+		return spoutCaptureFailureKindWhiteFrame, "取得画像がほぼ白一色です。VRChat Stream Cameraの映像ではない可能性があります。"
+	default:
+		return spoutCaptureFailureKindInvalidImage, err.Error()
+	}
+}
+
+func isLikelyBlackSpoutFrame(stats *SpoutFrameStats) bool {
+	return stats != nil && stats.NearBlackRatio > 0.99 && stats.Stddev < 1.5
+}
+
+func isLikelyWhiteSpoutFrame(stats *SpoutFrameStats) bool {
+	return stats != nil && stats.NearWhiteRatio > 0.99 && stats.Stddev < 1.5
+}
+
+func isLikelyTransparentSpoutFrame(stats *SpoutFrameStats) bool {
+	return stats != nil && stats.TransparentRatio > 0.99
 }
 
 func validateCapturedImage(path string) (capturedImageStats, error) {

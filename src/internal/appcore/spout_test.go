@@ -1,6 +1,7 @@
 package appcore
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
@@ -53,6 +54,120 @@ func TestValidateCapturedImageAcceptsVariedFrame(t *testing.T) {
 	}
 	if _, err := validateCapturedImage(path); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestClassifySpoutCaptureFailure(t *testing.T) {
+	tests := []struct {
+		name     string
+		result   SpoutCaptureResult
+		wantKind spoutCaptureFailureKind
+		wantText string
+	}{
+		{
+			name:     "sender missing",
+			result:   SpoutCaptureResult{Code: "sender_not_found"},
+			wantKind: spoutCaptureFailureKindSenderMissing,
+			wantText: "Spout senderがありません。",
+		},
+		{
+			name:     "old timeout is no new frame",
+			result:   SpoutCaptureResult{Code: "capture_timeout"},
+			wantKind: spoutCaptureFailureKindNoNewFrame,
+			wantText: "新しいフレームを受信できませんでした",
+		},
+		{
+			name:     "no new frame",
+			result:   SpoutCaptureResult{Code: "capture_no_new_frame"},
+			wantKind: spoutCaptureFailureKindNoNewFrame,
+			wantText: "新しいフレームを受信できませんでした",
+		},
+		{
+			name:     "receive stalled",
+			result:   SpoutCaptureResult{Code: "capture_receive_stalled"},
+			wantKind: spoutCaptureFailureKindReceiveStalled,
+			wantText: "画像を受信できませんでした",
+		},
+		{
+			name:     "transparent frame",
+			result:   SpoutCaptureResult{Code: "capture_blank_frame", FrameStats: &SpoutFrameStats{Samples: 1024, TransparentRatio: 1}},
+			wantKind: spoutCaptureFailureKindTransparentFrame,
+			wantText: "ほぼ透明",
+		},
+		{
+			name:     "black frame",
+			result:   SpoutCaptureResult{Code: "capture_blank_frame", FrameStats: &SpoutFrameStats{Samples: 1024, Mean: 0, Stddev: 0, NearBlackRatio: 1}},
+			wantKind: spoutCaptureFailureKindBlackFrame,
+			wantText: "ほぼ黒一色",
+		},
+		{
+			name:     "white frame",
+			result:   SpoutCaptureResult{Code: "capture_blank_frame", FrameStats: &SpoutFrameStats{Samples: 1024, Mean: 255, Stddev: 0, NearWhiteRatio: 1}},
+			wantKind: spoutCaptureFailureKindWhiteFrame,
+			wantText: "ほぼ白一色",
+		},
+		{
+			name:     "fallback message",
+			result:   SpoutCaptureResult{Code: "custom_error", Message: "custom detail"},
+			wantKind: spoutCaptureFailureKindUnknown,
+			wantText: "custom detail",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			kind, message := classifySpoutCaptureFailure(tt.result)
+			if kind != tt.wantKind {
+				t.Fatalf("kind = %q, want %q", kind, tt.wantKind)
+			}
+			if !strings.Contains(message, tt.wantText) {
+				t.Fatalf("message = %q, want substring %q", message, tt.wantText)
+			}
+		})
+	}
+}
+
+func TestClassifyCapturedImageValidationFailure(t *testing.T) {
+	tests := []struct {
+		name     string
+		stats    capturedImageStats
+		wantKind spoutCaptureFailureKind
+		wantText string
+	}{
+		{
+			name:     "transparent",
+			stats:    capturedImageStats{TransparentRatio: 1},
+			wantKind: spoutCaptureFailureKindTransparentFrame,
+			wantText: "ほぼ透明",
+		},
+		{
+			name:     "black",
+			stats:    capturedImageStats{NearBlackRatio: 1, Stddev: 0},
+			wantKind: spoutCaptureFailureKindBlackFrame,
+			wantText: "ほぼ黒一色",
+		},
+		{
+			name:     "white",
+			stats:    capturedImageStats{NearWhiteRatio: 1, Stddev: 0},
+			wantKind: spoutCaptureFailureKindWhiteFrame,
+			wantText: "ほぼ白一色",
+		},
+		{
+			name:     "decode fallback",
+			stats:    capturedImageStats{},
+			wantKind: spoutCaptureFailureKindInvalidImage,
+			wantText: "decode failed",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			kind, message := classifyCapturedImageValidationFailure(tt.stats, fmt.Errorf("decode failed"))
+			if kind != tt.wantKind {
+				t.Fatalf("kind = %q, want %q", kind, tt.wantKind)
+			}
+			if !strings.Contains(message, tt.wantText) {
+				t.Fatalf("message = %q, want substring %q", message, tt.wantText)
+			}
+		})
 	}
 }
 

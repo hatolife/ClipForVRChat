@@ -18,6 +18,17 @@
 #include <vector>
 
 #include "SpoutLibrary.h"
+#include "capture_logic.h"
+
+using spout_capture::CaptureFrameState;
+using spout_capture::CaptureObservation;
+using spout_capture::FrameStats;
+using spout_capture::analyze_rgba_frame;
+using spout_capture::capture_frame_state_code;
+using spout_capture::capture_frame_state_message;
+using spout_capture::classify_capture_frame_state;
+using spout_capture::format_frame_stats;
+using spout_capture::is_blank_frame;
 
 namespace {
 
@@ -35,14 +46,6 @@ struct Options {
   std::string sender;
   std::filesystem::path output;
   int timeout_ms = 10000;
-};
-
-struct FrameStats {
-  int samples = 0;
-  double mean = 0.0;
-  double stddev = 0.0;
-  double near_white_ratio = 0.0;
-  double near_black_ratio = 0.0;
 };
 
 std::string json_escape(const std::string &value) {
@@ -122,18 +125,25 @@ void print_error(const std::string &code, const std::string &message, const std:
 }
 
 void print_capture_error(const std::string &code, const std::string &message, const std::string &sender_name,
-                         unsigned int width, unsigned int height, int64_t frame, const FrameStats &stats,
-                         const std::vector<SenderInfo> &senders = {}) {
+                         unsigned int width, unsigned int height, const CaptureObservation &observation,
+                         const FrameStats &stats, const std::vector<SenderInfo> &senders = {}) {
   std::cout << "{\"ok\":false,\"code\":\"" << json_escape(code)
             << "\",\"message\":\"" << json_escape(message) << "\""
             << ",\"senderName\":\"" << json_escape(sender_name) << "\""
             << ",\"width\":" << width << ",\"height\":" << height
-            << ",\"frame\":" << frame
+            << ",\"frame\":" << observation.last_sender_frame
+            << ",\"frameState\":\"" << capture_frame_state_code(classify_capture_frame_state(observation)) << "\""
+            << ",\"receiveAttempts\":" << observation.receive_attempts
+            << ",\"receiveSuccesses\":" << observation.receive_successes
+            << ",\"firstFrame\":" << observation.first_sender_frame
+            << ",\"lastReceivedFrame\":" << observation.last_received_frame
             << ",\"frameStats\":{\"samples\":" << stats.samples
             << ",\"mean\":" << stats.mean
             << ",\"stddev\":" << stats.stddev
             << ",\"nearWhiteRatio\":" << stats.near_white_ratio
-            << ",\"nearBlackRatio\":" << stats.near_black_ratio << "}";
+            << ",\"nearBlackRatio\":" << stats.near_black_ratio
+            << ",\"transparentRatio\":" << stats.transparent_ratio << "}"
+            << ",\"frameStatsText\":\"" << json_escape(format_frame_stats(stats)) << "\"";
   if (!senders.empty()) {
     std::cout << ",\"senders\":[";
     for (size_t i = 0; i < senders.size(); ++i) {
@@ -233,71 +243,6 @@ std::string lower_copy(std::string value) {
     return static_cast<char>(std::tolower(c));
   });
   return value;
-}
-
-FrameStats analyze_rgba_frame(const std::vector<unsigned char> &rgba, unsigned int width, unsigned int height) {
-  FrameStats stats;
-  if (width == 0 || height == 0 || rgba.empty()) {
-    return stats;
-  }
-  unsigned int step_x = 1;
-  unsigned int step_y = 1;
-  const unsigned int max_samples = 16384;
-  while ((width / step_x) * (height / step_y) > max_samples) {
-    if (width / step_x >= height / step_y) {
-      step_x++;
-    } else {
-      step_y++;
-    }
-  }
-  double sum = 0.0;
-  double sum_sq = 0.0;
-  double near_white = 0.0;
-  double near_black = 0.0;
-  for (unsigned int y = 0; y < height; y += step_y) {
-    for (unsigned int x = 0; x < width; x += step_x) {
-      const size_t i = (static_cast<size_t>(y) * width + x) * 4;
-      if (i + 2 >= rgba.size()) {
-        continue;
-      }
-      const double r = static_cast<double>(rgba[i]);
-      const double g = static_cast<double>(rgba[i + 1]);
-      const double b = static_cast<double>(rgba[i + 2]);
-      const double luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-      sum += luma;
-      sum_sq += luma * luma;
-      if (luma >= 250.0) {
-        near_white++;
-      }
-      if (luma <= 5.0) {
-        near_black++;
-      }
-      stats.samples++;
-    }
-  }
-  if (stats.samples == 0) {
-    return stats;
-  }
-  const double samples = static_cast<double>(stats.samples);
-  stats.mean = sum / samples;
-  const double variance = (std::max)(0.0, (sum_sq / samples) - (stats.mean * stats.mean));
-  stats.stddev = std::sqrt(variance);
-  stats.near_white_ratio = near_white / samples;
-  stats.near_black_ratio = near_black / samples;
-  return stats;
-}
-
-bool is_blank_frame(const FrameStats &stats) {
-  if (stats.samples == 0) {
-    return true;
-  }
-  if (stats.near_black_ratio > 0.99 && stats.stddev < 1.5) {
-    return true;
-  }
-  if (stats.near_white_ratio > 0.99 && stats.stddev < 1.5) {
-    return true;
-  }
-  return false;
 }
 
 void force_opaque_alpha(std::vector<unsigned char> &rgba) {
@@ -540,39 +485,46 @@ int capture(SPOUTHANDLE spout, const Options &options) {
   unsigned int height = 0;
   HANDLE handle = nullptr;
   DWORD format = 0;
-  bool received_any = false;
-  bool received_valid = false;
-  FrameStats last_stats;
+  CaptureObservation observation;
   while (std::chrono::steady_clock::now() < deadline) {
+    const int64_t current_frame = spout->GetSenderFrame();
+    if (observation.first_sender_frame < 0) {
+      observation.first_sender_frame = current_frame;
+    } else if (current_frame != observation.last_sender_frame) {
+      observation.saw_frame_advance = true;
+    }
+    observation.last_sender_frame = current_frame;
+
     spout->GetSenderInfo(selection.name.c_str(), width, height, handle, format);
     if (width == 0 || height == 0) {
       std::this_thread::sleep_for(std::chrono::milliseconds(30));
       continue;
     }
+
     pixels.assign(static_cast<size_t>(width) * static_cast<size_t>(height) * 4, 0);
+    observation.receive_attempts++;
     if (spout->ReceiveImage(pixels.data(), GL_RGBA, false, 0)) {
-      received_any = true;
-      last_stats = analyze_rgba_frame(pixels, width, height);
-      if (!is_blank_frame(last_stats)) {
+      observation.saw_receive_success = true;
+      observation.receive_successes++;
+      observation.last_received_frame = current_frame;
+      observation.last_stats = analyze_rgba_frame(pixels, width, height);
+      if (!is_blank_frame(observation.last_stats)) {
+        observation.saw_non_blank_frame = true;
         force_opaque_alpha(pixels);
-        received_valid = true;
         break;
       }
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(30));
   }
-  if (!received_any) {
-    print_error("capture_timeout",
-                "Spoutフレームを取得できませんでした。VRChat Stream Cameraとsender設定を確認してください。",
-                selection.senders);
+
+  const CaptureFrameState state = classify_capture_frame_state(observation);
+  if (state != CaptureFrameState::ValidFrame) {
+    print_capture_error(capture_frame_state_code(state), capture_frame_state_message(state),
+                        selection.name, width, height, observation, observation.last_stats,
+                        selection.senders);
     return 3;
   }
-  if (!received_valid) {
-    print_capture_error("capture_blank_frame",
-                        "Spoutフレームは取得できましたが、timeout内に有効な映像になりませんでした。VRChat Stream Cameraの映像が表示されているか確認してください。",
-                        selection.name, width, height, spout->GetSenderFrame(), last_stats, selection.senders);
-    return 3;
-  }
+
   std::error_code ec;
   if (!options.output.parent_path().empty()) {
     std::filesystem::create_directories(options.output.parent_path(), ec);
@@ -595,7 +547,7 @@ int capture(SPOUTHANDLE spout, const Options &options) {
   std::strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%SZ", &utc);
   std::cout << "{\"ok\":true,\"senderName\":\"" << json_escape(selection.name)
             << "\",\"width\":" << width << ",\"height\":" << height
-            << ",\"frame\":" << spout->GetSenderFrame()
+            << ",\"frame\":" << observation.last_sender_frame
             << ",\"capturedAt\":\"" << timestamp << "\",\"outputPath\":\""
             << json_escape(options.output.u8string()) << "\"}\n";
   return 0;
