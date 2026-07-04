@@ -130,6 +130,27 @@ func TestConfigNormalizeTrimsSpoutHelperPathWithoutResettingCustomPath(t *testin
 	}
 }
 
+func TestOSCForwardConfigNormalize(t *testing.T) {
+	cfg := OSCForwardConfig{
+		Enabled: true,
+		Mode:    "unknown",
+		Targets: []OSCForwardTarget{
+			{Host: ` " " `, Port: 9101},
+			{Host: ` "127.0.0.2" `, Port: 9102},
+		},
+	}
+	cfg.Normalize()
+	if cfg.Mode != OSCForwardModeAll {
+		t.Fatalf("Mode = %q, want %q", cfg.Mode, OSCForwardModeAll)
+	}
+	if cfg.Targets[0].Host != "127.0.0.1" {
+		t.Fatalf("Targets[0].Host = %q, want default loopback", cfg.Targets[0].Host)
+	}
+	if cfg.Targets[1].Host != "127.0.0.2" {
+		t.Fatalf("Targets[1].Host = %q", cfg.Targets[1].Host)
+	}
+}
+
 func TestAutoCapturePlayerLocalNormalizeDefaultsAndSourceFallback(t *testing.T) {
 	cfg := AutoCapturePlayerLocalConfig{
 		AvatarOSC: AutoCapturePlayerLocalAvatarOSCConfig{

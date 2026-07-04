@@ -172,6 +172,10 @@ const vueApp = createApp({
       const autoCapture = this.state.config.autoCapture
       autoCapture.schedule ||= {}
       autoCapture.osc ||= {}
+      autoCapture.osc.forward ||= {}
+      if (autoCapture.osc.forward.enabled === undefined) autoCapture.osc.forward.enabled = false
+      autoCapture.osc.forward.mode ||= 'all'
+      autoCapture.osc.forward.targets ||= []
       autoCapture.playerLocal ||= {}
       autoCapture.playerLocal.basisSource ||= 'avatar_osc'
       autoCapture.playerLocal.avatarOsc ||= {}
@@ -226,6 +230,7 @@ const vueApp = createApp({
       return [
         { id: 'feature', label: '機能' },
         { id: 'autoCapture', label: '自動撮影' },
+        { id: 'osc', label: 'OSC' },
         { id: 'process', label: '処理' },
         { id: 'webhook', label: 'Discord投稿' },
         { id: 'update', label: '更新' }
@@ -504,7 +509,7 @@ const vueApp = createApp({
       try {
         this.state = await api.OpenSettings('')
         this.rememberSettingsBaseline()
-        if (this.settingsTab === 'autoCapture') {
+        if (this.settingsTab === 'osc') {
           this.startAvatarOSCBasisStatusPolling()
         }
       } catch (err) {
@@ -518,7 +523,7 @@ const vueApp = createApp({
     selectSettingsTab(tabId) {
       this.logUserAction('button_click', `settings_tab ${tabId}`)
       this.settingsTab = tabId
-      if (tabId === 'autoCapture') {
+      if (tabId === 'osc') {
         this.startAvatarOSCBasisStatusPolling()
       } else {
         this.stopAvatarOSCBasisStatusPolling()
@@ -1038,6 +1043,23 @@ const vueApp = createApp({
         this.normalizeAutoCaptureViewOrders()
       }
     },
+    addOSCForwardTarget() {
+      const forward = this.autoCaptureSettings.osc.forward
+      forward.targets.push({ host: '127.0.0.1', port: 9101 })
+    },
+    deleteOSCForwardTarget(target) {
+      const targets = this.autoCaptureSettings.osc.forward.targets
+      const index = targets.indexOf(target)
+      if (index >= 0) targets.splice(index, 1)
+    },
+    oscForwardTargetIsSelf(target) {
+      const osc = this.autoCaptureSettings.osc
+      if (!target || Number(target.port) !== Number(osc.appOutPort)) return false
+      const targetHost = String(target.host || '127.0.0.1').trim().toLowerCase()
+      const receiveHost = String(osc.vrcHost || '127.0.0.1').trim().toLowerCase()
+      const loopback = new Set(['', '127.0.0.1', 'localhost', '::1'])
+      return targetHost === receiveHost || (loopback.has(targetHost) && loopback.has(receiveHost))
+    },
     moveAutoCaptureView(view, direction) {
       const views = this.autoCaptureViews
       const index = views.indexOf(view)
@@ -1373,7 +1395,7 @@ const vueApp = createApp({
       }
     },
     shouldPollAvatarOSCBasisStatus() {
-      return this.isSettings && this.settingsTab === 'autoCapture'
+      return this.isSettings && this.settingsTab === 'osc'
     },
     startAvatarOSCBasisStatusPolling() {
       if (!this.shouldPollAvatarOSCBasisStatus()) {
@@ -1795,9 +1817,8 @@ const vueApp = createApp({
             <h3>自動撮影</h3>
             <div class="settings-explainer">
               <strong>VRChatのUser CameraをOSCで操作し、指定間隔で写真を撮影する機能です。</strong>
-              <p>VRChat側でOSCを有効にし、AvatarBeacon導入済みアバターから受け取る avatar_osc basis を使って player_local 構図を撮影します。</p>
-              <p>Stream方式ではVRChatのStream Camera(Spout)映像を直接受信して静止画として保存します。Photo方式はVRChat標準写真を使うフォールバックです。</p>
-              <p>AvatarBeaconはpositionをHips基準、yawをHead基準で送ります。標準OSCだけではプレイヤー位置を自動取得できないため、manual basis は専用ギミックなしのフォールバックです。</p>
+              <p>player_local構図は、AvatarBeaconを導入したアバターから受け取る avatar_osc basis を前提に自動追従します。AvatarBeaconは別途アバターへ導入する専用ギミックです。</p>
+              <p>Stream方式ではVRChatのStream Camera(Spout)映像を直接受信して静止画として保存します。Photo方式はVRChat標準写真を使うフォールバックで、連射時にVRChat側のシャッター音が鳴ります。</p>
               <p>正面、背後、斜めの初期構図にはプレーヤーを写す想定のPoseと拡大率が入っています。構図ごとのテスト撮影で見え方を確認できます。</p>
               <p>v0.1.8では撮影時の解像度変更は行わず、VRChat側の現在のカメラ解像度設定で保存します。</p>
             </div>
@@ -1809,37 +1830,7 @@ const vueApp = createApp({
                   <p>プレイヤー基準構図はAvatarBeaconの受信状態がreadyのときに自動追従します。</p>
                 </div>
                 <div class="button-row">
-                  <button v-if="autoCaptureSettings.playerLocal.basisSource === 'manual'" type="button" class="secondary" @click="saveCurrentCameraPoseAsPlayerBasis">現在Poseをmanual基準に保存</button>
                   <button type="button" class="secondary" @click="resetCameraViewsToDefaults">初期3構図に戻す</button>
-                  <button type="button" class="secondary" @click="resetCameraOSC">カメラOSCをリセット</button>
-                </div>
-              </div>
-              <p v-if="autoCaptureSettings.playerLocal.basisSource === 'manual'" class="setting-note" :class="autoCaptureSettings.playerLocal.calibrated ? 'ok' : 'warning'">
-                manual基準Pose: {{ autoCaptureSettings.playerLocal.calibrated ? '保存済み' : '未設定' }}
-                <span v-if="autoCaptureSettings.playerLocal.updatedAt"> / {{ autoCaptureSettings.playerLocal.updatedAt }}</span>
-              </p>
-              <div class="setting-row">
-                <div><strong>プレイヤー基準の取得元</strong><p>AvatarBeaconを使う avatar_osc が通常の取得元です。manual は専用ギミックなしで手動保存した基準Poseを使うフォールバックです。</p></div>
-                <label>
-                  <select v-model="autoCaptureSettings.playerLocal.basisSource">
-                    <option value="avatar_osc">AvatarBeacon / avatar_osc</option>
-                    <option value="manual">manual fallback</option>
-                  </select>
-                </label>
-              </div>
-              <div class="setting-row" :class="{ disabled: autoCaptureSettings.playerLocal.basisSource !== 'avatar_osc' }">
-                <div><strong>AvatarBeacon受信状態</strong><p>Hips基準position、Head基準yaw、最終受信、エラーを表示します。</p></div>
-                <div class="settings-control-stack">
-                  <div class="inline-actions">
-                    <span class="status-pill" :class="avatarOSCBasisStatusClass()">{{ avatarOSCBasisStatusLabel() }}</span>
-                  </div>
-                  <p class="setting-note">
-                    受信状態: {{ avatarOscBasisStatus?.state || avatarOscBasisStatus?.message || '未取得' }}
-                    <span v-if="avatarOscBasisStatus?.sourcePrefix"> / prefix: {{ avatarOscBasisStatus.sourcePrefix }}</span>
-                  </p>
-                  <p class="setting-note">最終受信: {{ avatarOscBasisStatus?.lastReceivedAt || '未受信' }}</p>
-                  <p class="setting-note">position: {{ formatAvatarOSCBasisPosition() }} / yaw: {{ formatAvatarOSCBasisYaw() }}</p>
-                  <p v-if="avatarOscBasisStatus?.error" class="setting-note warning">エラー: {{ avatarOscBasisStatus.error }}</p>
                 </div>
               </div>
               <div v-if="autoCaptureViews.length" class="view-list">
@@ -1929,30 +1920,6 @@ const vueApp = createApp({
             <div class="setting-row" :class="{ disabled: !autoCaptureSettings.schedule.enabled }">
               <div><strong>開始時に撮影</strong><p>自動撮影を開始した直後に1回撮影します。</p></div>
               <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.schedule.captureOnStart" :disabled="!autoCaptureSettings.schedule.enabled" /><span></span></label>
-            </div>
-            <div class="setting-row">
-              <div><strong>OSCホスト</strong><p>VRChat OSCへ接続するホストです。</p></div>
-              <label>
-                <input v-model="autoCaptureSettings.osc.vrcHost" placeholder="127.0.0.1" />
-              </label>
-            </div>
-            <div class="setting-row">
-              <div><strong>OSC送信ポート</strong><p>外部アプリからVRChatへ送るUDPポートです。</p></div>
-              <label>
-                <input type="number" min="1" max="65535" step="1" v-model.number="autoCaptureSettings.osc.vrcInPort" />
-              </label>
-            </div>
-            <div class="setting-row">
-              <div><strong>OSC受信ポート</strong><p>VRChatから外部アプリへ届くUDPポートです。</p></div>
-              <label>
-                <input type="number" min="1" max="65535" step="1" v-model.number="autoCaptureSettings.osc.appOutPort" />
-              </label>
-            </div>
-            <div class="setting-row">
-              <div><strong>現在Pose保存の有効秒数</strong><p>「現在Poseを保存」を押した時に、何秒以内にVRChatから受信したPoseなら保存に使うかです。撮影間隔ではありません。</p></div>
-              <label>
-                <input type="number" min="1" step="1" v-model.number="autoCaptureSettings.osc.poseFreshnessSec" />
-              </label>
             </div>
             <div class="setting-row">
               <div><strong>撮影方式</strong><p>StreamはStream Camera(Spout)映像を保存します。PhotoはVRChat標準写真を使うためシャッター音が出ます。</p></div>
@@ -2150,6 +2117,106 @@ const vueApp = createApp({
             <div class="setting-row" :class="{ disabled: !autoCaptureSettings.restore.enabled }">
               <div><strong>戻し先 Green Screen</strong><p>受信値がない場合にグリーンスクリーンをONへ戻すかです。</p></div>
               <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.restore.fallback.greenScreen" :disabled="!autoCaptureSettings.restore.enabled" /><span></span></label>
+            </div>
+          </section>
+
+          <section v-if="settingsTab === 'osc'" class="settings-group" role="tabpanel">
+            <h3>OSC</h3>
+            <div class="settings-explainer">
+              <strong>VRChat OSCの送受信と転送を設定します。</strong>
+              <p>ClipForVRChatがVRChatからのOSC受信ポートをlistenしている間、同じポートを他アプリが安定して同時受信できる前提にはできません。</p>
+              <p>他アプリが受信ポートを変更できる場合は、ここで転送先ポートを作り、他アプリ側をそのポートへ向けることで競合を避けられます。受信ポートを変更できない他アプリの競合は、この機能では解消できません。</p>
+            </div>
+            <div class="setting-row">
+              <div><strong>OSCホスト</strong><p>VRChat OSCへ接続し、VRChatからのOSCを受信するホストです。</p></div>
+              <label>
+                <input v-model="autoCaptureSettings.osc.vrcHost" placeholder="127.0.0.1" />
+              </label>
+            </div>
+            <div class="setting-row">
+              <div><strong>OSC送信ポート</strong><p>外部アプリからVRChatへ送るUDPポートです。</p></div>
+              <label>
+                <input type="number" min="1" max="65535" step="1" v-model.number="autoCaptureSettings.osc.vrcInPort" />
+              </label>
+            </div>
+            <div class="setting-row">
+              <div><strong>OSC受信ポート</strong><p>VRChatから外部アプリへ届くUDPポートです。ClipForVRChatはここを代表してlistenします。</p></div>
+              <label>
+                <input type="number" min="1" max="65535" step="1" v-model.number="autoCaptureSettings.osc.appOutPort" />
+              </label>
+            </div>
+            <div class="setting-row">
+              <div><strong>現在Pose保存の有効秒数</strong><p>「現在Poseを保存」を押した時に、何秒以内にVRChatから受信したPoseなら保存に使うかです。撮影間隔ではありません。</p></div>
+              <label>
+                <input type="number" min="1" step="1" v-model.number="autoCaptureSettings.osc.poseFreshnessSec" />
+              </label>
+            </div>
+            <div class="setting-row">
+              <div><strong>カメラOSCリセット</strong><p>VRChat User CameraのOSC操作状態を戻したいときに使います。</p></div>
+              <div class="settings-control-stack">
+                <button type="button" class="secondary" @click="resetCameraOSC">カメラOSCをリセット</button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div><strong>プレイヤー基準の取得元</strong><p>AvatarBeaconを使う avatar_osc が通常の取得元です。manual は専用ギミックなしで手動保存した基準Poseを使うフォールバックです。</p></div>
+              <div class="settings-control-stack">
+                <select v-model="autoCaptureSettings.playerLocal.basisSource">
+                  <option value="avatar_osc">AvatarBeacon / avatar_osc</option>
+                  <option value="manual">manual fallback</option>
+                </select>
+                <button v-if="autoCaptureSettings.playerLocal.basisSource === 'manual'" type="button" class="secondary" @click="saveCurrentCameraPoseAsPlayerBasis">現在Poseをmanual基準に保存</button>
+                <p v-if="autoCaptureSettings.playerLocal.basisSource === 'manual'" class="setting-note" :class="autoCaptureSettings.playerLocal.calibrated ? 'ok' : 'warning'">
+                  manual基準Pose: {{ autoCaptureSettings.playerLocal.calibrated ? '保存済み' : '未設定' }}
+                  <span v-if="autoCaptureSettings.playerLocal.updatedAt"> / {{ autoCaptureSettings.playerLocal.updatedAt }}</span>
+                </p>
+              </div>
+            </div>
+            <div class="setting-row" :class="{ disabled: autoCaptureSettings.playerLocal.basisSource !== 'avatar_osc' }">
+              <div><strong>AvatarBeacon受信状態</strong><p>Hips基準position、Head基準yaw、最終受信、エラーを表示します。</p></div>
+              <div class="settings-control-stack">
+                <div class="inline-actions">
+                  <span class="status-pill" :class="avatarOSCBasisStatusClass()">{{ avatarOSCBasisStatusLabel() }}</span>
+                </div>
+                <p class="setting-note">
+                  受信状態: {{ avatarOscBasisStatus?.state || avatarOscBasisStatus?.message || '未取得' }}
+                  <span v-if="avatarOscBasisStatus?.sourcePrefix"> / prefix: {{ avatarOscBasisStatus.sourcePrefix }}</span>
+                </p>
+                <p class="setting-note">最終受信: {{ avatarOscBasisStatus?.lastReceivedAt || '未受信' }}</p>
+                <p class="setting-note">position: {{ formatAvatarOSCBasisPosition() }} / yaw: {{ formatAvatarOSCBasisYaw() }}</p>
+                <p v-if="avatarOscBasisStatus?.error" class="setting-note warning">エラー: {{ avatarOscBasisStatus.error }}</p>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div><strong>OSC転送</strong><p>VRChatから受信したOSC packetを、他アプリ用の別ポートへUDP転送します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.osc.forward.enabled" /><span></span></label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.osc.forward.enabled }">
+              <div><strong>転送モード</strong><p>通常は全転送です。unhandled onlyではClipForVRChatが使うUser Camera OSCとAvatar Parameterを転送しません。</p></div>
+              <label>
+                <select v-model="autoCaptureSettings.osc.forward.mode" :disabled="!autoCaptureSettings.osc.forward.enabled">
+                  <option value="all">all</option>
+                  <option value="unhandled_only">unhandled only</option>
+                </select>
+              </label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.osc.forward.enabled }">
+              <div><strong>転送先</strong><p>他アプリがlistenするhostとportです。ClipForVRChat自身の受信ポートと同じ転送先は起動時に除外されます。</p></div>
+              <div class="settings-control-stack">
+                <div v-if="autoCaptureSettings.osc.forward.targets.length" class="view-list">
+                  <article v-for="(target, targetIndex) in autoCaptureSettings.osc.forward.targets" :key="'osc-forward-' + targetIndex" class="view-card">
+                    <div class="view-edit-grid">
+                      <label><small>host</small><input v-model="target.host" :disabled="!autoCaptureSettings.osc.forward.enabled" placeholder="127.0.0.1" /></label>
+                      <label><small>port</small><input type="number" min="1" max="65535" step="1" v-model.number="target.port" :disabled="!autoCaptureSettings.osc.forward.enabled" /></label>
+                    </div>
+                    <div class="inline-actions">
+                      <button type="button" class="secondary danger-button" @click="deleteOSCForwardTarget(target)" :disabled="!autoCaptureSettings.osc.forward.enabled">削除</button>
+                    </div>
+                    <p v-if="oscForwardTargetIsSelf(target)" class="setting-note warning">ClipForVRChat自身のOSC受信ポートと同じため、起動時に転送対象から除外されます。</p>
+                  </article>
+                </div>
+                <p v-else class="setting-note warning">転送先がありません。転送を有効にする場合は1つ以上追加してください。</p>
+                <button type="button" class="secondary" @click="addOSCForwardTarget" :disabled="!autoCaptureSettings.osc.forward.enabled">転送先を追加</button>
+              </div>
             </div>
           </section>
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -14,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/hatolife/ClipForVRChat/internal/appcore"
@@ -47,6 +49,7 @@ type App struct {
 	oscReceiverHost       string
 	oscReceiverPort       int
 	oscReceiverLogPath    string
+	oscReceiverForwardKey string
 	oscReceiverSeq        uint64
 	latestPose            appcore.CameraPoseConfig
 	poseAt                time.Time
@@ -1475,10 +1478,12 @@ func (a *App) restartCameraPoseReceiverLocked(cfg appcore.Config) {
 	cfg.Normalize()
 	logPath := appcore.DiagnosticLogPath(a.configPath)
 	host, port := cameraPoseReceiverEndpoint(cfg)
+	forwardKey := oscForwardConfigKey(cfg.AutoCapture.OSC.Forward)
 	if a.oscCancel != nil &&
 		a.oscReceiverHost == host &&
 		a.oscReceiverPort == port &&
-		a.oscReceiverLogPath == logPath {
+		a.oscReceiverLogPath == logPath &&
+		a.oscReceiverForwardKey == forwardKey {
 		appcore.AppendDiagnosticLog(logPath, "auto-capture osc receiver keep: addr=%s:%d basis_source=%q", host, port, cfg.AutoCapture.PlayerLocal.BasisSource)
 		return
 	}
@@ -1491,6 +1496,7 @@ func (a *App) restartCameraPoseReceiverLocked(cfg appcore.Config) {
 	a.oscReceiverHost = host
 	a.oscReceiverPort = port
 	a.oscReceiverLogPath = logPath
+	a.oscReceiverForwardKey = forwardKey
 	a.oscReceiverSeq++
 	seq := a.oscReceiverSeq
 	go a.runCameraPoseReceiver(ctx, seq, host, port, cfg.AutoCapture.PlayerLocal.BasisSource, logPath)
@@ -1505,7 +1511,17 @@ func (a *App) stopCameraPoseReceiverLocked() {
 	a.oscReceiverHost = ""
 	a.oscReceiverPort = 0
 	a.oscReceiverLogPath = ""
+	a.oscReceiverForwardKey = ""
 	a.oscReceiverSeq++
+}
+
+func oscForwardConfigKey(cfg appcore.OSCForwardConfig) string {
+	cfg.Normalize()
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		return ""
+	}
+	return string(data)
 }
 
 func cameraPoseReceiverEndpoint(cfg appcore.Config) (string, int) {
@@ -1534,6 +1550,8 @@ func (a *App) runCameraPoseReceiver(ctx context.Context, seq uint64, host string
 	}
 	defer conn.Close()
 	appcore.AppendDiagnosticLog(logPath, "auto-capture osc receiver start: addr=%s basis_source=%q", addr.String(), basisSource)
+	forwarder := newOSCForwarder(a.state.Config.AutoCapture.OSC, addr, logPath)
+	defer forwarder.Close()
 	go func() {
 		<-ctx.Done()
 		_ = conn.Close()
@@ -1554,10 +1572,13 @@ func (a *App) runCameraPoseReceiver(ctx context.Context, seq uint64, host string
 		address, typeTags, payload, ok := appcore.ParseOSCPacket(packet)
 		if !ok {
 			appcore.AppendDiagnosticLog(logPath, "auto-capture osc received invalid: remote=%q bytes=%d hex_preview=%q", oscRemoteAddrString(remoteAddr), n, hexPreview(packet, 96))
+			forwarder.Forward(packet, "", false)
 			continue
 		}
 		now := time.Now()
+		handledByClipForVRChat := false
 		if sample, ok := appcore.DecodeOSCUserCameraSample(address, typeTags, payload); ok {
+			handledByClipForVRChat = true
 			a.mu.Lock()
 			if a.userCameraSamples == nil {
 				a.userCameraSamples = make(map[string]userCameraOSCSample)
@@ -1574,13 +1595,16 @@ func (a *App) runCameraPoseReceiver(ctx context.Context, seq uint64, host string
 			}
 		}
 		if strings.HasPrefix(address, "/avatar/parameters/") {
+			handledByClipForVRChat = true
 			sample, ok := decodeAvatarOSCBasisSample(typeTags, payload)
 			if !ok {
+				forwarder.Forward(packet, address, handledByClipForVRChat)
 				continue
 			}
 			sample.ReceivedAt = now
 			canonicalAddress := canonicalAvatarOSCBasisAddress(address)
 			if canonicalAddress == "" {
+				forwarder.Forward(packet, address, handledByClipForVRChat)
 				continue
 			}
 			a.mu.Lock()
@@ -1598,7 +1622,124 @@ func (a *App) runCameraPoseReceiver(ctx context.Context, seq uint64, host string
 			}
 			a.mu.Unlock()
 		}
+		forwarder.Forward(packet, address, handledByClipForVRChat)
 	}
+}
+
+type oscForwarder struct {
+	mode    string
+	targets []oscForwardTarget
+	logPath string
+
+	forwarded uint64
+	errors    uint64
+	lastError atomic.Value
+	mu        sync.Mutex
+	nextLogAt time.Time
+}
+
+type oscForwardTarget struct {
+	label string
+	conn  *net.UDPConn
+}
+
+func newOSCForwarder(cfg appcore.AutoCaptureOSCConfig, receiveAddr *net.UDPAddr, logPath string) *oscForwarder {
+	cfg.Forward.Normalize()
+	forwarder := &oscForwarder{
+		mode:    cfg.Forward.Mode,
+		logPath: logPath,
+	}
+	if !cfg.Forward.Enabled {
+		appcore.AppendDiagnosticLog(logPath, "auto-capture osc forward disabled")
+		return forwarder
+	}
+	for _, target := range cfg.Forward.Targets {
+		target.Normalize()
+		if target.Port <= 0 || target.Port > 65535 {
+			appcore.AppendDiagnosticLog(logPath, "auto-capture osc forward target skipped: host=%q port=%d reason=%q", target.Host, target.Port, "invalid_port")
+			continue
+		}
+		addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", target.Host, target.Port))
+		if err != nil {
+			appcore.AppendDiagnosticLog(logPath, "auto-capture osc forward target skipped: host=%q port=%d reason=%q err=%v", target.Host, target.Port, "resolve_error", err)
+			continue
+		}
+		if sameOSCForwardEndpoint(receiveAddr, addr) {
+			appcore.AppendDiagnosticLog(logPath, "auto-capture osc forward target skipped: target=%s receive=%s reason=%q", addr.String(), receiveAddr.String(), "self_forward")
+			continue
+		}
+		conn, err := net.DialUDP("udp", nil, addr)
+		if err != nil {
+			appcore.AppendDiagnosticLog(logPath, "auto-capture osc forward target skipped: target=%s reason=%q err=%v", addr.String(), "dial_error", err)
+			continue
+		}
+		forwarder.targets = append(forwarder.targets, oscForwardTarget{label: addr.String(), conn: conn})
+	}
+	appcore.AppendDiagnosticLog(logPath, "auto-capture osc forward start: enabled=%t mode=%q targets=%d configured=%d", cfg.Forward.Enabled, forwarder.mode, len(forwarder.targets), len(cfg.Forward.Targets))
+	if len(forwarder.targets) == 0 {
+		appcore.AppendDiagnosticLog(logPath, "auto-capture osc forward warning: no active targets")
+	}
+	return forwarder
+}
+
+func (f *oscForwarder) Forward(packet []byte, address string, handledByClipForVRChat bool) {
+	if f == nil || len(f.targets) == 0 {
+		return
+	}
+	if f.mode == appcore.OSCForwardModeUnhandledOnly && handledByClipForVRChat {
+		f.logSummary(address)
+		return
+	}
+	for _, target := range f.targets {
+		if _, err := target.conn.Write(packet); err != nil {
+			atomic.AddUint64(&f.errors, 1)
+			f.lastError.Store(fmt.Sprintf("target=%s address=%s err=%v", target.label, address, err))
+			continue
+		}
+		atomic.AddUint64(&f.forwarded, 1)
+	}
+	f.logSummary(address)
+}
+
+func (f *oscForwarder) Close() {
+	if f == nil {
+		return
+	}
+	for _, target := range f.targets {
+		_ = target.conn.Close()
+	}
+	if len(f.targets) > 0 {
+		lastErr, _ := f.lastError.Load().(string)
+		appcore.AppendDiagnosticLog(f.logPath, "auto-capture osc forward stop: targets=%d forwarded=%d errors=%d last_error=%q", len(f.targets), atomic.LoadUint64(&f.forwarded), atomic.LoadUint64(&f.errors), lastErr)
+	}
+}
+
+func (f *oscForwarder) logSummary(address string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	now := time.Now()
+	if !f.nextLogAt.IsZero() && now.Before(f.nextLogAt) {
+		return
+	}
+	lastErr, _ := f.lastError.Load().(string)
+	appcore.AppendDiagnosticLog(f.logPath, "auto-capture osc forward summary: mode=%q targets=%d forwarded=%d errors=%d last_address=%q last_error=%q", f.mode, len(f.targets), atomic.LoadUint64(&f.forwarded), atomic.LoadUint64(&f.errors), address, lastErr)
+	f.nextLogAt = now.Add(10 * time.Second)
+}
+
+func sameOSCForwardEndpoint(a *net.UDPAddr, b *net.UDPAddr) bool {
+	if a == nil || b == nil || a.Port != b.Port {
+		return false
+	}
+	if a.IP == nil || a.IP.IsUnspecified() {
+		return b.IP == nil || b.IP.IsLoopback() || b.IP.IsUnspecified()
+	}
+	if b.IP == nil || b.IP.IsUnspecified() {
+		return a.IP.IsLoopback() || a.IP.IsUnspecified()
+	}
+	if a.IP.IsLoopback() && b.IP.IsLoopback() {
+		return true
+	}
+	return a.IP.Equal(b.IP)
 }
 
 func (a *App) appendAvatarOSCSummaryLocked(logPath string, now time.Time) {

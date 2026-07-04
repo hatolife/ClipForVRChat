@@ -12,6 +12,7 @@ import (
 	"image/png"
 	"io"
 	"math"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -522,6 +523,93 @@ func TestAppRebuildAvatarOSCBasisDoesNotRepeatPartialLog(t *testing.T) {
 	}
 }
 
+func TestOSCForwarderForwardsPacket(t *testing.T) {
+	receiver := listenUDPForTest(t)
+	cfg := appcore.DefaultConfig().AutoCapture.OSC
+	cfg.Forward.Enabled = true
+	cfg.Forward.Mode = appcore.OSCForwardModeAll
+	cfg.Forward.Targets = []appcore.OSCForwardTarget{{Host: "127.0.0.1", Port: receiver.LocalAddr().(*net.UDPAddr).Port}}
+
+	forwarder := newOSCForwarder(cfg, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 9001}, appcore.DiagnosticLogPath(filepath.Join(t.TempDir(), "config.json")))
+	defer forwarder.Close()
+
+	packet := []byte("/avatar/parameters/test\x00\x00\x00\x00,T\x00\x00")
+	forwarder.Forward(packet, "/avatar/parameters/test", true)
+
+	got := readUDPForTest(t, receiver)
+	if string(got) != string(packet) {
+		t.Fatalf("forwarded packet = %q, want %q", got, packet)
+	}
+}
+
+func TestOSCForwarderUnhandledOnlySkipsHandledPacket(t *testing.T) {
+	receiver := listenUDPForTest(t)
+	cfg := appcore.DefaultConfig().AutoCapture.OSC
+	cfg.Forward.Enabled = true
+	cfg.Forward.Mode = appcore.OSCForwardModeUnhandledOnly
+	cfg.Forward.Targets = []appcore.OSCForwardTarget{{Host: "127.0.0.1", Port: receiver.LocalAddr().(*net.UDPAddr).Port}}
+
+	forwarder := newOSCForwarder(cfg, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 9001}, appcore.DiagnosticLogPath(filepath.Join(t.TempDir(), "config.json")))
+	defer forwarder.Close()
+
+	forwarder.Forward([]byte("/avatar/parameters/test\x00\x00\x00\x00,T\x00\x00"), "/avatar/parameters/test", true)
+	_ = receiver.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+	buf := make([]byte, 256)
+	if n, _, err := receiver.ReadFromUDP(buf); err == nil {
+		t.Fatalf("unexpected forwarded packet bytes=%d", n)
+	}
+}
+
+func TestOSCForwarderSkipsSelfTarget(t *testing.T) {
+	cfg := appcore.DefaultConfig().AutoCapture.OSC
+	cfg.Forward.Enabled = true
+	cfg.Forward.Targets = []appcore.OSCForwardTarget{{Host: "127.0.0.1", Port: 9001}}
+
+	forwarder := newOSCForwarder(cfg, &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 9001}, appcore.DiagnosticLogPath(filepath.Join(t.TempDir(), "config.json")))
+	defer forwarder.Close()
+
+	if len(forwarder.targets) != 0 {
+		t.Fatalf("targets = %d, want 0", len(forwarder.targets))
+	}
+}
+
+func listenUDPForTest(t *testing.T) *net.UDPConn {
+	t.Helper()
+	addr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn, err := net.ListenUDP("udp", addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = conn.Close()
+	})
+	return conn
+}
+
+func freeUDPPortForTest(t *testing.T) int {
+	t.Helper()
+	conn := listenUDPForTest(t)
+	port := conn.LocalAddr().(*net.UDPAddr).Port
+	if err := conn.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return port
+}
+
+func readUDPForTest(t *testing.T, conn *net.UDPConn) []byte {
+	t.Helper()
+	_ = conn.SetReadDeadline(time.Now().Add(time.Second))
+	buf := make([]byte, 256)
+	n, _, err := conn.ReadFromUDP(buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return append([]byte(nil), buf[:n]...)
+}
+
 func TestAppRestartCameraPoseReceiverKeepsSameEndpoint(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.json")
@@ -529,13 +617,15 @@ func TestAppRestartCameraPoseReceiverKeepsSameEndpoint(t *testing.T) {
 	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
 	app.ctx = context.Background()
 	cfg := appcore.DefaultConfig()
+	cfg.AutoCapture.OSC.ReceivePort = freeUDPPortForTest(t)
 	cancelCalled := false
 	app.oscCancel = func() {
 		cancelCalled = true
 	}
 	app.oscReceiverHost = "127.0.0.1"
-	app.oscReceiverPort = 9001
+	app.oscReceiverPort = cfg.AutoCapture.OSC.ReceivePort
 	app.oscReceiverLogPath = logPath
+	app.oscReceiverForwardKey = oscForwardConfigKey(cfg.AutoCapture.OSC.Forward)
 	app.oscReceiverSeq = 7
 
 	app.restartCameraPoseReceiverLocked(cfg)
@@ -543,7 +633,7 @@ func TestAppRestartCameraPoseReceiverKeepsSameEndpoint(t *testing.T) {
 	if cancelCalled {
 		t.Fatal("receiver was canceled for the same endpoint")
 	}
-	if app.oscCancel == nil || app.oscReceiverHost != "127.0.0.1" || app.oscReceiverPort != 9001 || app.oscReceiverSeq != 7 {
+	if app.oscCancel == nil || app.oscReceiverHost != "127.0.0.1" || app.oscReceiverPort != cfg.AutoCapture.OSC.ReceivePort || app.oscReceiverSeq != 7 {
 		t.Fatalf("receiver state changed: cancel=%v host=%q port=%d seq=%d", app.oscCancel != nil, app.oscReceiverHost, app.oscReceiverPort, app.oscReceiverSeq)
 	}
 	data, err := os.ReadFile(logPath)
@@ -552,6 +642,37 @@ func TestAppRestartCameraPoseReceiverKeepsSameEndpoint(t *testing.T) {
 	}
 	if !strings.Contains(string(data), "auto-capture osc receiver keep") {
 		t.Fatalf("keep log missing: %s", string(data))
+	}
+}
+
+func TestAppRestartCameraPoseReceiverRestartsWhenForwardConfigChanges(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.json")
+	logPath := appcore.DiagnosticLogPath(configPath)
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+	app.ctx = context.Background()
+	cfg := appcore.DefaultConfig()
+	cfg.AutoCapture.OSC.ReceivePort = freeUDPPortForTest(t)
+	cancelCalled := false
+	app.oscCancel = func() {
+		cancelCalled = true
+	}
+	app.oscReceiverHost = "127.0.0.1"
+	app.oscReceiverPort = cfg.AutoCapture.OSC.ReceivePort
+	app.oscReceiverLogPath = logPath
+	app.oscReceiverForwardKey = oscForwardConfigKey(appcore.OSCForwardConfig{Enabled: false, Mode: appcore.OSCForwardModeAll})
+	app.oscReceiverSeq = 7
+
+	cfg.AutoCapture.OSC.Forward.Enabled = true
+	cfg.AutoCapture.OSC.Forward.Targets = []appcore.OSCForwardTarget{{Host: "127.0.0.1", Port: 9101}}
+	app.restartCameraPoseReceiverLocked(cfg)
+	defer app.stopCameraPoseReceiverLocked()
+
+	if !cancelCalled {
+		t.Fatal("receiver was not canceled after forward config changed")
+	}
+	if app.oscReceiverForwardKey != oscForwardConfigKey(cfg.AutoCapture.OSC.Forward) {
+		t.Fatal("forward config key was not updated")
 	}
 }
 

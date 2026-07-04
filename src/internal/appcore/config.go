@@ -86,10 +86,22 @@ type AutoCaptureConfig struct {
 }
 
 type AutoCaptureOSCConfig struct {
-	Host             string `json:"vrcHost"`
-	SendPort         int    `json:"vrcInPort"`
-	ReceivePort      int    `json:"appOutPort"`
-	PoseFreshnessSec int    `json:"poseFreshnessSec"`
+	Host             string           `json:"vrcHost"`
+	SendPort         int              `json:"vrcInPort"`
+	ReceivePort      int              `json:"appOutPort"`
+	PoseFreshnessSec int              `json:"poseFreshnessSec"`
+	Forward          OSCForwardConfig `json:"forward,omitempty"`
+}
+
+type OSCForwardConfig struct {
+	Enabled bool               `json:"enabled"`
+	Mode    string             `json:"mode"`
+	Targets []OSCForwardTarget `json:"targets"`
+}
+
+type OSCForwardTarget struct {
+	Host string `json:"host"`
+	Port int    `json:"port"`
 }
 
 type AutoCapturePlayerLocalConfig struct {
@@ -330,6 +342,10 @@ func DefaultAutoCaptureConfig() AutoCaptureConfig {
 			SendPort:         9000,
 			ReceivePort:      9001,
 			PoseFreshnessSec: 3,
+			Forward: OSCForwardConfig{
+				Enabled: false,
+				Mode:    OSCForwardModeAll,
+			},
 		},
 		PlayerLocal: AutoCapturePlayerLocalConfig{
 			BasisSource: PlayerLocalBasisSourceAvatarOSC,
@@ -496,6 +512,7 @@ func (c *AutoCaptureConfig) Normalize() {
 	if c.OSC.PoseFreshnessSec <= 0 {
 		c.OSC.PoseFreshnessSec = 3
 	}
+	c.OSC.Forward.Normalize()
 	c.PlayerLocal.Normalize()
 	if c.Schedule.CaptureIntervalSec <= 0 {
 		c.Schedule.CaptureIntervalSec = 300
@@ -608,6 +625,32 @@ func (c *AutoCaptureConfig) Normalize() {
 				c.Views[i].Zoom = defaultView.Zoom
 			}
 		}
+	}
+}
+
+const (
+	OSCForwardModeAll           = "all"
+	OSCForwardModeUnhandledOnly = "unhandled_only"
+)
+
+func (c *OSCForwardConfig) Normalize() {
+	switch c.Mode {
+	case OSCForwardModeAll, OSCForwardModeUnhandledOnly:
+	default:
+		c.Mode = OSCForwardModeAll
+	}
+	if c.Targets == nil {
+		c.Targets = []OSCForwardTarget{}
+	}
+	for i := range c.Targets {
+		c.Targets[i].Normalize()
+	}
+}
+
+func (t *OSCForwardTarget) Normalize() {
+	t.Host = strings.TrimSpace(strings.Trim(strings.TrimSpace(t.Host), `"`))
+	if t.Host == "" {
+		t.Host = "127.0.0.1"
 	}
 }
 
