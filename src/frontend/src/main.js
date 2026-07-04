@@ -1636,9 +1636,9 @@ const vueApp = createApp({
           <h1>{{ info.name }}</h1>
         </div>
         <nav>
-          <button :class="{ active: activeView === 'settings' }" @click="toggleSettings">設定</button>
-          <button :class="{ active: activeView === 'help' }" @click="toggleHelp">使い方</button>
-          <button :class="{ active: activeView === 'about' || activeView === 'licenses' }" @click="toggleAbout">情報</button>
+          <button :class="{ active: activeView === 'settings' }" @click="toggleSettings" title="設定画面を開く">設定</button>
+          <button :class="{ active: activeView === 'help' }" @click="toggleHelp" title="使い方を開く">使い方</button>
+          <button :class="{ active: activeView === 'about' || activeView === 'licenses' }" @click="toggleAbout" title="情報画面を開く">情報</button>
         </nav>
       </header>
 
@@ -1646,14 +1646,14 @@ const vueApp = createApp({
         <div v-if="shouldShowDiscordWebhookWarning" class="update-banner warning-banner">
           <span>Discord投稿がONですが、通常投稿用Webhook URLが空欄です。空の時は投稿できません。</span>
           <div class="update-actions">
-            <button @click="openDiscordWebhookSettings">設定する</button>
+            <button @click="openDiscordWebhookSettings" title="Discord投稿設定を開く">設定する</button>
           </div>
         </div>
         <div v-if="shouldShowUpdateBanner" class="update-banner">
           <span>新しいバージョン {{ updateInfo.latestVersion }} があります。</span>
           <div class="update-actions">
-            <button @click="openURL(updateInfo.url || latestReleaseUrl)">GitHub Releases</button>
-            <button class="secondary" @click="openURL(boothUrl)">BOOTH</button>
+            <button @click="openURL(updateInfo.url || latestReleaseUrl)" title="最新Releaseを開く">GitHub Releases</button>
+            <button class="secondary" @click="openURL(boothUrl)" title="BOOTHを開く">BOOTH</button>
             <button class="icon-button" @click="dismissUpdateBanner" aria-label="更新通知を閉じる" title="更新通知を閉じる">×</button>
           </div>
         </div>
@@ -1682,7 +1682,7 @@ const vueApp = createApp({
             <h3>3. Discordへ投稿する</h3>
             <p>Discord投稿を使う場合は、投稿先チャンネルのWebhook URLを設定します。</p>
             <p>Webhook URLの発行方法はDiscord公式ヘルプで確認できます。</p>
-            <button class="link-button" @click="openURL(webhookGuideUrl)">Discord公式: ウェブフックのご紹介</button>
+            <button class="link-button" @click="openURL(webhookGuideUrl)" title="DiscordのWebhook作成方法を開く">Discord公式: ウェブフックのご紹介</button>
           </article>
 
           <article class="help-card">
@@ -1693,7 +1693,7 @@ const vueApp = createApp({
         </div>
 
         <div class="button-row">
-          <button class="secondary" @click="setView('main', 'help_close')">閉じる</button>
+          <button class="secondary" @click="setView('main', 'help_close')" title="前の画面へ戻る">閉じる</button>
         </div>
       </section>
 
@@ -1703,16 +1703,16 @@ const vueApp = createApp({
           <div><dt>プログラム名</dt><dd>{{ info.name }}</dd></div>
           <div><dt>バージョン</dt><dd>{{ info.version }}</dd></div>
           <div><dt>ライセンス</dt><dd>MIT License / Copyright (c) 2026 hatolife</dd></div>
-          <div><dt>GitHub</dt><dd><button class="link-button" @click="openURL(info.github)">{{ info.github }}</button></dd></div>
-          <div><dt>作者</dt><dd><button class="link-button" @click="openURL(authorTwitterUrl)">@hato_poppo_life</button></dd></div>
-          <div><dt>バグ報告</dt><dd><button class="link-button" @click="openURL(issuesUrl)">{{ issuesUrl }}</button></dd></div>
+          <div><dt>GitHub</dt><dd><button class="link-button" @click="openURL(info.github)" title="GitHubのリポジトリを開く">{{ info.github }}</button></dd></div>
+          <div><dt>作者</dt><dd><button class="link-button" @click="openURL(authorTwitterUrl)" title="作者のXを開く">@hato_poppo_life</button></dd></div>
+          <div><dt>バグ報告</dt><dd><button class="link-button" @click="openURL(issuesUrl)" title="GitHub Issueを開く">{{ issuesUrl }}</button></dd></div>
         </dl>
         <section class="about-note">
           <h3>公式の配布場所</h3>
           <p>公式の配布場所は下記のみです。</p>
           <ul>
-            <li><button class="link-button inline" @click="openURL(latestReleaseUrl)">GitHub - https://github.com/hatolife/ClipForVRChat/releases/latest</button></li>
-            <li><button class="link-button inline" @click="openURL(boothUrl)">BOOTH - https://hatolife.booth.pm/items/8531663</button></li>
+            <li><button class="link-button inline" @click="openURL(latestReleaseUrl)" title="最新Releaseを開く">GitHub - https://github.com/hatolife/ClipForVRChat/releases/latest</button></li>
+            <li><button class="link-button inline" @click="openURL(boothUrl)" title="BOOTHを開く">BOOTH - https://hatolife.booth.pm/items/8531663</button></li>
           </ul>
         </section>
         <section class="about-note">
@@ -1724,7 +1724,7 @@ const vueApp = createApp({
             信頼済みfingerprintの公開鍵で検証した場合に限り、ダウンロードした通常版exeと署名の組み合わせを確認できます。
           </p>
           <ol>
-            <li><button class="link-button inline" @click="openURL(releasesUrl)">GitHub Releases</button> で使いたいバージョンを開きます。</li>
+            <li><button class="link-button inline" @click="openURL(releasesUrl)" title="Release一覧を開く">GitHub Releases</button> で使いたいバージョンを開きます。</li>
             <li>確認したい <code>ClipForVRChat-vX.Y.Z-windows-amd64.exe</code> を用意します。</li>
             <li>同じReleaseに別添付されている <code>.exe.asc</code> を、exeと同じフォルダに保存します。</li>
             <li><code>release-signing@hato.life</code> の公開鍵を取り込み、fingerprintが <code>BE40 AA8D 082F 493F 613B C072 21DC 3486 1B40 E77D</code> と一致することを、このアプリのREADMEや公式配布ページなどRelease assetとは別の信頼経路で確認します。</li>
@@ -1734,21 +1734,21 @@ const vueApp = createApp({
           <p>同じReleaseに同梱されたURLや公開鍵だけでは、公開鍵自体の真正性は確認できません。</p>
           <p>PGPがよく分からない場合は、公式の配布場所から直接ダウンロードしてください。</p>
           <ul>
-            <li><button class="link-button inline" @click="openURL(latestReleaseUrl)">GitHub - https://github.com/hatolife/ClipForVRChat/releases/latest</button></li>
-            <li><button class="link-button inline" @click="openURL(boothUrl)">BOOTH - https://hatolife.booth.pm/items/8531663</button></li>
+            <li><button class="link-button inline" @click="openURL(latestReleaseUrl)" title="最新Releaseを開く">GitHub - https://github.com/hatolife/ClipForVRChat/releases/latest</button></li>
+            <li><button class="link-button inline" @click="openURL(boothUrl)" title="BOOTHを開く">BOOTH - https://hatolife.booth.pm/items/8531663</button></li>
           </ul>
         </section>
         <section class="about-note">
           <h3>連絡・要望</h3>
           <p>
-            不具合や使いにくい点、要望などがありましたら、Twitterの <button class="link-button inline" @click="openURL(authorTwitterUrl)">@hato_poppo_life</button> までお気軽にご連絡ください。
+            不具合や使いにくい点、要望などがありましたら、Twitterの <button class="link-button inline" @click="openURL(authorTwitterUrl)" title="作者のXを開く">@hato_poppo_life</button> までお気軽にご連絡ください。
           </p>
           <p>
             「こんな機能が欲しい」といったご意見でも問題ありません。全てのご要望にお応えすることは難しいですが、できる限り改善していきます。
           </p>
           <p>
             できれば
-            <button class="link-button inline" @click="openURL(feedbackTweetUrl)">このツイートへの返信</button>
+            <button class="link-button inline" @click="openURL(feedbackTweetUrl)" title="返信元の投稿を開く">このツイートへの返信</button>
             でご連絡いただけると、管理しやすく助かります。
           </p>
           <p>
@@ -1767,7 +1767,7 @@ const vueApp = createApp({
             不具合報告用データ作成ボタンを押して作成されるデータはzip形式のデータとzipを暗号化したgpgファイルになります。
           </p>
           <p>
-            正式リリースされたプログラムで作成される不具合報告用データは、作者の <button class="link-button inline" @click="openURL(authorTwitterUrl)">@hato_poppo_life</button> のみ復号できます。
+            正式リリースされたプログラムで作成される不具合報告用データは、作者の <button class="link-button inline" @click="openURL(authorTwitterUrl)" title="作者のXを開く">@hato_poppo_life</button> のみ復号できます。
           </p>
           <p>
             不具合報告用データには、設定ファイル、履歴、ログ、実行ファイル本体、画像保持フォルダの情報が含まれます。
@@ -1788,14 +1788,14 @@ const vueApp = createApp({
             お送りいただいたデータは、不具合の調査および原因解析の目的にのみ使用します。
           </p>
           <div class="button-row">
-            <button @click="createDiagnosticPackage" :disabled="diagnosticGenerating">不具合報告用データ生成</button>
+            <button @click="createDiagnosticPackage" :disabled="diagnosticGenerating" title="不具合報告用データを作成する">不具合報告用データ生成</button>
           </div>
         </section>
         <section class="about-note">
           <h3>その他</h3>
           <div class="button-row">
-            <button @click="setView('licenses', 'about_licenses')">OSSライセンス</button>
-            <button class="secondary" @click="setView('main', 'about_close')">閉じる</button>
+            <button @click="setView('licenses', 'about_licenses')" title="OSSライセンス一覧を開く">OSSライセンス</button>
+            <button class="secondary" @click="setView('main', 'about_close')" title="前の画面へ戻る">閉じる</button>
           </div>
         </section>
       </section>
@@ -1808,10 +1808,10 @@ const vueApp = createApp({
             <h3>{{ license.name }}</h3>
             <p>{{ license.license }}</p>
             <p>{{ license.copyright }}</p>
-            <button class="link-button" @click="openURL(license.url)">{{ license.url }}</button>
+            <button class="link-button" @click="openURL(license.url)" title="このOSSの配布元を開く">{{ license.url }}</button>
           </article>
         </div>
-        <button class="secondary" @click="setView('about', 'licenses_back')">戻る</button>
+        <button class="secondary" @click="setView('about', 'licenses_back')" title="前の画面へ戻る">戻る</button>
       </section>
 
       <section v-else-if="view === 'history'" class="panel history-page">
@@ -1821,30 +1821,30 @@ const vueApp = createApp({
           </div>
           <div class="button-row">
             <span class="tooltip-action">
-              <button class="secondary" @click="selectAllHistory" :disabled="!(state.history && state.history.length)">全選択</button>
+              <button class="secondary" @click="selectAllHistory" :disabled="!(state.history && state.history.length)" :title="(state.history && state.history.length) ? '履歴をすべて選択する' : '履歴がありません'">全選択</button>
               <span class="tooltip">履歴に表示されている画像をすべて選択します。Ctrl+Aでも同じ操作ができます。</span>
             </span>
             <span class="tooltip-action">
-              <button @click="deleteSelectedFromDiscord" :disabled="!hasDiscordDeletableSelection">Discordから削除</button>
+              <button @click="deleteSelectedFromDiscord" :disabled="!hasDiscordDeletableSelection" :title="hasDiscordDeletableSelection ? '選択した履歴のDiscord投稿を削除する' : '削除できるDiscord投稿がありません'">Discordから削除</button>
               <span class="tooltip">選択されている履歴のうち、Discord上にあり削除可能な投稿だけを削除します。ピン止めした履歴は対象外です。</span>
             </span>
             <span class="tooltip-action">
-              <button class="secondary" @click="deleteSelectedLocalFiles" :disabled="!hasLocalDeletableSelection">ローカルから削除</button>
+              <button class="secondary" @click="deleteSelectedLocalFiles" :disabled="!hasLocalDeletableSelection" :title="hasLocalDeletableSelection ? '選択した履歴のローカル保存を削除する' : '削除できるローカル保存がありません'">ローカルから削除</button>
               <span class="tooltip">選択されている履歴のうち、ローカル保存ファイルがある履歴だけをPCから削除します。ピン止めした履歴は対象外です。</span>
             </span>
             <span class="tooltip-action">
-              <button class="secondary danger-button" @click="deleteSelectedHistoryEntries" :disabled="!hasHistoryDeletableSelection">履歴から削除</button>
+              <button class="secondary danger-button" @click="deleteSelectedHistoryEntries" :disabled="!hasHistoryDeletableSelection" :title="hasHistoryDeletableSelection ? '選択した履歴を履歴から削除する' : '削除できる履歴がありません'">履歴から削除</button>
               <span class="tooltip">選択されている履歴だけを履歴から削除します。Discord投稿やローカルファイルは削除しません。ピン止めした履歴は対象外です。</span>
             </span>
             <span class="tooltip-action">
-              <button class="secondary" @click="goHome">閉じる</button>
+              <button class="secondary" @click="goHome" title="結果画面へ戻る">閉じる</button>
               <span class="tooltip">履歴画面を閉じて結果画面へ戻ります。</span>
             </span>
           </div>
         </div>
         <p v-if="error" class="error">{{ error }}</p>
         <div v-if="state.history && state.history.length" ref="historyGrid" class="history-grid" :class="{ selecting: historyDragSelecting }" @mousedown="startHistoryDragSelect">
-          <button v-for="(item, index) in state.history" :key="item.id" class="history-card" :data-history-id="item.id" :class="{ selected: isHistorySelected(item.id), discordDeleted: item.discordDeleted, localDeleted: item.localDeleted, pinned: item.pinned }" @click="selectHistory($event, index, item)">
+          <button v-for="(item, index) in state.history" :key="item.id" class="history-card" :data-history-id="item.id" :class="{ selected: isHistorySelected(item.id), discordDeleted: item.discordDeleted, localDeleted: item.localDeleted, pinned: item.pinned }" @click="selectHistory($event, index, item)" :title="'履歴を選択: ' + (item.name || '画像')" :aria-label="'履歴を選択: ' + (item.name || '画像')">
             <span class="pin-action">
               <span class="pin-button" :class="{ active: item.pinned }" @click.stop="toggleHistoryPinned(item)" title="ピン止め" aria-label="ピン止め"></span>
             </span>
@@ -1861,12 +1861,12 @@ const vueApp = createApp({
             <span class="history-name">{{ item.name || '画像' }}</span>
             <small>{{ item.createdAt }}</small>
             <div v-if="item.url || item.outputPath" class="history-paths">
-              <button v-if="item.url" class="link-button inline" @click.stop="copy(item.url)" :disabled="item.discordDeleted">{{ item.url }}</button>
-              <button v-if="item.outputPath && item.localExists && !item.localDeleted" class="link-button inline" @click.stop="revealResultFile($event, item)">{{ item.outputPath }}</button>
+              <button v-if="item.url" class="link-button inline" @click.stop="copy(item.url)" :disabled="item.discordDeleted" title="URLをクリップボードへコピー">{{ item.url }}</button>
+              <button v-if="item.outputPath && item.localExists && !item.localDeleted" class="link-button inline" @click.stop="revealResultFile($event, item)" title="保存先を開く">{{ item.outputPath }}</button>
             </div>
             <div v-if="item.qrUrls && item.qrUrls.length" class="qr-url-list">
               <strong>QRコードURL</strong>
-              <button v-for="qrUrl in item.qrUrls" :key="qrUrl" class="qr-url-chip" @click="copyQRURL($event, qrUrl)" :title="qrUrl">{{ qrUrl }}</button>
+              <button v-for="qrUrl in item.qrUrls" :key="qrUrl" class="qr-url-chip" @click="copyQRURL($event, qrUrl)" title="QRコードURLをコピー">{{ qrUrl }}</button>
             </div>
           </button>
           <div v-if="historyDragSelecting" class="selection-rect" :style="historySelectionRectStyle"></div>
@@ -1881,8 +1881,8 @@ const vueApp = createApp({
             <p v-if="state.message" class="message" :class="{ warning: isError }">{{ state.message }}</p>
           </div>
           <div v-if="state.config" class="settings-title-actions">
-            <button @click="saveSettings()" :disabled="saving">{{ saving ? '保存中' : '保存' }}</button>
-            <button class="secondary" @click="closeSettings">閉じる</button>
+            <button @click="saveSettings()" :disabled="saving" :title="saving ? '保存中です' : '設定を保存する'">{{ saving ? '保存中' : '保存' }}</button>
+            <button class="secondary" @click="closeSettings" title="設定画面を閉じる">閉じる</button>
             <span v-if="saved" class="saved">保存しました</span>
           </div>
         </div>
@@ -1896,6 +1896,7 @@ const vueApp = createApp({
                 role="tab"
                 :aria-selected="settingsTab === tab.id"
                 :class="{ active: settingsTab === tab.id }"
+                :title="tab.label + '設定を開く'"
                 @click="selectSettingsTab(tab.id)"
               >{{ tab.label }}</button>
             </div>
@@ -2039,7 +2040,7 @@ const vueApp = createApp({
                   <p>プレイヤー基準構図はAvatarBeaconの受信状態がreadyのときに自動追従します。</p>
                 </div>
                 <div class="button-row">
-                  <button type="button" class="secondary" @click="resetCameraViewsToDefaults">初期3構図に戻す</button>
+                  <button type="button" class="secondary" @click="resetCameraViewsToDefaults" title="初期の3構図へ戻す">初期3構図に戻す</button>
                 </div>
               </div>
               <div v-if="autoCaptureViews.length" class="view-list">
@@ -2078,15 +2079,15 @@ const vueApp = createApp({
                     <label><small>拡大率</small><input type="number" min="0.1" max="10" step="0.01" v-model.number="cameraView.zoom" /></label>
                   </div>
                   <div class="view-actions">
-                    <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, -1)" :disabled="index === 0">↑</button>
-                    <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, 1)" :disabled="index === autoCaptureViews.length - 1">↓</button>
-                    <button type="button" class="secondary" @click="addCurrentCameraPoseAsView(cameraView)">現在Poseから追加</button>
-                    <button type="button" class="secondary" @click="saveCurrentCameraPoseToView(cameraView)">現在Poseを保存</button>
-                    <button type="button" class="secondary" @click="moveCameraToView(cameraView)">このPoseへカメラ移動</button>
-                    <button type="button" class="secondary" @click="testAutoCaptureView(cameraView)">テスト撮影</button>
-                    <button type="button" class="secondary" @click="resetCameraPoseToDefault(cameraView)">初期Poseへ戻す</button>
-                    <button type="button" class="secondary" @click="duplicateAutoCaptureView(cameraView)">複製</button>
-                    <button type="button" class="secondary danger-button" @click="deleteAutoCaptureView(cameraView)">削除</button>
+                      <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, -1)" :disabled="index === 0" :title="index === 0 ? '先頭なので上へ移動できません' : 'この構図を上へ移動'">↑</button>
+                      <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, 1)" :disabled="index === autoCaptureViews.length - 1" :title="index === autoCaptureViews.length - 1 ? '末尾なので下へ移動できません' : 'この構図を下へ移動'">↓</button>
+                    <button type="button" class="secondary" @click="addCurrentCameraPoseAsView(cameraView)" title="現在のPoseを構図として追加する">現在Poseから追加</button>
+                    <button type="button" class="secondary" @click="saveCurrentCameraPoseToView(cameraView)" title="現在のPoseをこの構図へ保存する">現在Poseを保存</button>
+                    <button type="button" class="secondary" @click="moveCameraToView(cameraView)" title="この構図へカメラを移動する">このPoseへカメラ移動</button>
+                    <button type="button" class="secondary" @click="testAutoCaptureView(cameraView)" title="この構図をテスト撮影する">テスト撮影</button>
+                    <button type="button" class="secondary" @click="resetCameraPoseToDefault(cameraView)" title="この構図を初期Poseへ戻す">初期Poseへ戻す</button>
+                    <button type="button" class="secondary" @click="duplicateAutoCaptureView(cameraView)" title="この構図を複製する">複製</button>
+                    <button type="button" class="secondary danger-button" @click="deleteAutoCaptureView(cameraView)" title="この構図を削除する">削除</button>
                   </div>
                   <p v-if="autoCaptureTestResults[cameraView.id]" :class="['setting-note', autoCaptureTestResults[cameraView.id].ok ? 'ok' : 'warning']">
                     {{ autoCaptureTestResults[cameraView.id].message }}
@@ -2102,7 +2103,7 @@ const vueApp = createApp({
                           <div><dt>Discord URL</dt><dd>{{ result.url || 'なし' }}</dd></div>
                           <div v-if="result.error"><dt>エラー</dt><dd>{{ result.error }}</dd></div>
                         </dl>
-                        <button type="button" class="secondary" @click="revealAutoCaptureResult(result)" :disabled="!(result.outputPath || result.sourcePath)">表示</button>
+                        <button type="button" class="secondary" @click="revealAutoCaptureResult(result)" :disabled="!(result.outputPath || result.sourcePath)" :title="(result.outputPath || result.sourcePath) ? '撮影結果を保存先で表示する' : '表示できる保存先がありません'">表示</button>
                       </div>
                     </div>
                   </div>
@@ -2134,8 +2135,8 @@ const vueApp = createApp({
               <div class="settings-control-stack">
                 <input v-model="autoCaptureSettings.stream.spoutHelperPath" :disabled="autoCaptureSettings.capture.mode !== 'stream' || spoutChecking || spoutSendersLoading" placeholder="spout-capture.exe" />
                 <div class="inline-actions">
-                  <button type="button" class="secondary" @click="checkSpoutHelper" :disabled="autoCaptureSettings.capture.mode !== 'stream' || spoutChecking || spoutSendersLoading">{{ spoutChecking ? '確認中' : 'helper確認' }}</button>
-                  <button type="button" class="secondary" @click="refreshSpoutSenders" :disabled="autoCaptureSettings.capture.mode !== 'stream' || spoutChecking || spoutSendersLoading">{{ spoutSendersLoading ? '取得中' : 'sender一覧更新' }}</button>
+                  <button type="button" class="secondary" @click="checkSpoutHelper" :disabled="autoCaptureSettings.capture.mode !== 'stream' || spoutChecking || spoutSendersLoading" :title="autoCaptureSettings.capture.mode !== 'stream' ? 'Stream方式で使います' : spoutChecking ? '確認中です' : spoutSendersLoading ? 'sender一覧を取得中です' : 'Stream方式のSpout helperを確認する'">{{ spoutChecking ? '確認中' : 'helper確認' }}</button>
+                  <button type="button" class="secondary" @click="refreshSpoutSenders" :disabled="autoCaptureSettings.capture.mode !== 'stream' || spoutChecking || spoutSendersLoading" :title="autoCaptureSettings.capture.mode !== 'stream' ? 'Stream方式で使います' : spoutChecking ? '確認中です' : spoutSendersLoading ? '取得中です' : 'Spout sender一覧を更新する'">{{ spoutSendersLoading ? '取得中' : 'sender一覧更新' }}</button>
                 </div>
                 <p v-if="spoutStatus" :class="['setting-note', spoutStatus.available ? 'ok' : 'warning']">
                   {{ spoutStatus.message }}
@@ -2286,7 +2287,7 @@ const vueApp = createApp({
             <div class="setting-row">
               <div><strong>カメラOSCリセット</strong><p>VRChat User CameraのOSC操作状態を戻したいときに使います。</p></div>
               <div class="settings-control-stack">
-                <button type="button" class="secondary" @click="resetCameraOSC">カメラOSCをリセット</button>
+                <button type="button" class="secondary" @click="resetCameraOSC" title="User CameraのOSC状態を初期化する">カメラOSCをリセット</button>
               </div>
             </div>
             <div class="setting-row">
@@ -2296,7 +2297,7 @@ const vueApp = createApp({
                   <option value="avatar_osc">AvatarBeacon / avatar_osc</option>
                   <option value="manual">manual fallback</option>
                 </select>
-                <button v-if="autoCaptureSettings.playerLocal.basisSource === 'manual'" type="button" class="secondary" @click="saveCurrentCameraPoseAsPlayerBasis">現在Poseをmanual基準に保存</button>
+                <button v-if="autoCaptureSettings.playerLocal.basisSource === 'manual'" type="button" class="secondary" @click="saveCurrentCameraPoseAsPlayerBasis" title="現在のPoseをmanual基準として保存する">現在Poseをmanual基準に保存</button>
                 <p v-if="autoCaptureSettings.playerLocal.basisSource === 'manual'" class="setting-note" :class="autoCaptureSettings.playerLocal.calibrated ? 'ok' : 'warning'">
                   manual基準Pose: {{ autoCaptureSettings.playerLocal.calibrated ? '保存済み' : '未設定' }}
                   <span v-if="autoCaptureSettings.playerLocal.updatedAt"> / {{ autoCaptureSettings.playerLocal.updatedAt }}</span>
@@ -2341,13 +2342,13 @@ const vueApp = createApp({
                       <label><small>port</small><input type="number" min="1" max="65535" step="1" v-model.number="target.port" :disabled="!autoCaptureSettings.osc.forward.enabled" /></label>
                     </div>
                     <div class="inline-actions">
-                      <button type="button" class="secondary danger-button" @click="deleteOSCForwardTarget(target)" :disabled="!autoCaptureSettings.osc.forward.enabled">削除</button>
+                      <button type="button" class="secondary danger-button" @click="deleteOSCForwardTarget(target)" :disabled="!autoCaptureSettings.osc.forward.enabled" :title="autoCaptureSettings.osc.forward.enabled ? 'この転送先を削除する' : 'OSC転送をONにすると削除できます'">削除</button>
                     </div>
                     <p v-if="oscForwardTargetIsSelf(target)" class="setting-note warning">ClipForVRChat自身のOSC受信ポートと同じため、起動時に転送対象から除外されます。</p>
                   </article>
                 </div>
                 <p v-else class="setting-note warning">転送先がありません。転送を有効にする場合は1つ以上追加してください。</p>
-                <button type="button" class="secondary" @click="addOSCForwardTarget" :disabled="!autoCaptureSettings.osc.forward.enabled">転送先を追加</button>
+                <button type="button" class="secondary" @click="addOSCForwardTarget" :disabled="!autoCaptureSettings.osc.forward.enabled" :title="autoCaptureSettings.osc.forward.enabled ? 'OSC転送先を追加する' : 'OSC転送をONにすると追加できます'">転送先を追加</button>
               </div>
             </div>
             <section class="osc-log-panel" aria-label="OSCログ">
@@ -2356,7 +2357,7 @@ const vueApp = createApp({
                   <h4>OSCログ</h4>
                   <p>送受信とforwardの一時ログです。通常の診断ログファイルには保存されません。</p>
                 </div>
-                <button type="button" class="secondary" @click="copyVisibleOSCLog" :disabled="filteredOSCLogEntries.length === 0">表示中ログをコピー</button>
+                <button type="button" class="secondary" @click="copyVisibleOSCLog" :disabled="filteredOSCLogEntries.length === 0" :title="filteredOSCLogEntries.length === 0 ? 'コピーできるOSCログがありません' : '表示中のOSCログをコピーする'">表示中ログをコピー</button>
               </div>
               <label>
                 <small>正規表現フィルタ</small>
@@ -2384,7 +2385,7 @@ const vueApp = createApp({
               <div><strong>出力先フォルダ</strong><p>ローカル保存時の保存先です。初期値はアプリと同じ場所にある output フォルダです。</p></div>
               <div class="input-with-button">
                 <input v-model="state.config.image.outputDirectory" @blur="sanitizeOutputDirectory" placeholder="./output" :disabled="!state.config.output.saveLocal" />
-                <button class="secondary" @click="chooseOutputDirectory" :disabled="!state.config.output.saveLocal">選択</button>
+                <button class="secondary" @click="chooseOutputDirectory" :disabled="!state.config.output.saveLocal" :title="state.config.output.saveLocal ? '出力先フォルダを選ぶ' : 'ローカル保存をONにすると選べます'">選択</button>
               </div>
             </div>
             <div class="setting-row" :class="{ disabled: !state.config.output.saveLocal }">
@@ -2440,7 +2441,7 @@ const vueApp = createApp({
               <div>
                 <strong>通常投稿用Webhook URL</strong>
                 <p>Discordの投稿先チャンネルでWebhookを作成し、そのURLを貼り付けます。空の時は投稿できません。</p>
-                <button class="link-button" @click="openURL(webhookGuideUrl)" :disabled="!state.config.output.uploadDiscord">Discord公式: Webhookの作成方法</button>
+                <button class="link-button" @click="openURL(webhookGuideUrl)" :disabled="!state.config.output.uploadDiscord" :title="state.config.output.uploadDiscord ? 'DiscordのWebhook作成方法を開く' : 'Discord投稿をONにすると開けます'">Discord公式: Webhookの作成方法</button>
               </div>
               <label>
               <input type="password" v-model="state.config.discord.webhookUrl" placeholder="https://discord.com/api/webhooks/..." :disabled="!state.config.output.uploadDiscord" :class="{ 'attention-input': shouldWarnMissingPrimaryWebhook() }" />
@@ -2471,7 +2472,7 @@ const vueApp = createApp({
             <h2>画像をここにドラッグ&ドロップ</h2>
             <p>複数画像をまとめて処理できます。config.json をドロップすると設定画面を開きます。</p>
             <span class="tooltip-action">
-              <button @click="processClipboard">クリップボード画像を処理</button>
+              <button @click="processClipboard" title="クリップボード画像を処理する">クリップボード画像を処理</button>
               <span class="tooltip">クリップボードにある画像を縮小し、設定に応じて保存やDiscord投稿を行います。</span>
             </span>
           </div>
@@ -2485,11 +2486,11 @@ const vueApp = createApp({
             </div>
             <div class="result-actions">
               <span class="tooltip-action">
-                <button class="secondary clear-button" @click="clearResults" :disabled="processing">クリア</button>
+                <button class="secondary clear-button" @click="clearResults" :disabled="processing" :title="processing ? '処理中です' : '結果一覧を消す'">クリア</button>
                 <span class="tooltip">結果一覧から非表示にします。Discord上の画像や履歴データは削除しません。</span>
               </span>
               <span class="tooltip-action">
-                <button class="secondary" @click="openHistory" :disabled="processing">履歴</button>
+                <button class="secondary" @click="openHistory" :disabled="processing" :title="processing ? '処理中です' : '履歴画面を開く'">履歴</button>
                 <span class="tooltip">過去の処理履歴を表示します。Discord、ローカル保存、QRコードURLの状態確認や削除操作ができます。</span>
               </span>
             </div>
@@ -2522,13 +2523,13 @@ const vueApp = createApp({
                     <span>Explorerで画像を選択</span>
                   </div>
                 </div>
-                <button v-if="canCopyResultURL(item)" class="result-action-button result-action-copy" @click="copyResultURL($event, item)" aria-label="URLをコピー"></button>
-                <button v-if="canRevealResultFile(item)" class="result-action-button result-action-reveal" @click="revealResultFile($event, item)" aria-label="保存先で表示"></button>
+                <button v-if="canCopyResultURL(item)" class="result-action-button result-action-copy" @click="copyResultURL($event, item)" aria-label="URLをコピー" title="URLをコピー"></button>
+                <button v-if="canRevealResultFile(item)" class="result-action-button result-action-reveal" @click="revealResultFile($event, item)" aria-label="保存先で表示" title="保存先で表示"></button>
               </div>
               <span>{{ item.name }}</span>
               <div v-if="item.qrUrls && item.qrUrls.length" class="qr-url-list">
                 <strong>QRコードURL</strong>
-                <button v-for="qrUrl in item.qrUrls" :key="qrUrl" class="qr-url-chip" @click="copyQRURL($event, qrUrl)" :title="qrUrl">{{ qrUrl }}</button>
+                <button v-for="qrUrl in item.qrUrls" :key="qrUrl" class="qr-url-chip" @click="copyQRURL($event, qrUrl)" title="QRコードURLをコピー">{{ qrUrl }}</button>
               </div>
               <small v-if="item.error" class="error">{{ item.error }}</small>
             </article>
@@ -2549,9 +2550,9 @@ const vueApp = createApp({
           <p>変更した設定を保存してから移動しますか。保存しない場合、変更前の設定が維持されます。</p>
           <p v-if="error" class="error">{{ error }}</p>
           <div class="button-row dialog-actions">
-            <button @click="confirmSaveAndLeaveSettings()" :disabled="saving">{{ saving ? '保存中' : '保存して移動' }}</button>
-            <button class="secondary" @click="discardSettingsAndLeave" :disabled="saving">保存せずに移動</button>
-            <button class="secondary" @click="cancelSettingsLeave" :disabled="saving">キャンセル</button>
+            <button @click="confirmSaveAndLeaveSettings()" :disabled="saving" :title="saving ? '保存中です' : '保存して移動する'">{{ saving ? '保存中' : '保存して移動' }}</button>
+            <button class="secondary" @click="discardSettingsAndLeave" :disabled="saving" :title="saving ? '保存中です' : '保存せずに移動する'">保存せずに移動</button>
+            <button class="secondary" @click="cancelSettingsLeave" :disabled="saving" :title="saving ? '保存中です' : '移動を取りやめる'">キャンセル</button>
           </div>
         </div>
       </div>
@@ -2569,9 +2570,9 @@ const vueApp = createApp({
           <p>通常投稿用Webhook URLが設定済みの場合、専用Webhook URLが空でもこの確認は表示されません。</p>
           <p v-if="error" class="error">{{ error }}</p>
           <div class="button-row dialog-actions">
-            <button @click="confirmAutoPostSettings" :disabled="saving">{{ saving ? '保存中' : '確認して保存' }}</button>
-            <button class="secondary" @click="openDiscordWebhookSettings" :disabled="saving">Discord投稿設定を開く</button>
-            <button class="secondary" @click="cancelAutoPostConfirmation" :disabled="saving">キャンセル</button>
+            <button @click="confirmAutoPostSettings" :disabled="saving" :title="saving ? '保存中です' : 'この内容で保存する'">{{ saving ? '保存中' : '確認して保存' }}</button>
+            <button class="secondary" @click="openDiscordWebhookSettings" :disabled="saving" :title="saving ? '保存中です' : 'Discord投稿設定を開く'">Discord投稿設定を開く</button>
+            <button class="secondary" @click="cancelAutoPostConfirmation" :disabled="saving" :title="saving ? '保存中です' : '確認を閉じる'">キャンセル</button>
           </div>
         </div>
       </div>
