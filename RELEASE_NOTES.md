@@ -2,11 +2,16 @@
 
 ## v0.1.8
 
+# [v0.1.8のダウンロード](https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.8/ClipForVRChat-v0.1.8-windows-amd64.zip)
+
+通常は `ClipForVRChat-v0.1.8-windows-amd64.zip` をダウンロードし、展開した `ClipForVRChat.exe` を起動してください。
+AvatarBeaconを使う場合は、同じReleaseに手動添付される `AvatarBeacon-v0.1.8.unitypackage` もダウンロードし、Unityでアバターへ導入してください。
+
 ### 更新内容
 
 - 設定画面に「自動撮影」タブを追加し、OSC、撮影間隔、撮影方式、出力、Presence、Discord投稿設定をまとめました。
 - VRChat User CameraへOSCで構図を送り、Stream Camera(Spout)方式またはPhoto方式で有効な構図を順番に撮影する自動撮影機能を追加しました。
-- Stream方式では内蔵の `spout-capture.exe` がVRChat Stream CameraのSpout senderから1フレームをPNGとして受信し、必要に応じてJPGへ変換して保存します。通常版exeには `spout-capture.exe` と `SpoutLibrary.dll` を埋め込み、初回使用時に管理フォルダへ展開して呼び出します。
+- Stream方式では内蔵の `spout-capture.exe` がVRChat Stream CameraのSpout senderから1フレームをPNGとして受信し、必要に応じてJPGへ変換して保存します。通常利用者向けzip内の `ClipForVRChat.exe` には `spout-capture.exe` と `SpoutLibrary.dll` を埋め込み、初回使用時に管理フォルダへ展開して呼び出します。
 - `spout-capture.exe` はSpout受信だけを担当するWindows helperです。Spout/DirectX/OpenGL/DLLロードをClipForVRChat本体プロセスから隔離するために別プロセスとして実行しており、sender列挙、1フレーム受信、指定先へのPNG保存、結果JSON出力だけを行います。ネットワーク送信やWebhook URL/設定ファイルの読み取りは行いません。
 - VRChat output logから同じインスタンスにいるユーザー情報、world ID、instance IDを推定し、撮影画像に対応するsidecar JSONへ保存するようにしました。
 - 自動撮影画像へPNG iTXt/eXIfまたはJPEG EXIF APP1で撮影メタデータを埋め込めるようにしました。ユーザーID埋め込みは設定で独立して制御できます。
@@ -45,14 +50,18 @@
 
 ### ダウンロード
 
-- プログラムのダウンロード: [ClipForVRChat-v0.1.8-windows-amd64.exe](https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.8/ClipForVRChat-v0.1.8-windows-amd64.exe)
-- 署名確認用ファイル: [ClipForVRChat-v0.1.8-windows-amd64.exe.asc](https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.8/ClipForVRChat-v0.1.8-windows-amd64.exe.asc)
-- 破損確認用ファイル: [ClipForVRChat-v0.1.8-windows-amd64.exe.sha256](https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.8/ClipForVRChat-v0.1.8-windows-amd64.exe.sha256)
+- 通常利用者向けzip: [ClipForVRChat-v0.1.8-windows-amd64.zip](https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.8/ClipForVRChat-v0.1.8-windows-amd64.zip)
+- 通常利用者向けzip破損確認用ファイル: [ClipForVRChat-v0.1.8-windows-amd64.zip.sha256](https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.8/ClipForVRChat-v0.1.8-windows-amd64.zip.sha256)
+- AvatarBeacon導入用unitypackage: `AvatarBeacon-v0.1.8.unitypackage`。リリース担当者がUnityで作成し、GitHub Releaseへ手動添付します。
+- AvatarBeacon再生成・検証用source zip: [AvatarBeacon-v0.1.8-source.zip](https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.8/AvatarBeacon-v0.1.8-source.zip)
+- 個別exe: [ClipForVRChat-v0.1.8-windows-amd64.exe](https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.8/ClipForVRChat-v0.1.8-windows-amd64.exe)
+- 個別exe署名確認用ファイル: [ClipForVRChat-v0.1.8-windows-amd64.exe.asc](https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.8/ClipForVRChat-v0.1.8-windows-amd64.exe.asc)
+- 個別exe破損確認用ファイル: [ClipForVRChat-v0.1.8-windows-amd64.exe.sha256](https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.8/ClipForVRChat-v0.1.8-windows-amd64.exe.sha256)
 - 検証・切り分け用分離版zip: [ClipForVRChat-v0.1.8-windows-amd64-separated.zip](https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.8/ClipForVRChat-v0.1.8-windows-amd64-separated.zip)
 - 署名確認用公開鍵: https://keys.openpgp.org/search?q=release-signing@hato.life
 - 署名確認用fingerprint: `BE40 AA8D 082F 493F 613B C072 21DC 3486 1B40 E77D`
 
-通常版exeにはStream Camera(Spout)方式用の `spout-capture.exe` と `SpoutLibrary.dll` を埋め込みます。分離版zipはhelper単体確認や不具合切り分け用です。
+通常利用者向けzip内の `ClipForVRChat.exe` にはStream Camera(Spout)方式用の `spout-capture.exe` と `SpoutLibrary.dll` を埋め込みます。分離版zipはhelper単体確認や不具合切り分け用です。
 
 ### 比較
 

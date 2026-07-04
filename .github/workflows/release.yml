@@ -178,6 +178,12 @@ jobs:
             "[InternetShortcut]",
             "URL=https://keys.openpgp.org/search?q=release-signing@hato.life"
           ) | Set-Content -Encoding ASCII "dist/ClipForVRChat/Release-signing-public-key.url"
+          New-Item -ItemType Directory -Force "dist/ClipForVRChat-user-package" | Out-Null
+          Copy-Item "src/build/bin/ClipForVRChat.exe" "dist/ClipForVRChat-user-package/"
+          Copy-Item "README.md" "dist/ClipForVRChat-user-package/"
+          Copy-Item "LICENSE" "dist/ClipForVRChat-user-package/"
+          Copy-Item "third_party/Spout2-LICENSE.txt" "dist/ClipForVRChat-user-package/"
+          Copy-Item "dist/ClipForVRChat/Release-signing-public-key.url" "dist/ClipForVRChat-user-package/"
 
       - name: Sign executable
         shell: bash
@@ -210,6 +216,10 @@ jobs:
           Get-FileHash "dist/$env:ASSET_PREFIX-windows-amd64.exe" -Algorithm SHA256 |
             ForEach-Object { "$($_.Hash.ToLower())  $env:ASSET_PREFIX-windows-amd64.exe" } |
             Set-Content "dist/$env:ASSET_PREFIX-windows-amd64.exe.sha256"
+          Compress-Archive -Path "dist/ClipForVRChat-user-package/*" -DestinationPath "dist/$env:ASSET_PREFIX-windows-amd64.zip" -Force
+          Get-FileHash "dist/$env:ASSET_PREFIX-windows-amd64.zip" -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $env:ASSET_PREFIX-windows-amd64.zip" } |
+            Set-Content "dist/$env:ASSET_PREFIX-windows-amd64.zip.sha256"
           Compress-Archive -Path "dist/ClipForVRChat/*" -DestinationPath "dist/$env:ASSET_PREFIX-windows-amd64-separated.zip" -Force
           Get-FileHash "dist/$env:ASSET_PREFIX-windows-amd64-separated.zip" -Algorithm SHA256 |
             ForEach-Object { "$($_.Hash.ToLower())  $env:ASSET_PREFIX-windows-amd64-separated.zip" } |
@@ -311,13 +321,25 @@ jobs:
           }
           $zipCheckDir = Join-Path $env:RUNNER_TEMP "release-zip-check"
           Remove-Item -Recurse -Force $zipCheckDir -ErrorAction SilentlyContinue
+          $userZipCheckDir = Join-Path $env:RUNNER_TEMP "release-user-zip-check"
+          Remove-Item -Recurse -Force $userZipCheckDir -ErrorAction SilentlyContinue
+          Expand-Archive "dist/$env:ASSET_PREFIX-windows-amd64.zip" -DestinationPath $userZipCheckDir
           Expand-Archive "dist/$env:ASSET_PREFIX-windows-amd64-separated.zip" -DestinationPath $zipCheckDir
-          $unexpectedZipFiles = Get-ChildItem $zipCheckDir -Recurse -File | Where-Object {
+          $unexpectedUserZipFiles = Get-ChildItem $userZipCheckDir -Recurse -File | Where-Object {
+            $_.Name -like "*release-signing-public-key.asc" -or
+            $_.Extension -eq ".asc" -or
+            $_.Name -in @("spout-capture.exe", "SpoutLibrary.dll")
+          }
+          if ($unexpectedUserZipFiles) {
+            $unexpectedUserZipFiles | ForEach-Object { Write-Error "Unexpected file in normal release zip: $($_.FullName)" }
+            throw "Unexpected files were found in normal release zip"
+          }
+          $unexpectedSeparatedZipFiles = Get-ChildItem $zipCheckDir -Recurse -File | Where-Object {
             $_.Name -like "*release-signing-public-key.asc" -or $_.Extension -eq ".asc"
           }
-          if ($unexpectedZipFiles) {
-            $unexpectedZipFiles | ForEach-Object { Write-Error "Unexpected file in release zip: $($_.FullName)" }
-            throw "Unexpected files were found in release zip"
+          if ($unexpectedSeparatedZipFiles) {
+            $unexpectedSeparatedZipFiles | ForEach-Object { Write-Error "Unexpected file in separated release zip: $($_.FullName)" }
+            throw "Unexpected files were found in separated release zip"
           }
           $avatarZipCheckDir = Join-Path $env:RUNNER_TEMP "release-avatarbeacon-zip-check"
           Remove-Item -Recurse -Force $avatarZipCheckDir -ErrorAction SilentlyContinue
@@ -355,6 +377,8 @@ jobs:
             "dist/$env:ASSET_PREFIX-windows-amd64.exe",
             "dist/$env:ASSET_PREFIX-windows-amd64.exe.sha256",
             "dist/$env:ASSET_PREFIX-windows-amd64.exe.asc",
+            "dist/$env:ASSET_PREFIX-windows-amd64.zip",
+            "dist/$env:ASSET_PREFIX-windows-amd64.zip.sha256",
             "dist/$env:ASSET_PREFIX-windows-amd64-separated.zip",
             "dist/$env:ASSET_PREFIX-windows-amd64-separated.zip.sha256",
             "dist/AvatarBeacon-$env:TAG_NAME-source.zip",
@@ -378,19 +402,36 @@ jobs:
             "README.md",
             "LICENSE",
             "Release-signing-public-key.url",
+            "Spout2-LICENSE.txt"
+          )
+          foreach ($name in $requiredZip) {
+            if (!(Test-Path (Join-Path $userZipCheckDir $name))) {
+              throw "Required normal release zip file was not created: $name"
+            }
+          }
+          $requiredSeparatedZip = @(
+            "ClipForVRChat.exe",
+            "README.md",
+            "LICENSE",
+            "Release-signing-public-key.url",
             "spout-capture.exe",
             "SpoutLibrary.dll",
             "Spout2-LICENSE.txt"
           )
-          foreach ($name in $requiredZip) {
+          foreach ($name in $requiredSeparatedZip) {
             if (!(Test-Path (Join-Path $zipCheckDir $name))) {
-              throw "Required release zip file was not created: $name"
+              throw "Required separated release zip file was not created: $name"
             }
           }
           $exeHashLine = Get-Content "dist/$env:ASSET_PREFIX-windows-amd64.exe.sha256"
           $exeHash = (Get-FileHash "dist/$env:ASSET_PREFIX-windows-amd64.exe" -Algorithm SHA256).Hash.ToLower()
           if ($exeHashLine -ne "$exeHash  $env:ASSET_PREFIX-windows-amd64.exe") {
             throw "main exe sha256 file does not match"
+          }
+          $zipHashLine = Get-Content "dist/$env:ASSET_PREFIX-windows-amd64.zip.sha256"
+          $zipHash = (Get-FileHash "dist/$env:ASSET_PREFIX-windows-amd64.zip" -Algorithm SHA256).Hash.ToLower()
+          if ($zipHashLine -ne "$zipHash  $env:ASSET_PREFIX-windows-amd64.zip") {
+            throw "normal release zip sha256 file does not match"
           }
           $avatarHashLine = Get-Content -Raw "dist/AvatarBeacon-$env:TAG_NAME-source.zip.sha256"
           if ($avatarHashLine.Trim() -ne "$avatarHash  AvatarBeacon-$env:TAG_NAME-source.zip") {
@@ -417,6 +458,8 @@ jobs:
             dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64.exe
             dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64.exe.sha256
             dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64.exe.asc
+            dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64.zip
+            dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64.zip.sha256
             dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64-separated.zip
             dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64-separated.zip.sha256
             dist/AvatarBeacon-${{ steps.version.outputs.version }}-source.zip
@@ -466,6 +509,8 @@ jobs:
             "dist/ClipForVRChat-${TAG_NAME}-windows-amd64.exe" \
             "dist/ClipForVRChat-${TAG_NAME}-windows-amd64.exe.sha256" \
             "dist/ClipForVRChat-${TAG_NAME}-windows-amd64.exe.asc" \
+            "dist/ClipForVRChat-${TAG_NAME}-windows-amd64.zip" \
+            "dist/ClipForVRChat-${TAG_NAME}-windows-amd64.zip.sha256" \
             "dist/ClipForVRChat-${TAG_NAME}-windows-amd64-separated.zip" \
             "dist/ClipForVRChat-${TAG_NAME}-windows-amd64-separated.zip.sha256" \
             "dist/AvatarBeacon-${TAG_NAME}-source.zip" \

@@ -17,7 +17,6 @@
 | 171 | [Spout helperを本体exeへ埋め込み単一exe配布にする](171-embed-spout-helper-single-exe-release.md) | 要確認 | `v0.1.8` | C案採用に基づき、通常利用者向けReleaseを単一exe主導線へ戻し、分離版zipも検証用に残す。 |
 | 172 | [player_local基準Poseの挙動を見直す](172-clarify-or-redesign-player-local-basis-behavior.md) | 未着手 | 未定 | `player_local` が自動追従ではなく手動基準Pose方式であるため、初期構図とUI説明の期待ズレを解消する。 |
 | 173 | [専用アバターギミックOSCでHips/avatar基準Poseを自動取得する](173-implement-avatar-osc-basis-bridge.md) | 要確認 | `v0.1.8` | YL-ATG方式を参考に、専用アバターギミックからOSCでHips/avatar基準Poseを受け取り `player_local` basisへ使う機能を実装する。 |
-| 174 | [Release本文先頭にダウンロード導線を置き、通常配布zipへ必要物をまとめる](174-release-top-download-zip-with-avatar-package.md) | 未着手 | 未定 | Release本文の最上部に通常配布zipへの大きなダウンロードリンクを置き、手動添付するアバターギミック用unitypackageも利用者向けに案内する。 |
 | 175 | [CIでアバターギミック元ファイルzipを配布する](175-package-avatar-gimmick-source-zip.md) | 要確認 | `v0.1.8-rc17` | `Assets/PoppoWorks/AvatarBeacon/...` に配置したPrefab等をCIで元ファイルzip化し、`.unitypackage` は手作業で作成してGitHub Releaseへ添付する。 |
 | 176 | [YL-ATGを参考にAvatarBeaconアバターギミックを作成する](176-create-clipforvrchat-avatar-gimmick-from-yl-atg-reference.md) | 要確認 | `v0.1.8-rc24` | ユーザー配置済みのATG_ForAvatar packageを参考に汎用アバターギミックAvatarBeaconを作成し、`coord/*` と `forward/*` の汎用OSC parameter、YL-ATG由来部分のMITライセンス表記、stale診断、10秒ごとのOSC summaryログ、`avatar_osc` 初期値化、受信器維持、受信状態の自動更新とyaw表示を整備する。 |
 | 177 | [自動処理Webhookの通常投稿フォールバックを明確にする](177-clarify-discord-webhook-fallback-for-auto-processing.md) | 要確認 | `v0.1.8-rc18` | 自動処理専用Webhookが空欄の場合に通常投稿用Webhookへフォールバックする表示と保存前確認条件を整理する。 |
