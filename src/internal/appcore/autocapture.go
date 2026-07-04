@@ -233,8 +233,7 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 		}
 		diagAutoCapture(logPath, "osc send success: address=%q value=%t detail=%q", "/usercamera/SmoothMovement", true, "stream_prepare")
 		diagAutoCapture(logPath, "osc button press begin: address=%q detail=%q", "/usercamera/Streaming", "stream_start")
-		if err := client.sendBool("/usercamera/Streaming", true); err != nil {
-			diagAutoCapture(logPath, "osc button press error: address=%q detail=%q err=%v", "/usercamera/Streaming", "stream_start", err)
+		if err := sendCameraBoolCompat(client, logPath, "/usercamera/Streaming", true, "stream_start"); err != nil {
 			return nil, err
 		}
 		diagAutoCapture(logPath, "osc button press success: address=%q detail=%q", "/usercamera/Streaming", "stream_start")
@@ -277,7 +276,7 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) ([]Result, error) {
 	if ac.Capture.CloseCameraAfterBatch && (successCount > 0 || ac.Capture.Mode == "stream") {
 		if ac.Capture.Mode == "stream" {
 			diagAutoCapture(logPath, "osc button release begin: address=%q detail=%q", "/usercamera/Streaming", "stream_stop")
-			if err := client.sendBool("/usercamera/Streaming", false); err != nil {
+			if err := sendCameraBoolCompat(client, logPath, "/usercamera/Streaming", false, "stream_stop"); err != nil {
 				diagAutoCapture(logPath, "stream stop failed: err=%v", err)
 			} else {
 				diagAutoCapture(logPath, "osc button release success: address=%q detail=%q", "/usercamera/Streaming", "stream_stop")
@@ -327,7 +326,7 @@ func (r AutoCaptureRunner) restoreUserCameraState(client oscClient) {
 		formatUserCameraStateValues(target),
 	)
 	if target.Streaming != nil && !*target.Streaming {
-		sendRestoreBool(client, logPath, "/usercamera/Streaming", *target.Streaming)
+		sendRestoreBoolCompat(client, logPath, "/usercamera/Streaming", *target.Streaming)
 	}
 	if target.Mode != nil {
 		sendRestoreInt(client, logPath, "/usercamera/Mode", *target.Mode)
@@ -397,7 +396,7 @@ func (r AutoCaptureRunner) restoreUserCameraState(client oscClient) {
 		}
 	}
 	if target.Streaming != nil && *target.Streaming && target.Mode != nil && *target.Mode == 2 {
-		sendRestoreBool(client, logPath, "/usercamera/Streaming", *target.Streaming)
+		sendRestoreBoolCompat(client, logPath, "/usercamera/Streaming", *target.Streaming)
 	}
 	diagAutoCapture(logPath, "camera restore complete")
 }
@@ -431,6 +430,17 @@ func sendRestoreBool(client oscClient, logPath string, address string, value boo
 		return
 	}
 	diagAutoCapture(logPath, "camera restore send success: address=%q value=%t", address, value)
+}
+
+func sendRestoreBoolCompat(client oscClient, logPath string, address string, value bool) {
+	sendRestoreBool(client, logPath, address, value)
+	intValue := boolOSCInt(value)
+	diagAutoCapture(logPath, "camera restore compat int send begin: address=%q value=%d", address, intValue)
+	if err := client.sendInt(address, intValue); err != nil {
+		diagAutoCapture(logPath, "camera restore compat int send error: address=%q value=%d err=%v", address, intValue, err)
+		return
+	}
+	diagAutoCapture(logPath, "camera restore compat int send success: address=%q value=%d", address, intValue)
 }
 
 func mergeUserCameraRestoreState(restore AutoCaptureRestoreConfig) AutoCaptureUserCameraState {
@@ -827,7 +837,7 @@ func (r AutoCaptureRunner) ensureStreamCameraForSpoutCapture(ctx context.Context
 		diagAutoCapture(logPath, "stream camera refresh error: address=%q view_id=%q err=%v", "/usercamera/SmoothMovement", viewID, err)
 		return err
 	}
-	if err := client.sendBool("/usercamera/Streaming", true); err != nil {
+	if err := sendCameraBoolCompat(client, logPath, "/usercamera/Streaming", true, "stream_refresh:"+viewID); err != nil {
 		diagAutoCapture(logPath, "stream camera refresh error: address=%q view_id=%q err=%v", "/usercamera/Streaming", viewID, err)
 		return err
 	}
@@ -1715,6 +1725,30 @@ func sendCameraButton(ctx context.Context, client oscClient, address string, rel
 	}
 	diagAutoCapture(logPath, "osc button release success: address=%q detail=%q", address, detail)
 	return nil
+}
+
+func sendCameraBoolCompat(client oscClient, logPath string, address string, value bool, detail string) error {
+	diagAutoCapture(logPath, "osc bool compat send begin: address=%q value=%t detail=%q", address, value, detail)
+	if err := client.sendBool(address, value); err != nil {
+		diagAutoCapture(logPath, "osc bool compat send error: address=%q value=%t detail=%q err=%v", address, value, detail, err)
+		return err
+	}
+	diagAutoCapture(logPath, "osc bool compat send success: address=%q value=%t detail=%q", address, value, detail)
+	intValue := boolOSCInt(value)
+	diagAutoCapture(logPath, "osc bool compat int send begin: address=%q value=%d detail=%q", address, intValue, detail)
+	if err := client.sendInt(address, intValue); err != nil {
+		diagAutoCapture(logPath, "osc bool compat int send error: address=%q value=%d detail=%q err=%v", address, intValue, detail, err)
+		return err
+	}
+	diagAutoCapture(logPath, "osc bool compat int send success: address=%q value=%d detail=%q", address, intValue, detail)
+	return nil
+}
+
+func boolOSCInt(value bool) int32 {
+	if value {
+		return 1
+	}
+	return 0
 }
 
 func sendOptionalFloat(client oscClient, address string, value *float64) int {

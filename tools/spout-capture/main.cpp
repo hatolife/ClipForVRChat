@@ -121,6 +121,34 @@ void print_error(const std::string &code, const std::string &message, const std:
   std::cout << "}\n";
 }
 
+void print_capture_error(const std::string &code, const std::string &message, const std::string &sender_name,
+                         unsigned int width, unsigned int height, int64_t frame, const FrameStats &stats,
+                         const std::vector<SenderInfo> &senders = {}) {
+  std::cout << "{\"ok\":false,\"code\":\"" << json_escape(code)
+            << "\",\"message\":\"" << json_escape(message) << "\""
+            << ",\"senderName\":\"" << json_escape(sender_name) << "\""
+            << ",\"width\":" << width << ",\"height\":" << height
+            << ",\"frame\":" << frame
+            << ",\"frameStats\":{\"samples\":" << stats.samples
+            << ",\"mean\":" << stats.mean
+            << ",\"stddev\":" << stats.stddev
+            << ",\"nearWhiteRatio\":" << stats.near_white_ratio
+            << ",\"nearBlackRatio\":" << stats.near_black_ratio << "}";
+  if (!senders.empty()) {
+    std::cout << ",\"senders\":[";
+    for (size_t i = 0; i < senders.size(); ++i) {
+      if (i > 0) {
+        std::cout << ",";
+      }
+      std::cout << "{\"name\":\"" << json_escape(senders[i].name) << "\",\"width\":"
+                << senders[i].width << ",\"height\":" << senders[i].height
+                << ",\"hostPath\":\"" << json_escape(senders[i].host_path) << "\"}";
+    }
+    std::cout << "]";
+  }
+  std::cout << "}\n";
+}
+
 bool parse_int(const std::string &value, int *out) {
   try {
     size_t used = 0;
@@ -540,9 +568,9 @@ int capture(SPOUTHANDLE spout, const Options &options) {
     return 3;
   }
   if (!received_valid) {
-    print_error("capture_blank_frame",
-                "Spoutフレームは取得できましたが、timeout内に有効な映像になりませんでした。VRChat Stream Cameraの映像が表示されているか確認してください。",
-                selection.senders);
+    print_capture_error("capture_blank_frame",
+                        "Spoutフレームは取得できましたが、timeout内に有効な映像になりませんでした。VRChat Stream Cameraの映像が表示されているか確認してください。",
+                        selection.name, width, height, spout->GetSenderFrame(), last_stats, selection.senders);
     return 3;
   }
   std::error_code ec;

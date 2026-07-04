@@ -50,9 +50,18 @@ type SpoutCaptureResult struct {
 	Width      int               `json:"width,omitempty"`
 	Height     int               `json:"height,omitempty"`
 	Frame      int64             `json:"frame,omitempty"`
+	FrameStats *SpoutFrameStats  `json:"frameStats,omitempty"`
 	CapturedAt string            `json:"capturedAt,omitempty"`
 	OutputPath string            `json:"outputPath,omitempty"`
 	Senders    []SpoutSenderInfo `json:"senders,omitempty"`
+}
+
+type SpoutFrameStats struct {
+	Samples        int     `json:"samples,omitempty"`
+	Mean           float64 `json:"mean,omitempty"`
+	Stddev         float64 `json:"stddev,omitempty"`
+	NearWhiteRatio float64 `json:"nearWhiteRatio,omitempty"`
+	NearBlackRatio float64 `json:"nearBlackRatio,omitempty"`
 }
 
 type SpoutHelperStatus struct {
@@ -359,7 +368,7 @@ func captureStreamFrameWithSpout(ctx context.Context, cfg AutoCaptureStreamConfi
 		if result.Message == "" {
 			result.Message = result.Code
 		}
-		diagAutoCapture(logPath, "spout capture helper error: code=%q message=%q senders=%d output=%q", result.Code, result.Message, len(result.Senders), trimmed)
+		diagAutoCapture(logPath, "spout capture helper error: code=%q message=%q sender=%q width=%d height=%d frame=%d frame_stats=%s senders=%d output=%q", result.Code, result.Message, result.SenderName, result.Width, result.Height, result.Frame, formatSpoutFrameStats(result.FrameStats), len(result.Senders), trimmed)
 		return result, fmt.Errorf("Spout取得に失敗しました: %s", result.Message)
 	}
 	if !result.OK {
@@ -386,6 +395,13 @@ func captureStreamFrameWithSpout(ctx context.Context, cfg AutoCaptureStreamConfi
 	result.OutputPath = outputPath
 	diagAutoCapture(logPath, "spout capture success: output=%q temp_output=%q sender=%q width=%d height=%d frame=%d captured_at=%q stats_format=%q stats_width=%d stats_height=%d samples=%d mean=%.2f stddev=%.2f near_white=%.4f near_black=%.4f transparent=%.4f", outputPath, tempOutputPath, result.SenderName, result.Width, result.Height, result.Frame, result.CapturedAt, stats.Format, stats.Width, stats.Height, stats.Samples, stats.Mean, stats.Stddev, stats.NearWhiteRatio, stats.NearBlackRatio, stats.TransparentRatio)
 	return result, nil
+}
+
+func formatSpoutFrameStats(stats *SpoutFrameStats) string {
+	if stats == nil {
+		return "<none>"
+	}
+	return fmt.Sprintf("samples=%d mean=%.2f stddev=%.2f near_white=%.4f near_black=%.4f", stats.Samples, stats.Mean, stats.Stddev, stats.NearWhiteRatio, stats.NearBlackRatio)
 }
 
 func validateCapturedImage(path string) (capturedImageStats, error) {
