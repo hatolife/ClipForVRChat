@@ -33,4 +33,9 @@ OSC受信器の再起動条件、特にforward設定変更時に受信器が再�
 
 - [x] `cd src && GOCACHE=/tmp/clipforvrchat-go-cache go test ./...`
 - [x] Windows向けの `GOOS=windows GOARCH=amd64 go test -c`。
-- GitHub Actions Release workflowの再実行、または次RCでの成功確認。
+- [x] GitHub Actions Release workflowの再実行、または次RCでの成功確認。
+
+## 検証結果
+
+- `v0.1.8-rc34` のRelease workflowとbranch CIでWindows `go test ./...` が通過した。
+- rc30で発生した `TestAppRestartCameraPoseReceiverRestartsWhenForwardConfigChanges` の `TempDir RemoveAll cleanup` 失敗は再発していない。

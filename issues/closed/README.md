@@ -167,3 +167,5 @@
 | 174 | [Release本文先頭にダウンロード導線を置き、通常配布zipへ必要物をまとめる](174-release-top-download-zip-with-avatar-package.md) | 完了 | `v0.1.8` | Release本文の最上部に通常配布zipへの大きなダウンロードリンクを置き、手動添付するアバターギミック用unitypackageも利用者向けに案内する。 |
 | 186 | [完了済みissueをclosedディレクトリへ移動する](186-move-completed-issues-to-closed.md) | 完了 | 整理のみ | `issues/README.md` で完了扱いのissueを `issues/closed/` へ移動し、一覧リンクを更新する。 |
 | 190 | [カメラ撮影機能終了時に一時OSC状態を確実に解除する](190-make-camera-osc-reset-streaming-compat.md) | 完了 | `v0.1.8-rc31` | カメラOSCリセットと撮影終了時の `/usercamera/Streaming=false` などを通常のStream制御と同じbool+numeric互換送信に揃え、成否にかかわらず一時OSC状態を解除する。 |
+| 193 | [rc30 Release workflowのWindowsテストcleanup失敗を安定化する](193-stabilize-rc30-windows-release-test-cleanup.md) | 完了 | `v0.1.8-rc34` | Windows CIでOSC受信器テスト終了時の一時ディレクトリcleanupが診断ログ/UDP listener停止と競合しないよう、receiver終了待ちを追加した。 |
+| 194 | [CIのWails Build application工程が長時間完了しない](194-investigate-ci-wails-build-hang.md) | 完了 | `v0.1.8-rc34` | Windows `wails build` がbindings生成で止まる問題に対し、bindings生成skip、WebView2 strategy、mod同期抑止、timeout/verboseを追加した。 |

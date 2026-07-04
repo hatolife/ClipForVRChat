@@ -16,8 +16,8 @@ Windows CI/Release workflowの `wails build` が通常時間内に完了し、�
 
 - [x] CI/Releaseの `Build application` が長時間無出力で止まる原因候補を特定する。
 - [x] Wails buildが正常完了する、または失敗ログを取得できるようにtimeout/verbose/診断を追加する。
-- `v0.1.8-rc31` 以降のRelease workflowがBuild application工程で止まらない。
-- rc30のGo test cleanup失敗とは別問題として記録し、混同しない。
+- [x] `v0.1.8-rc31` 以降のRelease workflowがBuild application工程で止まらない。
+- [x] rc30のGo test cleanup失敗とは別問題として記録し、混同しない。
 
 ## 実装メモ
 
@@ -35,4 +35,10 @@ Windows CI/Release workflowの `wails build` が通常時間内に完了し、�
   - rc31 branch CI: `28691252927`
   - rc31 Release: `28691253567`
 - [x] ローカル `wails build` はbindings/frontend生成まで進み、Linuxの `webkit2gtk-4.0` 不足で明示的に失敗するため、bindings生成の停止ではない。
-- [ ] CIで `wails build -v 2 -m -nosyncgomod -skipbindings -webview2 browser -tags embeddedspout ...` が完了するか。
+- [x] CIで `wails build -v 2 -m -nosyncgomod -skipbindings -webview2 browser -tags embeddedspout ...` が完了するか。
+
+## 検証結果
+
+- `v0.1.8-rc33` のCI/Releaseは `Generating bindings` で20分timeoutし、停止箇所を特定できた。
+- `v0.1.8-rc34` のbranch CIとRelease workflowは成功した。
+- Release asset一覧と通常zip/separated zip/AvatarBeacon source zipの中身を確認した。
