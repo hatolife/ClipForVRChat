@@ -450,6 +450,9 @@ func classifySpoutCaptureFailure(result SpoutCaptureResult) (spoutCaptureFailure
 	case "capture_blank_frame":
 		switch {
 		case isLikelyTransparentSpoutFrame(result.FrameStats):
+			if spoutSenderFrameDidNotAdvance(result) {
+				return spoutCaptureFailureKindTransparentFrame, "Spout senderは見つかりフレーム受信も成功していますが、senderのframe番号が進まず、取得内容が全透明のままです。VRChat Stream CameraのSpoutをOFF/ONし、Stream Cameraを閉じて開き直してください。"
+			}
 			return spoutCaptureFailureKindTransparentFrame, "Spoutフレームは取得できましたが、ほぼ透明です。VRChat Stream Cameraの映像ではない可能性があります。"
 		case isLikelyBlackSpoutFrame(result.FrameStats):
 			return spoutCaptureFailureKindBlackFrame, "Spoutフレームは取得できましたが、ほぼ黒一色です。VRChat Stream Cameraの映像が黒くないか、初期フレームのまま更新されていないか確認してください。"
@@ -499,6 +502,12 @@ func isLikelyWhiteSpoutFrame(stats *SpoutFrameStats) bool {
 
 func isLikelyTransparentSpoutFrame(stats *SpoutFrameStats) bool {
 	return stats != nil && stats.TransparentRatio > 0.99
+}
+
+func spoutSenderFrameDidNotAdvance(result SpoutCaptureResult) bool {
+	return result.ReceiveSuccesses > 0 &&
+		result.FirstFrame == result.Frame &&
+		result.LastReceivedFrame == result.Frame
 }
 
 func validateCapturedImage(path string) (capturedImageStats, error) {

@@ -37,6 +37,8 @@
 | 196 | [設定画面タブ内の項目を概要行と詳細設定画面へ整理する](196-reorganize-settings-tab-detail-screens.md) | 要確認 | `v0.1.8` | 自動撮影タブなど長くなった設定項目を、概要行と詳細設定画面へ分けて見通しを改善する。 |
 | 197 | [開始時に撮影を初期ONにし、OSC基準確定後かつワールド移動中でない時だけ実行する](197-capture-on-start-after-avatar-osc-ready-and-world-stable.md) | 要確認 | `v0.1.8` | 開始時撮影を初期ONにし、AvatarBeacon basis ready後、かつワールド移動中でない安定状態でだけ実行する。 |
 | 199 | [rc35でStream Camera起動済みでもSpout有効映像待ちがtimeoutする](199-rc35-spout-black-frame-timeout-with-stream-camera-active.md) | 要確認 | `v0.1.8` | Stream Camera/Spout ONでsenderと1920x1080フレームは取れるが、黒フレーム扱いのままtimeoutする問題を、frame進捗/receive状態/blank統計で切り分ける。 |
+| 200 | [このPoseへカメラ移動でavatar_osc基準のplayer_local変換を使う](200-fix-move-camera-to-view-avatar-osc-player-local.md) | 要確認 | `v0.1.8` | カメラ移動APIでもAvatarBeaconの `avatar_osc` basisを使ってplayer_local構図をworld poseへ変換し、変換ログを出す。 |
+| 201 | [rc36でStream Camera起動済みでもSpout取得が透明フレームになる](201-rc36-spout-transparent-frame-with-stream-camera-active.md) | 要確認 | `v0.1.8` | sender frame番号不変かつ全透明のSpout失敗を明確なエラー文で切り分ける。helper改善は実機確認が必要。 |
 
 ## 状態の意味
 

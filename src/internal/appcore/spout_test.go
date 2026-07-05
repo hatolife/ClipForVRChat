@@ -95,6 +95,19 @@ func TestClassifySpoutCaptureFailure(t *testing.T) {
 			wantText: "ほぼ透明",
 		},
 		{
+			name: "transparent frame with stuck sender frame",
+			result: SpoutCaptureResult{
+				Code:              "capture_blank_frame",
+				Frame:             0,
+				FirstFrame:        0,
+				LastReceivedFrame: 0,
+				ReceiveSuccesses:  264,
+				FrameStats:        &SpoutFrameStats{Samples: 1024, TransparentRatio: 1},
+			},
+			wantKind: spoutCaptureFailureKindTransparentFrame,
+			wantText: "frame番号が進まず",
+		},
+		{
 			name:     "black frame",
 			result:   SpoutCaptureResult{Code: "capture_blank_frame", FrameStats: &SpoutFrameStats{Samples: 1024, Mean: 0, Stddev: 0, NearBlackRatio: 1}},
 			wantKind: spoutCaptureFailureKindBlackFrame,

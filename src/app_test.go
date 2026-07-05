@@ -811,6 +811,63 @@ func TestAppPrepareAutoCaptureConfigRejectsStaleAvatarOSCBasis(t *testing.T) {
 	}
 }
 
+func TestAppMoveCameraToViewUsesAvatarOSCBasis(t *testing.T) {
+	conn, port := listenAppOSCPackets(t)
+	defer conn.Close()
+
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+	cfg := app.state.Config
+	cfg.AutoCapture.OSC.Host = "127.0.0.1"
+	cfg.AutoCapture.OSC.SendPort = port
+	cfg.AutoCapture.Capture.Mode = "photo"
+	cfg.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
+	cfg.AutoCapture.PlayerLocal.Calibrated = false
+	cfg.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
+	view := appcore.CameraViewConfig{
+		ID:              "local",
+		Name:            "ローカル",
+		CoordinateSpace: "player_local",
+		Pose: appcore.CameraPoseConfig{
+			Position: appcore.CameraVector3Config{X: 1, Y: 2, Z: 3},
+			Rotation: appcore.CameraVector3Config{X: 4, Y: 5, Z: 6},
+		},
+	}
+	cfg.AutoCapture.Views = []appcore.CameraViewConfig{view}
+	app.state.Config = cfg
+	app.avatarOSCBasisSamples = readyAvatarOSCBasisSamples(time.Now())
+
+	snapshot := app.latestPlayerLocalBasisLocked(app.state.Config, time.Now())
+	if snapshot.Status != "ready" || !snapshot.Fresh {
+		t.Fatalf("snapshot = %+v, want ready", snapshot)
+	}
+	wantPose := appcore.TransformPlayerLocalPose(snapshot.Pose, view.Pose)
+
+	if err := app.MoveCameraToView("local"); err != nil {
+		t.Fatal(err)
+	}
+
+	packets := readAppOSCPackets(t, conn)
+	var posePacket appOSCPacket
+	for _, packet := range packets {
+		if packet.Address == "/usercamera/Pose" {
+			posePacket = packet
+			break
+		}
+	}
+	if posePacket.Address == "" {
+		t.Fatalf("/usercamera/Pose was not sent: %+v", packets)
+	}
+	if len(posePacket.Floats) != 6 {
+		t.Fatalf("pose floats = %+v, want 6 values", posePacket.Floats)
+	}
+	gotPose := appcore.CameraPoseConfig{
+		Position: appcore.CameraVector3Config{X: float64(posePacket.Floats[0]), Y: float64(posePacket.Floats[1]), Z: float64(posePacket.Floats[2])},
+		Rotation: appcore.CameraVector3Config{X: float64(posePacket.Floats[3]), Y: float64(posePacket.Floats[4]), Z: float64(posePacket.Floats[5])},
+	}
+	assertAppPoseClose(t, gotPose, wantPose)
+}
+
 func readyAvatarOSCBasisSamples(now time.Time) map[string]avatarOSCBasisSample {
 	return map[string]avatarOSCBasisSample{
 		"coord/x":       {Float: 0.8, HasFloat: true, ReceivedAt: now},
@@ -825,6 +882,90 @@ func readyAvatarOSCBasisSamples(now time.Time) map[string]avatarOSCBasisSample {
 		"forward/ySign": {Float: 1, HasFloat: true, ReceivedAt: now},
 		"forward/z":     {Float: 0, HasFloat: true, ReceivedAt: now},
 		"forward/zSign": {Float: 1, HasFloat: true, ReceivedAt: now},
+	}
+}
+
+func listenAppOSCPackets(t *testing.T) (net.PacketConn, int) {
+	t.Helper()
+	conn, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := conn.LocalAddr().(*net.UDPAddr)
+	return conn, addr.Port
+}
+
+type appOSCPacket struct {
+	Address  string
+	TypeTags string
+	Ints     []int32
+	Floats   []float32
+}
+
+func readAppOSCPackets(t *testing.T, conn net.PacketConn) []appOSCPacket {
+	t.Helper()
+	packets := make([]appOSCPacket, 0, 8)
+	buf := make([]byte, 2048)
+	for {
+		if err := conn.SetReadDeadline(time.Now().Add(200 * time.Millisecond)); err != nil {
+			t.Fatal(err)
+		}
+		n, _, err := conn.ReadFrom(buf)
+		if err != nil {
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				break
+			}
+			t.Fatal(err)
+		}
+		address, typeTags, payload, ok := appcore.ParseOSCPacket(append([]byte(nil), buf[:n]...))
+		if !ok {
+			t.Fatalf("failed to parse OSC packet: %v", buf[:n])
+		}
+		packet := appOSCPacket{Address: address, TypeTags: typeTags}
+		payloadOffset := 0
+		for _, tag := range strings.TrimPrefix(typeTags, ",") {
+			switch tag {
+			case 'i':
+				if payloadOffset+4 > len(payload) {
+					t.Fatalf("OSC int payload too short: %v", payload)
+				}
+				packet.Ints = append(packet.Ints, int32(binary.BigEndian.Uint32(payload[payloadOffset:payloadOffset+4])))
+				payloadOffset += 4
+			case 'f':
+				if payloadOffset+4 > len(payload) {
+					t.Fatalf("OSC float payload too short: %v", payload)
+				}
+				packet.Floats = append(packet.Floats, math.Float32frombits(binary.BigEndian.Uint32(payload[payloadOffset:payloadOffset+4])))
+				payloadOffset += 4
+			case 'T', 'F':
+			default:
+				t.Fatalf("unsupported OSC type tag %q in %q", tag, typeTags)
+			}
+		}
+		packets = append(packets, packet)
+	}
+	return packets
+}
+
+func assertAppPoseClose(t *testing.T, got appcore.CameraPoseConfig, want appcore.CameraPoseConfig) {
+	t.Helper()
+	const epsilon = 1e-4
+	values := []struct {
+		name string
+		got  float64
+		want float64
+	}{
+		{"pos.x", got.Position.X, want.Position.X},
+		{"pos.y", got.Position.Y, want.Position.Y},
+		{"pos.z", got.Position.Z, want.Position.Z},
+		{"rot.x", got.Rotation.X, want.Rotation.X},
+		{"rot.y", got.Rotation.Y, want.Rotation.Y},
+		{"rot.z", got.Rotation.Z, want.Rotation.Z},
+	}
+	for _, value := range values {
+		if math.Abs(value.got-value.want) > epsilon {
+			t.Fatalf("%s = %v, want %v; got pose %+v want %+v", value.name, value.got, value.want, got, want)
+		}
 	}
 }
 

@@ -752,6 +752,15 @@ func (a *App) MoveCameraToView(viewID string) error {
 	cfg := a.state.Config
 	cfg.Normalize()
 	cfg.DiagnosticLogPath = appcore.DiagnosticLogPath(a.configPath)
+	if view, ok := findAutoCaptureViewByID(cfg.AutoCapture.Views, viewID); ok && view.CoordinateSpace == "player_local" {
+		var err error
+		cfg, err = a.preparePlayerLocalBasisForCameraMoveLocked(cfg, view)
+		if err != nil {
+			a.state.Message = "カメラ移動に失敗しました: " + err.Error()
+			a.mu.Unlock()
+			return err
+		}
+	}
 	a.mu.Unlock()
 	if err := appcore.MoveUserCameraToView(context.Background(), cfg, viewID); err != nil {
 		a.mu.Lock()
@@ -763,6 +772,41 @@ func (a *App) MoveCameraToView(viewID string) error {
 	a.state.Message = "カメラを構図のPoseへ移動しました。"
 	a.mu.Unlock()
 	return nil
+}
+
+func findAutoCaptureViewByID(views []appcore.CameraViewConfig, viewID string) (appcore.CameraViewConfig, bool) {
+	viewID = strings.TrimSpace(viewID)
+	for _, view := range views {
+		if view.ID == viewID {
+			return view, true
+		}
+	}
+	return appcore.CameraViewConfig{}, false
+}
+
+func (a *App) preparePlayerLocalBasisForCameraMoveLocked(cfg appcore.Config, view appcore.CameraViewConfig) (appcore.Config, error) {
+	source := normalizePlayerLocalBasisSource(cfg.AutoCapture.PlayerLocal.BasisSource)
+	logPath := appcore.DiagnosticLogPath(a.configPath)
+	if source != appcore.PlayerLocalBasisSourceAvatarOSC {
+		appcore.AppendDiagnosticLog(logPath, "auto-capture move camera player_local basis source: view_id=%q view_name=%q source=%q manual_calibrated=%t", view.ID, view.Name, source, cfg.AutoCapture.PlayerLocal.Calibrated)
+		return cfg, nil
+	}
+	now := time.Now()
+	snapshot := a.latestPlayerLocalBasisLocked(cfg, now)
+	pose, err := a.freshPlayerLocalBasisLocked(cfg)
+	if err != nil {
+		appcore.AppendDiagnosticLog(logPath, "auto-capture move camera avatar_osc basis resolve error: view_id=%q view_name=%q status=%q fresh=%t raw=%d last=%q age_ms=%d err=%v", view.ID, view.Name, snapshot.Status, snapshot.Fresh, snapshot.RawSampleCount, snapshot.LastReceivedAddress, snapshot.AgeMS, err)
+		return cfg, err
+	}
+	cfg.AutoCapture.PlayerLocal.BasisPose = pose
+	cfg.AutoCapture.PlayerLocal.Calibrated = true
+	if strings.TrimSpace(snapshot.UpdatedAt) != "" {
+		cfg.AutoCapture.PlayerLocal.UpdatedAt = snapshot.UpdatedAt
+	} else {
+		cfg.AutoCapture.PlayerLocal.UpdatedAt = now.Format(time.RFC3339Nano)
+	}
+	appcore.AppendDiagnosticLog(logPath, "auto-capture move camera avatar_osc basis resolved: view_id=%q view_name=%q status=%q fresh=%t raw=%d last=%q age_ms=%d basis_pose=%+v local_pose=%+v", view.ID, view.Name, snapshot.Status, snapshot.Fresh, snapshot.RawSampleCount, snapshot.LastReceivedAddress, snapshot.AgeMS, pose, view.Pose)
+	return cfg, nil
 }
 
 func (a *App) ResetCameraOSC() error {

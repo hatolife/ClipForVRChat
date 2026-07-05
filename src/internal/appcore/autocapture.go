@@ -806,8 +806,13 @@ func (r AutoCaptureRunner) applyCameraView(client oscClient, view CameraViewConf
 	logPath := r.Config.DiagnosticLogPath
 	pose, err := ResolveCameraViewPose(r.Config.AutoCapture, view)
 	if err != nil {
-		diagAutoCapture(logPath, "camera pose resolve error: view_id=%q coordinate_space=%q err=%v", view.ID, view.CoordinateSpace, err)
+		diagAutoCapture(logPath, "camera pose resolve error: view_id=%q view_name=%q coordinate_space=%q basis_source=%q manual_calibrated=%t err=%v", view.ID, view.Name, view.CoordinateSpace, r.Config.AutoCapture.PlayerLocal.BasisSource, r.Config.AutoCapture.PlayerLocal.Calibrated, err)
 		return err
+	}
+	if view.CoordinateSpace == "player_local" {
+		diagAutoCapture(logPath, "camera pose resolved: view_id=%q view_name=%q coordinate_space=%q basis_source=%q basis_pose=%+v local_pose=%+v resolved_pose=%+v", view.ID, view.Name, view.CoordinateSpace, r.Config.AutoCapture.PlayerLocal.BasisSource, r.Config.AutoCapture.PlayerLocal.BasisPose, view.Pose, pose)
+	} else {
+		diagAutoCapture(logPath, "camera pose resolved: view_id=%q view_name=%q coordinate_space=%q world_pose=%+v", view.ID, view.Name, view.CoordinateSpace, pose)
 	}
 	diagAutoCapture(logPath, "osc send begin: address=%q view_id=%q", "/usercamera/Pose", view.ID)
 	if err := client.sendFloats("/usercamera/Pose", []float32{
