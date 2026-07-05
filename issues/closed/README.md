@@ -173,3 +173,4 @@
 | 198 | [world ID を Avatar OSC で送れるか調査する](198-world-id-avatar-osc-feasibility-investigation.md) | 断念 | `v0.1.8` | AvatarBeacon単体で現在world ID文字列をOSC送信する公式手段が確認できないため断念し、VRChat output log由来のworld/instance取得を代替とする。 |
 | 203 | [Spout2ライセンス表記の配布方法を確認する](203-confirm-spout2-license-distribution.md) | 完了 | 調査のみ | `Spout2-LICENSE.txt` は公開zipへ同梱継続が妥当で、アプリ内OSS表示だけで代替するにはBSD-2-Clause本文表示が必要。 |
 | 204 | [アプリ内OSSライセンス表示でライセンス本文を確認できるようにする](204-show-full-oss-license-text-in-app.md) | 完了 | 未定 | Spout2のBSD-2-Clause本文をアプリ内OSSライセンス画面で確認できるようにし、zip内個別ライセンスファイル代替の前提を整えた。 |
+| 205 | [Release build metadata assetの意図を確認する](205-investigate-release-build-metadata-asset.md) | 完了 | 調査のみ | Release assetに添付されるbuild metadata JSONの生成箇所、内容、添付意図を確認した。 |
