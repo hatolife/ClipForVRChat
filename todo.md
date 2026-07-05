@@ -1,10 +1,8 @@
-# Spout helper録画デバッグ対応チェックリスト
+# OSSライセンス本文表示チェックリスト
 
-- [x] issue 202 を追加する
-- [x] spout-capture.exeにdebug録画引数を追加する
-- [x] Go側でテスト撮影時だけdebug録画引数を渡す
-- [x] 設定画面にSpout録画デバッグフラグを追加する
-- [x] helper起動時のWindowsコンソールを隠す
-- [x] ローカル検証を実行する
-- [ ] コミットしてpushする
-- [ ] rcを作成しCI/Releaseを確認する
+- [x] issue 204 を追加する
+- [x] Spout2のBSD-2-Clause本文をAPIで返す
+- [x] OSSライセンス画面で本文を確認できるようにする
+- [x] フロントエンドチェックを実行する
+- [x] issue 204 を完了扱いにする
+- [x] コミットする

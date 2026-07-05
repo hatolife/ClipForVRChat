@@ -126,6 +126,7 @@ type OSSLicense struct {
 	License   string `json:"license"`
 	Copyright string `json:"copyright"`
 	URL       string `json:"url"`
+	Text      string `json:"text,omitempty"`
 }
 
 type FFmpegStatus struct {
@@ -339,9 +340,34 @@ func (a *App) GetOSSLicenses() []OSSLicense {
 		{Name: "golang.design/x/clipboard", License: "MIT", Copyright: "Copyright (c) 2021 Changkun Ou", URL: "https://github.com/golang-design/clipboard"},
 		{Name: "golang.org/x/crypto", License: "BSD-3-Clause", Copyright: "Copyright (c) The Go Authors", URL: "https://cs.opensource.google/go/x/crypto"},
 		{Name: "golang.org/x/image", License: "BSD-3-Clause", Copyright: "Copyright (c) The Go Authors", URL: "https://cs.opensource.google/go/x/image"},
-		{Name: "Spout2", License: "BSD-2-Clause", Copyright: "Copyright (c) 2016-2025, Lynn Jarvis", URL: "https://github.com/leadedge/Spout2"},
+		{Name: "Spout2", License: "BSD-2-Clause", Copyright: "Copyright (c) 2016-2025, Lynn Jarvis", URL: "https://github.com/leadedge/Spout2", Text: spout2LicenseText},
 	}
 }
+
+const spout2LicenseText = `Spout2 / SpoutLibrary
+
+Copyright (c) 2016-2025, Lynn Jarvis. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice,
+   this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`
 
 func (a *App) SelectOutputDirectory(current string) (string, error) {
 	return a.selectDirectory("出力先フォルダを選択", current)

@@ -1811,6 +1811,10 @@ const vueApp = createApp({
             <p>{{ license.license }}</p>
             <p>{{ license.copyright }}</p>
             <button class="link-button" @click="openURL(license.url)" title="このOSSの配布元を開く">{{ license.url }}</button>
+            <details v-if="license.text" class="license-text">
+              <summary>ライセンス本文</summary>
+              <pre>{{ license.text }}</pre>
+            </details>
           </article>
         </div>
         <button class="secondary" @click="setView('about', 'licenses_back')" title="前の画面へ戻る">戻る</button>

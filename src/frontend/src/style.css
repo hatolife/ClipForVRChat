@@ -1318,6 +1318,33 @@ small {
   background: #ffffff;
 }
 
+.license-text {
+  display: grid;
+  gap: 8px;
+}
+
+.license-text summary {
+  cursor: pointer;
+  color: #1f6f9d;
+  font-weight: 700;
+}
+
+.license-text pre {
+  max-height: 280px;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid #d6dee7;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #334155;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .link-button {
   max-width: 100%;
   padding: 0;

@@ -171,3 +171,5 @@
 | 193 | [rc30 Release workflowのWindowsテストcleanup失敗を安定化する](193-stabilize-rc30-windows-release-test-cleanup.md) | 完了 | `v0.1.8-rc34` | Windows CIでOSC受信器テスト終了時の一時ディレクトリcleanupが診断ログ/UDP listener停止と競合しないよう、receiver終了待ちを追加した。 |
 | 194 | [CIのWails Build application工程が長時間完了しない](194-investigate-ci-wails-build-hang.md) | 完了 | `v0.1.8-rc34` | Windows `wails build` がbindings生成で止まる問題に対し、bindings生成skip、WebView2 strategy、mod同期抑止、timeout/verboseを追加した。 |
 | 198 | [world ID を Avatar OSC で送れるか調査する](198-world-id-avatar-osc-feasibility-investigation.md) | 断念 | `v0.1.8` | AvatarBeacon単体で現在world ID文字列をOSC送信する公式手段が確認できないため断念し、VRChat output log由来のworld/instance取得を代替とする。 |
+| 203 | [Spout2ライセンス表記の配布方法を確認する](203-confirm-spout2-license-distribution.md) | 完了 | 調査のみ | `Spout2-LICENSE.txt` は公開zipへ同梱継続が妥当で、アプリ内OSS表示だけで代替するにはBSD-2-Clause本文表示が必要。 |
+| 204 | [アプリ内OSSライセンス表示でライセンス本文を確認できるようにする](204-show-full-oss-license-text-in-app.md) | 完了 | 未定 | Spout2のBSD-2-Clause本文をアプリ内OSSライセンス画面で確認できるようにし、zip内個別ライセンスファイル代替の前提を整えた。 |
