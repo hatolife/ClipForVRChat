@@ -1,8 +1,10 @@
-# OSSライセンス本文表示チェックリスト
+# Release note/Asset整理チェックリスト
 
-- [x] issue 204 を追加する
-- [x] Spout2のBSD-2-Clause本文をAPIで返す
-- [x] OSSライセンス画面で本文を確認できるようにする
-- [x] フロントエンドチェックを実行する
-- [x] issue 204 を完了扱いにする
-- [x] コミットする
+- [x] issue 205 を追加する
+- [x] リリースノート書式の文書を更新する
+- [x] Release workflowの通常zip内容を変更する
+- [x] Release upload対象を4種類に絞る
+- [x] RELEASE_NOTES/SPECを実態に合わせる
+- [x] 検証を実行する
+- [x] issue 205 を完了扱いにする
+- [ ] コミットする

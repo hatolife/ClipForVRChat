@@ -174,7 +174,7 @@ ONの場合、縮小画像をファイルとして保存します。
 v0.1.8では、設定画面の「自動撮影」タブからVRChat User CameraをOSCで操作し、構図ごとに撮影します。
 `player_local` の basis は `manual` と `avatar_osc` を選べます。`avatar_osc` は専用アバターギミックからOSC Avatar Parametersを受信する経路で、標準OSCだけでは動きません。
 
-AvatarBeacon は `avatar_osc` basis の確認に使う汎用アバターギミックであり、ClipForVRChat専用ではありません。CIでは `AvatarBeacon-vX.Y.Z-source.zip` と `AvatarBeacon-vX.Y.Z-source.zip.sha256` の元ファイルzipだけを作成し、Unityで作る `.unitypackage` はリリース担当者が手作業で作成してGitHub Releaseへ手動添付します。source zipをUnity projectへ展開すると `Assets/PoppoWorks/AvatarBeacon/...` になる形を想定します。Prefab構造とparameter仕様は `docs/avatarbeacon-spec.md` に記録します。
+AvatarBeacon は `avatar_osc` basis の確認に使う汎用アバターギミックであり、ClipForVRChat専用ではありません。CIでは `AvatarBeacon-vX.Y.Z-source.zip` の元ファイルzipを作成します。source zipをUnity projectへ展開すると `Assets/PoppoWorks/AvatarBeacon/...` になる形を想定します。Prefab構造とparameter仕様は `docs/avatarbeacon-spec.md` に記録します。
 
 ### 撮影方式
 
@@ -677,32 +677,28 @@ config.json
 
 ## Release
 
-GitHub Release の通常利用者向けWindows配布物は、単一化したexeと説明書をまとめたzipです。
+GitHub Release の通常利用者向けWindows配布物は、単一化したexe、署名、説明書をまとめたzipです。
 
 - `ClipForVRChat-vX.Y.Z-windows-amd64.zip`
-- `ClipForVRChat-vX.Y.Z-windows-amd64.zip.sha256`
 
 通常利用者向けzipには以下を含めます。
 
 - `ClipForVRChat.exe`
+- `ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc`
+- `Release-signing-public-key.url`
 - `README.md`
 - `LICENSE`
-- `Spout2-LICENSE.txt`
-- `Release-signing-public-key.url`
 
 zip内の `ClipForVRChat.exe` には、Stream Camera(Spout)受信用のWindows helperである `spout-capture.exe` と、その実行時依存DLLである `SpoutLibrary.dll` を埋め込みます。
 実行時は管理フォルダへhash検証付きで展開し、helperを別プロセスとして起動します。
 
-GitHub Release には、検証用の個別exeと署名も添付します。
+GitHub Release には、通常利用者向けzip内の `ClipForVRChat.exe` を検証するための署名も添付します。
 
-- `ClipForVRChat-vX.Y.Z-windows-amd64.exe`
-- `ClipForVRChat-vX.Y.Z-windows-amd64.exe.sha256`
 - `ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc`
 
 GitHub Release には、検証・切り分け用の分離版zipも添付します。
 
 - `ClipForVRChat-vX.Y.Z-windows-amd64-separated.zip`
-- `ClipForVRChat-vX.Y.Z-windows-amd64-separated.zip.sha256`
 
 分離版zipには以下を含めます。
 
@@ -716,14 +712,9 @@ GitHub Release には、検証・切り分け用の分離版zipも添付しま�
 
 分離版zipで `spout-capture.exe` または `SpoutLibrary.dll` が欠けている場合は、v0.1.8のStream方式として不完全です。
 
-AvatarBeacon を使う通常利用者向けに、リリース担当者がUnityで手作業作成した `.unitypackage` をGitHub Releaseへ手動添付します。
-
-- `AvatarBeacon-vX.Y.Z.unitypackage`
-
-CIで生成するAvatarBeacon source zipは、`.unitypackage` の再生成・検証用Assetとして添付します。source zip自体は通常利用者の主導線にしません。
+CIで生成するAvatarBeacon source zipは、リリース担当者がUnityで `.unitypackage` を作るための元ファイルとして添付します。
 
 - `AvatarBeacon-vX.Y.Z-source.zip`
-- `AvatarBeacon-vX.Y.Z-source.zip.sha256`
 
 安全性確認の観点:
 
@@ -731,11 +722,9 @@ CIで生成するAvatarBeacon source zipは、`.unitypackage` の再生成・検
 - Spout2はBSD 2-Clause Licenseの `SpoutLibrary` を使用し、GPL-3.0のSpoutRecorder由来コードをコピー、リンク、派生利用しません。
 - `spout-capture.exe` はClipForVRChat本体からタイムアウト付きで起動されるCLI helperで、常駐サービスや自動起動項目として登録しません。
 - `spout-capture.exe` はネットワーク送信を行わず、入力はSpout sender、出力は指定されたPNGファイルと標準出力JSONに限定します。
-- Release確認では、通常利用者向けzipのsha256、個別exeのsha256とPGP署名、分離版zipのsha256、各zip内の必須ファイル、`Spout2-LICENSE.txt` の同梱、不要なSpoutRecorder由来ファイルやデバッグ成果物が含まれないことを確認します。
+- Release確認では、GitHub Release本文が `RELEASE_NOTES.md` から作成されること、Release添付ファイルが通常利用者向けzip、単一exe署名asc、分離版zip、AvatarBeacon source zipの4種類だけであること、各zip内の必須ファイル、不要なSpoutRecorder由来ファイルやデバッグ成果物が含まれないことを確認します。
 
-Release asset には通常利用者向けzip、個別exe、分離版zipに加えてbuild metadataを添付します。
-
-- `ClipForVRChat-vX.Y.Z-build-metadata.json`
+Release asset にはsha256、個別exe、build metadataを添付しません。
 
 PGP署名を検証する利用者向け説明では、Release assetに同梱または案内された公開鍵だけを信頼根拠にしません。
 `release-signing@hato.life` の公開鍵fingerprint `BE40 AA8D 082F 493F 613B C072 21DC 3486 1B40 E77D` を、READMEや公式配布ページなどRelease assetとは別の信頼経路で照合するよう案内します。
@@ -749,5 +738,5 @@ PGP署名を検証する利用者向け説明では、Release assetに同梱ま�
 ClipForVRChat-v0.4.0-windows-amd64.exe
 ClipForVRChat-v0.4.0-windows-amd64.zip
 ClipForVRChat-v0.4.0-windows-amd64-separated.zip
-AvatarBeacon-v0.4.0.unitypackage
+AvatarBeacon-v0.4.0-source.zip
 ```

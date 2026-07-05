@@ -28,9 +28,9 @@ https://github.com/hatolife/ClipForVRChat/releases/latest
 
 zipを展開し、フォルダ内の `ClipForVRChat.exe` を起動してください。
 
-同じリリースには、zip本体とは別に `.zip.sha256`、個別exe、`.exe.sha256`、`ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc` も添付されています。`.zip.sha256` は通常利用者向けzipのファイル破損確認用、`.exe.asc` は個別exeのPGP署名検証用です。通常はzipだけダウンロードすれば使用できます。
+同じリリースには、zip本体とは別に `ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc` も添付されています。`.exe.asc` は通常利用者向けzip内の `ClipForVRChat.exe` をPGP署名検証するためのファイルです。通常はzipだけダウンロードすれば使用できます。
 
-PGP署名を確認する場合は、GitHub Releasesに別添付されている同じバージョンの個別exeと `.exe.asc` を同じフォルダに保存してください。公開鍵は `release-signing@hato.life` の鍵を使用し、取り込んだ鍵のfingerprintが `BE40 AA8D 082F 493F 613B C072 21DC 3486 1B40 E77D` と一致することを、このREADMEや公式配布ページなどRelease assetとは別の信頼経路で確認してください。同じReleaseに同梱されたURLや公開鍵だけでは、公開鍵自体の真正性は確認できません。信頼済みfingerprintの公開鍵で `gpg --verify ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc ClipForVRChat-vX.Y.Z-windows-amd64.exe` が成功した場合に限り、exeと署名の組み合わせがその鍵で署名されたものだと判断できます。
+PGP署名を確認する場合は、zipを展開し、`ClipForVRChat.exe` と同じフォルダに `.exe.asc` を置いてください。公開鍵は `release-signing@hato.life` の鍵を使用し、取り込んだ鍵のfingerprintが `BE40 AA8D 082F 493F 613B C072 21DC 3486 1B40 E77D` と一致することを、このREADMEや公式配布ページなどRelease assetとは別の信頼経路で確認してください。同じReleaseに同梱されたURLや公開鍵だけでは、公開鍵自体の真正性は確認できません。信頼済みfingerprintの公開鍵で `gpg --verify ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc ClipForVRChat.exe` が成功した場合に限り、exeと署名の組み合わせがその鍵で署名されたものだと判断できます。
 
 ### 2. 初回設定
 
@@ -100,7 +100,7 @@ Stream方式はVRChat Stream CameraのSpout映像を内蔵の `spout-capture.exe
 
 安全性を確認しやすいように、`spout-capture.exe` の役割は限定しています。利用可能なSpout senderの列挙、指定senderからの1フレーム受信、指定された保存先へのPNG書き込み、結果JSONの出力だけを行います。Discord Webhook URLや設定ファイルを読み取らず、画像や設定を外部へ送信するネットワーク通信も行いません。`SpoutLibrary.dll` はSpout2 SDKの実行時DLLで、`spout-capture.exe` がsender列挙とフレーム受信に使います。ヘルパーのソースは `tools/spout-capture/main.cpp`、ビルド設定は `tools/spout-capture/CMakeLists.txt` にあり、Spout2はBSD 2-Clause Licenseの `SpoutLibrary` を使用します。
 
-配布物を確認するときは、公式Releaseまたは公式配布元から通常利用者向けzipを取得し、Releaseに掲載された `.zip.sha256` と一致することを確認してください。PGP署名まで確認する場合は、同じReleaseの個別exeと `.exe.asc` を検証してください。zip内の `ClipForVRChat.exe` と個別exeはいずれもStream方式に必要なhelper一式を埋め込みます。
+配布物を確認するときは、公式Releaseまたは公式配布元から通常利用者向けzipを取得してください。通常利用者向けzipには `ClipForVRChat.exe`、`ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc`、`Release-signing-public-key.url`、`README.md`、`LICENSE` が入ります。PGP署名まで確認する場合は、zip内の `ClipForVRChat.exe` と `.exe.asc` を検証してください。
 
 Release Assetsには、検証・切り分け用に `ClipForVRChat-vX.Y.Z-windows-amd64-separated.zip` も添付します。このzipには `ClipForVRChat.exe`、`spout-capture.exe`、`SpoutLibrary.dll`、`Spout2-LICENSE.txt` が入ります。helper単体確認や外部helper指定での切り分けが必要な場合だけ使用してください。`spout-capture.exe` だけ、または `SpoutLibrary.dll` だけではStream方式は動作しません。
 
@@ -110,7 +110,7 @@ Stream方式で `Spout helperが見つかりません`、`Spout helperは見つ�
 
 プレイヤー基準構図は、AvatarBeacon導入済みアバターから受け取る `avatar_osc` basis を基本にします。標準OSCだけでは動かず、positionはHips基準、yawはHead基準で、player root そのものではありません。専用ギミックなしの場合は `manual` basis で手動保存した基準Poseをフォールバックとして使えます。確認手順は `docs/v0.1.8-avatar-osc-basis-verification.md` と `docs/v0.1.8-player-local-verification.md`、AvatarBeaconの詳細は `docs/avatarbeacon-spec.md` を参照してください。
 
-AvatarBeacon は `avatar_osc` basis 確認用の汎用アバターギミックで、ClipForVRChat専用ではありません。通常利用者はReleaseに手動添付される `AvatarBeacon-vX.Y.Z.unitypackage` をUnityで導入してください。CIは `AvatarBeacon-vX.Y.Z-source.zip` と `AvatarBeacon-vX.Y.Z-source.zip.sha256` の元ファイルzipだけを作成し、Unityで作る `.unitypackage` はリリース担当者が手作業で作成してGitHub Releaseへ手動添付します。source zipをUnity projectへ展開すると `Assets/PoppoWorks/AvatarBeacon/...` になる形を想定しています。
+AvatarBeacon は `avatar_osc` basis 確認用の汎用アバターギミックで、ClipForVRChat専用ではありません。CIは `AvatarBeacon-vX.Y.Z-source.zip` の元ファイルzipを作成します。source zipをUnity projectへ展開すると `Assets/PoppoWorks/AvatarBeacon/...` になる形を想定しています。
 
 RC確認時の詳しい確認手順は、`docs/v0.1.8-stream-spout-verification.md`、`docs/v0.1.8-player-local-verification.md`、`docs/v0.1.8-embedded-metadata-verification.md` を参照してください。
 

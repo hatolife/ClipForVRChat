@@ -2,70 +2,24 @@
 
 ## v0.1.8
 
-# [v0.1.8のダウンロード](https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.8/ClipForVRChat-v0.1.8-windows-amd64.zip)
+# v0.1.8
 
-通常は `ClipForVRChat-v0.1.8-windows-amd64.zip` をダウンロードし、展開した `ClipForVRChat.exe` を起動してください。
-AvatarBeaconを使う場合は、同じReleaseに手動添付される `AvatarBeacon-v0.1.8.unitypackage` もダウンロードし、Unityでアバターへ導入してください。
+## ダウンロード
+
+- [プログラムのダウンロード](https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.8/ClipForVRChat-v0.1.8-windows-amd64.zip)
 
 ### 更新内容
 
-- 設定画面に「自動撮影」タブを追加し、OSC、撮影間隔、撮影方式、出力、Presence、Discord投稿設定をまとめました。
-- VRChat User CameraへOSCで構図を送り、Stream Camera(Spout)方式またはPhoto方式で有効な構図を順番に撮影する自動撮影機能を追加しました。
-- Stream方式では内蔵の `spout-capture.exe` がVRChat Stream CameraのSpout senderから1フレームをPNGとして受信し、必要に応じてJPGへ変換して保存します。通常利用者向けzip内の `ClipForVRChat.exe` には `spout-capture.exe` と `SpoutLibrary.dll` を埋め込み、初回使用時に管理フォルダへ展開して呼び出します。
-- `spout-capture.exe` はSpout受信だけを担当するWindows helperです。Spout/DirectX/OpenGL/DLLロードをClipForVRChat本体プロセスから隔離するために別プロセスとして実行しており、sender列挙、1フレーム受信、指定先へのPNG保存、結果JSON出力だけを行います。ネットワーク送信やWebhook URL/設定ファイルの読み取りは行いません。
-- VRChat output logから同じインスタンスにいるユーザー情報、world ID、instance IDを推定し、撮影画像に対応するsidecar JSONへ保存するようにしました。
-- 自動撮影画像へPNG iTXt/eXIfまたはJPEG EXIF APP1で撮影メタデータを埋め込めるようにしました。ユーザーID埋め込みは設定で独立して制御できます。
-- 自動撮影した画像を既存の結果/履歴画面で扱えるようにし、設定で有効化した場合はDiscord Webhookへ投稿できるようにしました。画像添付なしの本文のみ投稿にも対応しました。
-- 埋め込みメタデータ書き込みに失敗した場合も、sidecar JSON、Discord投稿、履歴追加は可能な限り継続し、警告として記録します。
-- 構図カード内に「現在Poseから追加」と「このPoseへカメラ移動」を追加し、設定済みPoseをゲーム内カメラへ送れるようにしました。
-- User Camera関連OSCをfalse/Offへ戻す「カメラOSCをリセット」ボタンを自動撮影タブに追加しました。
-- 専用アバターギミックからOSC Avatar Parametersで送られるPoseを `player_local` のbasisに使う `avatar_osc` 取得元を追加しました。標準OSC単体では動作せず、専用アバターギミック導入済みアバターでの実機確認が必要です。
-- AvatarBeacon を `avatar_osc` basis 確認用の汎用アバターギミックとして整理しました。OSC parameterは `coord/*` と `forward/*` を既定にし、CI は source zip だけを作成します。Unity で作る `.unitypackage` はリリース担当者が手作業で作成して GitHub Release に手動添付します。source zip は `Assets/PoppoWorks/AvatarBeacon/...` に展開できる形です。
-- AvatarBeaconのbasisを、positionはHips基準、yaw/forwardはHead基準で送る構成にしました。プレイヤー位置はHips寄り、向きは顔の向き寄りとして扱います。
-- プレイヤー基準の取得元の初期値を `avatar_osc` に変更しました。新規設定、または `basisSource` が未保存の設定では、AvatarBeaconからのOSC basis受信を既定で使います。
-- VRChat写真、スクリーンショット、自動撮影の専用Webhook URLが空欄の場合に通常投稿用Webhook URLへフォールバックすることを設定画面で明示し、通常投稿用Webhook URLが設定済みなら専用Webhook未設定だけでは保存時確認を出さないようにしました。
-- `avatar_osc` 受信状態で、Avatar OSC未受信時にmanual基準Pose未設定エラーが表示されないようにし、AvatarBeaconの `coord/*` / `forward/*` 受信確認先を表示するようにしました。
-- `avatar_osc` 受信処理がVRChatのAvatar Parameter受信ごとに大量ログを出し、起動直後のGUI表示を阻害する場合がある問題を修正しました。
-- 自動撮影タブの `avatar_osc` 受信状態を自動更新にし、手動更新ボタンを削除しました。最終受信、position、yawを確認できます。
-- `avatar_osc` 受信状態のyaw表示がGo APIの `pose.rotation.y` を読んでおらず0度に見える問題を修正しました。yawはAvatarBeaconの `forward/*` から復元した現在の向きです。
-- GUI起動の切り分け用に、Wails起動/DOM準備/frontend初期化/手動終了/shutdownの診断ログと、起動中の簡易進捗表示を追加しました。
-- 自動撮影タブの説明文がfrontendのtemplate literalを壊し、起動時に `avatar is not defined` が出る問題を修正しました。同種の混入をCI/Releaseで検出する検査も追加しました。
-- `avatar_osc` が `stale` の場合に、内部エラー名ではなく、AvatarBeaconの `coord/*` / `forward/*` 更新停止、最後に受信したparameter、OSC config resetやContact確認へ誘導する診断文を表示するようにしました。
-- AvatarBeacon切り分け用のOSC診断ログを、全packet連続出力から10秒ごとのsummaryへ変更しました。status、raw、last、position/yaw、`coord/*` / `forward/*` の最新値と受信時刻を確認できます。
-- 設定画面を開いたときに同じOSC受信ポートへ再bindして失敗し、`avatar_osc` 受信器が止まって `stale` になる問題を修正しました。同じhost/port/log pathでは既存の受信器を維持します。
-- `avatar_osc` の鮮度判定を、basis対象parameterの最古受信時刻ではなく最新受信時刻で見るようにしました。VRChat OSCが値変化時だけ送る挙動でも、変化していない軸だけを理由にstaleになりにくくなります。
-- 自動撮影タブのAvatarBeacon受信状態から、ログsummary確認を促す常時説明文を削除しました。
-- Spout helperのPNG書き出しでWindows WIC PNG encoderがRGBA pixel formatを受け付けず、Stream方式テスト撮影が `PNG encoder does not support RGBA` で失敗する問題を修正しました。
-- 自動撮影後にUser Cameraの状態をできるだけ元へ戻す復元処理を追加しました。撮影前に受信したUser Camera OSCのMode、Pose、Streaming、SmoothMovement、Zoom、Exposure、mask類などを優先し、受信できない項目は設定画面末尾付近のフォールバック値を使います。撮影失敗やキャンセルでも、OSC接続が開けた後なら復元処理を試みます。
-- Stream方式でVRChatへStream Camera/Spout ONを送った直後、Spout sender生成が間に合わず `Spout senderがありません` で即失敗する問題を修正しました。Spout helperはtimeout内でsender出現を待ち、自動撮影側も各shotのSpout取得直前にStream起動OSCを再送します。
-- Stream方式でSpout起動直後の空フレームを透明PNGとして保存し、`取得画像がほぼ透明です` で失敗する問題を修正しました。Spout helperは非空の有効フレームまでtimeout内で待ち、アプリ側は検証成功後だけ最終ファイル名へ確定するため、失敗画像が自動処理やDiscord投稿へ流れにくくなりました。
-- 別フォルダや別バージョンのClipForVRChatを同じWindowsユーザー環境で同時起動しようとした場合も、単一起動制御が働くようにしました。後から起動した側では、既存を閉じて新規起動するか、既存ウィンドウを表示して新規起動を終了するかを選べます。管理者権限での起動は本体初期化前に拒否します。
+- VRChat User CameraをOSCで操作し、複数構図をStream Camera(Spout)方式またはPhoto方式で順番に撮影する自動撮影機能を追加しました。
+- 自動撮影画像にsidecar JSONとPNG/JPEGメタデータを保存し、VRChat output logから推定した同席ユーザー、world ID、instance IDも記録できるようにしました。
+- 自動撮影結果を既存の結果/履歴画面、ローカル保存、Discord投稿へ統合しました。専用Webhook URLが空欄の場合は通常投稿用Webhook URLへフォールバックします。
+- AvatarBeaconからOSC Avatar Parametersで受け取る `avatar_osc` basisを使い、プレイヤー基準の構図をアバター位置と向きに追従できるようにしました。
 - 設定画面に「OSC」タブを追加し、OSC送受信ポート、カメラOSCリセット、AvatarBeacon受信状態、player_local basis取得元をまとめました。
-- VRChatから受信したOSC packetを、他アプリ向けの別UDPポートへ転送できるようにしました。ClipForVRChatがVRChat出力OSCポートを代表してlistenし、他アプリ側は設定した転送先ポートをlistenすることでポート競合を避けられます。
-
-### 既知の制限
-
-- player_local構図は標準OSCだけでプレイヤーrootを自動取得できないため、AvatarBeacon導入済みアバターからの `avatar_osc` basisを基本にします。専用ギミックなしの場合は、手動で保存したmanual基準Poseをフォールバックとして使います。
-- `avatar_osc` basisはpositionがHips基準、yawがHead基準であり、player root基準そのものではありません。専用アバターギミック未導入、OSC無効、parameter欠落、鮮度切れの場合は撮影前に失敗します。
-- AvatarBeacon の `.unitypackage` は CI では作らず、手作業で作成して Release に添付します。source zip は再生成・検証用の配布物です。
-- output log由来のユーザー一覧やworld/instance情報は、VRChatログの内容によって取得できない場合があります。
-- OSC転送は、他アプリ側の受信ポートを変更できる場合の競合回避策です。他アプリがVRChat標準の受信ポート固定で変更できない場合、この機能では競合を解消できません。UDP転送のため、転送先アプリが実際に受信したことまでは保証しません。
-- Camera Dolly Multi、解像度一時変更、SQLiteローカルDB、OSCQuery自動検出はv0.1.8の対象外です。v0.1.8ではsidecar JSONと履歴JSONを正本/索引として扱います。
-
-### ダウンロード
-
-- 通常利用者向けzip: [ClipForVRChat-v0.1.8-windows-amd64.zip](https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.8/ClipForVRChat-v0.1.8-windows-amd64.zip)
-- 通常利用者向けzip破損確認用ファイル: [ClipForVRChat-v0.1.8-windows-amd64.zip.sha256](https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.8/ClipForVRChat-v0.1.8-windows-amd64.zip.sha256)
-- AvatarBeacon導入用unitypackage: `AvatarBeacon-v0.1.8.unitypackage`。リリース担当者がUnityで作成し、GitHub Releaseへ手動添付します。
-- AvatarBeacon再生成・検証用source zip: [AvatarBeacon-v0.1.8-source.zip](https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.8/AvatarBeacon-v0.1.8-source.zip)
-- 個別exe: [ClipForVRChat-v0.1.8-windows-amd64.exe](https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.8/ClipForVRChat-v0.1.8-windows-amd64.exe)
-- 個別exe署名確認用ファイル: [ClipForVRChat-v0.1.8-windows-amd64.exe.asc](https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.8/ClipForVRChat-v0.1.8-windows-amd64.exe.asc)
-- 個別exe破損確認用ファイル: [ClipForVRChat-v0.1.8-windows-amd64.exe.sha256](https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.8/ClipForVRChat-v0.1.8-windows-amd64.exe.sha256)
-- 検証・切り分け用分離版zip: [ClipForVRChat-v0.1.8-windows-amd64-separated.zip](https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.8/ClipForVRChat-v0.1.8-windows-amd64-separated.zip)
-- 署名確認用公開鍵: https://keys.openpgp.org/search?q=release-signing@hato.life
-- 署名確認用fingerprint: `BE40 AA8D 082F 493F 613B C072 21DC 3486 1B40 E77D`
-
-通常利用者向けzip内の `ClipForVRChat.exe` にはStream Camera(Spout)方式用の `spout-capture.exe` と `SpoutLibrary.dll` を埋め込みます。分離版zipはhelper単体確認や不具合切り分け用です。
+- VRChatから受信したOSC packetを別UDPポートへ転送できるようにし、他OSC受信アプリとのポート競合を避けやすくしました。
+- Stream Camera(Spout)取得の起動待ち、空フレーム待ち、PNG書き出し、失敗画像の隔離を改善し、Stream方式の撮影失敗を減らしました。
+- 自動撮影後にUser CameraのMode、Pose、Streaming、Zoom、Exposure、mask類などをできるだけ撮影前の状態へ戻すようにしました。
+- 別フォルダや別バージョンのClipForVRChatでも同じWindowsユーザーでは単一起動になるようにし、OSC port競合を避けました。
+- 起動中の進捗表示、frontend template検査、Wails API surface検査を追加し、GUI起動不具合を切り分けやすくしました。
 
 ### 比較
 
