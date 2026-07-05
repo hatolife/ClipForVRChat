@@ -8,6 +8,8 @@
 #include <cstdint>
 #include <ctime>
 #include <filesystem>
+#include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <cmath>
 #include <memory>
@@ -45,7 +47,10 @@ struct Options {
   bool show_version = false;
   std::string sender;
   std::filesystem::path output;
+  std::filesystem::path debug_dir;
   int timeout_ms = 10000;
+  int debug_frames = 0;
+  bool debug_frames_set = false;
 };
 
 std::string json_escape(const std::string &value) {
@@ -98,7 +103,8 @@ void print_help() {
   std::cout << "spout-capture --help\n"
             << "spout-capture --version\n"
             << "spout-capture --list-senders\n"
-            << "spout-capture --capture [--sender name] --output file.png --timeout-ms 10000\n";
+            << "spout-capture --capture [--sender name] --output file.png --timeout-ms 10000\n"
+            << "              [--debug-dir directory] [--debug-frames 8]\n";
 }
 
 void print_version() {
@@ -126,7 +132,8 @@ void print_error(const std::string &code, const std::string &message, const std:
 
 void print_capture_error(const std::string &code, const std::string &message, const std::string &sender_name,
                          unsigned int width, unsigned int height, const CaptureObservation &observation,
-                         const FrameStats &stats, const std::vector<SenderInfo> &senders = {}) {
+                         const FrameStats &stats, const std::vector<SenderInfo> &senders = {},
+                         const std::string &debug_dir = {}, int debug_frames = 0) {
   std::cout << "{\"ok\":false,\"code\":\"" << json_escape(code)
             << "\",\"message\":\"" << json_escape(message) << "\""
             << ",\"senderName\":\"" << json_escape(sender_name) << "\""
@@ -144,6 +151,9 @@ void print_capture_error(const std::string &code, const std::string &message, co
             << ",\"nearBlackRatio\":" << stats.near_black_ratio
             << ",\"transparentRatio\":" << stats.transparent_ratio << "}"
             << ",\"frameStatsText\":\"" << json_escape(format_frame_stats(stats)) << "\"";
+  if (!debug_dir.empty()) {
+    std::cout << ",\"debugDir\":\"" << json_escape(debug_dir) << "\",\"debugFrames\":" << debug_frames;
+  }
   if (!senders.empty()) {
     std::cout << ",\"senders\":[";
     for (size_t i = 0; i < senders.size(); ++i) {
@@ -194,6 +204,18 @@ bool parse_args(int argc, char **argv, Options *options, std::string *error) {
         return false;
       }
       options->output = std::filesystem::path(argv[i]);
+    } else if (arg == "--debug-dir") {
+      if (++i >= argc) {
+        *error = "--debug-dir requires a value";
+        return false;
+      }
+      options->debug_dir = std::filesystem::path(argv[i]);
+    } else if (arg == "--debug-frames") {
+      if (++i >= argc || !parse_int(argv[i], &options->debug_frames)) {
+        *error = "--debug-frames requires an integer value";
+        return false;
+      }
+      options->debug_frames_set = true;
     } else if (arg == "--timeout-ms") {
       if (++i >= argc || !parse_int(argv[i], &options->timeout_ms)) {
         *error = "--timeout-ms requires an integer value";
@@ -221,6 +243,17 @@ bool parse_args(int argc, char **argv, Options *options, std::string *error) {
   }
   if (options->timeout_ms < 100) {
     options->timeout_ms = 100;
+  }
+  if (!options->debug_dir.empty()) {
+    if (options->debug_frames <= 0) {
+      options->debug_frames = 8;
+    }
+    if (options->debug_frames > 120) {
+      options->debug_frames = 120;
+    }
+  } else if (options->debug_frames_set) {
+    *error = "--debug-frames requires --debug-dir";
+    return false;
   }
   return true;
 }
@@ -250,6 +283,119 @@ void force_opaque_alpha(std::vector<unsigned char> &rgba) {
     rgba[i] = 255;
   }
 }
+
+std::string timestamp_utc() {
+  auto now = std::chrono::system_clock::now();
+  auto seconds = std::chrono::time_point_cast<std::chrono::seconds>(now);
+  std::time_t t = std::chrono::system_clock::to_time_t(seconds);
+  std::tm utc = {};
+  gmtime_s(&utc, &t);
+  char timestamp[32] = {};
+  std::strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%SZ", &utc);
+  return timestamp;
+}
+
+std::string timestamp_file_utc() {
+  auto now = std::chrono::system_clock::now();
+  auto seconds = std::chrono::time_point_cast<std::chrono::seconds>(now);
+  std::time_t t = std::chrono::system_clock::to_time_t(seconds);
+  std::tm utc = {};
+  gmtime_s(&utc, &t);
+  char timestamp[32] = {};
+  std::strftime(timestamp, sizeof(timestamp), "%Y%m%dT%H%M%SZ", &utc);
+  return timestamp;
+}
+
+struct DebugRecorder {
+  bool enabled = false;
+  std::filesystem::path dir;
+  std::ofstream log;
+  std::ofstream frames_jsonl;
+  std::string session_id;
+  int max_frames = 0;
+  int dumped_frames = 0;
+
+  void start(const Options &options, std::string *error) {
+    if (options.debug_dir.empty()) {
+      return;
+    }
+    dir = options.debug_dir;
+    session_id = timestamp_file_utc() + "_pid" + std::to_string(GetCurrentProcessId());
+    max_frames = options.debug_frames;
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);
+    if (ec) {
+      *error = "debug directory could not be created: " + ec.message();
+      return;
+    }
+    log.open(dir / "spout-capture-debug.log", std::ios::app);
+    frames_jsonl.open(dir / "frames.jsonl", std::ios::app);
+    if (!log || !frames_jsonl) {
+      *error = "debug log files could not be opened";
+      return;
+    }
+    enabled = true;
+    log_event("debug recording started dir=\"" + dir.u8string() + "\" session=\"" + session_id +
+              "\" max_frames=" + std::to_string(max_frames));
+  }
+
+  void log_event(const std::string &message) {
+    if (!enabled || !log) {
+      return;
+    }
+    log << timestamp_utc() << " " << message << "\n";
+    log.flush();
+  }
+
+  void dump_frame(const std::vector<unsigned char> &rgba, unsigned int width, unsigned int height,
+                  int64_t sender_frame, const FrameStats &stats) {
+    if (!enabled || dumped_frames >= max_frames || width == 0 || height == 0 || rgba.empty()) {
+      return;
+    }
+    const int next_index = dumped_frames + 1;
+    std::ostringstream base;
+    base << session_id << "_frame_" << std::setw(6) << std::setfill('0') << next_index;
+    const std::filesystem::path raw_path = dir / (base.str() + ".rgba");
+    const std::filesystem::path json_path = dir / (base.str() + ".json");
+    std::ofstream raw(raw_path, std::ios::binary);
+    if (!raw) {
+      log_event("debug frame raw file open failed path=\"" + raw_path.u8string() + "\"");
+      return;
+    }
+    raw.write(reinterpret_cast<const char *>(rgba.data()), static_cast<std::streamsize>(rgba.size()));
+    if (!raw) {
+      log_event("debug frame raw file write failed path=\"" + raw_path.u8string() + "\"");
+      return;
+    }
+    dumped_frames = next_index;
+    std::ostringstream metadata;
+    metadata << "{\"capturedAt\":\"" << timestamp_utc()
+             << "\",\"session\":\"" << json_escape(session_id) << "\""
+             << "\",\"index\":" << dumped_frames
+             << ",\"senderFrame\":" << sender_frame
+             << ",\"width\":" << width
+             << ",\"height\":" << height
+             << ",\"format\":\"rgba8\""
+             << ",\"rawPath\":\"" << json_escape(raw_path.u8string()) << "\""
+             << ",\"frameStats\":{\"samples\":" << stats.samples
+             << ",\"mean\":" << stats.mean
+             << ",\"stddev\":" << stats.stddev
+             << ",\"nearWhiteRatio\":" << stats.near_white_ratio
+             << ",\"nearBlackRatio\":" << stats.near_black_ratio
+             << ",\"transparentRatio\":" << stats.transparent_ratio << "}}";
+    std::ofstream json(json_path);
+    if (json) {
+      json << metadata.str() << "\n";
+    }
+    if (frames_jsonl) {
+      frames_jsonl << metadata.str() << "\n";
+      frames_jsonl.flush();
+    }
+    log_event("debug frame dumped index=" + std::to_string(dumped_frames) +
+              " sender_frame=" + std::to_string(sender_frame) +
+              " stats=\"" + format_frame_stats(stats) + "\"");
+  }
+};
 
 bool write_png_wic(const std::filesystem::path &path, unsigned int width, unsigned int height,
                    const std::vector<unsigned char> &rgba, std::string *error) {
@@ -472,13 +618,22 @@ int list_senders(SPOUTHANDLE spout) {
 }
 
 int capture(SPOUTHANDLE spout, const Options &options) {
+  DebugRecorder debug;
+  std::string debug_error;
+  debug.start(options, &debug_error);
+  if (!debug_error.empty()) {
+    print_error("debug_record_error", "Spout debug録画の準備に失敗しました: " + debug_error);
+    return 6;
+  }
   auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(options.timeout_ms);
   SenderSelection selection = wait_for_sender(spout, options.sender, deadline);
   if (selection.name.empty()) {
+    debug.log_event("sender selection failed code=\"" + selection.code + "\" message=\"" + selection.message + "\"");
     print_error(selection.code.empty() ? "sender_not_selected" : selection.code,
                 selection.message, selection.senders);
     return 2;
   }
+  debug.log_event("sender selected name=\"" + selection.name + "\"");
   spout->SetReceiverName(selection.name.c_str());
   std::vector<unsigned char> pixels;
   unsigned int width = 0;
@@ -497,6 +652,7 @@ int capture(SPOUTHANDLE spout, const Options &options) {
 
     spout->GetSenderInfo(selection.name.c_str(), width, height, handle, format);
     if (width == 0 || height == 0) {
+      debug.log_event("sender info has zero size sender_frame=" + std::to_string(current_frame));
       std::this_thread::sleep_for(std::chrono::milliseconds(30));
       continue;
     }
@@ -508,20 +664,31 @@ int capture(SPOUTHANDLE spout, const Options &options) {
       observation.receive_successes++;
       observation.last_received_frame = current_frame;
       observation.last_stats = analyze_rgba_frame(pixels, width, height);
+      debug.dump_frame(pixels, width, height, current_frame, observation.last_stats);
       if (!is_blank_frame(observation.last_stats)) {
         observation.saw_non_blank_frame = true;
+        debug.log_event("valid non blank frame found sender_frame=" + std::to_string(current_frame) +
+                        " stats=\"" + format_frame_stats(observation.last_stats) + "\"");
         force_opaque_alpha(pixels);
         break;
       }
+    } else {
+      debug.log_event("ReceiveImage returned false sender_frame=" + std::to_string(current_frame));
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(30));
   }
 
   const CaptureFrameState state = classify_capture_frame_state(observation);
   if (state != CaptureFrameState::ValidFrame) {
+    debug.log_event("capture failed state=\"" + std::string(capture_frame_state_code(state)) +
+                    "\" attempts=" + std::to_string(observation.receive_attempts) +
+                    " successes=" + std::to_string(observation.receive_successes) +
+                    " first_frame=" + std::to_string(observation.first_sender_frame) +
+                    " last_frame=" + std::to_string(observation.last_sender_frame) +
+                    " dumped_frames=" + std::to_string(debug.dumped_frames));
     print_capture_error(capture_frame_state_code(state), capture_frame_state_message(state),
                         selection.name, width, height, observation, observation.last_stats,
-                        selection.senders);
+                        selection.senders, debug.enabled ? debug.dir.u8string() : "", debug.dumped_frames);
     return 3;
   }
 
@@ -535,21 +702,22 @@ int capture(SPOUTHANDLE spout, const Options &options) {
   }
   std::string write_error;
   if (!write_png_wic(options.output, width, height, pixels, &write_error)) {
+    debug.log_event("png write failed error=\"" + write_error + "\"");
     print_error("png_write_error", write_error);
     return 5;
   }
-  auto now = std::chrono::system_clock::now();
-  auto seconds = std::chrono::time_point_cast<std::chrono::seconds>(now);
-  std::time_t t = std::chrono::system_clock::to_time_t(seconds);
-  std::tm utc = {};
-  gmtime_s(&utc, &t);
-  char timestamp[32] = {};
-  std::strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%SZ", &utc);
+  const std::string timestamp = timestamp_utc();
+  debug.log_event("capture success output=\"" + options.output.u8string() + "\" dumped_frames=" + std::to_string(debug.dumped_frames));
   std::cout << "{\"ok\":true,\"senderName\":\"" << json_escape(selection.name)
             << "\",\"width\":" << width << ",\"height\":" << height
             << ",\"frame\":" << observation.last_sender_frame
             << ",\"capturedAt\":\"" << timestamp << "\",\"outputPath\":\""
-            << json_escape(options.output.u8string()) << "\"}\n";
+            << json_escape(options.output.u8string()) << "\"";
+  if (debug.enabled) {
+    std::cout << ",\"debugDir\":\"" << json_escape(debug.dir.u8string())
+              << "\",\"debugFrames\":" << debug.dumped_frames;
+  }
+  std::cout << "}\n";
   return 0;
 }
 

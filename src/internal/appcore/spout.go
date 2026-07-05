@@ -59,6 +59,8 @@ type SpoutCaptureResult struct {
 	FrameStatsText    string            `json:"frameStatsText,omitempty"`
 	CapturedAt        string            `json:"capturedAt,omitempty"`
 	OutputPath        string            `json:"outputPath,omitempty"`
+	DebugDir          string            `json:"debugDir,omitempty"`
+	DebugFrames       int               `json:"debugFrames,omitempty"`
 	Senders           []SpoutSenderInfo `json:"senders,omitempty"`
 }
 
@@ -262,6 +264,7 @@ func checkSpoutHelperVersion(ctx context.Context, helper string, logPath string)
 	commandCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(commandCtx, helper, "--version") // #nosec G204 -- local helper path from config or release folder.
+	hideSpoutHelperWindow(cmd)
 	output, err := cmd.CombinedOutput()
 	trimmed := trimCommandOutput(output)
 	if commandCtx.Err() == context.DeadlineExceeded {
@@ -300,6 +303,7 @@ func ListSpoutSenders(ctx context.Context, cfg AutoCaptureStreamConfig, logPath 
 	defer cancel()
 	diagAutoCapture(logPath, "spout list begin: helper=%q timeout_ms=%d", helper, timeout.Milliseconds())
 	cmd := exec.CommandContext(commandCtx, helper, "--list-senders") // #nosec G204 -- local helper path from config or release folder.
+	hideSpoutHelperWindow(cmd)
 	output, err := cmd.CombinedOutput()
 	trimmed := trimCommandOutput(output)
 	if commandCtx.Err() == context.DeadlineExceeded {
@@ -352,12 +356,10 @@ func captureStreamFrameWithSpout(ctx context.Context, cfg AutoCaptureStreamConfi
 	}()
 	commandCtx, cancel := context.WithTimeout(ctx, timeout+5*time.Second)
 	defer cancel()
-	args := []string{"--capture", "--output", tempOutputPath, "--timeout-ms", fmt.Sprintf("%d", timeout.Milliseconds())}
-	if strings.TrimSpace(cfg.SpoutSenderName) != "" && !cfg.SpoutAutoSelect {
-		args = append(args, "--sender", cfg.SpoutSenderName)
-	}
-	diagAutoCapture(logPath, "spout capture begin: helper=%q args=%q output=%q temp_output=%q sender=%q auto_select=%t timeout_ms=%d os=%s", helper, strings.Join(args, " "), outputPath, tempOutputPath, cfg.SpoutSenderName, cfg.SpoutAutoSelect, timeout.Milliseconds(), runtime.GOOS)
+	args := spoutCaptureArgs(cfg, tempOutputPath, timeout)
+	diagAutoCapture(logPath, "spout capture begin: helper=%q args=%q output=%q temp_output=%q sender=%q auto_select=%t timeout_ms=%d debug_dir=%q debug_frames=%d os=%s", helper, strings.Join(args, " "), outputPath, tempOutputPath, cfg.SpoutSenderName, cfg.SpoutAutoSelect, timeout.Milliseconds(), cfg.DebugRecordingDirectory, cfg.DebugFrameCount, runtime.GOOS)
 	cmd := exec.CommandContext(commandCtx, helper, args...) // #nosec G204 -- local helper path from config or release folder.
+	hideSpoutHelperWindow(cmd)
 	output, err := cmd.CombinedOutput()
 	trimmed := trimCommandOutput(output)
 	if commandCtx.Err() == context.DeadlineExceeded {
@@ -373,12 +375,14 @@ func captureStreamFrameWithSpout(ctx context.Context, cfg AutoCaptureStreamConfi
 	}
 	if err != nil {
 		kind, message := classifySpoutCaptureFailure(result)
-		diagAutoCapture(logPath, "spout capture helper error: kind=%q code=%q frame_state=%q message=%q sender=%q width=%d height=%d frame=%d first_frame=%d last_received_frame=%d receive_attempts=%d receive_successes=%d frame_stats=%s senders=%d raw_output=%q", kind, result.Code, result.FrameState, message, result.SenderName, result.Width, result.Height, result.Frame, result.FirstFrame, result.LastReceivedFrame, result.ReceiveAttempts, result.ReceiveSuccesses, formatSpoutFrameStats(result.FrameStats), len(result.Senders), trimmed)
+		message = appendSpoutDebugLocation(message, result)
+		diagAutoCapture(logPath, "spout capture helper error: kind=%q code=%q frame_state=%q message=%q sender=%q width=%d height=%d frame=%d first_frame=%d last_received_frame=%d receive_attempts=%d receive_successes=%d frame_stats=%s debug_dir=%q debug_frames=%d senders=%d raw_output=%q", kind, result.Code, result.FrameState, message, result.SenderName, result.Width, result.Height, result.Frame, result.FirstFrame, result.LastReceivedFrame, result.ReceiveAttempts, result.ReceiveSuccesses, formatSpoutFrameStats(result.FrameStats), result.DebugDir, result.DebugFrames, len(result.Senders), trimmed)
 		return result, fmt.Errorf("Spout取得に失敗しました: %s", message)
 	}
 	if !result.OK {
 		kind, message := classifySpoutCaptureFailure(result)
-		diagAutoCapture(logPath, "spout capture helper rejected: kind=%q code=%q frame_state=%q message=%q sender=%q width=%d height=%d frame=%d first_frame=%d last_received_frame=%d receive_attempts=%d receive_successes=%d frame_stats=%s senders=%d", kind, result.Code, result.FrameState, message, result.SenderName, result.Width, result.Height, result.Frame, result.FirstFrame, result.LastReceivedFrame, result.ReceiveAttempts, result.ReceiveSuccesses, formatSpoutFrameStats(result.FrameStats), len(result.Senders))
+		message = appendSpoutDebugLocation(message, result)
+		diagAutoCapture(logPath, "spout capture helper rejected: kind=%q code=%q frame_state=%q message=%q sender=%q width=%d height=%d frame=%d first_frame=%d last_received_frame=%d receive_attempts=%d receive_successes=%d frame_stats=%s debug_dir=%q debug_frames=%d senders=%d", kind, result.Code, result.FrameState, message, result.SenderName, result.Width, result.Height, result.Frame, result.FirstFrame, result.LastReceivedFrame, result.ReceiveAttempts, result.ReceiveSuccesses, formatSpoutFrameStats(result.FrameStats), result.DebugDir, result.DebugFrames, len(result.Senders))
 		return result, fmt.Errorf("Spout取得に失敗しました: %s", message)
 	}
 	if result.OutputPath == "" {
@@ -387,7 +391,8 @@ func captureStreamFrameWithSpout(ctx context.Context, cfg AutoCaptureStreamConfi
 	stats, err := validateCapturedImage(tempOutputPath)
 	if err != nil {
 		kind, message := classifyCapturedImageValidationFailure(stats, err)
-		diagAutoCapture(logPath, "spout capture invalid image: kind=%q output=%q temp_output=%q err=%v sender=%q width=%d height=%d frame=%d captured_at=%q stats_format=%q stats_width=%d stats_height=%d samples=%d mean=%.2f stddev=%.2f near_white=%.4f near_black=%.4f transparent=%.4f", kind, outputPath, tempOutputPath, err, result.SenderName, result.Width, result.Height, result.Frame, result.CapturedAt, stats.Format, stats.Width, stats.Height, stats.Samples, stats.Mean, stats.Stddev, stats.NearWhiteRatio, stats.NearBlackRatio, stats.TransparentRatio)
+		message = appendSpoutDebugLocation(message, result)
+		diagAutoCapture(logPath, "spout capture invalid image: kind=%q output=%q temp_output=%q err=%v sender=%q width=%d height=%d frame=%d captured_at=%q debug_dir=%q debug_frames=%d stats_format=%q stats_width=%d stats_height=%d samples=%d mean=%.2f stddev=%.2f near_white=%.4f near_black=%.4f transparent=%.4f", kind, outputPath, tempOutputPath, err, result.SenderName, result.Width, result.Height, result.Frame, result.CapturedAt, result.DebugDir, result.DebugFrames, stats.Format, stats.Width, stats.Height, stats.Samples, stats.Mean, stats.Stddev, stats.NearWhiteRatio, stats.NearBlackRatio, stats.TransparentRatio)
 		return result, fmt.Errorf("Spout取得に失敗しました: %s", message)
 	}
 	if err := os.Remove(outputPath); err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -400,6 +405,32 @@ func captureStreamFrameWithSpout(ctx context.Context, cfg AutoCaptureStreamConfi
 	result.OutputPath = outputPath
 	diagAutoCapture(logPath, "spout capture success: output=%q temp_output=%q sender=%q width=%d height=%d frame=%d captured_at=%q stats_format=%q stats_width=%d stats_height=%d samples=%d mean=%.2f stddev=%.2f near_white=%.4f near_black=%.4f transparent=%.4f", outputPath, tempOutputPath, result.SenderName, result.Width, result.Height, result.Frame, result.CapturedAt, stats.Format, stats.Width, stats.Height, stats.Samples, stats.Mean, stats.Stddev, stats.NearWhiteRatio, stats.NearBlackRatio, stats.TransparentRatio)
 	return result, nil
+}
+
+func spoutCaptureArgs(cfg AutoCaptureStreamConfig, outputPath string, timeout time.Duration) []string {
+	args := []string{"--capture", "--output", outputPath, "--timeout-ms", fmt.Sprintf("%d", timeout.Milliseconds())}
+	if strings.TrimSpace(cfg.SpoutSenderName) != "" && !cfg.SpoutAutoSelect {
+		args = append(args, "--sender", cfg.SpoutSenderName)
+	}
+	debugDir := strings.TrimSpace(cfg.DebugRecordingDirectory)
+	if debugDir != "" {
+		frames := cfg.DebugFrameCount
+		if frames <= 0 {
+			frames = 8
+		}
+		if frames > 120 {
+			frames = 120
+		}
+		args = append(args, "--debug-dir", debugDir, "--debug-frames", fmt.Sprintf("%d", frames))
+	}
+	return args
+}
+
+func appendSpoutDebugLocation(message string, result SpoutCaptureResult) string {
+	if strings.TrimSpace(result.DebugDir) == "" {
+		return message
+	}
+	return message + " debug保存先: " + result.DebugDir
 }
 
 func formatSpoutFrameStats(stats *SpoutFrameStats) string {

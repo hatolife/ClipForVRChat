@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestValidateCapturedImageRejectsBlankFrames(t *testing.T) {
@@ -181,6 +182,32 @@ func TestClassifyCapturedImageValidationFailure(t *testing.T) {
 				t.Fatalf("message = %q, want substring %q", message, tt.wantText)
 			}
 		})
+	}
+}
+
+func TestSpoutCaptureArgsDebugRecording(t *testing.T) {
+	args := spoutCaptureArgs(AutoCaptureStreamConfig{
+		SpoutAutoSelect:         true,
+		DebugRecordingEnabled:   true,
+		DebugFrameCount:         12,
+		DebugRecordingDirectory: "",
+	}, "capture.png", 1500*time.Millisecond)
+	if strings.Contains(strings.Join(args, " "), "--debug-dir") {
+		t.Fatalf("args = %v, debug args should require runtime debug directory", args)
+	}
+
+	args = spoutCaptureArgs(AutoCaptureStreamConfig{
+		SpoutAutoSelect:         false,
+		SpoutSenderName:         "VRChat Stream Camera",
+		DebugRecordingEnabled:   true,
+		DebugFrameCount:         12,
+		DebugRecordingDirectory: filepath.Join("out", "spout-debug", "session"),
+	}, "capture.png", 1500*time.Millisecond)
+	joined := strings.Join(args, "\n")
+	for _, want := range []string{"--sender", "VRChat Stream Camera", "--debug-dir", filepath.Join("out", "spout-debug", "session"), "--debug-frames", "12"} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("args = %v, want %q", args, want)
+		}
 	}
 }
 

@@ -143,13 +143,16 @@ type AutoCaptureCaptureConfig struct {
 }
 
 type AutoCaptureStreamConfig struct {
-	SpoutHelperPath  string `json:"spoutHelperPath"`
-	SpoutSenderName  string `json:"spoutSenderName"`
-	SpoutAutoSelect  bool   `json:"spoutAutoSelect"`
-	CaptureTimeoutMS int    `json:"captureTimeoutMs"`
-	StartDelayMS     int    `json:"startDelayMs"`
-	LegacyFFmpegPath string `json:"legacyFfmpegPath,omitempty"`
-	LegacyInputArgs  string `json:"legacyInputArgs,omitempty"`
+	SpoutHelperPath         string `json:"spoutHelperPath"`
+	SpoutSenderName         string `json:"spoutSenderName"`
+	SpoutAutoSelect         bool   `json:"spoutAutoSelect"`
+	CaptureTimeoutMS        int    `json:"captureTimeoutMs"`
+	StartDelayMS            int    `json:"startDelayMs"`
+	DebugRecordingEnabled   bool   `json:"debugRecordingEnabled"`
+	DebugFrameCount         int    `json:"debugFrameCount"`
+	DebugRecordingDirectory string `json:"-"`
+	LegacyFFmpegPath        string `json:"legacyFfmpegPath,omitempty"`
+	LegacyInputArgs         string `json:"legacyInputArgs,omitempty"`
 }
 
 type AutoCaptureRestoreConfig struct {
@@ -373,6 +376,7 @@ func DefaultAutoCaptureConfig() AutoCaptureConfig {
 			SpoutAutoSelect:  true,
 			CaptureTimeoutMS: 10000,
 			StartDelayMS:     1000,
+			DebugFrameCount:  8,
 		},
 		Restore: defaultAutoCaptureRestoreConfig(),
 		Output: AutoCaptureOutputConfig{
@@ -585,6 +589,13 @@ func (c *AutoCaptureConfig) Normalize() {
 	if c.Stream.StartDelayMS > 10000 {
 		c.Stream.StartDelayMS = 10000
 	}
+	if c.Stream.DebugFrameCount <= 0 {
+		c.Stream.DebugFrameCount = 8
+	}
+	if c.Stream.DebugFrameCount > 120 {
+		c.Stream.DebugFrameCount = 120
+	}
+	c.Stream.DebugRecordingDirectory = strings.Trim(strings.TrimSpace(c.Stream.DebugRecordingDirectory), `"`)
 	c.Restore.Normalize()
 	c.Output.Directory = strings.Trim(strings.TrimSpace(c.Output.Directory), `"`)
 	if c.Output.Directory == "" {

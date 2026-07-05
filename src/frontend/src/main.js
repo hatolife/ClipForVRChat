@@ -185,6 +185,8 @@ const vueApp = createApp({
       autoCapture.playerLocal.avatarOsc ||= {}
       autoCapture.capture ||= {}
       autoCapture.stream ||= {}
+      if (autoCapture.stream.debugRecordingEnabled === undefined) autoCapture.stream.debugRecordingEnabled = false
+      if (!autoCapture.stream.debugFrameCount) autoCapture.stream.debugFrameCount = 8
       autoCapture.output ||= {}
       autoCapture.presence ||= {}
       autoCapture.discord ||= {}
@@ -2170,6 +2172,16 @@ const vueApp = createApp({
               <div><strong>Stream起動後待機</strong><p>VRChat Stream CameraをONにしてからSpoutフレーム取得を始めるまで待つミリ秒です。</p></div>
               <label>
                 <input type="number" min="0" max="10000" step="100" v-model.number="autoCaptureSettings.stream.startDelayMs" :disabled="autoCaptureSettings.capture.mode !== 'stream'" />
+              </label>
+            </div>
+            <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
+              <div><strong>Spout録画デバッグ</strong><p>テスト撮影時だけ、Spout helperが受信したPNG化前のRGBA生フレームとmetadata/logを保存します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.stream.debugRecordingEnabled" :disabled="autoCaptureSettings.capture.mode !== 'stream'" /><span></span></label>
+            </div>
+            <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' || !autoCaptureSettings.stream.debugRecordingEnabled }">
+              <div><strong>Spout録画デバッグ フレーム数</strong><p>テスト撮影1回で保存する最大フレーム数です。保存先は自動撮影保存先の spout-debug フォルダです。</p></div>
+              <label>
+                <input type="number" min="1" max="120" step="1" v-model.number="autoCaptureSettings.stream.debugFrameCount" :disabled="autoCaptureSettings.capture.mode !== 'stream' || !autoCaptureSettings.stream.debugRecordingEnabled" />
               </label>
             </div>
             <div class="setting-row">

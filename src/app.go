@@ -966,6 +966,10 @@ func (a *App) TestAutoCaptureView(viewID string) ([]appcore.Result, error) {
 	}
 	cfg.AutoCapture.Schedule.Enabled = false
 	cfg.DiagnosticLogPath = appcore.DiagnosticLogPath(a.configPath)
+	if cfg.AutoCapture.Capture.Mode == "stream" && cfg.AutoCapture.Stream.DebugRecordingEnabled {
+		cfg.AutoCapture.Stream.DebugRecordingDirectory = spoutDebugRecordingDir(cfg.AutoCapture.Output.Directory, viewID)
+		appcore.AppendDiagnosticLog(cfg.DiagnosticLogPath, "spout debug recording enabled for test capture: view_id=%q dir=%q frames=%d", viewID, cfg.AutoCapture.Stream.DebugRecordingDirectory, cfg.AutoCapture.Stream.DebugFrameCount)
+	}
 	a.mu.Unlock()
 
 	results, err := appcore.AutoCaptureRunner{Config: cfg}.RunOnce(context.Background())
@@ -1304,6 +1308,44 @@ func managedOutputDir(configPath string, cfg appcore.Config) string {
 		return outputDir
 	}
 	return filepath.Join(filepath.Dir(configPath), outputDir)
+}
+
+func spoutDebugRecordingDir(outputDir string, viewID string) string {
+	baseDir := strings.TrimSpace(outputDir)
+	if baseDir == "" {
+		baseDir = appcore.DefaultAutoCaptureDirectory()
+	}
+	viewPart := sanitizeDebugPathPart(viewID)
+	if viewPart == "" {
+		viewPart = "view"
+	}
+	return filepath.Join(baseDir, "spout-debug", time.Now().Format("20060102_150405")+"_"+viewPart)
+}
+
+func sanitizeDebugPathPart(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	var b strings.Builder
+	for _, r := range value {
+		switch {
+		case r >= 'a' && r <= 'z':
+			b.WriteRune(r)
+		case r >= 'A' && r <= 'Z':
+			b.WriteRune(r)
+		case r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case r == '-' || r == '_':
+			b.WriteRune(r)
+		default:
+			b.WriteByte('_')
+		}
+		if b.Len() >= 80 {
+			break
+		}
+	}
+	return strings.Trim(b.String(), "_")
 }
 
 func nowRFC3339() string {

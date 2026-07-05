@@ -39,6 +39,7 @@
 | 199 | [rc35でStream Camera起動済みでもSpout有効映像待ちがtimeoutする](199-rc35-spout-black-frame-timeout-with-stream-camera-active.md) | 要確認 | `v0.1.8` | Stream Camera/Spout ONでsenderと1920x1080フレームは取れるが、黒フレーム扱いのままtimeoutする問題を、frame進捗/receive状態/blank統計で切り分ける。 |
 | 200 | [このPoseへカメラ移動でavatar_osc基準のplayer_local変換を使う](200-fix-move-camera-to-view-avatar-osc-player-local.md) | 要確認 | `v0.1.8` | カメラ移動APIでもAvatarBeaconの `avatar_osc` basisを使ってplayer_local構図をworld poseへ変換し、変換ログを出す。 |
 | 201 | [rc36でStream Camera起動済みでもSpout取得が透明フレームになる](201-rc36-spout-transparent-frame-with-stream-camera-active.md) | 要確認 | `v0.1.8` | sender frame番号不変かつ全透明のSpout失敗を明確なエラー文で切り分ける。helper改善は実機確認が必要。 |
+| 202 | [Spout helperに録画デバッグ出力を追加し起動コンソールを隠す](202-add-spout-helper-debug-recording-and-hide-console.md) | 要確認 | `v0.1.8` | Spout helperで受信RGBAフレームとmetadata/logを保存できるデバッグ引数を追加し、テスト撮影から有効化できるようにする。 |
 
 ## 状態の意味
 
