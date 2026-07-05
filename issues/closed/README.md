@@ -175,3 +175,4 @@
 | 204 | [アプリ内OSSライセンス表示でライセンス本文を確認できるようにする](204-show-full-oss-license-text-in-app.md) | 完了 | 未定 | Spout2のBSD-2-Clause本文をアプリ内OSSライセンス画面で確認できるようにし、zip内個別ライセンスファイル代替の前提を整えた。 |
 | 205 | [Release note書式と公開Assetを整理する](205-simplify-release-notes-and-assets.md) | 完了 | `v0.1.8` | Release noteを指定書式へ揃え、通常zip内容とGitHub Release添付Assetを必要な4種類へ絞った。 |
 | 205 | [Release build metadata assetの意図を確認する](205-investigate-release-build-metadata-asset.md) | 完了 | 調査のみ | Release assetに添付されるbuild metadata JSONの生成箇所、内容、添付意図を確認した。 |
+| 206 | [自動撮影機能を使用するための条件を整理する](206-investigate-auto-capture-user-requirements.md) | 完了 | 調査のみ | 自動撮影を使うための前提条件、方式別条件、構図基準、任意機能の条件を整理した。 |
