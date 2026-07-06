@@ -1193,7 +1193,7 @@ const vueApp = createApp({
         if (updated?.id) {
           Object.assign(view, updated)
         }
-        this.toast = '現在Poseを保存しました'
+        this.toast = '現在Poseを取得しました'
         setTimeout(() => {
           this.toast = ''
         }, 1800)
@@ -2103,11 +2103,9 @@ const vueApp = createApp({
                       <div class="view-actions">
                         <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, -1)" :disabled="index === 0" :title="index === 0 ? '先頭なので上へ移動できません' : 'この構図を上へ移動'">↑</button>
                         <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, 1)" :disabled="index === autoCaptureViews.length - 1" :title="index === autoCaptureViews.length - 1 ? '末尾なので下へ移動できません' : 'この構図を下へ移動'">↓</button>
-                        <button type="button" class="secondary" @click="addCurrentCameraPoseAsView(cameraView)" :disabled="effectiveAutoCapturePreplacedLocalAnchor" :title="effectiveAutoCapturePreplacedLocalAnchor ? 'フォールバックモード中は構図Poseを使いません' : '現在のPoseを構図として追加する'">現在Poseから追加</button>
-                        <button type="button" class="secondary" @click="saveCurrentCameraPoseToView(cameraView)" :disabled="effectiveAutoCapturePreplacedLocalAnchor" :title="effectiveAutoCapturePreplacedLocalAnchor ? 'フォールバックモード中は構図Poseを使いません' : '現在のPoseをこの構図へ保存する'">現在Poseを保存</button>
-                        <button type="button" class="secondary" @click="moveCameraToView(cameraView)" :disabled="effectiveAutoCapturePreplacedLocalAnchor" :title="effectiveAutoCapturePreplacedLocalAnchor ? 'フォールバックモード中はVRChat内で配置済みのローカルアンカーCameraを使います' : 'この構図へカメラを移動する'">このPoseへカメラ移動</button>
+                        <button type="button" class="secondary" @click="saveCurrentCameraPoseToView(cameraView)" :disabled="effectiveAutoCapturePreplacedLocalAnchor" :title="effectiveAutoCapturePreplacedLocalAnchor ? 'フォールバックモード中は構図Poseを使いません' : '現在のPoseをこの構図へ取得する'">現在Poseを取得</button>
+                        <button type="button" class="secondary" @click="moveCameraToView(cameraView)" :disabled="effectiveAutoCapturePreplacedLocalAnchor" :title="effectiveAutoCapturePreplacedLocalAnchor ? 'フォールバックモード中はVRChat内で配置済みのローカルアンカーCameraを使います' : 'この構図の位置へカメラを移動する'">この位置に移動</button>
                         <button type="button" class="secondary" @click="testAutoCaptureView(cameraView)" title="この構図をテスト撮影する">テスト撮影</button>
-                        <button type="button" class="secondary" @click="resetCameraPoseToDefault(cameraView)" :disabled="effectiveAutoCapturePreplacedLocalAnchor" :title="effectiveAutoCapturePreplacedLocalAnchor ? 'フォールバックモード中は構図Poseを使いません' : 'この構図を初期Poseへ戻す'">初期Poseへ戻す</button>
                         <button type="button" class="secondary" @click="duplicateAutoCaptureView(cameraView)" title="この構図を複製する">複製</button>
                         <button type="button" class="secondary danger-button" @click="deleteAutoCaptureView(cameraView)" title="この構図を削除する">削除</button>
                       </div>
@@ -2419,7 +2417,7 @@ const vueApp = createApp({
               </label>
             </div>
             <div class="setting-row">
-              <div><strong>現在Pose保存の有効秒数</strong><p>「現在Poseを保存」を押した時に、何秒以内にVRChatから受信したPoseなら保存に使うかです。撮影間隔ではありません。</p></div>
+              <div><strong>現在Pose取得の有効秒数</strong><p>「現在Poseを取得」を押した時に、何秒以内にVRChatから受信したPoseなら取得に使うかです。撮影間隔ではありません。</p></div>
               <label>
                 <input type="number" min="1" step="1" v-model.number="autoCaptureSettings.osc.poseFreshnessSec" />
               </label>
