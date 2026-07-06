@@ -718,6 +718,81 @@ func TestAppRestartCameraPoseReceiverKeepsSameEndpoint(t *testing.T) {
 	}
 }
 
+func TestAppSaveCurrentCameraPoseToViewCapturesFreshZoom(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	cfg := appcore.DefaultConfig()
+	cfg.Normalize()
+	cfg.AutoCapture.Views[0].CoordinateSpace = "world"
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults, Config: cfg})
+	now := time.Now()
+	app.latestPose = appcore.CameraPoseConfig{
+		Position: appcore.CameraVector3Config{X: 1, Y: 2, Z: 3},
+		Rotation: appcore.CameraVector3Config{X: 4, Y: 5, Z: 6},
+	}
+	app.poseAt = now
+	app.userCameraSamples = map[string]userCameraOSCSample{
+		"/usercamera/Zoom": {
+			UserCameraOSCSample: appcore.UserCameraOSCSample{
+				Address:  "/usercamera/Zoom",
+				Float:    72.5,
+				HasFloat: true,
+			},
+			ReceivedAt: now,
+		},
+	}
+
+	got, err := app.SaveCurrentCameraPoseToView("front")
+	if err != nil {
+		t.Fatal(err)
+	}
+	view, ok := findAutoCaptureViewByID(got.AutoCapture.Views, "front")
+	if !ok {
+		t.Fatal("front view missing")
+	}
+	if view.Zoom == nil || *view.Zoom != 72.5 {
+		t.Fatalf("zoom = %v, want 72.5", view.Zoom)
+	}
+	if view.Pose.Position.X != 1 || view.Pose.Rotation.Z != 6 || !view.Calibrated {
+		t.Fatalf("view pose/calibrated = %+v", view)
+	}
+}
+
+func TestAppSaveCurrentCameraPoseToViewKeepsZoomWithoutFreshSample(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	cfg := appcore.DefaultConfig()
+	cfg.Normalize()
+	cfg.AutoCapture.Views[0].CoordinateSpace = "world"
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults, Config: cfg})
+	now := time.Now()
+	app.latestPose = appcore.CameraPoseConfig{
+		Position: appcore.CameraVector3Config{X: 1},
+		Rotation: appcore.CameraVector3Config{Z: 2},
+	}
+	app.poseAt = now
+	app.userCameraSamples = map[string]userCameraOSCSample{
+		"/usercamera/Zoom": {
+			UserCameraOSCSample: appcore.UserCameraOSCSample{
+				Address:  "/usercamera/Zoom",
+				Float:    72.5,
+				HasFloat: true,
+			},
+			ReceivedAt: now.Add(-10 * time.Minute),
+		},
+	}
+
+	got, err := app.SaveCurrentCameraPoseToView("front")
+	if err != nil {
+		t.Fatal(err)
+	}
+	view, ok := findAutoCaptureViewByID(got.AutoCapture.Views, "front")
+	if !ok {
+		t.Fatal("front view missing")
+	}
+	if view.Zoom == nil || *view.Zoom != 45 {
+		t.Fatalf("zoom = %v, want existing 45", view.Zoom)
+	}
+}
+
 func TestAppRestartCameraPoseReceiverRestartsWhenForwardConfigChanges(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.json")

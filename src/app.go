@@ -583,6 +583,7 @@ func (a *App) SaveCurrentCameraPoseToView(viewID string) (appcore.Config, error)
 	if err != nil {
 		return cfg, err
 	}
+	zoom := a.freshUserCameraZoomLocked(cfg)
 	viewID = strings.TrimSpace(viewID)
 	found := false
 	for i := range cfg.AutoCapture.Views {
@@ -598,6 +599,9 @@ func (a *App) SaveCurrentCameraPoseToView(viewID string) (appcore.Config, error)
 			savedPose = appcore.InverseTransformPlayerLocalPose(basisPose, pose)
 		}
 		cfg.AutoCapture.Views[i].Pose = savedPose
+		if zoom != nil {
+			cfg.AutoCapture.Views[i].Zoom = zoom
+		}
 		cfg.AutoCapture.Views[i].Calibrated = true
 		found = true
 		break
@@ -621,6 +625,7 @@ func (a *App) AddCurrentCameraPoseAsView(viewID string) (appcore.Config, error) 
 	if err != nil {
 		return cfg, err
 	}
+	currentZoom := a.freshUserCameraZoomLocked(cfg)
 	viewID = strings.TrimSpace(viewID)
 	var sourceView appcore.CameraViewConfig
 	found := false
@@ -647,6 +652,9 @@ func (a *App) AddCurrentCameraPoseAsView(viewID string) (appcore.Config, error) 
 	if sourceView.Zoom != nil {
 		value := *sourceView.Zoom
 		zoom = &value
+	}
+	if currentZoom != nil {
+		zoom = currentZoom
 	}
 	var exposure *float64
 	if sourceView.Exposure != nil {
@@ -2356,6 +2364,15 @@ func (a *App) freshCameraPoseLocked(cfg appcore.Config) (appcore.CameraPoseConfi
 		return appcore.CameraPoseConfig{}, fmt.Errorf("User Camera Poseが古いです。VRChat内でUser Cameraを少し動かしてから保存してください。")
 	}
 	return snapshot.Pose, nil
+}
+
+func (a *App) freshUserCameraZoomLocked(cfg appcore.Config) *float64 {
+	state := a.latestUserCameraStateLocked(cfg, time.Now())
+	if state.Zoom == nil {
+		return nil
+	}
+	value := *state.Zoom
+	return &value
 }
 
 func (a *App) latestPlayerLocalBasisLocked(cfg appcore.Config, now time.Time) PlayerLocalBasisSnapshot {

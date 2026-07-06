@@ -18,6 +18,7 @@
 - VRChatから受信したOSC packetを別UDPポートへ転送できるようにし、他OSC受信アプリとのポート競合を避けやすくしました。
 - Stream Camera(Spout)取得の起動待ち、空フレーム待ち、PNG書き出し、失敗画像の隔離を改善し、Stream方式の撮影失敗を減らしました。
 - 自動撮影後にUser CameraのMode、Pose、Streaming、Zoom、Exposure、mask類などをできるだけ撮影前の状態へ戻すようにしました。
+- 構図の「現在Poseを取得」で、直近のUser Camera Zoomも拡大率として保存するようにしました。
 - 別フォルダや別バージョンのClipForVRChatでも同じWindowsユーザーでは単一起動になるようにし、OSC port競合を避けました。
 - 起動中の進捗表示、frontend template検査、Wails API surface検査を追加し、GUI起動不具合を切り分けやすくしました。
 
