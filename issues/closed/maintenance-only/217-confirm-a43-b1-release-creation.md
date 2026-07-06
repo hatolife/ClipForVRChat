@@ -23,3 +23,7 @@ Release workflowのCI設定変更を含む新しい `v0.1.8-a44` と `v0.1.8-b2`
 - 2026-07-07: ユーザー指示により、`v0.1.8-a43` と `v0.1.8-b1` をremoteから削除して再pushし、Release workflowが起動してRelease作成されるか確認する。
 - 2026-07-07: 再pushにより `v0.1.8-a43` / `v0.1.8-b1` のRelease workflowは起動したが、どちらも `Prepare version` で失敗した。旧commit上のworkflowが `vX.Y.Z` / `vX.Y.Z-rcN` だけを許可しており、`a/b` タグを受け付けないため。
 - 2026-07-07: `a43/b1` の旧commitを無理に使わず、CI設定変更を含む新しい `v0.1.8-a44` / `v0.1.8-b2` を作成して確認する方針へ変更する。
+- 2026-07-07: Release workflowを `vX.Y.Z-aW` / `vX.Y.Z-bW` / `vX.Y.Z-rcW` / `vX.Y.Z` すべてでRelease作成するよう修正し、`v0.1.8-a44` / `v0.1.8-b2` をCI設定変更後のcommitへ作成した。
+- 2026-07-07: コミットメッセージ整理の履歴書き換え後、`release/v0.1.8` と `v0.1.8-a*` / `v0.1.8-b*` タグを更新し、古い `v0.1.8-a44` / `v0.1.8-b2` Releaseを削除してタグ再pushでRelease workflowを再実行した。
+- 2026-07-07: `v0.1.8-a44` のRelease workflow run `28821404437` が成功し、GitHub Releaseはprereleaseとして作成された。添付は `ClipForVRChat-v0.1.8-a44-windows-amd64.zip`、`.exe.asc`、`-separated.zip`、`AvatarBeacon-v0.1.8-a44-source.zip` の4種類のみ。
+- 2026-07-07: `v0.1.8-b2` のRelease workflow run `28821404347` が成功し、GitHub Releaseはprereleaseとして作成された。添付は `ClipForVRChat-v0.1.8-b2-windows-amd64.zip`、`.exe.asc`、`-separated.zip`、`AvatarBeacon-v0.1.8-b2-source.zip` の4種類のみ。

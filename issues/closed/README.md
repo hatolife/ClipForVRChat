@@ -185,3 +185,5 @@
 | 214 | [Spout senderが空のときStreamingをOFF/ONして再確認する](v0.1.8-a43/214-retry-spout-sender-after-streaming-toggle.md) | 完了 | `v0.1.8-a43` | sender一覧が空のときOSCでStreamingをOFF/ONして再確認し、本体経由でsender復帰からcapture成功まで確認した。 |
 | 215 | [alpha/beta/rcを分けたバージョニング規則を定義する](maintenance-only/215-define-alpha-beta-rc-versioning.md) | 完了 | 整理のみ | RCを正式リリース直前確認に限定し、alpha/beta/rc/正式版のタグ規則、CI/CD対象、勝手なスコープ縮小禁止を明文化した。 |
 | 216 | [v0.1.8既存RCタグをalpha/beta扱いへ整理する](maintenance-only/216-reclassify-v018-rc-tags-to-alpha-beta.md) | 完了 | 整理のみ | 旧 `v0.1.8-rc1..rc43` を `v0.1.8-a1..a43`、旧 `v0.1.8-rc44` を `v0.1.8-b1` としてタグ・記録・分類を整理した。 |
+| 217 | [v0.1.8-a44とv0.1.8-b2でRelease workflowを確認する](maintenance-only/217-confirm-a43-b1-release-creation.md) | 完了 | 整理のみ | CI設定変更を含む `v0.1.8-a44` と `v0.1.8-b2` でalpha/betaタグのRelease作成を確認した。 |
+| 218 | [直近コミットメッセージがConventional Commitsから外れた原因を調査する](maintenance-only/218-investigate-conventional-commit-regression.md) | 完了 | 整理のみ | 直近130コミットの件名をConventional Commits形式へ整理し、再発防止ルールと検査スクリプトを追加した。 |

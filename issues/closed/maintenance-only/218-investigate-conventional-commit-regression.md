@@ -21,3 +21,6 @@
 - 2026-07-07: `AGENTS.md` には「意味のある単位で細かくコミットする」ルールはあったが、Conventional Commits形式の明示ルールがなかった。
 - 2026-07-07: コミット前に件名形式を機械確認する手順もなかったため、`Define alpha beta rc versioning` などの自然文件名でコミットしてしまった。
 - 2026-07-07: 対象コミットは履歴を書き換え、`ci(release): ...` / `docs(release): ...` / `docs(issues): ...` 形式へ整理した。
+- 2026-07-07: 過去130コミットを `node scripts/check-commit-subjects.mjs HEAD~130..HEAD` で検査し、メインライン外の `add codex security reports` を含む違反件名をConventional Commits形式へ修正した。
+- 2026-07-07: 再発防止として、`AGENTS.md` にコミット件名のConventional Commits必須ルールと、必要に応じた検査コマンドを追記した。
+- 2026-07-07: `scripts/check-commit-subjects.mjs` を追加し、任意の範囲でコミット件名形式を機械確認できるようにした。
