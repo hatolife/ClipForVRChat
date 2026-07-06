@@ -526,7 +526,7 @@ func TestAppAvatarOSCBasisStatusExplainsStaleWithNonBasisLastParameter(t *testin
 	now := time.Date(2026, 7, 4, 4, 35, 50, 0, time.UTC)
 	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
 	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
-	staleAt := now.Add(-10 * time.Second)
+	staleAt := now.Add(-31 * time.Second)
 	app.avatarOSCBasisSamples = map[string]avatarOSCBasisSample{
 		"coord/x":       {Float: 0.8, HasFloat: true, ReceivedAt: staleAt},
 		"coord/xSign":   {Float: 1, HasFloat: true, ReceivedAt: staleAt},
@@ -546,6 +546,9 @@ func TestAppAvatarOSCBasisStatusExplainsStaleWithNonBasisLastParameter(t *testin
 	got := app.latestAvatarOSCBasisSnapshotLocked(app.state.Config, now)
 	if got.Status != "stale" || got.Fresh {
 		t.Fatalf("snapshot = %+v, want stale", got)
+	}
+	if !got.AutoFallback {
+		t.Fatalf("autoFallback = false, want true for stale AvatarBeacon basis")
 	}
 	if got.LastReceivedAddress != "Ahoge_Angle" {
 		t.Fatalf("last address = %q, want Ahoge_Angle", got.LastReceivedAddress)
@@ -838,32 +841,54 @@ func TestHexPreviewTruncatesLongPayload(t *testing.T) {
 	}
 }
 
-func TestAppPrepareAutoCaptureConfigRejectsStaleAvatarOSCBasis(t *testing.T) {
+func TestAppPrepareAutoCaptureConfigUsesAutoFallbackAfterAvatarBeaconTimeout(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
-	now := time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC)
+	now := time.Now()
 	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
 	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
 	app.avatarOSCBasisSamples = map[string]avatarOSCBasisSample{
-		"coord/x":       {Float: 0.8, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
-		"coord/xSign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
-		"coord/y":       {Float: 0.5, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
-		"coord/ySign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
-		"coord/z":       {Float: 0.2, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
-		"coord/zSign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
-		"forward/x":     {Float: 1, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
-		"forward/xSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
-		"forward/y":     {Float: 0, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
-		"forward/ySign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
-		"forward/z":     {Float: 0, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
-		"forward/zSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
+		"coord/x":       {Float: 0.8, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
+		"coord/xSign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
+		"coord/y":       {Float: 0.5, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
+		"coord/ySign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
+		"coord/z":       {Float: 0.2, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
+		"coord/zSign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
+		"forward/x":     {Float: 1, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
+		"forward/xSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
+		"forward/y":     {Float: 0, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
+		"forward/ySign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
+		"forward/z":     {Float: 0, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
+		"forward/zSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
 	}
 
 	app.mu.Lock()
-	_, err := app.prepareAutoCaptureConfigForRunLocked(app.state.Config)
+	cfg, err := app.prepareAutoCaptureConfigForRunLocked(app.state.Config)
 	app.mu.Unlock()
-	if err == nil {
-		t.Fatal("expected stale avatar OSC basis to be rejected")
+	if err != nil {
+		t.Fatalf("prepareAutoCaptureConfigForRunLocked error = %v", err)
+	}
+	if !cfg.AutoCapture.Capture.PreplacedLocalAnchor {
+		t.Fatal("expected preplaced local anchor fallback after 30s avatar beacon timeout")
+	}
+}
+
+func TestAppPrepareAutoCaptureConfigReturnsToNormalWhenAvatarBeaconReceived(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
+	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
+	app.state.Config.AutoCapture.Capture.PreplacedLocalAnchor = true
+	app.avatarOSCBasisSamples = readyAvatarOSCBasisSamples(time.Now().Add(-5 * time.Second))
+
+	app.mu.Lock()
+	cfg, err := app.prepareAutoCaptureConfigForRunLocked(app.state.Config)
+	app.mu.Unlock()
+	if err != nil {
+		t.Fatalf("prepareAutoCaptureConfigForRunLocked error = %v", err)
+	}
+	if cfg.AutoCapture.Capture.PreplacedLocalAnchor {
+		t.Fatal("expected normal mode when AvatarBeacon basis was received within 30s")
 	}
 }
 
@@ -1031,6 +1056,9 @@ func TestAppWaitForAutoCaptureStartReadinessWaitsForAvatarOSCBasis(t *testing.T)
 	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
 	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
 	app.state.Config.AutoCapture.Presence.WatchOutputLog = false
+	app.avatarOSCBasisSamples = map[string]avatarOSCBasisSample{
+		"coord/x": {Float: 0.8, HasFloat: true, ReceivedAt: time.Now()},
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	go func() {
@@ -1048,7 +1076,7 @@ func TestAppWaitForAutoCaptureStartReadinessWaitsForAvatarOSCBasis(t *testing.T)
 	}
 }
 
-func TestAppWaitForAutoCaptureStartReadinessTimesOutWithoutAvatarOSCBasis(t *testing.T) {
+func TestAppWaitForAutoCaptureStartReadinessFallsBackWithoutAvatarOSCBasis(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
 	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
@@ -1056,14 +1084,11 @@ func TestAppWaitForAutoCaptureStartReadinessTimesOutWithoutAvatarOSCBasis(t *tes
 	ctx := context.Background()
 	start := time.Now()
 	err := app.waitForAutoCaptureStartReadiness(ctx, app.state.Config, 50*time.Millisecond)
-	if err == nil {
-		t.Fatal("expected readiness wait to time out")
+	if err != nil {
+		t.Fatalf("readiness wait error = %v", err)
 	}
-	if elapsed := time.Since(start); elapsed < 50*time.Millisecond {
-		t.Fatalf("timeout returned too early: %s", elapsed)
-	}
-	if !strings.Contains(err.Error(), "AvatarBeacon basis") {
-		t.Fatalf("err = %v, want AvatarBeacon basis timeout", err)
+	if elapsed := time.Since(start); elapsed > 50*time.Millisecond {
+		t.Fatalf("fallback readiness took too long: %s", elapsed)
 	}
 }
 

@@ -164,6 +164,9 @@ const vueApp = createApp({
       const yaw = Number.isFinite(Number(status?.yaw)) ? `${Number(status.yaw).toFixed(3)}°` : '-°'
       return `現在のAvatarBeacon受信状態: 成功 ${fmt(position.x)}, ${fmt(position.y)}, ${fmt(position.z)}, ${yaw}`
     },
+    effectiveAutoCapturePreplacedLocalAnchor() {
+      return Boolean(this.avatarOscBasisStatus?.autoFallback || this.autoCaptureSettings.capture?.preplacedLocalAnchor)
+    },
     shouldShowAutoCaptureHelpDetails() {
       return this.autoCaptureHelpExpanded || !this.autoCaptureAvatarBeaconOK
     },
@@ -1232,7 +1235,7 @@ const vueApp = createApp({
     },
     async moveCameraToView(view) {
       if (!view?.id) return
-      if (this.autoCaptureSettings.capture?.preplacedLocalAnchor) {
+      if (this.effectiveAutoCapturePreplacedLocalAnchor) {
         this.error = 'フォールバックモード中は、VRChat内で配置済みのローカルアンカーCameraを使うため、カメラ移動は送信しません。'
         return
       }
@@ -1413,11 +1416,13 @@ const vueApp = createApp({
         message: String(status?.message || '').trim(),
         sourcePrefix: String(status?.sourcePrefix || status?.prefix || status?.parameterPrefix || '').trim(),
         rawSampleCount: Number.isFinite(Number(status?.rawSampleCount)) ? Number(status.rawSampleCount) : 0,
-        lastReceivedAddress: String(status?.lastReceivedAddress || '').trim()
+        lastReceivedAddress: String(status?.lastReceivedAddress || '').trim(),
+        autoFallback: Boolean(status?.autoFallback)
       }
     },
     avatarOSCBasisStatusClass() {
       if (!this.avatarOscBasisStatus) return 'muted'
+      if (this.avatarOscBasisStatus.autoFallback) return 'warning'
       if (this.avatarOscBasisStatus.error) return 'warning'
       if (this.avatarOscBasisStatus.available) return 'ok'
       return 'muted'
@@ -1426,6 +1431,7 @@ const vueApp = createApp({
       const status = this.avatarOscBasisStatus
       if (!status) return '未取得'
       if (this.avatarOscStatusLoading) return '更新中'
+      if (status.autoFallback) return '自動フォールバック'
       if (status.error) return 'エラー'
       if (status.available) return status.state || '受信中'
       return status.state || status.message || '待機中'
@@ -2047,11 +2053,12 @@ const vueApp = createApp({
                     <div>
                       <h4>構図設定</h4>
                       <p>「撮影する」がONの構図を上から順番に撮影します。</p>
-                      <p v-if="autoCaptureSettings.capture.preplacedLocalAnchor">フォールバックモード中は、各構図のPose、拡大率、表示対象はOSC送信されないため編集できません。</p>
-                      <p v-else>プレイヤー基準構図はAvatarBeaconの受信状態がreadyのときに自動追従します。</p>
+                      <p v-if="effectiveAutoCapturePreplacedLocalAnchor">フォールバックモード中は、各構図のPose、拡大率、表示対象はOSC送信されないため編集できません。</p>
+                      <p v-if="avatarOscBasisStatus?.autoFallback">AvatarBeaconのbasis受信が30秒以上ないため、自動的にフォールバックモードで実行します。</p>
+                      <p v-else-if="!effectiveAutoCapturePreplacedLocalAnchor">プレイヤー基準構図はAvatarBeaconの受信状態がreadyのときに自動追従します。</p>
                     </div>
                     <div class="button-row">
-                      <button type="button" class="secondary" @click="resetCameraViewsToDefaults" :disabled="autoCaptureSettings.capture.preplacedLocalAnchor" :title="autoCaptureSettings.capture.preplacedLocalAnchor ? 'フォールバックモード中は構図PoseやZoomを使いません' : '初期の3構図へ戻す'">初期3構図に戻す</button>
+                      <button type="button" class="secondary" @click="resetCameraViewsToDefaults" :disabled="effectiveAutoCapturePreplacedLocalAnchor" :title="effectiveAutoCapturePreplacedLocalAnchor ? 'フォールバックモード中は構図PoseやZoomを使いません' : '初期の3構図へ戻す'">初期3構図に戻す</button>
                     </div>
                   </div>
                   <div v-if="autoCaptureViews.length" class="view-list">
@@ -2068,7 +2075,7 @@ const vueApp = createApp({
                           </label>
                           <label>
                             <small>座標系</small>
-                            <select v-model="cameraView.coordinateSpace" :disabled="autoCaptureSettings.capture.preplacedLocalAnchor">
+                            <select v-model="cameraView.coordinateSpace" :disabled="effectiveAutoCapturePreplacedLocalAnchor">
                               <option value="world">ワールド</option>
                               <option value="player_local">プレイヤー基準</option>
                             </select>
@@ -2079,23 +2086,23 @@ const vueApp = createApp({
                           </div>
                         </div>
                       </div>
-                      <div class="pose-grid" :class="{ disabled: autoCaptureSettings.capture.preplacedLocalAnchor }">
-                        <label><small>位置 X</small><input type="number" step="0.001" v-model.number="cameraView.pose.position.x" :disabled="autoCaptureSettings.capture.preplacedLocalAnchor" /></label>
-                        <label><small>位置 Y</small><input type="number" step="0.001" v-model.number="cameraView.pose.position.y" :disabled="autoCaptureSettings.capture.preplacedLocalAnchor" /></label>
-                        <label><small>位置 Z</small><input type="number" step="0.001" v-model.number="cameraView.pose.position.z" :disabled="autoCaptureSettings.capture.preplacedLocalAnchor" /></label>
-                        <label><small>回転 X</small><input type="number" step="0.001" v-model.number="cameraView.pose.rotation.x" :disabled="autoCaptureSettings.capture.preplacedLocalAnchor" /></label>
-                        <label><small>回転 Y</small><input type="number" step="0.001" v-model.number="cameraView.pose.rotation.y" :disabled="autoCaptureSettings.capture.preplacedLocalAnchor" /></label>
-                        <label><small>回転 Z</small><input type="number" step="0.001" v-model.number="cameraView.pose.rotation.z" :disabled="autoCaptureSettings.capture.preplacedLocalAnchor" /></label>
-                        <label><small>拡大率</small><input type="number" min="20" max="150" step="0.1" v-model.number="cameraView.zoom" :disabled="autoCaptureSettings.capture.preplacedLocalAnchor" /></label>
+                      <div class="pose-grid" :class="{ disabled: effectiveAutoCapturePreplacedLocalAnchor }">
+                        <label><small>位置 X</small><input type="number" step="0.001" v-model.number="cameraView.pose.position.x" :disabled="effectiveAutoCapturePreplacedLocalAnchor" /></label>
+                        <label><small>位置 Y</small><input type="number" step="0.001" v-model.number="cameraView.pose.position.y" :disabled="effectiveAutoCapturePreplacedLocalAnchor" /></label>
+                        <label><small>位置 Z</small><input type="number" step="0.001" v-model.number="cameraView.pose.position.z" :disabled="effectiveAutoCapturePreplacedLocalAnchor" /></label>
+                        <label><small>回転 X</small><input type="number" step="0.001" v-model.number="cameraView.pose.rotation.x" :disabled="effectiveAutoCapturePreplacedLocalAnchor" /></label>
+                        <label><small>回転 Y</small><input type="number" step="0.001" v-model.number="cameraView.pose.rotation.y" :disabled="effectiveAutoCapturePreplacedLocalAnchor" /></label>
+                        <label><small>回転 Z</small><input type="number" step="0.001" v-model.number="cameraView.pose.rotation.z" :disabled="effectiveAutoCapturePreplacedLocalAnchor" /></label>
+                        <label><small>拡大率</small><input type="number" min="20" max="150" step="0.1" v-model.number="cameraView.zoom" :disabled="effectiveAutoCapturePreplacedLocalAnchor" /></label>
                       </div>
                       <div class="view-actions">
                         <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, -1)" :disabled="index === 0" :title="index === 0 ? '先頭なので上へ移動できません' : 'この構図を上へ移動'">↑</button>
                         <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, 1)" :disabled="index === autoCaptureViews.length - 1" :title="index === autoCaptureViews.length - 1 ? '末尾なので下へ移動できません' : 'この構図を下へ移動'">↓</button>
-                        <button type="button" class="secondary" @click="addCurrentCameraPoseAsView(cameraView)" :disabled="autoCaptureSettings.capture.preplacedLocalAnchor" :title="autoCaptureSettings.capture.preplacedLocalAnchor ? 'フォールバックモード中は構図Poseを使いません' : '現在のPoseを構図として追加する'">現在Poseから追加</button>
-                        <button type="button" class="secondary" @click="saveCurrentCameraPoseToView(cameraView)" :disabled="autoCaptureSettings.capture.preplacedLocalAnchor" :title="autoCaptureSettings.capture.preplacedLocalAnchor ? 'フォールバックモード中は構図Poseを使いません' : '現在のPoseをこの構図へ保存する'">現在Poseを保存</button>
-                        <button type="button" class="secondary" @click="moveCameraToView(cameraView)" :disabled="autoCaptureSettings.capture.preplacedLocalAnchor" :title="autoCaptureSettings.capture.preplacedLocalAnchor ? 'フォールバックモード中はVRChat内で配置済みのローカルアンカーCameraを使います' : 'この構図へカメラを移動する'">このPoseへカメラ移動</button>
+                        <button type="button" class="secondary" @click="addCurrentCameraPoseAsView(cameraView)" :disabled="effectiveAutoCapturePreplacedLocalAnchor" :title="effectiveAutoCapturePreplacedLocalAnchor ? 'フォールバックモード中は構図Poseを使いません' : '現在のPoseを構図として追加する'">現在Poseから追加</button>
+                        <button type="button" class="secondary" @click="saveCurrentCameraPoseToView(cameraView)" :disabled="effectiveAutoCapturePreplacedLocalAnchor" :title="effectiveAutoCapturePreplacedLocalAnchor ? 'フォールバックモード中は構図Poseを使いません' : '現在のPoseをこの構図へ保存する'">現在Poseを保存</button>
+                        <button type="button" class="secondary" @click="moveCameraToView(cameraView)" :disabled="effectiveAutoCapturePreplacedLocalAnchor" :title="effectiveAutoCapturePreplacedLocalAnchor ? 'フォールバックモード中はVRChat内で配置済みのローカルアンカーCameraを使います' : 'この構図へカメラを移動する'">このPoseへカメラ移動</button>
                         <button type="button" class="secondary" @click="testAutoCaptureView(cameraView)" title="この構図をテスト撮影する">テスト撮影</button>
-                        <button type="button" class="secondary" @click="resetCameraPoseToDefault(cameraView)" :disabled="autoCaptureSettings.capture.preplacedLocalAnchor" :title="autoCaptureSettings.capture.preplacedLocalAnchor ? 'フォールバックモード中は構図Poseを使いません' : 'この構図を初期Poseへ戻す'">初期Poseへ戻す</button>
+                        <button type="button" class="secondary" @click="resetCameraPoseToDefault(cameraView)" :disabled="effectiveAutoCapturePreplacedLocalAnchor" :title="effectiveAutoCapturePreplacedLocalAnchor ? 'フォールバックモード中は構図Poseを使いません' : 'この構図を初期Poseへ戻す'">初期Poseへ戻す</button>
                         <button type="button" class="secondary" @click="duplicateAutoCaptureView(cameraView)" title="この構図を複製する">複製</button>
                         <button type="button" class="secondary danger-button" @click="deleteAutoCaptureView(cameraView)" title="この構図を削除する">削除</button>
                       </div>
