@@ -226,7 +226,7 @@ MonoBehaviour:
   - forward/xSign
   allowSelf: 1
   allowOthers: 0
-  localOnly: 0
+  localOnly: 1
   receiverType: 2
   parameter: forward/xSign
   minVelocity: 0.05
@@ -252,7 +252,7 @@ MonoBehaviour:
   - forward/ySign
   allowSelf: 1
   allowOthers: 0
-  localOnly: 0
+  localOnly: 1
   receiverType: 2
   parameter: forward/ySign
   minVelocity: 0
@@ -278,7 +278,7 @@ MonoBehaviour:
   - forward/zSign
   allowSelf: 1
   allowOthers: 0
-  localOnly: 0
+  localOnly: 1
   receiverType: 2
   parameter: forward/zSign
   minVelocity: 0
@@ -870,7 +870,7 @@ MonoBehaviour:
   - forward/x
   allowSelf: 1
   allowOthers: 0
-  localOnly: 0
+  localOnly: 1
   receiverType: 2
   parameter: forward/x
   minVelocity: 0.05
@@ -896,7 +896,7 @@ MonoBehaviour:
   - forward/y
   allowSelf: 1
   allowOthers: 0
-  localOnly: 0
+  localOnly: 1
   receiverType: 2
   parameter: forward/y
   minVelocity: 0.05
@@ -922,7 +922,7 @@ MonoBehaviour:
   - forward/z
   allowSelf: 1
   allowOthers: 0
-  localOnly: 0
+  localOnly: 1
   receiverType: 2
   parameter: forward/z
   minVelocity: 0.05
@@ -1161,7 +1161,7 @@ MonoBehaviour:
   - coord/x
   allowSelf: 1
   allowOthers: 0
-  localOnly: 0
+  localOnly: 1
   receiverType: 2
   parameter: coord/x
   minVelocity: 0.05
@@ -1187,7 +1187,7 @@ MonoBehaviour:
   - coord/y
   allowSelf: 1
   allowOthers: 0
-  localOnly: 0
+  localOnly: 1
   receiverType: 2
   parameter: coord/y
   minVelocity: 0.05
@@ -1213,7 +1213,7 @@ MonoBehaviour:
   - coord/z
   allowSelf: 1
   allowOthers: 0
-  localOnly: 0
+  localOnly: 1
   receiverType: 2
   parameter: coord/z
   minVelocity: 0.05
@@ -1239,7 +1239,7 @@ MonoBehaviour:
   - coord/xSign
   allowSelf: 1
   allowOthers: 0
-  localOnly: 0
+  localOnly: 1
   receiverType: 2
   parameter: coord/xSign
   minVelocity: 0.05
@@ -1265,7 +1265,7 @@ MonoBehaviour:
   - coord/ySign
   allowSelf: 1
   allowOthers: 0
-  localOnly: 0
+  localOnly: 1
   receiverType: 2
   parameter: coord/ySign
   minVelocity: 0.05
@@ -1291,7 +1291,7 @@ MonoBehaviour:
   - coord/zSign
   allowSelf: 1
   allowOthers: 0
-  localOnly: 0
+  localOnly: 1
   receiverType: 2
   parameter: coord/zSign
   minVelocity: 0.05

@@ -57,6 +57,15 @@ Prefab内のparameter名はその下の相対名です。
 `coord/*` と `forward/*` のmagnitudeは float、`*Sign` はbool相当の制御値として扱います。
 magnitudeだけでは正負が分からないため、各軸は必ずmagnitude parameterとsign parameterを組み合わせて復元します。
 現Prefabでは Modular Avatar Parameters に全12個を `localOnly` として登録しています。
+また、basis 用の Contact Receiver も `localOnly` として、ローカルクライアント上でOSC出力用の値を作る前提にしています。
+
+これは「他プレイヤーへOSC packetを送らない」という意味ではありません。
+VRChatのOSC出力自体は、ローカルのVRChatクライアントから設定されたOSC送信先へ出ます。
+`localOnly` は、AvatarBeaconのContact処理とExpression Parameter同期を他プレイヤー側の表示・同期用途へ広げないための設定です。
+
+VRChatのOSC Avatar Parametersはparameter単位のaddressとして出力されます。
+AvatarBeacon単体では、12個の値を1つのOSC messageや文字列へまとめて送信しません。
+1 message化が必要な場合は、ClipForVRChatまたは別のOSCルーターで `/avatar/parameters/coord/*` と `/avatar/parameters/forward/*` を受け、外部向けに集約messageを再送する構成を別途設計します。
 
 ## 値の復元
 

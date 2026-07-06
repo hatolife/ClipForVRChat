@@ -52,6 +52,7 @@ Prefab内には `AvatarBeacon Version ...` という無効化済みGameObjectが
 
 - basis 用に Expression Parameter 枠を 12 個使います。
 - Contact / Constraint / Animator の追加分だけ、Avatar Performance Rank に影響します。
+- basis 用の Contact Receiver は Local Only として、ローカルクライアント上でのみ動作する前提です。
 - Modular Avatar と VRChat SDK の依存が必要です。
 
 ## ClipForVRChat での確認
@@ -75,6 +76,18 @@ Avatar Dynamics Contact / Avatar Interactions が無効な場合も値が変化�
 
 静的確認ベースの暫定目安としては、`1 Hz` は実機で試す下限候補、`0.1 Hz` は `avatar_osc` basis には遅すぎるため非推奨です。
 送信頻度を本当に可変にしたい場合は、Prefabとは別の実装を追加してから再評価してください。
+
+## OSC出力と同期範囲
+
+AvatarBeacon の `coord/*` と `forward/*` は、VRChatのOSC Avatar ParametersとしてローカルのOSC送信先へ出る値です。
+他プレイヤーへOSC packetを直接送る仕組みではありません。
+
+現Prefabでは basis 用 Expression Parameter と Contact Receiver をローカル用途にしています。
+これにより、AvatarBeaconの座標計測は導入者本人のクライアント上でOSC出力に使う前提になります。
+
+VRChatのOSC Avatar Parametersはparameterごとに `/avatar/parameters/<name>` として出力されます。
+アバターギミックだけで `coord/x` から `forward/zSign` までを1つのOSC messageへまとめる設計にはしていません。
+1 message化したい場合は、VRChatから出た複数parameterを外部ツール側で集約して別OSC messageへ再送する方式を検討してください。
 
 ## 検証限界
 
