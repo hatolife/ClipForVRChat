@@ -1938,6 +1938,9 @@ const vueApp = createApp({
             <span v-if="saved" class="saved">保存しました</span>
           </div>
         </div>
+        <div v-if="state.config && isAutoCaptureDetailActive" class="settings-detail-backbar">
+          <button type="button" class="secondary" title="自動撮影設定の一覧へ戻ります。" aria-label="自動撮影設定の一覧へ戻る" @click="closeAutoCaptureDetail">戻る</button>
+        </div>
         <div v-if="state.config" class="settings-layout">
           <div v-if="!isAutoCaptureDetailActive" class="settings-topbar">
             <div class="settings-tabs" role="tablist" aria-label="設定カテゴリ">
@@ -2002,7 +2005,6 @@ const vueApp = createApp({
                   <h4>{{ autoCaptureDetailTitle() }}</h4>
                   <p>{{ autoCaptureDetailDescription() }}</p>
                 </div>
-                <button type="button" class="secondary" title="自動撮影設定の一覧へ戻ります。" aria-label="自動撮影設定の一覧へ戻る" @click="closeAutoCaptureDetail">戻る</button>
               </div>
               <template v-if="autoCaptureDetailView === 'schedule'">
                 <div class="setting-row" :class="{ disabled: !autoCaptureSettings.schedule.enabled }">

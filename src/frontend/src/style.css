@@ -309,6 +309,17 @@ button:disabled {
   padding: 7px 12px;
 }
 
+.settings-detail-backbar {
+  display: flex;
+  justify-content: flex-start;
+  padding: 0 0 10px;
+}
+
+.settings-detail-backbar button {
+  width: auto;
+  padding: 7px 12px;
+}
+
 .message {
   color: #5b6875;
   line-height: 1.6;
