@@ -180,10 +180,17 @@
 | 209 | [構図カードの未キャリブレーション表示を分かりやすくする](unreleased/209-clarify-camera-view-calibration-label.md) | 完了 | 未定 | 構図カードから内部状態のキャリブレーション表示を削除し、撮影対象と座標系だけを表示する。 |
 | 210 | [構図設定の拡大率が常に最低値になる](unreleased/210-fix-auto-capture-view-zoom-range.md) | 完了 | 未定 | 構図ZoomのUI範囲、初期値、既存設定補正をUser Camera Zoomの扱いに合わせた。 |
 | 211 | [ローカルアンカー配置済みカメラを使うフォールバックモードを追加する](unreleased/211-add-preplaced-local-anchor-fallback-mode.md) | 完了 | 未定 | VRChat内でローカルアンカー配置済みのカメラを使い、ClipForVRChatは撮影だけ操作するフォールバックを追加した。 |
+| 212 | [Stream方式撮影失敗をSpout helper録画から切り分ける](v0.1.8-a43/212-investigate-stream-capture-spout-helper-debug-recording.md) | 完了 | `v0.1.8-a43` | Spout helper単体と本体経由の実機確認で、`IsUpdated()` 未処理による透明フレームを修正し、Stream方式撮影成功を確認した。 |
+| 213 | [完了済みissueを対応バージョンごとのフォルダに整理する](maintenance-only/213-organize-closed-issues-by-version.md) | 完了 | 整理のみ | 完了済みissueを対応バージョン別フォルダへ移動し、READMEリンクと運用ルールを更新した。 |
+| 214 | [Spout senderが空のときStreamingをOFF/ONして再確認する](v0.1.8-a43/214-retry-spout-sender-after-streaming-toggle.md) | 完了 | `v0.1.8-a43` | sender一覧が空のときOSCでStreamingをOFF/ONして再確認し、本体経由でsender復帰からcapture成功まで確認した。 |
+| 215 | [alpha/beta/rcを分けたバージョニング規則を定義する](maintenance-only/215-define-alpha-beta-rc-versioning.md) | 完了 | 整理のみ | RCを正式リリース直前確認に限定し、alpha/beta/rc/正式版のタグ規則、CI/CD対象、勝手なスコープ縮小禁止を明文化した。 |
+| 216 | [v0.1.8既存RCタグをalpha/beta扱いへ整理する](maintenance-only/216-reclassify-v018-rc-tags-to-alpha-beta.md) | 完了 | 整理のみ | 旧 `v0.1.8-rc1..rc43` を `v0.1.8-a1..a43`、旧 `v0.1.8-rc44` を `v0.1.8-b1` としてタグ・記録・分類を整理した。 |
+| 217 | [v0.1.8-a44とv0.1.8-b2でRelease workflowを確認する](maintenance-only/217-confirm-a43-b1-release-creation.md) | 完了 | 整理のみ | CI設定変更を含む `v0.1.8-a44` と `v0.1.8-b2` でalpha/betaタグのRelease作成を確認した。 |
+| 218 | [直近コミットメッセージがConventional Commitsから外れた原因を調査する](maintenance-only/218-investigate-conventional-commit-regression.md) | 完了 | 整理のみ | 直近130コミットの件名をConventional Commits形式へ整理し、再発防止ルールと検査スクリプトを追加した。 |
 | 219 | [構図設定の右下に＋/－ボタンを追加する](unreleased/219-add-plus-minus-composition-buttons.md) | 完了 | 未定 | 構図設定リストの右下に、構図追加と末尾削除用の `＋` / `－` ボタンを追加した。 |
 | 220 | [現在Pose取得で拡大率が保存されない](v0.1.8-b3/220-save-current-camera-pose-captures-zoom.md) | 完了 | `v0.1.8-b3` | 現在Pose取得時に直近のUser Camera Zoomも構図へ保存し、45以外の拡大率を反映できるようにした。 |
 | 221 | [詳細設定画面でも保存/閉じるボタンを表示する](v0.1.8-b4/221-show-settings-actions-in-detail-view.md) | 完了 | `v0.1.8-b4` | 自動撮影の詳細設定画面でも設定画面上部の保存/閉じる操作を表示するようにした。 |
-| 222 | [フォールバックモードを既定ONにしOFF時は通常撮影失敗を許容する](v0.1.8-b4/222-default-enable-preplaced-local-anchor-toggle.md) | 完了 | `v0.1.8-b4` | ローカルアンカー配置済みカメラのフォールバックを既定ONにし、OFF時は自動フォールバックせず通常撮影の失敗を見えるようにした。 |
+| 222 | [フォールバックモード自動切替設定の解釈誤り](v0.1.8-b4/222-default-enable-preplaced-local-anchor-toggle.md) | 完了 | `v0.1.8-b4` | フォールバックモード既定ONと自動切替廃止は解釈誤りとして、#235で自動ON/OFF設定へ修正する。 |
 | 223 | [保存/閉じるボタンを上部ナビ右へ移動する](unreleased/223-move-settings-actions-to-header-nav.md) | 完了 | 未定 | 設定画面中の保存/閉じる操作を、設定/使い方/情報ボタンの右側へ移動した。 |
 | 224 | [終了時にSpout helper展開キャッシュを削除する](unreleased/224-clean-spout-helper-cache-on-exit.md) | 完了 | 未定 | `%LOCALAPPDATA%\ClipForVRChat\spout-helper` に展開された内蔵Spout helperの管理キャッシュをアプリ終了時に削除するようにした。 |
 | 225 | [自動撮影用Webhook URLをDiscord投稿タブへ移動する](unreleased/225-move-autocapture-webhook-to-discord-tab.md) | 完了 | 未定 | 自動撮影用Webhook URLをDiscord投稿タブへ移し、投稿先設定を同じ場所にまとめた。 |
@@ -195,10 +202,7 @@
 | 232 | [GitHub Release本文からバージョン見出しを除外する](v0.1.8/232-strip-release-body-version-heading.md) | 完了 | `v0.1.8` | Release本文生成時に先頭の単独バージョン見出しを除外し、タイトルとの二重表記を防ぐ。 |
 | 233 | [OSCデバッグ送信が送信ログに表示されない](unreleased/233-fix-debug-osc-send-log.md) | 完了 | 未定 | OSC受信/転送ログとOSC送信ログを別バッファに分け、受信ログ増加で送信ログが消えないようにした。 |
 | 234 | [未保存変更の項目名が大分類だけで分かりにくい](unreleased/234-show-specific-unsaved-setting-labels.md) | 完了 | 未定 | 未保存変更表示でOSCホストやOSC送信ポートなどの具体的な設定項目名を表示するようにした。 |
-| 213 | [完了済みissueを対応バージョンごとのフォルダに整理する](maintenance-only/213-organize-closed-issues-by-version.md) | 完了 | 整理のみ | 完了済みissueを対応バージョン別フォルダへ移動し、READMEリンクと運用ルールを更新した。 |
-| 212 | [Stream方式撮影失敗をSpout helper録画から切り分ける](v0.1.8-a43/212-investigate-stream-capture-spout-helper-debug-recording.md) | 完了 | `v0.1.8-a43` | Spout helper単体と本体経由の実機確認で、`IsUpdated()` 未処理による透明フレームを修正し、Stream方式撮影成功を確認した。 |
-| 214 | [Spout senderが空のときStreamingをOFF/ONして再確認する](v0.1.8-a43/214-retry-spout-sender-after-streaming-toggle.md) | 完了 | `v0.1.8-a43` | sender一覧が空のときOSCでStreamingをOFF/ONして再確認し、本体経由でsender復帰からcapture成功まで確認した。 |
-| 215 | [alpha/beta/rcを分けたバージョニング規則を定義する](maintenance-only/215-define-alpha-beta-rc-versioning.md) | 完了 | 整理のみ | RCを正式リリース直前確認に限定し、alpha/beta/rc/正式版のタグ規則、CI/CD対象、勝手なスコープ縮小禁止を明文化した。 |
-| 216 | [v0.1.8既存RCタグをalpha/beta扱いへ整理する](maintenance-only/216-reclassify-v018-rc-tags-to-alpha-beta.md) | 完了 | 整理のみ | 旧 `v0.1.8-rc1..rc43` を `v0.1.8-a1..a43`、旧 `v0.1.8-rc44` を `v0.1.8-b1` としてタグ・記録・分類を整理した。 |
-| 217 | [v0.1.8-a44とv0.1.8-b2でRelease workflowを確認する](maintenance-only/217-confirm-a43-b1-release-creation.md) | 完了 | 整理のみ | CI設定変更を含む `v0.1.8-a44` と `v0.1.8-b2` でalpha/betaタグのRelease作成を確認した。 |
-| 218 | [直近コミットメッセージがConventional Commitsから外れた原因を調査する](maintenance-only/218-investigate-conventional-commit-regression.md) | 完了 | 整理のみ | 直近130コミットの件名をConventional Commits形式へ整理し、再発防止ルールと検査スクリプトを追加した。 |
+| 235 | [自動フォールバック切替設定を追加する](unreleased/235-add-auto-fallback-mode-toggle.md) | 完了 | 未定 | フォールバックモードの自動ON/OFF制御を別フラグで追加し、どちらも既定OFFにした。 |
+| 236 | [closed issue一覧の昇順とissue記録形式を修正する](unreleased/236-sort-closed-issue-index-and-preserve-user-instructions.md) | 完了 | 未定 | closed issue一覧を昇順に直し、昇順チェックと原文付きissue記録ルールを追加した。 |
+| 237 | [構図削除後に初期3構図へ戻すとグレーアウトする](unreleased/237-fix-reset-default-views-disabled-after-delete.md) | 完了 | 未定 | 初期3構図へ戻した後も、フォールバックOFFなら構図が操作できる状態になるようにした。 |
+| 238 | [未保存変更のある設定項目を行としてハイライトする](unreleased/238-highlight-unsaved-setting-rows.md) | 完了 | 未定 | 未保存変更のある主要な設定行と構図カードを画面上でハイライトするようにした。 |
