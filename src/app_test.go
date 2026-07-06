@@ -84,6 +84,62 @@ func TestAppSaveConfigAndOpenSettings(t *testing.T) {
 	}
 }
 
+func TestAppSaveConfigWritesDiagnosticConfigSummary(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.json")
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeSettings})
+	cfg := appcore.DefaultConfig()
+	cfg.Discord.WebhookURL = "https://discord.com/api/webhooks/primary-secret"
+	cfg.AutoPhoto.WebhookURL = ""
+	cfg.ScreenshotAutoPost.WebhookURL = ""
+	cfg.AutoCapture.Discord.WebhookURL = ""
+
+	if err := app.SaveConfig(cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := os.ReadFile(appcore.DiagnosticLogPath(configPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, want := range []string{
+		"settings saved config=",
+		`"discord":{"webhookConfigured":true}`,
+		`"fallbackToPrimaryWebhook":true`,
+		`"effectiveWebhookConfigured":true`,
+		`"effectiveWebhookSource":"primary"`,
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("diagnostic log = %q, want %q", text, want)
+		}
+	}
+	if strings.Contains(text, "primary-secret") || strings.Contains(text, "discord.com/api/webhooks") {
+		t.Fatalf("diagnostic log leaked webhook URL: %q", text)
+	}
+}
+
+func TestAppSaveConfigLogsFailure(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.json")
+	if err := os.Mkdir(configPath, 0700); err != nil {
+		t.Fatal(err)
+	}
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeSettings})
+
+	if err := app.SaveConfig(appcore.DefaultConfig()); err == nil {
+		t.Fatal("expected save error")
+	}
+
+	data, err := os.ReadFile(appcore.DiagnosticLogPath(configPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if text := string(data); !strings.Contains(text, "settings save error: err=") {
+		t.Fatalf("diagnostic log = %q, want settings save error", text)
+	}
+}
+
 func TestAppOpenSettingsKeepsConfigPathOnLoadError(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.json")

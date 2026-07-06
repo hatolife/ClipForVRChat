@@ -37,10 +37,20 @@ type webhookConfigLogSummary struct {
 	WebhookConfigured bool `json:"webhookConfigured"`
 }
 
+type webhookFallbackLogSummary struct {
+	WebhookConfigured          bool   `json:"webhookConfigured"`
+	FallbackToPrimaryWebhook   bool   `json:"fallbackToPrimaryWebhook"`
+	EffectiveWebhookConfigured bool   `json:"effectiveWebhookConfigured"`
+	EffectiveWebhookSource     string `json:"effectiveWebhookSource"`
+}
+
 type autoPhotoConfigLogSummary struct {
 	Enabled             bool   `json:"enabled"`
 	PhotoDirectory      string `json:"photoDirectory"`
 	WebhookConfigured   bool   `json:"webhookConfigured"`
+	FallbackToPrimary   bool   `json:"fallbackToPrimaryWebhook"`
+	EffectiveConfigured bool   `json:"effectiveWebhookConfigured"`
+	EffectiveSource     string `json:"effectiveWebhookSource"`
 	ScanIntervalSeconds int    `json:"scanIntervalSeconds"`
 }
 
@@ -48,6 +58,9 @@ type screenshotAutoPostConfigLogSummary struct {
 	Enabled             bool   `json:"enabled"`
 	ScreenshotDirectory string `json:"screenshotDirectory"`
 	WebhookConfigured   bool   `json:"webhookConfigured"`
+	FallbackToPrimary   bool   `json:"fallbackToPrimaryWebhook"`
+	EffectiveConfigured bool   `json:"effectiveWebhookConfigured"`
+	EffectiveSource     string `json:"effectiveWebhookSource"`
 	ScanIntervalSeconds int    `json:"scanIntervalSeconds"`
 }
 
@@ -73,10 +86,13 @@ type autoCaptureOutputLogSummary struct {
 }
 
 type autoCaptureDiscordLogSummary struct {
-	Enabled           bool   `json:"enabled"`
-	WebhookConfigured bool   `json:"webhookConfigured"`
-	PostMode          string `json:"postMode"`
-	IncludeImages     bool   `json:"includeImages"`
+	Enabled                    bool   `json:"enabled"`
+	WebhookConfigured          bool   `json:"webhookConfigured"`
+	FallbackToPrimaryWebhook   bool   `json:"fallbackToPrimaryWebhook"`
+	EffectiveWebhookConfigured bool   `json:"effectiveWebhookConfigured"`
+	EffectiveWebhookSource     string `json:"effectiveWebhookSource"`
+	PostMode                   string `json:"postMode"`
+	IncludeImages              bool   `json:"includeImages"`
 }
 
 type autoCapturePlayerLocalLogSummary struct {
@@ -112,8 +128,19 @@ func (a *App) logStartupLocked() {
 	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "startup config=%s", configSummaryForLog(a.state.Config))
 }
 
+func (a *App) logSettingsSavedConfigLocked(cfg appcore.Config) {
+	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "settings saved config=%s", configSummaryForLog(cfg))
+}
+
+func (a *App) logSettingsSaveErrorLocked(err error) {
+	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "settings save error: err=%v", err)
+}
+
 func configSummaryForLog(cfg appcore.Config) string {
 	cfg.Normalize()
+	primaryWebhookConfigured := strings.TrimSpace(cfg.Discord.WebhookURL) != ""
+	autoPhotoWebhook := webhookFallbackSummary(cfg.AutoPhoto.WebhookURL, primaryWebhookConfigured)
+	screenshotWebhook := webhookFallbackSummary(cfg.ScreenshotAutoPost.WebhookURL, primaryWebhookConfigured)
 	summary := configLogSummary{
 		Image: imageConfigLogSummary{
 			MaxWidth:        cfg.Image.MaxWidth,
@@ -127,19 +154,25 @@ func configSummaryForLog(cfg appcore.Config) string {
 		},
 		Output: cfg.Output,
 		Discord: webhookConfigLogSummary{
-			WebhookConfigured: strings.TrimSpace(cfg.Discord.WebhookURL) != "",
+			WebhookConfigured: primaryWebhookConfigured,
 		},
 		AutoPhoto: autoPhotoConfigLogSummary{
 			Enabled:             cfg.AutoPhoto.Enabled,
 			PhotoDirectory:      cfg.AutoPhoto.PhotoDirectory,
-			WebhookConfigured:   strings.TrimSpace(cfg.AutoPhoto.WebhookURL) != "",
+			WebhookConfigured:   autoPhotoWebhook.WebhookConfigured,
+			FallbackToPrimary:   autoPhotoWebhook.FallbackToPrimaryWebhook,
+			EffectiveConfigured: autoPhotoWebhook.EffectiveWebhookConfigured,
+			EffectiveSource:     autoPhotoWebhook.EffectiveWebhookSource,
 			ScanIntervalSeconds: cfg.AutoPhoto.ScanIntervalSeconds,
 		},
-		AutoCapture: autoCaptureSummaryForLog(cfg.AutoCapture),
+		AutoCapture: autoCaptureSummaryForLog(cfg.AutoCapture, primaryWebhookConfigured),
 		ScreenshotAutoPost: screenshotAutoPostConfigLogSummary{
 			Enabled:             cfg.ScreenshotAutoPost.Enabled,
 			ScreenshotDirectory: cfg.ScreenshotAutoPost.ScreenshotDirectory,
-			WebhookConfigured:   strings.TrimSpace(cfg.ScreenshotAutoPost.WebhookURL) != "",
+			WebhookConfigured:   screenshotWebhook.WebhookConfigured,
+			FallbackToPrimary:   screenshotWebhook.FallbackToPrimaryWebhook,
+			EffectiveConfigured: screenshotWebhook.EffectiveWebhookConfigured,
+			EffectiveSource:     screenshotWebhook.EffectiveWebhookSource,
 			ScanIntervalSeconds: cfg.ScreenshotAutoPost.ScanIntervalSeconds,
 		},
 		Update: cfg.Update,
@@ -151,7 +184,7 @@ func configSummaryForLog(cfg appcore.Config) string {
 	return string(data)
 }
 
-func autoCaptureSummaryForLog(cfg appcore.AutoCaptureConfig) autoCaptureConfigLogSummary {
+func autoCaptureSummaryForLog(cfg appcore.AutoCaptureConfig, primaryWebhookConfigured bool) autoCaptureConfigLogSummary {
 	enabledViews := 0
 	calibratedViews := 0
 	for _, view := range cfg.Views {
@@ -162,6 +195,7 @@ func autoCaptureSummaryForLog(cfg appcore.AutoCaptureConfig) autoCaptureConfigLo
 			calibratedViews++
 		}
 	}
+	discordWebhook := webhookFallbackSummary(cfg.Discord.WebhookURL, primaryWebhookConfigured)
 	return autoCaptureConfigLogSummary{
 		Schedule: cfg.Schedule,
 		Capture:  cfg.Capture,
@@ -180,14 +214,33 @@ func autoCaptureSummaryForLog(cfg appcore.AutoCaptureConfig) autoCaptureConfigLo
 		},
 		Presence: cfg.Presence,
 		Discord: autoCaptureDiscordLogSummary{
-			Enabled:           cfg.Discord.Enabled,
-			WebhookConfigured: strings.TrimSpace(cfg.Discord.WebhookURL) != "",
-			PostMode:          cfg.Discord.PostMode,
-			IncludeImages:     cfg.Discord.IncludeImages,
+			Enabled:                    cfg.Discord.Enabled,
+			WebhookConfigured:          discordWebhook.WebhookConfigured,
+			FallbackToPrimaryWebhook:   discordWebhook.FallbackToPrimaryWebhook,
+			EffectiveWebhookConfigured: discordWebhook.EffectiveWebhookConfigured,
+			EffectiveWebhookSource:     discordWebhook.EffectiveWebhookSource,
+			PostMode:                   cfg.Discord.PostMode,
+			IncludeImages:              cfg.Discord.IncludeImages,
 		},
 		ViewCount:       len(cfg.Views),
 		EnabledViews:    enabledViews,
 		CalibratedViews: calibratedViews,
+	}
+}
+
+func webhookFallbackSummary(specificWebhookURL string, primaryWebhookConfigured bool) webhookFallbackLogSummary {
+	specificConfigured := strings.TrimSpace(specificWebhookURL) != ""
+	source := "none"
+	if specificConfigured {
+		source = "specific"
+	} else if primaryWebhookConfigured {
+		source = "primary"
+	}
+	return webhookFallbackLogSummary{
+		WebhookConfigured:          specificConfigured,
+		FallbackToPrimaryWebhook:   !specificConfigured && primaryWebhookConfigured,
+		EffectiveWebhookConfigured: specificConfigured || primaryWebhookConfigured,
+		EffectiveWebhookSource:     source,
 	}
 }
 

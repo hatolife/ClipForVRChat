@@ -538,7 +538,9 @@ func (a *App) SaveConfig(cfg appcore.Config) error {
 }
 
 func (a *App) saveConfigLocked(cfg appcore.Config) error {
+	cfg.Normalize()
 	if err := appcore.SaveConfig(a.configPath, cfg); err != nil {
+		a.logSettingsSaveErrorLocked(err)
 		return err
 	}
 	a.state.Config = cfg
@@ -547,6 +549,7 @@ func (a *App) saveConfigLocked(cfg appcore.Config) error {
 	a.state.Results = nil
 	a.restartCameraPoseReceiverLocked(cfg)
 	a.restartAutoPhotoWatcher(cfg)
+	a.logSettingsSavedConfigLocked(cfg)
 	return nil
 }
 
@@ -1020,13 +1023,16 @@ func (a *App) TestAutoCaptureView(viewID string) ([]appcore.Result, error) {
 }
 
 func (a *App) saveAutoCaptureConfigFromSettingsLocked(cfg appcore.Config) error {
+	cfg.Normalize()
 	if err := appcore.SaveConfig(a.configPath, cfg); err != nil {
+		a.logSettingsSaveErrorLocked(err)
 		return err
 	}
 	a.state.Config = cfg
 	a.state.ConfigPath = a.configPath
 	a.restartCameraPoseReceiverLocked(cfg)
 	a.restartAutoPhotoWatcher(cfg)
+	a.logSettingsSavedConfigLocked(cfg)
 	return nil
 }
 
