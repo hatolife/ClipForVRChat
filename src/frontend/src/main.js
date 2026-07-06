@@ -84,6 +84,8 @@ const vueApp = createApp({
       debugOSCInput: '/avatar/parameters/debug true',
       debugOSCSending: false,
       debugOSCResult: null,
+      settingsDraftSyncTimer: null,
+      settingsCloseUnsubscribe: null,
       startupLoading: true,
       startupStatus: 'フロントエンドを初期化しています。',
       startupError: ''
@@ -176,6 +178,20 @@ const vueApp = createApp({
     hasUnsavedSettings() {
       if (!this.isSettings || !this.state.config || !this.settingsBaseline) return false
       return this.serializeSettings(this.state.config) !== this.settingsBaseline
+    },
+    changedSettingLabels() {
+      if (!this.hasUnsavedSettings) return []
+      let baseline
+      try {
+        baseline = JSON.parse(this.settingsBaseline || '{}')
+      } catch {
+        return ['設定']
+      }
+      const labels = new Set()
+      for (const path of this.changedSettingPaths(baseline, this.state.config)) {
+        labels.add(this.settingLabelForPath(path))
+      }
+      return [...labels].filter(Boolean).slice(0, 24)
     },
     historySelectionRectStyle() {
       if (!this.historyDragSelecting) return {}
@@ -366,6 +382,14 @@ const vueApp = createApp({
       return entries.filter((entry) => re.test(this.formatOSCLogLine(entry)))
     }
   },
+  watch: {
+    'state.config': {
+      handler() {
+        this.scheduleSettingsDraftSync()
+      },
+      deep: true
+    }
+  },
   async mounted() {
     try {
       this.setStartupStatus('Wails APIを確認しています。')
@@ -376,6 +400,9 @@ const vueApp = createApp({
       this.info = await api.GetAppInfo()
       this.setStartupStatus('初期状態を取得しています。')
       this.state = await api.GetInitialState()
+      if (this.isSettings) {
+        this.rememberSettingsBaseline()
+      }
       this.setStartupStatus('ライセンス情報を取得しています。')
       this.licenses = await api.GetOSSLicenses()
       this.setStartupStatus('イベント受信を登録しています。')
@@ -385,6 +412,15 @@ const vueApp = createApp({
       window.runtime?.EventsOn?.('auto-photo:result', (event) => {
         this.applyAutoPhotoResult(event)
       })
+      if (window.runtime?.EventsOn) {
+        this.settingsCloseUnsubscribe = window.runtime.EventsOn('settings:close-requested', () => {
+          if (this.hasUnsavedSettings) {
+            this.pendingSettingsLeave = 'quit'
+          } else if (api?.QuitAfterSettingsDecision) {
+            api.QuitAfterSettingsDecision()
+          }
+        })
+      }
       window.runtime?.OnFileDrop?.(async (_x, _y, paths) => {
         this.dragging = false
         await this.handleDrop(paths || [])
@@ -413,6 +449,14 @@ const vueApp = createApp({
   },
   unmounted() {
     this.stopAvatarOSCBasisStatusPolling()
+    if (this.settingsDraftSyncTimer) {
+      window.clearTimeout(this.settingsDraftSyncTimer)
+      this.settingsDraftSyncTimer = null
+    }
+    if (this.settingsCloseUnsubscribe) {
+      this.settingsCloseUnsubscribe()
+      this.settingsCloseUnsubscribe = null
+    }
     window.removeEventListener('keydown', this.handleKeyDown)
     window.removeEventListener('mousemove', this.updateHistoryDragSelect)
     window.removeEventListener('mouseup', this.finishHistoryDragSelect)
@@ -450,8 +494,39 @@ const vueApp = createApp({
     serializeSettings(config) {
       return JSON.stringify(config || {})
     },
+    changedSettingPaths(before, after, prefix = '') {
+      if (this.serializeSettings(before) === this.serializeSettings(after)) return []
+      if (!before || !after || typeof before !== 'object' || typeof after !== 'object') return [prefix || 'config']
+      if (Array.isArray(before) || Array.isArray(after)) return [prefix || 'config']
+      const keys = new Set([...Object.keys(before), ...Object.keys(after)])
+      const paths = []
+      for (const key of keys) {
+        const child = prefix ? `${prefix}.${key}` : key
+        paths.push(...this.changedSettingPaths(before[key], after[key], child))
+      }
+      return paths
+    },
+    settingLabelForPath(path) {
+      if (path.startsWith('image.')) return '画像変換'
+      if (path.startsWith('output.uploadDiscord') || path.startsWith('discord.')) return 'Discord投稿'
+      if (path.startsWith('output.saveLocal') || path.startsWith('output.local') || path.startsWith('output.detectQrCodeUrls')) return '処理結果'
+      if (path.startsWith('autoPhoto.')) return 'VRChat写真自動処理'
+      if (path.startsWith('screenshotAutoPost.')) return 'スクリーンショット自動処理'
+      if (path.startsWith('update.')) return '更新確認'
+      if (path.startsWith('autoCapture.osc.')) return '自動撮影 OSC'
+      if (path.startsWith('autoCapture.capture.preplacedLocalAnchor')) return 'フォールバックモード'
+      if (path.startsWith('autoCapture.capture.')) return '自動撮影 撮影方式'
+      if (path.startsWith('autoCapture.views.')) return '構図設定'
+      if (path.startsWith('autoCapture.schedule.')) return '自動撮影スケジュール'
+      if (path.startsWith('autoCapture.stream.') || path.startsWith('autoCapture.output.')) return '自動撮影 撮影・出力'
+      if (path.startsWith('autoCapture.discord.')) return '自動撮影 Discord投稿'
+      if (path.startsWith('autoCapture.restore.')) return '撮影後復元'
+      if (path.startsWith('autoCapture.presence.')) return '同席ユーザー情報'
+      if (path.startsWith('autoCapture.playerLocal.')) return 'プレイヤー基準'
+      return '設定'
+    },
     rememberSettingsBaseline() {
-      this.settingsBaseline = this.serializeSettings(this.state.config)
+      this.settingsBaseline = this.serializeSettings(this.state.settingsBaselineConfig || this.state.config)
       this.settingsTab = 'feature'
       this.autoCaptureDetailView = ''
     },
@@ -474,6 +549,12 @@ const vueApp = createApp({
         this.state = await api.CloseSettings()
         this.resetSettingsBaseline()
         this.autoCaptureDetailView = ''
+      }
+      if (action === 'quit') {
+        if (api?.QuitAfterSettingsDecision) {
+          api.QuitAfterSettingsDecision()
+        }
+        return
       }
       if (action === 'help') {
         this.setView('help', 'after_settings')
@@ -522,6 +603,15 @@ const vueApp = createApp({
           this.logUserAction('settings_warning', 'missing_primary_discord_webhook')
         }
         this.resetSettingsBaseline()
+        if (api?.ClearSettingsDraft) {
+          await api.ClearSettingsDraft()
+        }
+        if (action === 'quit') {
+          if (api?.QuitAfterSettingsDecision) {
+            api.QuitAfterSettingsDecision()
+          }
+          return
+        }
         await this.performSettingsLeave(action)
       } catch (err) {
         this.error = String(err)
@@ -533,12 +623,33 @@ const vueApp = createApp({
     async discardSettingsAndLeave() {
       const action = this.pendingSettingsLeave || 'home'
       this.pendingSettingsLeave = null
+      if (api?.ClearSettingsDraft) {
+        await api.ClearSettingsDraft()
+      }
       await this.performSettingsLeave(action)
     },
     cancelSettingsLeave() {
       this.logUserAction('button_click', 'cancel_settings_leave')
       this.pendingSettingsLeave = null
       this.pendingDropPaths = []
+    },
+    scheduleSettingsDraftSync() {
+      if (!this.isSettings || !this.state.config || !this.settingsBaseline || !api?.StoreSettingsDraft) return
+      if (this.settingsDraftSyncTimer) {
+        window.clearTimeout(this.settingsDraftSyncTimer)
+      }
+      this.settingsDraftSyncTimer = window.setTimeout(() => {
+        this.settingsDraftSyncTimer = null
+        void this.syncSettingsDraft()
+      }, 250)
+    },
+    async syncSettingsDraft() {
+      if (!this.isSettings || !this.state.config || !this.settingsBaseline || !api?.StoreSettingsDraft) return
+      try {
+        await api.StoreSettingsDraft(this.state.config, this.hasUnsavedSettings)
+      } catch (err) {
+        this.error = String(err)
+      }
     },
     async goHome() {
       if (this.isSettings) {
@@ -1719,6 +1830,9 @@ const vueApp = createApp({
           this.state = await api.CloseSettings()
         }
         this.resetSettingsBaseline()
+        if (api?.ClearSettingsDraft) {
+          await api.ClearSettingsDraft()
+        }
         this.saved = true
         this.updateBannerDismissed = false
         void this.checkForUpdate()
@@ -2021,6 +2135,10 @@ const vueApp = createApp({
             </div>
           </div>
           <p v-if="error" class="error settings-error">{{ error }}</p>
+          <div v-if="changedSettingLabels.length" class="unsaved-change-list" aria-label="未保存変更のある設定項目">
+            <strong>未保存変更</strong>
+            <span v-for="label in changedSettingLabels" :key="label" class="unsaved-change-chip">{{ label }}</span>
+          </div>
 
           <section v-if="settingsTab === 'feature'" class="settings-group" role="tabpanel">
             <h3>機能</h3>

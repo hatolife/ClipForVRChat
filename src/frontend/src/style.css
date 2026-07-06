@@ -388,6 +388,34 @@ button:disabled {
   margin-top: 14px;
 }
 
+.unsaved-change-list {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid #e4c36b;
+  border-radius: 8px;
+  background: #fff8df;
+}
+
+.unsaved-change-list strong {
+  color: #74530b;
+}
+
+.unsaved-change-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #fff1b8;
+  color: #5f4709;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .settings-group {
   display: grid;
   gap: 14px;

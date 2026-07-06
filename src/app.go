@@ -63,6 +63,8 @@ type App struct {
 	oscLogSeq             uint64
 	oscLogLastEmit        time.Time
 	oscTraceCleanup       func()
+	settingsDraftDirty    bool
+	allowClose            bool
 	mu                    sync.Mutex
 }
 
@@ -141,8 +143,9 @@ type FFmpegStatus struct {
 
 func NewApp(configPath string, initial appcore.UIState) *App {
 	return &App{
-		configPath: configPath,
-		state:      initial,
+		configPath:         configPath,
+		state:              initial,
+		settingsDraftDirty: initial.UnsavedSettingsDraft,
 	}
 }
 
@@ -171,6 +174,11 @@ func (a *App) beforeClose(ctx context.Context) bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.ctx = ctx
+	if a.settingsDraftDirty && !a.allowClose {
+		a.logLifecycleLocked("before_close: pending unsaved settings; preventing close")
+		emitWailsEvent(ctx, "settings:close-requested", nil)
+		return true
+	}
 	a.logLifecycleLocked("before_close: allowing close")
 	return false
 }
@@ -213,6 +221,46 @@ func (a *App) shutdownFromSingleInstance() error {
 	}
 	go runtime.Quit(ctx)
 	return nil
+}
+
+func (a *App) StoreSettingsDraft(cfg appcore.Config, dirty bool) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if !dirty {
+		a.settingsDraftDirty = false
+		a.state.UnsavedSettingsDraft = false
+		a.state.SettingsBaselineConfig = nil
+		return removeSettingsDraft()
+	}
+	cfg.Normalize()
+	if err := saveSettingsDraft(cfg); err != nil {
+		a.logLifecycleLocked("settings draft save failed: %v", err)
+		return err
+	}
+	a.settingsDraftDirty = true
+	a.state.UnsavedSettingsDraft = true
+	a.logLifecycleLocked("settings draft saved")
+	return nil
+}
+
+func (a *App) ClearSettingsDraft() error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.settingsDraftDirty = false
+	a.state.UnsavedSettingsDraft = false
+	a.state.SettingsBaselineConfig = nil
+	return removeSettingsDraft()
+}
+
+func (a *App) QuitAfterSettingsDecision() {
+	a.mu.Lock()
+	a.allowClose = true
+	ctx := a.ctx
+	a.logLifecycleLocked("quit after settings decision: ctx_ready=%t", ctx != nil)
+	a.mu.Unlock()
+	if ctx != nil {
+		go runtime.Quit(ctx)
+	}
 }
 
 func (a *App) stopBackgroundTasksLocked() {
@@ -567,9 +615,15 @@ func (a *App) saveConfigLocked(cfg appcore.Config) error {
 		a.logSettingsSaveErrorLocked(err)
 		return err
 	}
+	if err := removeSettingsDraft(); err != nil {
+		a.logLifecycleLocked("settings draft remove after save failed: %v", err)
+	}
+	a.settingsDraftDirty = false
 	a.state.Config = cfg
 	a.state.Mode = appcore.ModeResults
 	a.state.Message = ""
+	a.state.SettingsBaselineConfig = nil
+	a.state.UnsavedSettingsDraft = false
 	a.state.Results = nil
 	a.restartCameraPoseReceiverLocked(cfg)
 	a.restartAutoPhotoWatcher(cfg)
@@ -1060,8 +1114,14 @@ func (a *App) saveAutoCaptureConfigFromSettingsLocked(cfg appcore.Config) error 
 		a.logSettingsSaveErrorLocked(err)
 		return err
 	}
+	if err := removeSettingsDraft(); err != nil {
+		a.logLifecycleLocked("settings draft remove after save failed: %v", err)
+	}
+	a.settingsDraftDirty = false
 	a.state.Config = cfg
 	a.state.ConfigPath = a.configPath
+	a.state.SettingsBaselineConfig = nil
+	a.state.UnsavedSettingsDraft = false
 	a.restartCameraPoseReceiverLocked(cfg)
 	a.restartAutoPhotoWatcher(cfg)
 	a.logSettingsSavedConfigLocked(cfg)
@@ -1071,8 +1131,14 @@ func (a *App) saveAutoCaptureConfigFromSettingsLocked(cfg appcore.Config) error 
 func (a *App) CloseSettings() appcore.UIState {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if err := removeSettingsDraft(); err != nil {
+		a.logLifecycleLocked("settings draft remove on close settings failed: %v", err)
+	}
+	a.settingsDraftDirty = false
 	a.state.Mode = appcore.ModeResults
 	a.state.Message = ""
+	a.state.SettingsBaselineConfig = nil
+	a.state.UnsavedSettingsDraft = false
 	a.state.Results = nil
 	a.state.PendingPaths = nil
 	a.state.ProcessOnSave = false
@@ -1095,6 +1161,8 @@ func (a *App) OpenSettings(path string) (appcore.UIState, error) {
 	a.state.Message = ""
 	a.state.ConfigPath = a.configPath
 	a.state.Config = cfg
+	a.state.SettingsBaselineConfig = nil
+	a.state.UnsavedSettingsDraft = false
 	a.state.Results = nil
 	a.state.PendingPaths = nil
 	a.state.ProcessOnSave = false

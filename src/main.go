@@ -77,6 +77,16 @@ func main() {
 	if history, err := appcore.LoadHistoryWithManagedOutputDir(appcore.HistoryPath(configPath), filepath.Dir(configPath), managedOutputDir(configPath, cfg)); err == nil {
 		state.History = history
 	}
+	if draft, ok, err := loadSettingsDraft(); err != nil {
+		appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(configPath), "settings draft load error: %v", err)
+	} else if ok {
+		baseline := cfg
+		state.Mode = appcore.ModeSettings
+		state.Message = "保存されていない設定の一時変更を復元しました。保存するまで設定ファイルには反映されません。"
+		state.Config = draft
+		state.SettingsBaselineConfig = &baseline
+		state.UnsavedSettingsDraft = true
+	}
 
 	if len(args) == 1 && strings.EqualFold(filepath.Ext(args[0]), ".json") {
 		requestedConfigPath := args[0]

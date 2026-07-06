@@ -10,14 +10,16 @@ const (
 )
 
 type UIState struct {
-	Mode          Mode           `json:"mode"`
-	Message       string         `json:"message"`
-	ConfigPath    string         `json:"configPath"`
-	Config        Config         `json:"config"`
-	Results       []Result       `json:"results"`
-	History       []HistoryEntry `json:"history"`
-	PendingPaths  []string       `json:"pendingPaths"`
-	ProcessOnSave bool           `json:"processOnSave"`
+	Mode                   Mode           `json:"mode"`
+	Message                string         `json:"message"`
+	ConfigPath             string         `json:"configPath"`
+	Config                 Config         `json:"config"`
+	SettingsBaselineConfig *Config        `json:"settingsBaselineConfig,omitempty"`
+	UnsavedSettingsDraft   bool           `json:"unsavedSettingsDraft,omitempty"`
+	Results                []Result       `json:"results"`
+	History                []HistoryEntry `json:"history"`
+	PendingPaths           []string       `json:"pendingPaths"`
+	ProcessOnSave          bool           `json:"processOnSave"`
 }
 
 type Result struct {

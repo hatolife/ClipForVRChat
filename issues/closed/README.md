@@ -189,6 +189,9 @@
 | 225 | [自動撮影用Webhook URLをDiscord投稿タブへ移動する](unreleased/225-move-autocapture-webhook-to-discord-tab.md) | 完了 | 未定 | 自動撮影用Webhook URLをDiscord投稿タブへ移し、投稿先設定を同じ場所にまとめた。 |
 | 226 | [フォールバックモードを構図設定の上へ移動する](unreleased/226-move-fallback-mode-above-composition.md) | 完了 | 未定 | 自動撮影タブ概要で構図設定の上にフォールバックモードを表示し、詳細画面に入らず切り替えられるようにした。 |
 | 227 | [OSC送信ログを分離し任意OSC送信欄を追加する](unreleased/227-split-osc-send-log-and-debug-send.md) | 完了 | 未定 | OSCタブで受信ログと送信ログを分離し、デバッグ用に任意OSCを送信できる入力欄を追加した。 |
+| 229 | [ウィンドウ終了時にも未保存設定の保存確認を出す](unreleased/229-confirm-unsaved-settings-on-window-close.md) | 完了 | 未定 | 設定画面で未保存変更がある状態の×ボタンや複数起動による既存終了で、保存確認ダイアログを出すようにした。 |
+| 230 | [保存せず終了した設定変更を一時変更として復元する](unreleased/230-restore-unsaved-settings-draft-from-single-instance.md) | 完了 | 未定 | 未保存変更をsingle-instance配下へ一時保存し、次回起動時に保存せず一時状態として復元するようにした。 |
+| 231 | [未保存変更がある設定項目名をハイライトする](unreleased/231-highlight-unsaved-settings-fields.md) | 完了 | 未定 | 保存前に変更された設定項目名を設定画面上部へハイライト表示するようにした。 |
 | 213 | [完了済みissueを対応バージョンごとのフォルダに整理する](maintenance-only/213-organize-closed-issues-by-version.md) | 完了 | 整理のみ | 完了済みissueを対応バージョン別フォルダへ移動し、READMEリンクと運用ルールを更新した。 |
 | 212 | [Stream方式撮影失敗をSpout helper録画から切り分ける](v0.1.8-a43/212-investigate-stream-capture-spout-helper-debug-recording.md) | 完了 | `v0.1.8-a43` | Spout helper単体と本体経由の実機確認で、`IsUpdated()` 未処理による透明フレームを修正し、Stream方式撮影成功を確認した。 |
 | 214 | [Spout senderが空のときStreamingをOFF/ONして再確認する](v0.1.8-a43/214-retry-spout-sender-after-streaming-toggle.md) | 完了 | `v0.1.8-a43` | sender一覧が空のときOSCでStreamingをOFF/ONして再確認し、本体経由でsender復帰からcapture成功まで確認した。 |
