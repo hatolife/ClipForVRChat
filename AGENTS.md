@@ -30,10 +30,17 @@
 
 ## リリース運用
 
-- 正式リリース前に release candidate を確認する場合は、`vX.Y.Z-rcW` 形式のタグを打つ。例: `v0.1.7-rc1`。
-- `vX.Y.Z-rcW` タグのGitHub Releaseは prerelease として作成される。Release本文は原則として `RELEASE_NOTES.md` の同じバージョン見出しから作成し、専用見出しがない場合は対応する `vX.Y.Z` の見出しを使う。
+- ユーザーが「`vX.Y.Z` でこの機能を実装する」と指定または合意した場合、その機能は `vX.Y.Z` のリリース対象として扱う。難易度、残作業、実装リスクを理由に、ユーザーの明示承認なしで未実装部分を次バージョンへ延期したり、仕様を縮小して完了扱いにしたりしない。
+- 対象バージョンから機能を外す、仕様を縮小する、または次バージョンへ送る必要がある場合は、理由、未実装範囲、影響を明示し、ユーザーの承認を得てから `issues/` とリリースノート方針を更新する。
+- alpha、beta、rc、正式版への段階移行は、ユーザーの明示的な合意に基づいて行う。特に、機能開発中や最低機能確認段階の成果物を、作業者判断だけで `vX.Y.Z-rcW` として扱わない。
+- 開発版タグは、段階に応じて `vX.Y.Z-aW`、`vX.Y.Z-bW`、`vX.Y.Z-rcW` を使い分ける。`W` は同じ段階内の連番とし、タグの付け直しは共有済みブランチやタグの force push 禁止ルールに従う。
+- `vX.Y.Z-aW` は alpha として扱う。未完成機能、実装途中の機能、破壊的変更の早期確認、CI/CDと配布物生成の確認に使う。正式リリース品質を期待しない。
+- `vX.Y.Z-bW` は beta として扱う。対象機能が概ね揃い、主要フローの機能確認と不具合洗い出しを行う段階で使う。既知の未解決問題や実機確認待ちが残っていてよい。
+- `vX.Y.Z-rcW` は release candidate として扱う。既知の重大問題がなく、Release成果物、ドキュメント、手作業チェックを通せばそのまま `vX.Y.Z` として正式リリースできる候補だけに使う。機能追加や大きな仕様変更を含む確認版には使わない。
+- `vX.Y.Z-aW` / `vX.Y.Z-bW` / `vX.Y.Z-rcW` / `vX.Y.Z` の各タグでは CI/CD と Release workflow を走らせ、GitHub Releaseと配布成果物を作成する。
+- `vX.Y.Z-aW` / `vX.Y.Z-bW` / `vX.Y.Z-rcW` タグのGitHub Releaseは prerelease として作成される。Release本文は原則として `RELEASE_NOTES.md` の同じバージョン見出しから作成し、専用見出しがない場合は対応する `vX.Y.Z` の見出しを使う。
 - 正式リリースは `vX.Y.Z` 形式のタグを打つ。GitHub Releaseは draft でも prerelease でもない通常Releaseとして作成される。
-- `vX.Y.Z` / `vX.Y.Z-rcW` 以外の `v*` タグは検証用の draft Release として扱う。検証目的で作成したタグとReleaseは、確認後に削除する。
+- `vX.Y.Z` / `vX.Y.Z-aW` / `vX.Y.Z-bW` / `vX.Y.Z-rcW` 以外の `v*` タグは原則として作成しない。検証目的で一時タグが必要な場合は、GitHub Releaseを公開しない運用に留め、確認後にタグとReleaseを削除する。
 - `RELEASE_NOTES.md` の各バージョン本文は、GitHub Release本文としてそのまま使われるため、次の書式に揃える。
   - 先頭は `# vX.Y.Z`。
   - 続けて `## ダウンロード` を置き、`- [プログラムのダウンロード](https://github.com/hatolife/ClipForVRChat/releases/download/vX.Y.Z/ClipForVRChat-vX.Y.Z-windows-amd64.zip)` の1行を置く。

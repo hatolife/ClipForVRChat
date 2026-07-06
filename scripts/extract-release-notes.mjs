@@ -15,7 +15,7 @@ const outPath = path.resolve(process.cwd(), outPathArg)
 const content = fs.readFileSync(releaseNotesPath, 'utf8')
 const findSection = (sectionVersion) => {
   const escapedVersion = sectionVersion.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const pattern = new RegExp(`^## ${escapedVersion}\\s*$([\\s\\S]*?)(?=^## v\\d+\\.\\d+\\.\\d+(?:-rc\\d+)?\\s*$|(?![\\s\\S]))`, 'm')
+  const pattern = new RegExp(`^## ${escapedVersion}\\s*$([\\s\\S]*?)(?=^## v\\d+\\.\\d+\\.\\d+(?:-(?:a|b|rc)\\d+)?\\s*$|(?![\\s\\S]))`, 'm')
   return content.match(pattern)
 }
 
@@ -23,11 +23,11 @@ let match = findSection(version)
 let sourceVersion = version
 
 if (!match) {
-  const rcMatch = version.match(/^(v\d+\.\d+\.\d+)-rc\d+$/)
-  if (flags.includes('--fallback-rc-notes') && rcMatch) {
-    match = findSection(rcMatch[1])
+  const prereleaseMatch = version.match(/^(v\d+\.\d+\.\d+)-(?:a|b|rc)\d+$/)
+  if (flags.includes('--fallback-rc-notes') && prereleaseMatch) {
+    match = findSection(prereleaseMatch[1])
     if (match) {
-      sourceVersion = rcMatch[1]
+      sourceVersion = prereleaseMatch[1]
     }
   }
 }

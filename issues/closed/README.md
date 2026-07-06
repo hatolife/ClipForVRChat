@@ -183,3 +183,4 @@
 | 213 | [完了済みissueを対応バージョンごとのフォルダに整理する](maintenance-only/213-organize-closed-issues-by-version.md) | 完了 | 整理のみ | 完了済みissueを対応バージョン別フォルダへ移動し、READMEリンクと運用ルールを更新した。 |
 | 212 | [Stream方式撮影失敗をSpout helper録画から切り分ける](v0.1.8-rc43/212-investigate-stream-capture-spout-helper-debug-recording.md) | 完了 | `v0.1.8-rc43` | Spout helper単体と本体経由の実機確認で、`IsUpdated()` 未処理による透明フレームを修正し、Stream方式撮影成功を確認した。 |
 | 214 | [Spout senderが空のときStreamingをOFF/ONして再確認する](v0.1.8-rc43/214-retry-spout-sender-after-streaming-toggle.md) | 完了 | `v0.1.8-rc43` | sender一覧が空のときOSCでStreamingをOFF/ONして再確認し、本体経由でsender復帰からcapture成功まで確認した。 |
+| 215 | [alpha/beta/rcを分けたバージョニング規則を定義する](maintenance-only/215-define-alpha-beta-rc-versioning.md) | 完了 | 整理のみ | RCを正式リリース直前確認に限定し、alpha/beta/rc/正式版のタグ規則、CI/CD対象、勝手なスコープ縮小禁止を明文化した。 |

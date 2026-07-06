@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: "Release tag to build, for example v0.1.8-rc13"
+        description: "Release tag to build, for example v0.1.8-a1, v0.1.8-b1, v0.1.8-rc1, or v0.1.8"
         required: true
         type: string
 
@@ -44,12 +44,12 @@ jobs:
           COMMIT_SHA: ${{ github.sha }}
         run: |
           $tagName = $env:TAG_NAME
-          if ($tagName -notmatch '^v\d+\.\d+\.\d+(-rc\d+)?$') {
-            throw "Release tag must match vX.Y.Z or vX.Y.Z-rcN: $tagName"
+          if ($tagName -notmatch '^v\d+\.\d+\.\d+(-(a|b|rc)\d+)?$') {
+            throw "Release tag must match vX.Y.Z, vX.Y.Z-aN, vX.Y.Z-bN, or vX.Y.Z-rcN: $tagName"
           }
           $shortSha = $env:COMMIT_SHA.Substring(0, 7)
           $releaseTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-          $isReleaseCandidate = $tagName -match '^v\d+\.\d+\.\d+-rc\d+$'
+          $isPrerelease = $tagName -match '^v\d+\.\d+\.\d+-(a|b|rc)\d+$'
           $assetPrefix = "ClipForVRChat-$tagName"
           $avatarAssetPrefix = "AvatarBeacon-$tagName-source"
           "app_version=$tagName.$shortSha" >> $env:GITHUB_OUTPUT
@@ -59,7 +59,7 @@ jobs:
           "asset_prefix=$assetPrefix" >> $env:GITHUB_OUTPUT
           "avatar_asset_prefix=$avatarAssetPrefix" >> $env:GITHUB_OUTPUT
           "draft=false" >> $env:GITHUB_OUTPUT
-          "prerelease=$($isReleaseCandidate.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "prerelease=$($isPrerelease.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
 
       - name: Setup Go
         uses: actions/setup-go@v6
