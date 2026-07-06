@@ -193,6 +193,8 @@
 | 230 | [保存せず終了した設定変更を一時変更として復元する](unreleased/230-restore-unsaved-settings-draft-from-single-instance.md) | 完了 | 未定 | 未保存変更をsingle-instance配下へ一時保存し、次回起動時に保存せず一時状態として復元するようにした。 |
 | 231 | [未保存変更がある設定項目名をハイライトする](unreleased/231-highlight-unsaved-settings-fields.md) | 完了 | 未定 | 保存前に変更された設定項目名を設定画面上部へハイライト表示するようにした。 |
 | 232 | [GitHub Release本文からバージョン見出しを除外する](v0.1.8/232-strip-release-body-version-heading.md) | 完了 | `v0.1.8` | Release本文生成時に先頭の単独バージョン見出しを除外し、タイトルとの二重表記を防ぐ。 |
+| 233 | [OSCデバッグ送信が送信ログに表示されない](unreleased/233-fix-debug-osc-send-log.md) | 完了 | 未定 | OSC受信/転送ログとOSC送信ログを別バッファに分け、受信ログ増加で送信ログが消えないようにした。 |
+| 234 | [未保存変更の項目名が大分類だけで分かりにくい](unreleased/234-show-specific-unsaved-setting-labels.md) | 完了 | 未定 | 未保存変更表示でOSCホストやOSC送信ポートなどの具体的な設定項目名を表示するようにした。 |
 | 213 | [完了済みissueを対応バージョンごとのフォルダに整理する](maintenance-only/213-organize-closed-issues-by-version.md) | 完了 | 整理のみ | 完了済みissueを対応バージョン別フォルダへ移動し、READMEリンクと運用ルールを更新した。 |
 | 212 | [Stream方式撮影失敗をSpout helper録画から切り分ける](v0.1.8-a43/212-investigate-stream-capture-spout-helper-debug-recording.md) | 完了 | `v0.1.8-a43` | Spout helper単体と本体経由の実機確認で、`IsUpdated()` 未処理による透明フレームを修正し、Stream方式撮影成功を確認した。 |
 | 214 | [Spout senderが空のときStreamingをOFF/ONして再確認する](v0.1.8-a43/214-retry-spout-sender-after-streaming-toggle.md) | 完了 | `v0.1.8-a43` | sender一覧が空のときOSCでStreamingをOFF/ONして再確認し、本体経由でsender復帰からcapture成功まで確認した。 |

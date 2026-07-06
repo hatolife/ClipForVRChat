@@ -79,8 +79,10 @@ const vueApp = createApp({
       avatarOscStatusLoading: false,
       avatarOscStatusPollTimer: null,
       oscLogEntries: [],
+      oscSendLogEntries: [],
       oscLogFilter: '',
       oscLogUnsubscribe: null,
+      oscSendLogUnsubscribe: null,
       debugOSCInput: '/avatar/parameters/debug true',
       debugOSCSending: false,
       debugOSCResult: null,
@@ -359,7 +361,7 @@ const vueApp = createApp({
       }
     },
     filteredOSCLogEntries() {
-      const entries = (this.oscLogEntries || []).filter((entry) => entry?.direction !== 'send')
+      const entries = this.oscLogEntries || []
       const query = String(this.oscLogFilter || '').trim()
       if (!query) return entries
       let re
@@ -371,7 +373,7 @@ const vueApp = createApp({
       return entries.filter((entry) => re.test(this.formatOSCLogLine(entry)))
     },
     filteredOSCSendLogEntries() {
-      const entries = (this.oscLogEntries || []).filter((entry) => entry?.direction === 'send')
+      const entries = this.oscSendLogEntries || []
       const query = String(this.oscLogFilter || '').trim()
       if (!query) return entries
       let re
@@ -508,6 +510,27 @@ const vueApp = createApp({
       return paths
     },
     settingLabelForPath(path) {
+      const exactLabels = {
+        'autoCapture.osc.vrcHost': 'OSCホスト',
+        'autoCapture.osc.vrcInPort': 'OSC送信ポート',
+        'autoCapture.osc.appOutPort': 'OSC受信ポート',
+        'autoCapture.osc.poseFreshnessSec': '現在Pose取得の有効秒数',
+        'autoCapture.osc.forward.enabled': 'OSC転送',
+        'autoCapture.osc.forward.mode': '転送モード',
+        'autoCapture.playerLocal.basisSource': 'プレイヤー基準の取得元',
+        'autoCapture.playerLocal.calibrated': 'manual基準Pose',
+        'autoCapture.playerLocal.updatedAt': 'manual基準Pose',
+        'autoCapture.playerLocal.basisPose': 'manual基準Pose',
+        'autoCapture.playerLocal.avatarOsc.parameterPrefix': 'AvatarBeacon parameter prefix',
+        'autoCapture.playerLocal.avatarOsc.positionScale': 'AvatarBeacon position scale',
+        'autoCapture.playerLocal.avatarOsc.positiveFlagThreshold': 'AvatarBeacon sign threshold',
+        'autoCapture.playerLocal.avatarOsc.freshnessSec': 'AvatarBeacon受信の有効秒数',
+        'autoCapture.playerLocal.avatarOsc.maxAbsPosition': 'AvatarBeacon position上限',
+        'autoCapture.playerLocal.avatarOsc.maxAbsForward': 'AvatarBeacon forward上限'
+      }
+      if (exactLabels[path]) return exactLabels[path]
+      if (path.startsWith('autoCapture.osc.forward.targets.')) return 'OSC転送先'
+      if (path.startsWith('autoCapture.playerLocal.basisPose.')) return 'manual基準Pose'
       if (path.startsWith('image.')) return '画像変換'
       if (path.startsWith('output.uploadDiscord') || path.startsWith('discord.')) return 'Discord投稿'
       if (path.startsWith('output.saveLocal') || path.startsWith('output.local') || path.startsWith('output.detectQrCodeUrls')) return '処理結果'
@@ -1662,6 +1685,20 @@ const vueApp = createApp({
         this.stopOSCLogSubscription()
         return
       }
+      await this.refreshOSCLogEntries()
+      this.startOSCLogEventSubscription()
+    },
+    stopOSCLogSubscription() {
+      if (this.oscLogUnsubscribe) {
+        this.oscLogUnsubscribe()
+        this.oscLogUnsubscribe = null
+      }
+      if (this.oscSendLogUnsubscribe) {
+        this.oscSendLogUnsubscribe()
+        this.oscSendLogUnsubscribe = null
+      }
+    },
+    async refreshOSCLogEntries() {
       if (api?.GetOSCLogEntries) {
         try {
           this.oscLogEntries = await api.GetOSCLogEntries()
@@ -1669,16 +1706,27 @@ const vueApp = createApp({
           this.oscLogEntries = []
         }
       }
-      if (this.oscLogUnsubscribe || !window.runtime?.EventsOn) return
-      this.oscLogUnsubscribe = window.runtime.EventsOn('osc-log:entries', (entries) => {
-        if (!this.isSettings || this.settingsTab !== 'osc') return
-        this.oscLogEntries = Array.isArray(entries) ? entries : []
-      })
+      if (api?.GetOSCSendLogEntries) {
+        try {
+          this.oscSendLogEntries = await api.GetOSCSendLogEntries()
+        } catch {
+          this.oscSendLogEntries = []
+        }
+      }
     },
-    stopOSCLogSubscription() {
-      if (this.oscLogUnsubscribe) {
-        this.oscLogUnsubscribe()
-        this.oscLogUnsubscribe = null
+    startOSCLogEventSubscription() {
+      if (!window.runtime?.EventsOn) return
+      if (!this.oscLogUnsubscribe) {
+        this.oscLogUnsubscribe = window.runtime.EventsOn('osc-log:entries', (entries) => {
+          if (!this.isSettings || this.settingsTab !== 'osc') return
+          this.oscLogEntries = Array.isArray(entries) ? entries : []
+        })
+      }
+      if (!this.oscSendLogUnsubscribe) {
+        this.oscSendLogUnsubscribe = window.runtime.EventsOn('osc-send-log:entries', (entries) => {
+          if (!this.isSettings || this.settingsTab !== 'osc') return
+          this.oscSendLogEntries = Array.isArray(entries) ? entries : []
+        })
       }
     },
     oscLogDirectionLabel(direction) {
@@ -1736,11 +1784,10 @@ const vueApp = createApp({
       try {
         const result = await api.SendDebugOSC(line)
         this.debugOSCResult = result || { ok: true, message: 'OSCを送信しました' }
-        if (api?.GetOSCLogEntries) {
-          this.oscLogEntries = await api.GetOSCLogEntries()
-        }
+        await this.refreshOSCLogEntries()
       } catch (err) {
         this.debugOSCResult = { ok: false, message: startupErrorMessage(err) }
+        await this.refreshOSCLogEntries()
       } finally {
         this.debugOSCSending = false
       }

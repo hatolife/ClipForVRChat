@@ -60,8 +60,11 @@ type App struct {
 	latestAvatarOSCBasis  avatarOSCBasisState
 	avatarOSCBasisSamples map[string]avatarOSCBasisSample
 	oscLogEntries         []OSCLogEntry
+	oscSendLogEntries     []OSCLogEntry
 	oscLogSeq             uint64
+	oscSendLogSeq         uint64
 	oscLogLastEmit        time.Time
+	oscSendLogLastEmit    time.Time
 	oscTraceCleanup       func()
 	settingsDraftDirty    bool
 	allowClose            bool
@@ -301,14 +304,22 @@ func (a *App) GetOSCLogEntries() []OSCLogEntry {
 	return append([]OSCLogEntry(nil), a.oscLogEntries...)
 }
 
+func (a *App) GetOSCSendLogEntries() []OSCLogEntry {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return append([]OSCLogEntry(nil), a.oscSendLogEntries...)
+}
+
 func (a *App) SendDebugOSC(line string) (appcore.DebugOSCSendResult, error) {
 	a.mu.Lock()
 	cfg := a.state.Config
 	cfg.Normalize()
 	logPath := appcore.DiagnosticLogPath(a.configPath)
+	beforeSeq := a.oscSendLogSeq
 	a.logUserActionLocked("debug_osc_send", strings.TrimSpace(line))
 	a.mu.Unlock()
 	result, err := appcore.SendDebugOSCLine(cfg.AutoCapture.OSC, line)
+	a.recordDebugOSCLogResult(beforeSeq, result, err)
 	if err != nil {
 		appcore.AppendDiagnosticLog(logPath, "debug osc send failed: target=%q address=%q types=%q err=%v", result.Target, result.Address, result.TypeTags, err)
 		return result, err
@@ -2179,6 +2190,10 @@ func (a *App) recordOSCLogEvent(entry OSCLogEntry) {
 }
 
 func (a *App) recordOSCLogEventLocked(entry OSCLogEntry) {
+	if entry.Direction == "send" {
+		a.recordOSCSendLogEventLocked(entry)
+		return
+	}
 	a.oscLogSeq++
 	entry.Seq = a.oscLogSeq
 	if strings.TrimSpace(entry.Time) == "" {
@@ -2201,6 +2216,59 @@ func (a *App) recordOSCLogEventLocked(entry OSCLogEntry) {
 	}
 	a.oscLogLastEmit = now
 	emitWailsEvent(a.ctx, "osc-log:entries", append([]OSCLogEntry(nil), a.oscLogEntries...))
+}
+
+func (a *App) recordOSCSendLogEventLocked(entry OSCLogEntry) {
+	a.oscSendLogSeq++
+	entry.Seq = a.oscSendLogSeq
+	if strings.TrimSpace(entry.Time) == "" {
+		entry.Time = time.Now().Format("15:04:05.000")
+	}
+	if strings.TrimSpace(entry.Status) == "" {
+		entry.Status = "ok"
+	}
+	a.oscSendLogEntries = append(a.oscSendLogEntries, entry)
+	const maxOSCSendLogEntries = 500
+	if len(a.oscSendLogEntries) > maxOSCSendLogEntries {
+		a.oscSendLogEntries = append([]OSCLogEntry(nil), a.oscSendLogEntries[len(a.oscSendLogEntries)-maxOSCSendLogEntries:]...)
+	}
+	if a.ctx == nil || runningGoTest {
+		return
+	}
+	now := time.Now()
+	if !a.oscSendLogLastEmit.IsZero() && now.Sub(a.oscSendLogLastEmit) < 250*time.Millisecond {
+		return
+	}
+	a.oscSendLogLastEmit = now
+	emitWailsEvent(a.ctx, "osc-send-log:entries", append([]OSCLogEntry(nil), a.oscSendLogEntries...))
+}
+
+func (a *App) recordDebugOSCLogResult(beforeSeq uint64, result appcore.DebugOSCSendResult, err error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	for i := len(a.oscSendLogEntries) - 1; i >= 0; i-- {
+		entry := a.oscSendLogEntries[i]
+		if entry.Seq <= beforeSeq {
+			break
+		}
+		if entry.Direction == "send" && entry.Address == result.Address && entry.Target == result.Target {
+			return
+		}
+	}
+	status := "ok"
+	errText := ""
+	if err != nil {
+		status = "error"
+		errText = err.Error()
+	}
+	a.recordOSCSendLogEventLocked(OSCLogEntry{
+		Direction: "send",
+		Address:   result.Address,
+		TypeTags:  result.TypeTags,
+		Target:    result.Target,
+		Status:    status,
+		Error:     errText,
+	})
 }
 
 func (a *App) startOSCTraceLocked() {

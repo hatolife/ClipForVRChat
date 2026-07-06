@@ -650,6 +650,56 @@ func TestAppOSCLogEntriesAreBounded(t *testing.T) {
 	}
 }
 
+func TestAppOSCSendLogEntriesAreSeparateFromReceiveLog(t *testing.T) {
+	app := NewApp(filepath.Join(t.TempDir(), "config.json"), appcore.UIState{Mode: appcore.ModeSettings})
+	app.recordOSCLogEvent(OSCLogEntry{Direction: "send", Address: "/avatar/parameters/debug", Target: "127.0.0.1:9000"})
+	for i := 0; i < 550; i++ {
+		app.recordOSCLogEvent(OSCLogEntry{Direction: "receive", Address: fmt.Sprintf("/test/%d", i)})
+	}
+
+	receiveLog := app.GetOSCLogEntries()
+	if len(receiveLog) != 500 {
+		t.Fatalf("receive entries = %d, want 500", len(receiveLog))
+	}
+	for _, entry := range receiveLog {
+		if entry.Direction == "send" {
+			t.Fatalf("receive log contains send entry: %+v", entry)
+		}
+	}
+	sendLog := app.GetOSCSendLogEntries()
+	if len(sendLog) != 1 {
+		t.Fatalf("send entries = %d, want 1: %+v", len(sendLog), sendLog)
+	}
+	if sendLog[0].Address != "/avatar/parameters/debug" {
+		t.Fatalf("send address = %q", sendLog[0].Address)
+	}
+}
+
+func TestAppSendDebugOSCRecordsSendLogWithoutTraceSubscription(t *testing.T) {
+	conn := listenUDPForTest(t)
+	defer conn.Close()
+	port := conn.LocalAddr().(*net.UDPAddr).Port
+	cfg := appcore.DefaultConfig()
+	cfg.AutoCapture.OSC.Host = "127.0.0.1"
+	cfg.AutoCapture.OSC.SendPort = port
+	app := NewApp(filepath.Join(t.TempDir(), "config.json"), appcore.UIState{Mode: appcore.ModeSettings, Config: cfg})
+
+	result, err := app.SendDebugOSC("/avatar/parameters/debug true")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.OK {
+		t.Fatalf("result = %+v, want ok", result)
+	}
+	sendLog := app.GetOSCSendLogEntries()
+	if len(sendLog) != 1 {
+		t.Fatalf("send entries = %d, want 1: %+v", len(sendLog), sendLog)
+	}
+	if sendLog[0].Direction != "send" || sendLog[0].Address != "/avatar/parameters/debug" || sendLog[0].TypeTags != ",T" || sendLog[0].Status != "ok" {
+		t.Fatalf("unexpected send log: %+v", sendLog[0])
+	}
+}
+
 func listenUDPForTest(t *testing.T) *net.UDPConn {
 	t.Helper()
 	addr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
