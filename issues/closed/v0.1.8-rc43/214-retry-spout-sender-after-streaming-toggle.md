@@ -23,3 +23,4 @@ Stream方式のSpout取得直前にsender一覧が0件の場合、ClipForVRChat�
 - 2026-07-07: Spout取得直前に `ListSpoutSenders` を実行し、senderが0件のときだけ `/usercamera/Streaming=false` と `true` を互換int付きで送信する回復処理を追加した。
 - 2026-07-07: sender一覧取得に失敗した場合は回復OSCを送らず、従来通り後続のSpout取得で詳細エラーを出す。
 - ローカル検証: `go test ./internal/appcore -run 'TestRecoverEmptySpoutSenderList|TestAutoCaptureRunnerRunOnceSkipsCameraAutoOpenWhenDisabled'`、`go test ./...`。
+- 2026-07-07: rc43 helperを使ったWindows版一時ハーネスで `AutoCaptureRunner.RunOnce` 相当経路を実行し、初回sender 0件からStreaming OFF/ON回復、再確認sender 1件、`spout capture success` まで到達することを実機確認した。診断ログに回復前後のsender数と各OSC送信結果が記録された。

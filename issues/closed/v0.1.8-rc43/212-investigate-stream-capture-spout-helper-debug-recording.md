@@ -23,7 +23,7 @@
 - [x] 実機環境で `spout-capture.exe --capture` の単体実行結果、終了コード、JSON、出力PNGの有無を記録する。
 - [x] `--debug-dir` / `--debug-frames` の出力有無と、`frames.jsonl`、frame metadata、`.rgba` の内容傾向を確認する。
 - [x] `spout-capture.exe --diagnose` でsender一覧、frame番号、ReceiveImage成否、RGBA統計を時系列で記録できる。
-- [ ] ClipForVRChatのテスト撮影ログから、helper実行引数、debug_dir、debug_frames、helper JSON、出力ファイル検証結果を確認する。
+- [x] ClipForVRChatのテスト撮影ログから、helper実行引数、debug_dir、debug_frames、helper JSON、出力ファイル検証結果を確認する。
 - [x] helper単体失敗か、ClipForVRChat統合部失敗か、VRChat Stream Camera/sender側失敗かを判断する。
 - [x] 原因に応じて修正チケットまたは既存チケットへの追記内容を決める。
 
@@ -72,3 +72,4 @@
 - 2026-07-07: Spout2側コメントと実装を確認したところ、sender更新時は `ReceiveImage()` がtrueを返してもピクセルバッファは未書き込みで、受信側は `IsUpdated()` を呼んで更新状態を消費し、バッファ再確保などを行う前提だった。現状は `IsUpdated()` を呼んでいないため、`m_bUpdated` が残り続け、以降の `ReceiveImage()` が即trueを返して空バッファを解析している可能性が高い。
 - 2026-07-07: `ReceiveImage()` 後に `IsUpdated()` を消費し、更新通知の回はピクセル解析しない修正を `v0.1.8-rc43` に入れた。rc43分離版 `/mnt/c/Users/user/Downloads/ClipForVRChat-v0.1.8-rc43-windows-amd64-separated/spout-capture.exe` は `v0.1.8-737ca7b`。OSC OFF/ON後の `--diagnose --output ... --duration-ms 15000 --interval-ms 500 --debug-frames 4` は `diagnose_success`、`receiverUpdates=1`、`receiveSuccesses=28`、`validFrames=27`、`blankFrames=1`、`transparentRatio=0`、`outputWritten=true`。
 - 2026-07-07: rc43でdiagnose終了直後の別プロセス `--capture --sender VRCSender1` は従来通り `sender_not_found` になったが、OSC OFF/ON直後に `--capture --sender VRCSender1 --output ... --debug-dir ... --debug-frames 4` を実行すると成功し、`capture.png` (`1365750` bytes) とdebug frame 2件を出力した。アプリ側には既に空sender時のOSC OFF/ON再試行を入れているため、helper単体の主因は `IsUpdated()` 未処理、sender消失対策はOSC再トグルで成立する見込み。
+- 2026-07-07: rc43 helperを指定したWindows版一時ハーネスで、ClipForVRChat本体の `AutoCaptureRunner.RunOnce` 相当経路を実行して成功を確認した。ログでは初回 `spout list success ... senders=0` から `spout sender recovery begin`、Streaming OFF/ON、再確認 `senders=1`、`spout capture begin`、`spout capture success` の順に進み、`sender="VRCSender1"`、`width=1920`、`height=1080`、PNG検証 `transparent=0.0000`。出力は `C:\Users\user\Downloads\cfvrc-rc43-app-runonce\20260707_033225_batch-20260707-033217_01_正面_stream.png` (`1156997` bytes)、sidecar JSONとdebug frame 2件も出力された。
