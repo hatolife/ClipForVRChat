@@ -143,12 +143,16 @@ type AutoCaptureCaptureConfig struct {
 	RequestedCameraCount    int    `json:"requestedCameraCount"`
 	MultiBackend            string `json:"multiBackend"`
 	FallbackToSequential    bool   `json:"fallbackToSequential"`
-	PreplacedLocalAnchor    bool   `json:"preplacedLocalAnchor"`
+	PreplacedLocalAnchor    *bool  `json:"preplacedLocalAnchor"`
 	OpenCameraBeforeBatch   bool   `json:"openCameraBeforeBatch"`
 	CloseCameraAfterBatch   bool   `json:"closeCameraAfterBatch"`
 	AutoLevelRollBeforeShot *bool  `json:"autoLevelRollBeforeShot"`
 	SettleDelayMS           int    `json:"settleDelayMs"`
 	ButtonReleaseDelayMS    int    `json:"buttonReleaseDelayMs"`
+}
+
+func (c AutoCaptureCaptureConfig) PreplacedLocalAnchorEnabled() bool {
+	return c.PreplacedLocalAnchor == nil || *c.PreplacedLocalAnchor
 }
 
 type AutoCaptureStreamConfig struct {
@@ -376,6 +380,7 @@ func DefaultAutoCaptureConfig() AutoCaptureConfig {
 			RequestedCameraCount:    1,
 			MultiBackend:            "dolly_multi",
 			FallbackToSequential:    true,
+			PreplacedLocalAnchor:    boolConfigPtr(true),
 			OpenCameraBeforeBatch:   false,
 			CloseCameraAfterBatch:   false,
 			AutoLevelRollBeforeShot: boolConfigPtr(true),
@@ -571,6 +576,9 @@ func (c *AutoCaptureConfig) Normalize() {
 	}
 	if c.Capture.AutoLevelRollBeforeShot == nil {
 		c.Capture.AutoLevelRollBeforeShot = boolConfigPtr(true)
+	}
+	if c.Capture.PreplacedLocalAnchor == nil {
+		c.Capture.PreplacedLocalAnchor = boolConfigPtr(true)
 	}
 	c.Stream.SpoutHelperPath = strings.Trim(strings.TrimSpace(c.Stream.SpoutHelperPath), `"`)
 	if c.Stream.SpoutHelperPath == "" {

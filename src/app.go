@@ -1558,7 +1558,7 @@ func (a *App) runAutoCaptureScheduler(ctx context.Context, cfg appcore.Config) {
 func (a *App) waitForAutoCaptureStartReadiness(ctx context.Context, cfg appcore.Config, timeout time.Duration) error {
 	cfg.Normalize()
 	logPath := appcore.DiagnosticLogPath(a.configPath)
-	if cfg.AutoCapture.Capture.PreplacedLocalAnchor {
+	if cfg.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
 		appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait: avatar_osc skipped preplaced_local_anchor=true")
 		if !cfg.AutoCapture.Presence.WatchOutputLog {
 			appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait complete: preplaced_local_anchor=true world_metadata=disabled")
@@ -2438,14 +2438,11 @@ func (a *App) prepareAutoCaptureConfigForRunLocked(cfg appcore.Config) (appcore.
 	source := normalizePlayerLocalBasisSource(cfg.AutoCapture.PlayerLocal.BasisSource)
 	if source == appcore.PlayerLocalBasisSourceAvatarOSC {
 		snapshot := a.latestAvatarOSCBasisSnapshotLocked(cfg, now)
-		if snapshot.AutoFallback {
-			cfg.AutoCapture.Capture.PreplacedLocalAnchor = true
-			appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "avatar osc basis auto fallback enabled: status=%q last=%q age_ms=%d threshold_ms=%d err=%q", snapshot.Status, snapshot.LastReceivedAddress, snapshot.AgeMS, avatarBeaconAutoFallbackAfter.Milliseconds(), snapshot.Error)
-			return cfg, nil
+		if snapshot.AutoFallback && !cfg.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
+			appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "avatar osc basis stale while fallback mode disabled: status=%q last=%q age_ms=%d threshold_ms=%d err=%q", snapshot.Status, snapshot.LastReceivedAddress, snapshot.AgeMS, avatarBeaconAutoFallbackAfter.Milliseconds(), snapshot.Error)
 		}
-		cfg.AutoCapture.Capture.PreplacedLocalAnchor = false
 	}
-	if cfg.AutoCapture.Capture.PreplacedLocalAnchor {
+	if cfg.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
 		appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "avatar osc basis resolve skipped: preplaced_local_anchor=true")
 		return cfg, nil
 	}

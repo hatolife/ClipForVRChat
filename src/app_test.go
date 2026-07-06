@@ -38,6 +38,10 @@ func TestAppGetInitialStateRefreshesHistory(t *testing.T) {
 	}
 }
 
+func appBoolPtr(value bool) *bool {
+	return &value
+}
+
 func TestAppClearResultsMarksHistoryCleared(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	history := []appcore.HistoryEntry{{ID: "h1", URL: "https://cdn.discordapp.com/attachments/1/2/a.png"}}
@@ -916,12 +920,13 @@ func TestHexPreviewTruncatesLongPayload(t *testing.T) {
 	}
 }
 
-func TestAppPrepareAutoCaptureConfigUsesAutoFallbackAfterAvatarBeaconTimeout(t *testing.T) {
+func TestAppPrepareAutoCaptureConfigKeepsFallbackOffAfterAvatarBeaconTimeout(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
 	now := time.Now()
 	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
 	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
+	app.state.Config.AutoCapture.Capture.PreplacedLocalAnchor = appBoolPtr(false)
 	app.avatarOSCBasisSamples = map[string]avatarOSCBasisSample{
 		"coord/x":       {Float: 0.8, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
 		"coord/xSign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
@@ -940,20 +945,20 @@ func TestAppPrepareAutoCaptureConfigUsesAutoFallbackAfterAvatarBeaconTimeout(t *
 	app.mu.Lock()
 	cfg, err := app.prepareAutoCaptureConfigForRunLocked(app.state.Config)
 	app.mu.Unlock()
-	if err != nil {
-		t.Fatalf("prepareAutoCaptureConfigForRunLocked error = %v", err)
+	if err == nil {
+		t.Fatal("expected stale avatar basis error when fallback mode is off")
 	}
-	if !cfg.AutoCapture.Capture.PreplacedLocalAnchor {
-		t.Fatal("expected preplaced local anchor fallback after 30s avatar beacon timeout")
+	if cfg.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
+		t.Fatal("fallback mode should remain off after avatar beacon timeout")
 	}
 }
 
-func TestAppPrepareAutoCaptureConfigReturnsToNormalWhenAvatarBeaconReceived(t *testing.T) {
+func TestAppPrepareAutoCaptureConfigKeepsFallbackOnWhenAvatarBeaconReceived(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
 	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
 	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
-	app.state.Config.AutoCapture.Capture.PreplacedLocalAnchor = true
+	app.state.Config.AutoCapture.Capture.PreplacedLocalAnchor = appBoolPtr(true)
 	app.avatarOSCBasisSamples = readyAvatarOSCBasisSamples(time.Now().Add(-5 * time.Second))
 
 	app.mu.Lock()
@@ -962,8 +967,8 @@ func TestAppPrepareAutoCaptureConfigReturnsToNormalWhenAvatarBeaconReceived(t *t
 	if err != nil {
 		t.Fatalf("prepareAutoCaptureConfigForRunLocked error = %v", err)
 	}
-	if cfg.AutoCapture.Capture.PreplacedLocalAnchor {
-		t.Fatal("expected normal mode when AvatarBeacon basis was received within 30s")
+	if !cfg.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
+		t.Fatal("fallback mode should remain on when AvatarBeacon basis was received")
 	}
 }
 
@@ -977,6 +982,7 @@ func TestAppMoveCameraToViewUsesAvatarOSCBasis(t *testing.T) {
 	cfg.AutoCapture.OSC.Host = "127.0.0.1"
 	cfg.AutoCapture.OSC.SendPort = port
 	cfg.AutoCapture.Capture.Mode = "photo"
+	cfg.AutoCapture.Capture.PreplacedLocalAnchor = appBoolPtr(false)
 	cfg.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
 	cfg.AutoCapture.PlayerLocal.Calibrated = false
 	cfg.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
@@ -1130,6 +1136,7 @@ func TestAppWaitForAutoCaptureStartReadinessWaitsForAvatarOSCBasis(t *testing.T)
 	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
 	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
 	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
+	app.state.Config.AutoCapture.Capture.PreplacedLocalAnchor = appBoolPtr(false)
 	app.state.Config.AutoCapture.Presence.WatchOutputLog = false
 	app.avatarOSCBasisSamples = map[string]avatarOSCBasisSample{
 		"coord/x": {Float: 0.8, HasFloat: true, ReceivedAt: time.Now()},

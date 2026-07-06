@@ -165,7 +165,7 @@ const vueApp = createApp({
       return `現在のAvatarBeacon受信状態: 成功 ${fmt(position.x)}, ${fmt(position.y)}, ${fmt(position.z)}, ${yaw}`
     },
     effectiveAutoCapturePreplacedLocalAnchor() {
-      return Boolean(this.avatarOscBasisStatus?.autoFallback || this.autoCaptureSettings.capture?.preplacedLocalAnchor)
+      return Boolean(this.autoCaptureSettings.capture?.preplacedLocalAnchor)
     },
     shouldShowAutoCaptureHelpDetails() {
       return this.autoCaptureHelpExpanded || !this.autoCaptureAvatarBeaconOK
@@ -206,7 +206,7 @@ const vueApp = createApp({
       autoCapture.playerLocal.basisSource ||= 'avatar_osc'
       autoCapture.playerLocal.avatarOsc ||= {}
       autoCapture.capture ||= {}
-      if (autoCapture.capture.preplacedLocalAnchor === undefined) autoCapture.capture.preplacedLocalAnchor = false
+      if (autoCapture.capture.preplacedLocalAnchor === undefined) autoCapture.capture.preplacedLocalAnchor = true
       if (autoCapture.capture.openCameraBeforeBatch === undefined) autoCapture.capture.openCameraBeforeBatch = false
       if (autoCapture.capture.closeCameraAfterBatch === undefined) autoCapture.capture.closeCameraAfterBatch = false
       if (autoCapture.capture.autoLevelRollBeforeShot === undefined) autoCapture.capture.autoLevelRollBeforeShot = true
@@ -1436,7 +1436,7 @@ const vueApp = createApp({
       const status = this.avatarOscBasisStatus
       if (!status) return '未取得'
       if (this.avatarOscStatusLoading) return '更新中'
-      if (status.autoFallback) return '自動フォールバック'
+      if (status.autoFallback) return 'basis未受信'
       if (status.error) return 'エラー'
       if (status.available) return status.state || '受信中'
       return status.state || status.message || '待機中'
@@ -2059,7 +2059,7 @@ const vueApp = createApp({
                       <h4>構図設定</h4>
                       <p>「撮影する」がONの構図を上から順番に撮影します。</p>
                       <p v-if="effectiveAutoCapturePreplacedLocalAnchor">フォールバックモード中は、各構図のPose、拡大率、表示対象はOSC送信されないため編集できません。</p>
-                      <p v-if="avatarOscBasisStatus?.autoFallback">AvatarBeaconのbasis受信が30秒以上ないため、自動的にフォールバックモードで実行します。</p>
+                      <p v-if="avatarOscBasisStatus?.autoFallback && !effectiveAutoCapturePreplacedLocalAnchor">AvatarBeaconのbasis受信が30秒以上ないため、フォールバックモードOFFでは通常撮影に失敗する可能性があります。</p>
                       <p v-else-if="!effectiveAutoCapturePreplacedLocalAnchor">プレイヤー基準構図はAvatarBeaconの受信状態がreadyのときに自動追従します。</p>
                     </div>
                     <div class="button-row">

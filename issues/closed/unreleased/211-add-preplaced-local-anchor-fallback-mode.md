@@ -24,7 +24,7 @@ ClipForVRChatは構図PoseやZoomなどを送らず、撮影に必要な最小�
 
 ## 対応内容
 
-- `autoCapture.capture.preplacedLocalAnchor` を追加し、既定OFFにした。
+- `autoCapture.capture.preplacedLocalAnchor` を追加した。2026-07-07に #222 で既定ONへ変更した。
 - 構図設定画面の先頭にフォールバックモードのトグルを追加した。
 - フォールバックONではCamera Mode、Streaming、Pose、Zoom、表示マスク、Close、復元送信をスキップする。
 - Photo方式では撮影時に `/usercamera/Capture` だけ送る。
@@ -36,4 +36,4 @@ ClipForVRChatは構図PoseやZoomなどを送らず、撮影に必要な最小�
 
 - 2026-07-07: フォールバックON時に、構図カード内のPose/Zoom/座標系など、撮影時に送信されないOFF用設定をグレーアウトする。
 - 2026-07-07: フォールバックモードの説明を、アバターギミック未導入時の利用条件とVRChat内でカメラを出しっぱなしにする手順が分かる文言へ変更する。
-- 2026-07-07: AvatarBeaconのbasis最終受信から30秒以上経過した場合は実行時にフォールバック扱いにし、受信が戻れば通常扱いに戻す。
+- 2026-07-07: AvatarBeaconのbasis最終受信から30秒以上経過した場合の自動切り替えは #222 で廃止し、ユーザーが選んだフォールバックON/OFFを尊重する。OFF時はbasis不足なら通常撮影エラーとして扱う。

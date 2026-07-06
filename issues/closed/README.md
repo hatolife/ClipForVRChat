@@ -183,6 +183,7 @@
 | 219 | [構図設定の右下に＋/－ボタンを追加する](unreleased/219-add-plus-minus-composition-buttons.md) | 完了 | 未定 | 構図設定リストの右下に、構図追加と末尾削除用の `＋` / `－` ボタンを追加した。 |
 | 220 | [現在Pose取得で拡大率が保存されない](v0.1.8-b3/220-save-current-camera-pose-captures-zoom.md) | 完了 | `v0.1.8-b3` | 現在Pose取得時に直近のUser Camera Zoomも構図へ保存し、45以外の拡大率を反映できるようにした。 |
 | 221 | [詳細設定画面でも保存/閉じるボタンを表示する](v0.1.8-b4/221-show-settings-actions-in-detail-view.md) | 完了 | `v0.1.8-b4` | 自動撮影の詳細設定画面でも設定画面上部の保存/閉じる操作を表示するようにした。 |
+| 222 | [フォールバックモードを既定ONにしOFF時は通常撮影失敗を許容する](v0.1.8-b4/222-default-enable-preplaced-local-anchor-toggle.md) | 完了 | `v0.1.8-b4` | ローカルアンカー配置済みカメラのフォールバックを既定ONにし、OFF時は自動フォールバックせず通常撮影の失敗を見えるようにした。 |
 | 213 | [完了済みissueを対応バージョンごとのフォルダに整理する](maintenance-only/213-organize-closed-issues-by-version.md) | 完了 | 整理のみ | 完了済みissueを対応バージョン別フォルダへ移動し、READMEリンクと運用ルールを更新した。 |
 | 212 | [Stream方式撮影失敗をSpout helper録画から切り分ける](v0.1.8-a43/212-investigate-stream-capture-spout-helper-debug-recording.md) | 完了 | `v0.1.8-a43` | Spout helper単体と本体経由の実機確認で、`IsUpdated()` 未処理による透明フレームを修正し、Stream方式撮影成功を確認した。 |
 | 214 | [Spout senderが空のときStreamingをOFF/ONして再確認する](v0.1.8-a43/214-retry-spout-sender-after-streaming-toggle.md) | 完了 | `v0.1.8-a43` | sender一覧が空のときOSCでStreamingをOFF/ONして再確認し、本体経由でsender復帰からcapture成功まで確認した。 |

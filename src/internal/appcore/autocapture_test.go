@@ -81,8 +81,8 @@ func TestAutoCaptureConfigNormalize(t *testing.T) {
 	if cfg.AutoCapture.Capture.AutoLevelRollBeforeShot == nil || !*cfg.AutoCapture.Capture.AutoLevelRollBeforeShot {
 		t.Fatalf("AutoLevelRollBeforeShot should default on: %+v", cfg.AutoCapture.Capture)
 	}
-	if cfg.AutoCapture.Capture.PreplacedLocalAnchor {
-		t.Fatalf("PreplacedLocalAnchor should default off: %+v", cfg.AutoCapture.Capture)
+	if !cfg.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
+		t.Fatalf("PreplacedLocalAnchor should default on: %+v", cfg.AutoCapture.Capture)
 	}
 	if len(cfg.AutoCapture.Views) != 3 {
 		t.Fatalf("default views = %d, want 3", len(cfg.AutoCapture.Views))
@@ -117,7 +117,7 @@ func TestAutoCaptureConfigNormalizeMigratesOldCameraViewZoom(t *testing.T) {
 
 func TestPreplacedLocalAnchorSkipsPoseResolve(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.AutoCapture.Capture.PreplacedLocalAnchor = true
+	cfg.AutoCapture.Capture.PreplacedLocalAnchor = boolPtr(true)
 	view := DefaultCameraViews()[0]
 	view.CoordinateSpace = "player_local"
 	cfg.AutoCapture.PlayerLocal.Calibrated = false
@@ -129,7 +129,7 @@ func TestPreplacedLocalAnchorSkipsPoseResolve(t *testing.T) {
 
 func TestMoveUserCameraToViewRejectsPreplacedLocalAnchorBeforeOSCOpen(t *testing.T) {
 	cfg := DefaultConfig()
-	cfg.AutoCapture.Capture.PreplacedLocalAnchor = true
+	cfg.AutoCapture.Capture.PreplacedLocalAnchor = boolPtr(true)
 	cfg.AutoCapture.OSC.Host = "bad host name"
 	err := MoveUserCameraToView(context.Background(), cfg, cfg.AutoCapture.Views[0].ID)
 	if err == nil || !strings.Contains(err.Error(), "フォールバックモード") {
@@ -336,6 +336,7 @@ func TestAutoCaptureRunnerRunOnceReleasesStreamingOnCancellation(t *testing.T) {
 	cfg.AutoCapture.OSC.SendPort = port
 	cfg.AutoCapture.Restore.Enabled = false
 	cfg.AutoCapture.Capture.Mode = "stream"
+	cfg.AutoCapture.Capture.PreplacedLocalAnchor = boolPtr(false)
 	cfg.AutoCapture.Capture.OpenCameraBeforeBatch = true
 	cfg.AutoCapture.Capture.CloseCameraAfterBatch = false
 	cfg.AutoCapture.Capture.SettleDelayMS = 1500
@@ -417,6 +418,7 @@ func TestAutoCaptureRunnerRunOnceSkipsCameraAutoOpenWhenDisabled(t *testing.T) {
 	cfg.AutoCapture.OSC.SendPort = port
 	cfg.AutoCapture.Restore.Enabled = false
 	cfg.AutoCapture.Capture.Mode = "stream"
+	cfg.AutoCapture.Capture.PreplacedLocalAnchor = boolPtr(false)
 	cfg.AutoCapture.Capture.OpenCameraBeforeBatch = false
 	cfg.AutoCapture.Capture.CloseCameraAfterBatch = false
 	cfg.AutoCapture.Stream.SpoutHelperPath = filepath.Join(t.TempDir(), "missing-spout-capture.exe")
@@ -464,6 +466,7 @@ func TestAutoCaptureRunnerRunOnceCanDisableAutoLevelRollBeforeShot(t *testing.T)
 	cfg.AutoCapture.OSC.SendPort = port
 	cfg.AutoCapture.Restore.Enabled = false
 	cfg.AutoCapture.Capture.Mode = "stream"
+	cfg.AutoCapture.Capture.PreplacedLocalAnchor = boolPtr(false)
 	cfg.AutoCapture.Capture.OpenCameraBeforeBatch = false
 	cfg.AutoCapture.Capture.CloseCameraAfterBatch = false
 	cfg.AutoCapture.Capture.AutoLevelRollBeforeShot = boolPtr(false)
@@ -510,7 +513,7 @@ func TestRecoverEmptySpoutSenderListTogglesStreaming(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.AutoCapture.OSC.Host = "127.0.0.1"
 	cfg.AutoCapture.OSC.SendPort = port
-	cfg.AutoCapture.Capture.PreplacedLocalAnchor = false
+	cfg.AutoCapture.Capture.PreplacedLocalAnchor = boolPtr(false)
 	runner := AutoCaptureRunner{Config: cfg}
 	client := oscClient{host: "127.0.0.1", port: port}
 	if err := client.open(); err != nil {

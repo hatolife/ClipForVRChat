@@ -123,7 +123,7 @@ func MoveUserCameraToView(ctx context.Context, cfg Config, viewID string) error 
 	if !found {
 		return fmt.Errorf("構図が見つかりません: %s", viewID)
 	}
-	if ac.Capture.PreplacedLocalAnchor {
+	if ac.Capture.PreplacedLocalAnchorEnabled() {
 		return fmt.Errorf("ローカルアンカー配置済みカメラを使うフォールバックモードでは、ClipForVRChatからカメラ移動は送信しません。VRChat内でUser Cameraをローカルアンカーにして配置してください")
 	}
 	logPath := cfg.DiagnosticLogPath
@@ -207,7 +207,7 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) (results []Result, err e
 		ac.Schedule.Enabled,
 		ac.Schedule.CaptureOnStart,
 		ac.Schedule.CaptureIntervalSec,
-		ac.Capture.PreplacedLocalAnchor,
+		ac.Capture.PreplacedLocalAnchorEnabled(),
 		ac.Capture.OpenCameraBeforeBatch,
 		ac.Capture.CloseCameraAfterBatch,
 		ac.Capture.ButtonReleaseDelayMS,
@@ -256,9 +256,9 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) (results []Result, err e
 	}
 	defer client.close()
 	streamStarted := false
-	if ac.Restore.Enabled && !ac.Capture.PreplacedLocalAnchor {
+	if ac.Restore.Enabled && !ac.Capture.PreplacedLocalAnchorEnabled() {
 		defer r.restoreUserCameraState(client)
-	} else if ac.Capture.PreplacedLocalAnchor {
+	} else if ac.Capture.PreplacedLocalAnchorEnabled() {
 		diagAutoCapture(logPath, "camera restore skipped: preplaced_local_anchor=true")
 	}
 	defer func() {
@@ -273,7 +273,7 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) (results []Result, err e
 		diagAutoCapture(logPath, "stream cleanup success: reason=%q", "run_once_error")
 	}()
 	diagAutoCapture(logPath, "osc open success: target=%s:%d", ac.OSC.Host, ac.OSC.SendPort)
-	if ac.Capture.OpenCameraBeforeBatch && !ac.Capture.PreplacedLocalAnchor {
+	if ac.Capture.OpenCameraBeforeBatch && !ac.Capture.PreplacedLocalAnchorEnabled() {
 		cameraMode := 1
 		if ac.Capture.Mode == "stream" {
 			cameraMode = 2
@@ -314,7 +314,7 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) (results []Result, err e
 				diagAutoCapture(logPath, "stream start wait complete")
 			}
 		}
-	} else if ac.Capture.PreplacedLocalAnchor {
+	} else if ac.Capture.PreplacedLocalAnchorEnabled() {
 		diagAutoCapture(logPath, "camera auto open skipped: preplaced_local_anchor=true capture_mode=%q", ac.Capture.Mode)
 	} else {
 		diagAutoCapture(logPath, "camera auto open skipped: open_before_batch=false capture_mode=%q", ac.Capture.Mode)
@@ -345,7 +345,7 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) (results []Result, err e
 			successCount++
 		}
 	}
-	if ac.Capture.CloseCameraAfterBatch && ac.Capture.PreplacedLocalAnchor {
+	if ac.Capture.CloseCameraAfterBatch && ac.Capture.PreplacedLocalAnchorEnabled() {
 		diagAutoCapture(logPath, "camera close skipped: preplaced_local_anchor=true")
 	} else if ac.Capture.CloseCameraAfterBatch && (successCount > 0 || ac.Capture.Mode == "stream") {
 		if ac.Capture.Mode == "stream" {
@@ -835,7 +835,7 @@ func (r AutoCaptureRunner) applyCameraView(client oscClient, view CameraViewConf
 
 func (r AutoCaptureRunner) applyCameraViewAndOptions(client oscClient, view CameraViewConfig) error {
 	logPath := r.Config.DiagnosticLogPath
-	if r.Config.AutoCapture.Capture.PreplacedLocalAnchor {
+	if r.Config.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
 		diagAutoCapture(logPath, "camera pose/options skipped: view_id=%q preplaced_local_anchor=true", view.ID)
 		return r.applyAutoLevelRollBeforeShot(client, view.ID)
 	}
@@ -938,7 +938,7 @@ func (r AutoCaptureRunner) captureStreamShot(ctx context.Context, client oscClie
 
 func (r AutoCaptureRunner) ensureStreamCameraForSpoutCapture(ctx context.Context, client oscClient, viewID string) error {
 	logPath := r.Config.DiagnosticLogPath
-	if r.Config.AutoCapture.Capture.PreplacedLocalAnchor {
+	if r.Config.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
 		diagAutoCapture(logPath, "stream camera refresh skipped: preplaced_local_anchor=true view_id=%q", viewID)
 		return nil
 	}
@@ -969,7 +969,7 @@ func (r AutoCaptureRunner) ensureStreamCameraForSpoutCapture(ctx context.Context
 
 func (r AutoCaptureRunner) recoverEmptySpoutSenderList(ctx context.Context, client oscClient, viewID string) error {
 	logPath := r.Config.DiagnosticLogPath
-	if r.Config.AutoCapture.Capture.PreplacedLocalAnchor {
+	if r.Config.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
 		diagAutoCapture(logPath, "spout sender recovery skipped: preplaced_local_anchor=true view_id=%q", viewID)
 		return nil
 	}
