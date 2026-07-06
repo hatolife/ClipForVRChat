@@ -199,6 +199,23 @@ func spoutHelperCacheRoot() string {
 	return filepath.Join(os.TempDir(), "ClipForVRChat", "spout-helper")
 }
 
+func CleanupEmbeddedSpoutHelperCache() error {
+	root := spoutHelperCacheRoot()
+	cleaned := filepath.Clean(root)
+	if cleaned == "" || cleaned == "." || cleaned == string(filepath.Separator) {
+		return fmt.Errorf("Spout helper cache cleanup refused unsafe path: %q", root)
+	}
+	var err error
+	for attempt := 0; attempt < 3; attempt++ {
+		err = os.RemoveAll(cleaned)
+		if err == nil || os.IsNotExist(err) {
+			return nil
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return err
+}
+
 func ensureEmbeddedSpoutFile(path string, data []byte, executable bool) error {
 	if len(data) == 0 {
 		return fmt.Errorf("埋め込みSpout helper資産が空です: %s", filepath.Base(path))

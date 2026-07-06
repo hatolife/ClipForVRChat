@@ -181,6 +181,11 @@ func (a *App) shutdown(ctx context.Context) {
 	a.logLifecycleLocked("shutdown begin: auto_capture_osc=%t auto_photo=%t", a.oscCancel != nil, a.autoCancel != nil)
 	a.stopBackgroundTasksLocked()
 	a.stopOSCTraceLocked()
+	if err := appcore.CleanupEmbeddedSpoutHelperCache(); err != nil {
+		a.logLifecycleLocked("spout helper cache cleanup failed: %v", err)
+	} else {
+		a.logLifecycleLocked("spout helper cache cleanup complete")
+	}
 	a.logLifecycleLocked("shutdown complete")
 }
 

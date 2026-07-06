@@ -74,3 +74,24 @@ func TestEnsureEmbeddedSpoutFileRejectsEmptyAsset(t *testing.T) {
 		t.Fatal("err = nil, want empty asset error")
 	}
 }
+
+func TestCleanupEmbeddedSpoutHelperCacheRemovesRoot(t *testing.T) {
+	t.Cleanup(func() { spoutHelperCacheDirForTest = "" })
+	root := t.TempDir()
+	spoutHelperCacheDirForTest = root
+
+	nested := filepath.Join(root, "hash", spoutHelperFileName)
+	if err := os.MkdirAll(filepath.Dir(nested), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(nested, []byte("helper"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := CleanupEmbeddedSpoutHelperCache(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(root); !os.IsNotExist(err) {
+		t.Fatalf("cache root still exists or stat failed unexpectedly: %v", err)
+	}
+}
