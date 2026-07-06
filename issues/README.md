@@ -41,6 +41,9 @@
 | 201 | [a36でStream Camera起動済みでもSpout取得が透明フレームになる](201-a36-spout-transparent-frame-with-stream-camera-active.md) | 要確認 | `v0.1.8` | sender frame番号不変かつ全透明のSpout失敗を明確なエラー文で切り分ける。helper改善は実機確認が必要。 |
 | 202 | [Spout helperに録画デバッグ出力を追加し起動コンソールを隠す](202-add-spout-helper-debug-recording-and-hide-console.md) | 要確認 | `v0.1.8` | Spout helperで受信RGBAフレームとmetadata/logを保存できるデバッグ引数を追加し、テスト撮影から有効化できるようにする。 |
 | 208 | [自動撮影説明を改善し、カメラ自動起動/終了を既定OFFにする](208-improve-auto-capture-help-and-disable-camera-auto-open-close.md) | 要確認 | `v0.1.8` | 自動撮影説明とAvatarBeacon状態表示を整理し、Camera OSCの不安定さを避けるためカメラ自動起動/終了を設定化して既定OFFにする。 |
+| 228 | [ウィンドウ終了時にも未保存設定の保存確認を出す](228-confirm-unsaved-settings-on-window-close.md) | 要対応 | 未定 | 設定画面で未保存変更がある状態の×ボタンや複数起動による既存終了で、保存確認ダイアログを出す。 |
+| 229 | [保存せず終了した設定変更を一時変更として復元する](229-restore-unsaved-settings-draft-from-single-instance.md) | 要対応 | 未定 | 未保存変更をsingle-instance配下へ一時保存し、次回起動時に保存せず一時状態として復元する。 |
+| 230 | [未保存変更がある設定項目名をハイライトする](230-highlight-unsaved-settings-fields.md) | 要対応 | 未定 | 保存前に変更された設定項目名をハイライトして分かるようにする。 |
 
 ## 状態の意味
 
