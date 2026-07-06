@@ -108,7 +108,7 @@ void print_help() {
             << "spout-capture --list-senders\n"
             << "spout-capture --capture [--sender name] --output file.png --timeout-ms 10000\n"
             << "              [--debug-dir directory] [--debug-frames 8]\n"
-            << "spout-capture --diagnose --debug-dir directory [--sender name]\n"
+            << "spout-capture --diagnose --debug-dir directory [--sender name] [--output file.png]\n"
             << "              [--duration-ms 10000] [--interval-ms 250] [--debug-frames 8]\n";
 }
 
@@ -672,6 +672,10 @@ struct DiagnoseSummary {
   unsigned int width = 0;
   unsigned int height = 0;
   FrameStats last_stats;
+  bool output_requested = false;
+  bool output_written = false;
+  std::string output_path;
+  std::string output_error;
 };
 
 std::string diagnose_code(const DiagnoseSummary &summary) {
@@ -739,7 +743,11 @@ void write_diagnose_summary_json(std::ostream &out, const DiagnoseSummary &summa
       << ",\"blankFrames\":" << summary.blank_frames
       << ",\"lastFrameStats\":";
   write_frame_stats_json(out, summary.last_stats);
-  out << ",\"timelinePath\":\"" << json_escape(timeline_path.u8string()) << "\""
+  out << ",\"outputRequested\":" << (summary.output_requested ? "true" : "false")
+      << ",\"outputWritten\":" << (summary.output_written ? "true" : "false")
+      << ",\"outputPath\":\"" << json_escape(summary.output_path) << "\""
+      << ",\"outputError\":\"" << json_escape(summary.output_error) << "\""
+      << ",\"timelinePath\":\"" << json_escape(timeline_path.u8string()) << "\""
       << ",\"summaryPath\":\"" << json_escape(summary_path.u8string()) << "\""
       << ",\"debugFrames\":" << debug_frames
       << "}";
@@ -762,6 +770,10 @@ int diagnose(SPOUTHANDLE spout, const Options &options) {
   }
 
   DiagnoseSummary summary;
+  summary.output_requested = !options.output.empty();
+  if (summary.output_requested) {
+    summary.output_path = options.output.u8string();
+  }
   std::vector<unsigned char> pixels;
   unsigned int width = 0;
   unsigned int height = 0;
@@ -827,6 +839,27 @@ int diagnose(SPOUTHANDLE spout, const Options &options) {
           } else {
             summary.valid_frames++;
             frame_state = "valid";
+            if (summary.output_requested && !summary.output_written && summary.output_error.empty()) {
+              std::error_code ec;
+              if (!options.output.parent_path().empty()) {
+                std::filesystem::create_directories(options.output.parent_path(), ec);
+              }
+              if (ec) {
+                summary.output_error = "output directory could not be created: " + ec.message();
+                debug.log_event("diagnose output directory error=\"" + summary.output_error + "\"");
+              } else {
+                std::vector<unsigned char> output_pixels = pixels;
+                force_opaque_alpha(output_pixels);
+                std::string write_error;
+                if (write_png_wic(options.output, width, height, output_pixels, &write_error)) {
+                  summary.output_written = true;
+                  debug.log_event("diagnose output written path=\"" + options.output.u8string() + "\"");
+                } else {
+                  summary.output_error = write_error;
+                  debug.log_event("diagnose output write failed error=\"" + write_error + "\"");
+                }
+              }
+            }
           }
         } else {
           frame_state = "receive_failed";
@@ -851,6 +884,7 @@ int diagnose(SPOUTHANDLE spout, const Options &options) {
              << ",\"receiveAttempted\":" << (receive_attempted ? "true" : "false")
              << ",\"receiveOK\":" << (receive_ok ? "true" : "false")
              << ",\"frameState\":\"" << json_escape(frame_state) << "\""
+             << ",\"outputWritten\":" << (summary.output_written ? "true" : "false")
              << ",\"frameStats\":";
     write_frame_stats_json(timeline, stats);
     timeline << "}\n";

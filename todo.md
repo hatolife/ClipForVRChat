@@ -1,7 +1,6 @@
-# issue 212 Spout diagnose実装チェックリスト
+# issue 212 Spout diagnose capture統合チェックリスト
 
-- [x] 212にdiagnose補助機能の受け入れ条件を追記する
-- [x] `spout-capture --diagnose` のCLI引数を追加する
-- [x] diagnose summary JSONとdebug JSONLを出力する
-- [x] 既存C++ロジックテストを通す
-- [ ] Windows helperのビルド/実行確認を行う
+- [x] 別プロセスcaptureでsenderが消える挙動を212に記録する
+- [x] `--diagnose --output` で同一プロセスPNG保存を追加する
+- [x] summary JSONにoutput結果を出す
+- [x] 構文チェックとCTestを通す
