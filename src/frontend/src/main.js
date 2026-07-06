@@ -583,6 +583,8 @@ const vueApp = createApp({
     openAutoCaptureDetail(viewId) {
       const enabled =
         viewId === 'composition' ||
+        viewId === 'capture' ||
+        viewId === 'metadata' ||
         (viewId === 'schedule' && this.autoCaptureSettings.schedule.enabled) ||
         (viewId === 'restore' && this.autoCaptureSettings.restore.enabled)
       if (!enabled) return
@@ -595,12 +597,16 @@ const vueApp = createApp({
     },
     autoCaptureDetailTitle() {
       if (this.autoCaptureDetailView === 'composition') return '構図設定'
+      if (this.autoCaptureDetailView === 'capture') return '撮影・出力'
+      if (this.autoCaptureDetailView === 'metadata') return '保存・投稿・復元'
       if (this.autoCaptureDetailView === 'schedule') return '自動撮影スケジュール'
       if (this.autoCaptureDetailView === 'restore') return '撮影後にCamera状態を戻す'
       return '自動撮影設定'
     },
     autoCaptureDetailDescription() {
       if (this.autoCaptureDetailView === 'composition') return '撮影する構図、座標系、Pose、拡大率、並び順を設定します。'
+      if (this.autoCaptureDetailView === 'capture') return 'Stream方式のSpout受信、出力先、保存形式、ファイル名を設定します。'
+      if (this.autoCaptureDetailView === 'metadata') return 'sidecar、画像メタデータ、同席ユーザー情報、Discord投稿、撮影後復元を設定します。'
       if (this.autoCaptureDetailView === 'schedule') return '自動撮影の開始条件と繰り返し間隔を設定します。'
       if (this.autoCaptureDetailView === 'restore') return '撮影後に戻すUser Camera状態を設定します。'
       return ''
@@ -2097,7 +2103,133 @@ const vueApp = createApp({
                   <p v-else class="empty">構図設定がありません。</p>
                 </section>
               </template>
-              <template v-else-if="autoCaptureDetailView === 'restore'">
+              <template v-else-if="autoCaptureDetailView === 'capture'">
+                <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
+                  <div><strong>Spout helper</strong><p>Stream Camera(Spout)映像を受信する同梱ヘルパーです。通常は初期値のまま使います。</p></div>
+                  <div class="settings-control-stack">
+                    <input v-model="autoCaptureSettings.stream.spoutHelperPath" :disabled="autoCaptureSettings.capture.mode !== 'stream' || spoutChecking || spoutSendersLoading" placeholder="spout-capture.exe" />
+                    <div class="inline-actions">
+                      <button type="button" class="secondary" @click="checkSpoutHelper" :disabled="autoCaptureSettings.capture.mode !== 'stream' || spoutChecking || spoutSendersLoading" :title="autoCaptureSettings.capture.mode !== 'stream' ? 'Stream方式で使います' : spoutChecking ? '確認中です' : spoutSendersLoading ? 'sender一覧を取得中です' : 'Stream方式のSpout helperを確認する'">{{ spoutChecking ? '確認中' : 'helper確認' }}</button>
+                      <button type="button" class="secondary" @click="refreshSpoutSenders" :disabled="autoCaptureSettings.capture.mode !== 'stream' || spoutChecking || spoutSendersLoading" :title="autoCaptureSettings.capture.mode !== 'stream' ? 'Stream方式で使います' : spoutChecking ? '確認中です' : spoutSendersLoading ? '取得中です' : 'Spout sender一覧を更新する'">{{ spoutSendersLoading ? '取得中' : 'sender一覧更新' }}</button>
+                    </div>
+                    <p v-if="spoutStatus" :class="['setting-note', spoutStatus.available ? 'ok' : 'warning']">
+                      {{ spoutStatus.message }}
+                      <span v-if="spoutStatus.path"> / {{ spoutStatus.path }}</span>
+                    </p>
+                  </div>
+                </div>
+                <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
+                  <div><strong>Spout sender自動選択</strong><p>sender未指定時に単一senderまたはVRChatらしいsenderを自動選択します。複数候補で判断不能な場合は一覧から選択してください。</p></div>
+                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.stream.spoutAutoSelect" :disabled="autoCaptureSettings.capture.mode !== 'stream'" /><span></span></label>
+                </div>
+                <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' || autoCaptureSettings.stream.spoutAutoSelect }">
+                  <div><strong>Spout sender名</strong><p>自動選択をOFFにした場合に使うsender名です。VRChatでStream Cameraを起動してから一覧更新してください。</p></div>
+                  <div class="settings-control-stack">
+                    <input v-model="autoCaptureSettings.stream.spoutSenderName" :disabled="autoCaptureSettings.capture.mode !== 'stream' || autoCaptureSettings.stream.spoutAutoSelect" list="spout-senders" placeholder="VRChat Stream Camera" />
+                    <datalist id="spout-senders">
+                      <option v-for="sender in spoutStatus?.senders || []" :key="sender.name" :value="sender.name">{{ sender.name }}</option>
+                    </datalist>
+                    <p v-if="spoutStatus?.senders?.length" class="setting-note">
+                      検出: <span v-for="sender in spoutStatus.senders" :key="sender.name">{{ sender.name }} {{ sender.width && sender.height ? '(' + sender.width + 'x' + sender.height + ')' : '' }} </span>
+                    </p>
+                  </div>
+                </div>
+                <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
+                  <div><strong>Stream取得タイムアウト</strong><p>Spout helperが1枚のStream Cameraフレームを保存するまで待つ最大ミリ秒です。</p></div>
+                  <label>
+                    <input type="number" min="1000" max="60000" step="500" v-model.number="autoCaptureSettings.stream.captureTimeoutMs" :disabled="autoCaptureSettings.capture.mode !== 'stream'" />
+                  </label>
+                </div>
+                <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
+                  <div><strong>Stream起動後待機</strong><p>VRChat Stream CameraをONにしてからSpoutフレーム取得を始めるまで待つミリ秒です。</p></div>
+                  <label>
+                    <input type="number" min="0" max="10000" step="100" v-model.number="autoCaptureSettings.stream.startDelayMs" :disabled="autoCaptureSettings.capture.mode !== 'stream'" />
+                  </label>
+                </div>
+                <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
+                  <div><strong>Spout録画デバッグ</strong><p>テスト撮影時だけ、Spout helperが受信したPNG化前のRGBA生フレームとmetadata/logを保存します。</p></div>
+                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.stream.debugRecordingEnabled" :disabled="autoCaptureSettings.capture.mode !== 'stream'" /><span></span></label>
+                </div>
+                <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' || !autoCaptureSettings.stream.debugRecordingEnabled }">
+                  <div><strong>Spout録画デバッグ フレーム数</strong><p>テスト撮影1回で保存する最大フレーム数です。保存先は自動撮影保存先の spout-debug フォルダです。</p></div>
+                  <label>
+                    <input type="number" min="1" max="120" step="1" v-model.number="autoCaptureSettings.stream.debugFrameCount" :disabled="autoCaptureSettings.capture.mode !== 'stream' || !autoCaptureSettings.stream.debugRecordingEnabled" />
+                  </label>
+                </div>
+                <div class="setting-row">
+                  <div><strong>自動撮影保存先</strong><p>Stream方式で保存した画像と関連ファイルの保存先です。Photo方式ではVRChat写真フォルダに保存された画像を使います。</p></div>
+                  <label>
+                    <input v-model="autoCaptureSettings.output.directory" placeholder="%USERPROFILE%/Pictures/VRChat/VRC-AutoCapture" />
+                  </label>
+                </div>
+                <div class="setting-row">
+                  <div><strong>Stream保存形式</strong><p>Stream方式で保存する画像形式です。Spout helperはPNGで取得し、必要に応じて後続処理で扱います。</p></div>
+                  <label>
+                    <select v-model="autoCaptureSettings.output.imageFormat">
+                      <option value="png">PNG</option>
+                      <option value="jpg">JPG</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="setting-row">
+                  <div><strong>ファイル名テンプレート</strong><p>{timestamp_local}、{batch_id}、{shot_index}、{view_name}、{mode}、{ext} を使用できます。</p></div>
+                  <label>
+                    <input v-model="autoCaptureSettings.output.filenameTemplate" placeholder="{timestamp_local}_{batch_id}_{shot_index}_{view_name}_{mode}.{ext}" />
+                  </label>
+                </div>
+              </template>
+              <template v-else-if="autoCaptureDetailView === 'metadata'">
+                <div class="setting-row">
+                  <div><strong>サイドカーJSON</strong><p>撮影情報を画像と同じ場所にJSONとして保存します。</p></div>
+                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.output.writeSidecarJson" /><span></span></label>
+                </div>
+                <div class="setting-row">
+                  <div><strong>画像埋め込みメタデータ</strong><p>PNG/JPEG画像内に自動撮影情報を埋め込みます。sidecar JSONと合わせて画像との紐づけ確認に使います。</p></div>
+                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.output.writeExif" /><span></span></label>
+                </div>
+                <div class="setting-row" :class="{ disabled: !autoCaptureSettings.output.writeExif }">
+                  <div><strong>同席ユーザー一覧を画像に埋め込む</strong><p>取得できた同席ユーザー表示名を画像メタデータに含めます。</p></div>
+                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.output.writeUserListToExif" :disabled="!autoCaptureSettings.output.writeExif" /><span></span></label>
+                </div>
+                <div class="setting-row" :class="{ disabled: !autoCaptureSettings.output.writeExif || !autoCaptureSettings.output.writeUserListToExif }">
+                  <div><strong>ユーザーIDを画像に埋め込む</strong><p>ユーザーIDは識別性が高いため、必要な場合だけONにしてください。sidecar/Discordの設定とは独立しています。</p></div>
+                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.output.writeUserIdsToExif" :disabled="!autoCaptureSettings.output.writeExif || !autoCaptureSettings.output.writeUserListToExif" /><span></span></label>
+                </div>
+                <div class="setting-row">
+                  <div><strong>VRChat output log監視</strong><p>output_logから同じインスタンスのユーザー情報を取得します。</p></div>
+                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.presence.watchOutputLog" /><span></span></label>
+                </div>
+                <div class="setting-row" :class="{ disabled: !autoCaptureSettings.output.writeSidecarJson }">
+                  <div><strong>サイドカーJSONにユーザーIDを含める</strong><p>取得できたユーザーIDを撮影情報に保存します。</p></div>
+                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.presence.includeUserIdsInSidecar" :disabled="!autoCaptureSettings.output.writeSidecarJson" /><span></span></label>
+                </div>
+                <div class="setting-row">
+                  <div><strong>Discordに表示名を含める</strong><p>自動撮影のDiscord本文に参加者の表示名を含めます。</p></div>
+                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.presence.includeDisplayNamesInDiscord" /><span></span></label>
+                </div>
+                <div class="setting-row">
+                  <div><strong>DiscordにユーザーIDを含める</strong><p>自動撮影のDiscord本文に参加者のユーザーIDを含めます。</p></div>
+                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.presence.includeUserIdsInDiscord" /><span></span></label>
+                </div>
+                <div class="setting-row">
+                  <div><strong>Discord自動投稿</strong><p>自動撮影した画像をDiscord Webhookへ投稿します。</p></div>
+                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.discord.enabled" /><span></span></label>
+                </div>
+                <div class="setting-row" :class="{ disabled: !autoCaptureSettings.discord.enabled }">
+                  <div><strong>自動撮影用Webhook URL</strong><p>通常投稿とは別の投稿先にしたい場合だけ入力します。空の場合は通常投稿用Webhook URLへ投稿します。</p></div>
+                  <label>
+                    <input type="password" v-model="autoCaptureSettings.discord.webhookUrl" placeholder="空なら通常投稿用Webhook URLを使用" :disabled="!autoCaptureSettings.discord.enabled" />
+                    <p v-if="autoCaptureSettings.discord.enabled" :class="['setting-note', webhookFallbackNoteClass(autoCaptureSettings.discord.webhookUrl, autoCaptureSettings.discord.enabled)]">{{ webhookFallbackNote(autoCaptureSettings.discord.webhookUrl, autoCaptureSettings.discord.enabled) }}</p>
+                  </label>
+                </div>
+                <div class="setting-row" :class="{ disabled: !autoCaptureSettings.discord.enabled }">
+                  <div><strong>Discordに画像を添付する</strong><p>OFFの場合は撮影情報の本文だけを投稿します。画像はローカル保存先とsidecar JSONで保持します。</p></div>
+                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.discord.includeImages" :disabled="!autoCaptureSettings.discord.enabled" /><span></span></label>
+                </div>
+                <div class="setting-row">
+                  <div><strong>撮影後にCamera状態を戻す</strong><p>撮影前に受信したUser Camera OSC値を優先し、不足分は下の戻し先を使います。</p></div>
+                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.restore.enabled" /><span></span></label>
+                </div>
                 <div class="setting-row" :class="{ disabled: !autoCaptureSettings.restore.enabled }">
                   <div><strong>撮影前の受信値を優先</strong><p>Mode、Pose、Streaming、Smooth、拡大率、露出、マスクなどを撮影直前の受信値へ戻します。</p></div>
                   <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.restore.preferSnapshot" :disabled="!autoCaptureSettings.restore.enabled" /><span></span></label>
@@ -2205,141 +2337,21 @@ const vueApp = createApp({
               </label>
             </div>
             <div class="setting-row">
-              <div><strong>撮影前にカメラを自動起動</strong><p>OFFの場合、ゲーム内でカメラを手動で起動してから自動撮影します。現在はOFF推奨です。</p></div>
-              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.capture.openCameraBeforeBatch" /><span></span></label>
-            </div>
-            <div class="setting-row">
-              <div><strong>撮影後にカメラを自動終了</strong><p>OFFの場合、撮影後もゲーム内カメラの状態を維持します。現在はOFF推奨です。</p></div>
-              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.capture.closeCameraAfterBatch" /><span></span></label>
-            </div>
-            <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
-              <div><strong>Spout helper</strong><p>Stream Camera(Spout)映像を受信する同梱ヘルパーです。通常は初期値のまま使います。</p></div>
-              <div class="settings-control-stack">
-                <input v-model="autoCaptureSettings.stream.spoutHelperPath" :disabled="autoCaptureSettings.capture.mode !== 'stream' || spoutChecking || spoutSendersLoading" placeholder="spout-capture.exe" />
-                <div class="inline-actions">
-                  <button type="button" class="secondary" @click="checkSpoutHelper" :disabled="autoCaptureSettings.capture.mode !== 'stream' || spoutChecking || spoutSendersLoading" :title="autoCaptureSettings.capture.mode !== 'stream' ? 'Stream方式で使います' : spoutChecking ? '確認中です' : spoutSendersLoading ? 'sender一覧を取得中です' : 'Stream方式のSpout helperを確認する'">{{ spoutChecking ? '確認中' : 'helper確認' }}</button>
-                  <button type="button" class="secondary" @click="refreshSpoutSenders" :disabled="autoCaptureSettings.capture.mode !== 'stream' || spoutChecking || spoutSendersLoading" :title="autoCaptureSettings.capture.mode !== 'stream' ? 'Stream方式で使います' : spoutChecking ? '確認中です' : spoutSendersLoading ? '取得中です' : 'Spout sender一覧を更新する'">{{ spoutSendersLoading ? '取得中' : 'sender一覧更新' }}</button>
-                </div>
-                <p v-if="spoutStatus" :class="['setting-note', spoutStatus.available ? 'ok' : 'warning']">
-                  {{ spoutStatus.message }}
-                  <span v-if="spoutStatus.path"> / {{ spoutStatus.path }}</span>
-                </p>
+              <div>
+                <strong>撮影・出力</strong>
+                <p>Spout helper、sender、Stream取得、録画デバッグ、保存先、ファイル名を設定します。</p>
               </div>
-            </div>
-            <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
-              <div><strong>Spout sender自動選択</strong><p>sender未指定時に単一senderまたはVRChatらしいsenderを自動選択します。複数候補で判断不能な場合は一覧から選択してください。</p></div>
-              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.stream.spoutAutoSelect" :disabled="autoCaptureSettings.capture.mode !== 'stream'" /><span></span></label>
-            </div>
-            <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' || autoCaptureSettings.stream.spoutAutoSelect }">
-              <div><strong>Spout sender名</strong><p>自動選択をOFFにした場合に使うsender名です。VRChatでStream Cameraを起動してから一覧更新してください。</p></div>
-              <div class="settings-control-stack">
-                <input v-model="autoCaptureSettings.stream.spoutSenderName" :disabled="autoCaptureSettings.capture.mode !== 'stream' || autoCaptureSettings.stream.spoutAutoSelect" list="spout-senders" placeholder="VRChat Stream Camera" />
-                <datalist id="spout-senders">
-                  <option v-for="sender in spoutStatus?.senders || []" :key="sender.name" :value="sender.name">{{ sender.name }}</option>
-                </datalist>
-                <p v-if="spoutStatus?.senders?.length" class="setting-note">
-                  検出: <span v-for="sender in spoutStatus.senders" :key="sender.name">{{ sender.name }} {{ sender.width && sender.height ? '(' + sender.width + 'x' + sender.height + ')' : '' }} </span>
-                </p>
+              <div class="settings-overview-controls">
+                <button type="button" class="secondary" title="撮影と出力の詳細設定を開きます。" aria-label="撮影と出力の詳細設定" @click="openAutoCaptureDetail('capture')">詳細設定</button>
               </div>
-            </div>
-            <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
-              <div><strong>Stream取得タイムアウト</strong><p>Spout helperが1枚のStream Cameraフレームを保存するまで待つ最大ミリ秒です。</p></div>
-              <label>
-                <input type="number" min="1000" max="60000" step="500" v-model.number="autoCaptureSettings.stream.captureTimeoutMs" :disabled="autoCaptureSettings.capture.mode !== 'stream'" />
-              </label>
-            </div>
-            <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
-              <div><strong>Stream起動後待機</strong><p>VRChat Stream CameraをONにしてからSpoutフレーム取得を始めるまで待つミリ秒です。</p></div>
-              <label>
-                <input type="number" min="0" max="10000" step="100" v-model.number="autoCaptureSettings.stream.startDelayMs" :disabled="autoCaptureSettings.capture.mode !== 'stream'" />
-              </label>
-            </div>
-            <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
-              <div><strong>Spout録画デバッグ</strong><p>テスト撮影時だけ、Spout helperが受信したPNG化前のRGBA生フレームとmetadata/logを保存します。</p></div>
-              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.stream.debugRecordingEnabled" :disabled="autoCaptureSettings.capture.mode !== 'stream'" /><span></span></label>
-            </div>
-            <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' || !autoCaptureSettings.stream.debugRecordingEnabled }">
-              <div><strong>Spout録画デバッグ フレーム数</strong><p>テスト撮影1回で保存する最大フレーム数です。保存先は自動撮影保存先の spout-debug フォルダです。</p></div>
-              <label>
-                <input type="number" min="1" max="120" step="1" v-model.number="autoCaptureSettings.stream.debugFrameCount" :disabled="autoCaptureSettings.capture.mode !== 'stream' || !autoCaptureSettings.stream.debugRecordingEnabled" />
-              </label>
-            </div>
-            <div class="setting-row">
-              <div><strong>自動撮影保存先</strong><p>Stream方式で保存した画像と関連ファイルの保存先です。Photo方式ではVRChat写真フォルダに保存された画像を使います。</p></div>
-              <label>
-                <input v-model="autoCaptureSettings.output.directory" placeholder="%USERPROFILE%/Pictures/VRChat/VRC-AutoCapture" />
-              </label>
-            </div>
-            <div class="setting-row">
-              <div><strong>Stream保存形式</strong><p>Stream方式で保存する画像形式です。Spout helperはPNGで取得し、必要に応じて後続処理で扱います。</p></div>
-              <label>
-                <select v-model="autoCaptureSettings.output.imageFormat">
-                  <option value="png">PNG</option>
-                  <option value="jpg">JPG</option>
-                </select>
-              </label>
-            </div>
-            <div class="setting-row">
-              <div><strong>ファイル名テンプレート</strong><p>{timestamp_local}、{batch_id}、{shot_index}、{view_name}、{mode}、{ext} を使用できます。</p></div>
-              <label>
-                <input v-model="autoCaptureSettings.output.filenameTemplate" placeholder="{timestamp_local}_{batch_id}_{shot_index}_{view_name}_{mode}.{ext}" />
-              </label>
-            </div>
-            <div class="setting-row">
-              <div><strong>サイドカーJSON</strong><p>撮影情報を画像と同じ場所にJSONとして保存します。</p></div>
-              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.output.writeSidecarJson" /><span></span></label>
-            </div>
-            <div class="setting-row">
-              <div><strong>画像埋め込みメタデータ</strong><p>PNG/JPEG画像内に自動撮影情報を埋め込みます。sidecar JSONと合わせて画像との紐づけ確認に使います。</p></div>
-              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.output.writeExif" /><span></span></label>
-            </div>
-            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.output.writeExif }">
-              <div><strong>同席ユーザー一覧を画像に埋め込む</strong><p>取得できた同席ユーザー表示名を画像メタデータに含めます。</p></div>
-              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.output.writeUserListToExif" :disabled="!autoCaptureSettings.output.writeExif" /><span></span></label>
-            </div>
-            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.output.writeExif || !autoCaptureSettings.output.writeUserListToExif }">
-              <div><strong>ユーザーIDを画像に埋め込む</strong><p>ユーザーIDは識別性が高いため、必要な場合だけONにしてください。sidecar/Discordの設定とは独立しています。</p></div>
-              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.output.writeUserIdsToExif" :disabled="!autoCaptureSettings.output.writeExif || !autoCaptureSettings.output.writeUserListToExif" /><span></span></label>
-            </div>
-            <div class="setting-row">
-              <div><strong>VRChat output log監視</strong><p>output_logから同じインスタンスのユーザー情報を取得します。</p></div>
-              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.presence.watchOutputLog" /><span></span></label>
-            </div>
-            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.output.writeSidecarJson }">
-              <div><strong>サイドカーJSONにユーザーIDを含める</strong><p>取得できたユーザーIDを撮影情報に保存します。</p></div>
-              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.presence.includeUserIdsInSidecar" :disabled="!autoCaptureSettings.output.writeSidecarJson" /><span></span></label>
-            </div>
-            <div class="setting-row">
-              <div><strong>Discordに表示名を含める</strong><p>自動撮影のDiscord本文に参加者の表示名を含めます。</p></div>
-              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.presence.includeDisplayNamesInDiscord" /><span></span></label>
-            </div>
-            <div class="setting-row">
-              <div><strong>DiscordにユーザーIDを含める</strong><p>自動撮影のDiscord本文に参加者のユーザーIDを含めます。</p></div>
-              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.presence.includeUserIdsInDiscord" /><span></span></label>
-            </div>
-            <div class="setting-row">
-              <div><strong>Discord自動投稿</strong><p>自動撮影した画像をDiscord Webhookへ投稿します。</p></div>
-              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.discord.enabled" /><span></span></label>
-            </div>
-            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.discord.enabled }">
-              <div><strong>自動撮影用Webhook URL</strong><p>通常投稿とは別の投稿先にしたい場合だけ入力します。空の場合は通常投稿用Webhook URLへ投稿します。</p></div>
-              <label>
-                <input type="password" v-model="autoCaptureSettings.discord.webhookUrl" placeholder="空なら通常投稿用Webhook URLを使用" :disabled="!autoCaptureSettings.discord.enabled" />
-                <p v-if="autoCaptureSettings.discord.enabled" :class="['setting-note', webhookFallbackNoteClass(autoCaptureSettings.discord.webhookUrl, autoCaptureSettings.discord.enabled)]">{{ webhookFallbackNote(autoCaptureSettings.discord.webhookUrl, autoCaptureSettings.discord.enabled) }}</p>
-              </label>
-            </div>
-            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.discord.enabled }">
-              <div><strong>Discordに画像を添付する</strong><p>OFFの場合は撮影情報の本文だけを投稿します。画像はローカル保存先とsidecar JSONで保持します。</p></div>
-              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.discord.includeImages" :disabled="!autoCaptureSettings.discord.enabled" /><span></span></label>
             </div>
             <div class="setting-row">
               <div>
-                <strong>撮影後にCamera状態を戻す</strong>
-                <p>撮影前に受信したUser Camera OSC値を優先し、不足分は詳細設定の戻し先を使います。</p>
+                <strong>保存・投稿・復元</strong>
+                <p>sidecar、画像メタデータ、同席ユーザー情報、Discord投稿、撮影後復元を設定します。</p>
               </div>
               <div class="settings-overview-controls">
-                <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.restore.enabled" /><span></span></label>
-                <button type="button" class="secondary" :title="autoCaptureSettings.restore.enabled ? '撮影後に復元するUser Camera状態を設定します。' : '撮影後にCamera状態を戻すをONにすると詳細設定を開けます。'" aria-label="Camera状態復元の詳細設定" :disabled="!autoCaptureSettings.restore.enabled" @click="openAutoCaptureDetail('restore')">詳細設定</button>
+                <button type="button" class="secondary" title="保存、投稿、復元の詳細設定を開きます。" aria-label="保存、投稿、復元の詳細設定" @click="openAutoCaptureDetail('metadata')">詳細設定</button>
               </div>
             </div>
             </template>
