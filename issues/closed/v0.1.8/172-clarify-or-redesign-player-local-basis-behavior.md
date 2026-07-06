@@ -21,5 +21,5 @@
 
 - 標準OSCの `/usercamera/Pose` はUser Cameraのworld poseであり、ローカルプレイヤーrootの位置/Yawを返すものではない。
 - rc14時点の問題提起は手動基準Pose方式だったが、v0.1.8では AvatarBeacon により `avatar_osc` を既定basis sourceとして使える。
-- 現在のプレイヤー位置取得方法の再調査は [#139](closed/139-investigate-player-basis-source.md) に追記した。
+- 現在のプレイヤー位置取得方法の再調査は [#139](139-investigate-player-basis-source.md) に追記した。
 - 2026-07-04: AvatarBeacon + docs で `player_local` の basis source を既定 `avatar_osc` / fallback `manual` として整理できたため、issue 172 は解消済みとして閉じる。

@@ -25,7 +25,7 @@
 
 ## 再監査メモ
 
-- 2026-07-01: [#164](closed/164-audit-v018-completed-items.md) の再監査で未達が見つかったため、完了扱いを取り消して `要対応` に戻した。
+- 2026-07-01: [#164](closed/v0.1.8/164-audit-v018-completed-items.md) の再監査で未達が見つかったため、完了扱いを取り消して `要対応` に戻した。
 
 ## 実装前調査メモ
 
@@ -33,8 +33,8 @@
 
 - `SaveCurrentCameraPoseToView()` は選択中viewの `CoordinateSpace` を尊重する。`player_local` の場合は基準Poseがあるときだけ逆変換して保存し、基準Poseがない場合は保存しない。
 - `AddCurrentCameraPoseAsView()` は各構図カード内ボタンから呼ばれるため、参照元view IDを受け取り、参照元の座標系/ズーム/表示マスクを引き継いだ新規構図を作る。
-- 既存のWails公開メソッド名を変える場合は [#156](closed/156-add-wails-api-surface-check.md) のAPI surface検査で漏れを検出する。
-- 「初期Poseへ戻す」は [#138](closed/138-define-player-local-coordinate-spec.md) の `player_local` 初期値へ戻す。
+- 既存のWails公開メソッド名を変える場合は [#156](closed/v0.1.8/156-add-wails-api-surface-check.md) のAPI surface検査で漏れを検出する。
+- 「初期Poseへ戻す」は [#138](closed/v0.1.8/138-define-player-local-coordinate-spec.md) の `player_local` 初期値へ戻す。
 - 「このPoseへカメラ移動」と「テスト撮影」は `ResolveCameraViewPose()` を通す現行設計を維持する。
 
 対象ファイル:

@@ -31,7 +31,7 @@ zip内容検証でも必要ファイルの存在と不要ファイルの不在�
 
 ## 再監査メモ
 
-- 2026-07-01: [#164](closed/164-audit-v018-completed-items.md) の再監査で未達が見つかったため、完了扱いを取り消して `要対応` に戻した。
+- 2026-07-01: [#164](closed/v0.1.8/164-audit-v018-completed-items.md) の再監査で未達が見つかったため、完了扱いを取り消して `要対応` に戻した。
 - 2026-07-01: `v0.1.8-rc13` のCI/Releaseで `LINK : fatal error LNK1181: cannot open input file 'SpoutLibrary_static.lib'` が発生した。Spout2 SDKは `SpoutLibrary_static` ではなく `SpoutLibrary` DLLターゲットを公開しているため、CMakeのリンク対象とRelease同梱物を修正する。
 
 ## 実装前調査メモ

@@ -26,8 +26,8 @@
 
 ### 参照調査
 
-- [#139](closed/139-investigate-player-basis-source.md)
-- [#172](closed/172-clarify-or-redesign-player-local-basis-behavior.md)
+- [#139](closed/v0.1.8/139-investigate-player-basis-source.md)
+- [#172](closed/v0.1.8/172-clarify-or-redesign-player-local-basis-behavior.md)
 - YL-ATG: https://github.com/YozoraKurage/YL-ATG
 
 ### 対象スコープ

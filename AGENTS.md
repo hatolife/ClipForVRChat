@@ -5,7 +5,7 @@
 - ユーザーから不具合、改善、仕様変更、調査依頼などの指示があった場合は、まず `issues/` に日本語のチケットを作成または追記してから作業する。
 - チケットには「問題」「期待する挙動」「受け入れ条件」を簡潔に書く。
 - 既存チケットに該当する場合は、新規作成ではなく該当チケットを更新する。
-- 作業が完了したチケットは `issues/README.md` から該当行を外し、`issues/closed/README.md` へ状態 `完了` の行として移動する。チケットファイルも `issues/closed/` へ移動し、`issues/closed/README.md` のリンクは同ディレクトリ内のファイルを指す形にする。
+- 作業が完了したチケットは `issues/README.md` から該当行を外し、`issues/closed/README.md` へ状態 `完了` の行として移動する。チケットファイルも対応バージョンに応じて `issues/closed/vX.Y.Z/` などの分類フォルダへ移動し、`issues/closed/README.md` のリンクは移動後のファイルを指す形にする。
 - GUIが表示されない、起動画面で止まる、フロントエンドエラー、Wails/HTML/Vue/API初期化不具合を扱う場合は、作業前に `docs/frontend-runtime-troubleshooting.md` を確認する。新しい既知パターンを同定した場合は、原因、同定方法、対処方法を同ドキュメントへ追記する。
 - `src/frontend/src/main.js` のVue templateを変更した場合は、`node scripts/check-frontend-template-literals.mjs` と `node scripts/check-wails-api-surface.mjs` を実行する。
 - 作業は意味のある単位で細かくコミットする。

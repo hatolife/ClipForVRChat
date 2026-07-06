@@ -37,5 +37,5 @@ GitHub Release本文の一番上に、通常利用者向けの最優先導線と
 
 - 2026-07-04: Release workflowで `ClipForVRChat-vX.Y.Z-windows-amd64.zip` と `.zip.sha256` を生成・添付するようにした。zipには `ClipForVRChat.exe`、`README.md`、`LICENSE`、`Spout2-LICENSE.txt`、`Release-signing-public-key.url` を含め、`spout-capture.exe` / `SpoutLibrary.dll` の直接混入は検証で拒否する。
 - 2026-07-04: Release本文先頭に通常配布zipリンクを追加し、RC向け置換も `scripts/extract-release-notes.mjs` で確認した。
-- 2026-07-04: アバターギミック用 `.unitypackage` のファイル名は `AvatarBeacon-vX.Y.Z.unitypackage` とし、Release担当者がUnityで手動作成・手動添付する。CIで作る `AvatarBeacon-vX.Y.Z-source.zip` は再生成・検証用Assetとして残す。source zip生成と手動 `.unitypackage` 作成運用の詳細は [#175](../175-package-avatar-gimmick-source-zip.md) で扱う。
+- 2026-07-04: アバターギミック用 `.unitypackage` のファイル名は `AvatarBeacon-vX.Y.Z.unitypackage` とし、Release担当者がUnityで手動作成・手動添付する。CIで作る `AvatarBeacon-vX.Y.Z-source.zip` は再生成・検証用Assetとして残す。source zip生成と手動 `.unitypackage` 作成運用の詳細は [#175](../../175-package-avatar-gimmick-source-zip.md) で扱う。
 - 通常配布zipを主導線にする場合でも、改竄確認の導線が分かりにくくならないよう、zip sha256や署名対象を合わせて整理する。

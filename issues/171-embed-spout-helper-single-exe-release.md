@@ -3,7 +3,7 @@
 ## 問題
 
 `v0.1.8-rc13` では `ClipForVRChat.exe`、`spout-capture.exe`、`SpoutLibrary.dll` が分かれており、利用者が改竄確認する対象が増えている。
-[#170](closed/170-investigate-single-exe-distribution-for-spout.md) の追加調査でC案を採用する方針になったため、通常利用者向けの主導線を単一exeへ戻したい。
+[#170](closed/investigation-only/170-investigate-single-exe-distribution-for-spout.md) の追加調査でC案を採用する方針になったため、通常利用者向けの主導線を単一exeへ戻したい。
 
 ## 期待する挙動
 

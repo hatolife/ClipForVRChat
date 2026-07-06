@@ -26,8 +26,8 @@ v0.1.8の自動撮影まわりでは、実機確認でデスクトップ撮影�
 
 既存issueでカバー済みの主な未完成点:
 
-- Stream方式は現状ffmpeg/gdigrabの画面キャプチャであり、Stream Camera/Spout映像そのものではない。対応先: [#129](../129-add-spout-capture-helper.md), [#131](../131-integrate-spout-helper-into-auto-capture.md), [#132](../132-validate-spout-capture-output-and-metadata.md), [#133](133-update-auto-capture-stream-ui-and-docs-for-spout.md), [#135](135-add-spout-stream-camera-verification-guide.md)。
-- Spout helperはRelease workflowへ同梱されていない。対応先: [#134](../134-package-spout-helper-in-ci-release.md)。
+- Stream方式は現状ffmpeg/gdigrabの画面キャプチャであり、Stream Camera/Spout映像そのものではない。対応先: [#129](../../129-add-spout-capture-helper.md), [#131](../../131-integrate-spout-helper-into-auto-capture.md), [#132](../../132-validate-spout-capture-output-and-metadata.md), [#133](133-update-auto-capture-stream-ui-and-docs-for-spout.md), [#135](135-add-spout-stream-camera-verification-guide.md)。
+- Spout helperはRelease workflowへ同梱されていない。対応先: [#134](../../134-package-spout-helper-in-ci-release.md)。
 - `CoordinateSpace` は送信前Pose変換に使われず、`player_local` は未実装。対応先: [#138](138-define-player-local-coordinate-spec.md) から [#142](142-verify-player-local-camera-compositions.md)。
 - `WriteEXIF` / `WriteUserListToEXIF` は設定だけ存在し、画像埋め込みメタデータwriterに接続されていない。対応先: [#143](143-define-autocapture-embedded-metadata-schema.md) から [#147](147-verify-embedded-metadata-output.md)。
 - output log同席ユーザー取得はsnapshot方式であり、継続監視やworld/instance metadataは未完了。対応先: [#111](111-vrc-output-log-presence-users.md)、[#158](158-populate-or-remove-autocapture-world-instance-metadata.md)。

@@ -38,7 +38,7 @@ v0.1.8では、ワールド座標をプレイヤー中心ローカル座標と�
 - [#138](138-define-player-local-coordinate-spec.md) `player_local` 座標仕様を確定する。
 - [#139](139-investigate-player-basis-source.md) ローカルプレイヤー基準Poseの取得可否を実機調査する。
 - [#140](140-implement-player-local-pose-transform.md) `player_local` からUser Camera Poseへの変換処理を実装する。
-- [#141](../141-integrate-player-local-coordinate-ui.md) 自動撮影構図の設定/保存/リセット/移動UIへ `player_local` を統合する。
+- [#141](../../141-integrate-player-local-coordinate-ui.md) 自動撮影構図の設定/保存/リセット/移動UIへ `player_local` を統合する。
 - [#142](142-verify-player-local-camera-compositions.md) プレイヤー中心構図の実機確認手順を整備する。
 
 ## 参照
