@@ -253,6 +253,9 @@ const vueApp = createApp({
       })
       return views.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
     },
+    enabledAutoCaptureViewCount() {
+      return this.autoCaptureViews.filter((view) => view.enabled).length
+    },
     settingsTabs() {
       return [
         { id: 'feature', label: '機能' },
@@ -579,6 +582,7 @@ const vueApp = createApp({
     },
     openAutoCaptureDetail(viewId) {
       const enabled =
+        viewId === 'composition' ||
         (viewId === 'schedule' && this.autoCaptureSettings.schedule.enabled) ||
         (viewId === 'restore' && this.autoCaptureSettings.restore.enabled)
       if (!enabled) return
@@ -588,6 +592,18 @@ const vueApp = createApp({
     closeAutoCaptureDetail() {
       this.logUserAction('button_click', `auto_capture_detail_back ${this.autoCaptureDetailView || 'none'}`)
       this.autoCaptureDetailView = ''
+    },
+    autoCaptureDetailTitle() {
+      if (this.autoCaptureDetailView === 'composition') return '構図設定'
+      if (this.autoCaptureDetailView === 'schedule') return '自動撮影スケジュール'
+      if (this.autoCaptureDetailView === 'restore') return '撮影後にCamera状態を戻す'
+      return '自動撮影設定'
+    },
+    autoCaptureDetailDescription() {
+      if (this.autoCaptureDetailView === 'composition') return '撮影する構図、座標系、Pose、拡大率、並び順を設定します。'
+      if (this.autoCaptureDetailView === 'schedule') return '自動撮影の開始条件と繰り返し間隔を設定します。'
+      if (this.autoCaptureDetailView === 'restore') return '撮影後に戻すUser Camera状態を設定します。'
+      return ''
     },
     shouldWarnMissingPrimaryWebhook(config = this.state.config) {
       return Boolean(config?.output?.uploadDiscord && !String(config?.discord?.webhookUrl || '').trim())
@@ -600,7 +616,7 @@ const vueApp = createApp({
       const specific = String(specificWebhookURL || '').trim()
       if (specific) return 'この欄のWebhook URLへ送信します。'
       const primary = String(this.state.config?.discord?.webhookUrl || '').trim()
-      if (primary) return `空欄のため通常投稿用Webhook URL（${this.maskWebhook(primary)}）へ送信します。`
+      if (primary) return '空欄のため通常投稿用Webhook URLへ送信します。'
       return '空欄です。通常投稿用Webhook URLも空の場合はDiscordへ投稿できません。'
     },
     webhookFallbackNoteClass(specificWebhookURL, enabled = true) {
@@ -1977,8 +1993,8 @@ const vueApp = createApp({
             <div v-if="autoCaptureDetailView" class="settings-detail-view">
               <div class="settings-detail-header">
                 <div>
-                  <h4>{{ autoCaptureDetailView === 'schedule' ? '自動撮影スケジュール' : '撮影後にCamera状態を戻す' }}</h4>
-                  <p>{{ autoCaptureDetailView === 'schedule' ? '自動撮影の開始条件と繰り返し間隔を設定します。' : '撮影後に戻すUser Camera状態を設定します。' }}</p>
+                  <h4>{{ autoCaptureDetailTitle() }}</h4>
+                  <p>{{ autoCaptureDetailDescription() }}</p>
                 </div>
                 <button type="button" class="secondary" title="自動撮影設定の一覧へ戻ります。" aria-label="自動撮影設定の一覧へ戻る" @click="closeAutoCaptureDetail">戻る</button>
               </div>
@@ -1999,6 +2015,87 @@ const vueApp = createApp({
                   <div><strong>開始時に撮影</strong><p>自動撮影開始後、AvatarBeaconのOSC基準が確定してから1回撮影します。ワールド移動中は延期します。</p></div>
                   <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.schedule.captureOnStart" :disabled="!autoCaptureSettings.schedule.enabled" /><span></span></label>
                 </div>
+              </template>
+              <template v-else-if="autoCaptureDetailView === 'composition'">
+                <section class="auto-capture-views" aria-label="構図設定">
+                  <div class="auto-capture-views-header">
+                    <div>
+                      <h4>構図設定</h4>
+                      <p>「撮影する」がONの構図を上から順番に撮影します。</p>
+                      <p>プレイヤー基準構図はAvatarBeaconの受信状態がreadyのときに自動追従します。</p>
+                    </div>
+                    <div class="button-row">
+                      <button type="button" class="secondary" @click="resetCameraViewsToDefaults" title="初期の3構図へ戻す">初期3構図に戻す</button>
+                    </div>
+                  </div>
+                  <div v-if="autoCaptureViews.length" class="view-list">
+                    <article v-for="(cameraView, index) in autoCaptureViews" :key="cameraView.id" class="view-card">
+                      <div class="view-card-main">
+                        <label class="switch compact-switch" :title="cameraView.enabled ? '撮影する' : '撮影しない'">
+                          <input type="checkbox" v-model="cameraView.enabled" />
+                          <span></span>
+                        </label>
+                        <div class="view-fields">
+                          <label>
+                            <small>構図名</small>
+                            <input v-model.trim="cameraView.name" placeholder="構図名" />
+                          </label>
+                          <label>
+                            <small>座標系</small>
+                            <select v-model="cameraView.coordinateSpace">
+                              <option value="world">ワールド</option>
+                              <option value="player_local">プレイヤー基準</option>
+                            </select>
+                          </label>
+                          <div class="view-meta">
+                            <span :class="['status-pill', cameraView.enabled ? 'ok' : 'muted']">{{ cameraView.enabled ? '撮影する' : '撮影しない' }}</span>
+                            <span :class="['status-pill', cameraView.calibrated ? 'ok' : 'muted']">{{ cameraView.calibrated ? 'キャリブレーション済み' : '未キャリブレーション' }}</span>
+                            <span class="status-pill">{{ coordinateSpaceLabel(cameraView.coordinateSpace) }}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="pose-grid">
+                        <label><small>位置 X</small><input type="number" step="0.001" v-model.number="cameraView.pose.position.x" /></label>
+                        <label><small>位置 Y</small><input type="number" step="0.001" v-model.number="cameraView.pose.position.y" /></label>
+                        <label><small>位置 Z</small><input type="number" step="0.001" v-model.number="cameraView.pose.position.z" /></label>
+                        <label><small>回転 X</small><input type="number" step="0.001" v-model.number="cameraView.pose.rotation.x" /></label>
+                        <label><small>回転 Y</small><input type="number" step="0.001" v-model.number="cameraView.pose.rotation.y" /></label>
+                        <label><small>回転 Z</small><input type="number" step="0.001" v-model.number="cameraView.pose.rotation.z" /></label>
+                        <label><small>拡大率</small><input type="number" min="0.1" max="10" step="0.01" v-model.number="cameraView.zoom" /></label>
+                      </div>
+                      <div class="view-actions">
+                        <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, -1)" :disabled="index === 0" :title="index === 0 ? '先頭なので上へ移動できません' : 'この構図を上へ移動'">↑</button>
+                        <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, 1)" :disabled="index === autoCaptureViews.length - 1" :title="index === autoCaptureViews.length - 1 ? '末尾なので下へ移動できません' : 'この構図を下へ移動'">↓</button>
+                        <button type="button" class="secondary" @click="addCurrentCameraPoseAsView(cameraView)" title="現在のPoseを構図として追加する">現在Poseから追加</button>
+                        <button type="button" class="secondary" @click="saveCurrentCameraPoseToView(cameraView)" title="現在のPoseをこの構図へ保存する">現在Poseを保存</button>
+                        <button type="button" class="secondary" @click="moveCameraToView(cameraView)" title="この構図へカメラを移動する">このPoseへカメラ移動</button>
+                        <button type="button" class="secondary" @click="testAutoCaptureView(cameraView)" title="この構図をテスト撮影する">テスト撮影</button>
+                        <button type="button" class="secondary" @click="resetCameraPoseToDefault(cameraView)" title="この構図を初期Poseへ戻す">初期Poseへ戻す</button>
+                        <button type="button" class="secondary" @click="duplicateAutoCaptureView(cameraView)" title="この構図を複製する">複製</button>
+                        <button type="button" class="secondary danger-button" @click="deleteAutoCaptureView(cameraView)" title="この構図を削除する">削除</button>
+                      </div>
+                      <p v-if="autoCaptureTestResults[cameraView.id]" :class="['setting-note', autoCaptureTestResults[cameraView.id].ok ? 'ok' : 'warning']">
+                        {{ autoCaptureTestResults[cameraView.id].message }}
+                      </p>
+                      <div v-if="autoCaptureTestResults[cameraView.id]" class="auto-capture-test-result">
+                        <small>更新: {{ autoCaptureTestResults[cameraView.id].updatedAt }}</small>
+                        <div v-if="autoCaptureTestResults[cameraView.id].results.length" class="test-result-list">
+                          <div v-for="(result, resultIndex) in autoCaptureTestResults[cameraView.id].results" :key="cameraView.id + '-test-' + resultIndex" class="test-result-item">
+                            <img v-if="result.thumbnail" :src="result.thumbnail" alt="" class="test-result-thumb" />
+                            <dl class="test-result-meta">
+                              <div><dt>保存先</dt><dd>{{ result.outputPath || result.sourcePath || 'なし' }}</dd></div>
+                              <div><dt>sidecar</dt><dd>{{ result.sidecarPath || 'なし' }}</dd></div>
+                              <div><dt>Discord URL</dt><dd>{{ result.url || 'なし' }}</dd></div>
+                              <div v-if="result.error"><dt>エラー</dt><dd>{{ result.error }}</dd></div>
+                            </dl>
+                            <button type="button" class="secondary" @click="revealAutoCaptureResult(result)" :disabled="!(result.outputPath || result.sourcePath)" :title="(result.outputPath || result.sourcePath) ? '撮影結果を保存先で表示する' : '表示できる保存先がありません'">表示</button>
+                          </div>
+                        </div>
+                      </div>
+                    </article>
+                  </div>
+                  <p v-else class="empty">構図設定がありません。</p>
+                </section>
               </template>
               <template v-else-if="autoCaptureDetailView === 'restore'">
                 <div class="setting-row" :class="{ disabled: !autoCaptureSettings.restore.enabled }">
@@ -2078,85 +2175,16 @@ const vueApp = createApp({
               </template>
             </div>
             <template v-else>
-            <section class="auto-capture-views" aria-label="構図プリセット">
-              <div class="auto-capture-views-header">
-                <div>
-                  <h4>構図プリセット</h4>
-                  <p>「撮影する」がONの構図を上から順番に撮影します。</p>
-                  <p>プレイヤー基準構図はAvatarBeaconの受信状態がreadyのときに自動追従します。</p>
-                </div>
-                <div class="button-row">
-                  <button type="button" class="secondary" @click="resetCameraViewsToDefaults" title="初期の3構図へ戻す">初期3構図に戻す</button>
-                </div>
+            <div class="setting-row">
+              <div>
+                <strong>構図設定</strong>
+                <p>撮影する構図、座標系、Pose、拡大率、並び順を設定します。</p>
+                <p>有効な構図: {{ enabledAutoCaptureViewCount }} / {{ autoCaptureViews.length }}</p>
               </div>
-              <div v-if="autoCaptureViews.length" class="view-list">
-                <article v-for="(cameraView, index) in autoCaptureViews" :key="cameraView.id" class="view-card">
-                  <div class="view-card-main">
-                    <label class="switch compact-switch" :title="cameraView.enabled ? '撮影する' : '撮影しない'">
-                      <input type="checkbox" v-model="cameraView.enabled" />
-                      <span></span>
-                    </label>
-                    <div class="view-fields">
-                      <label>
-                        <small>構図名</small>
-                        <input v-model.trim="cameraView.name" placeholder="構図名" />
-                      </label>
-                      <label>
-                        <small>座標系</small>
-                        <select v-model="cameraView.coordinateSpace">
-                          <option value="world">ワールド</option>
-                          <option value="player_local">プレイヤー基準</option>
-                        </select>
-                      </label>
-                      <div class="view-meta">
-                        <span :class="['status-pill', cameraView.enabled ? 'ok' : 'muted']">{{ cameraView.enabled ? '撮影する' : '撮影しない' }}</span>
-                        <span :class="['status-pill', cameraView.calibrated ? 'ok' : 'muted']">{{ cameraView.calibrated ? 'キャリブレーション済み' : '未キャリブレーション' }}</span>
-                        <span class="status-pill">{{ coordinateSpaceLabel(cameraView.coordinateSpace) }}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="pose-grid">
-                    <label><small>位置 X</small><input type="number" step="0.001" v-model.number="cameraView.pose.position.x" /></label>
-                    <label><small>位置 Y</small><input type="number" step="0.001" v-model.number="cameraView.pose.position.y" /></label>
-                    <label><small>位置 Z</small><input type="number" step="0.001" v-model.number="cameraView.pose.position.z" /></label>
-                    <label><small>回転 X</small><input type="number" step="0.001" v-model.number="cameraView.pose.rotation.x" /></label>
-                    <label><small>回転 Y</small><input type="number" step="0.001" v-model.number="cameraView.pose.rotation.y" /></label>
-                    <label><small>回転 Z</small><input type="number" step="0.001" v-model.number="cameraView.pose.rotation.z" /></label>
-                    <label><small>拡大率</small><input type="number" min="0.1" max="10" step="0.01" v-model.number="cameraView.zoom" /></label>
-                  </div>
-                  <div class="view-actions">
-                      <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, -1)" :disabled="index === 0" :title="index === 0 ? '先頭なので上へ移動できません' : 'この構図を上へ移動'">↑</button>
-                      <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, 1)" :disabled="index === autoCaptureViews.length - 1" :title="index === autoCaptureViews.length - 1 ? '末尾なので下へ移動できません' : 'この構図を下へ移動'">↓</button>
-                    <button type="button" class="secondary" @click="addCurrentCameraPoseAsView(cameraView)" title="現在のPoseを構図として追加する">現在Poseから追加</button>
-                    <button type="button" class="secondary" @click="saveCurrentCameraPoseToView(cameraView)" title="現在のPoseをこの構図へ保存する">現在Poseを保存</button>
-                    <button type="button" class="secondary" @click="moveCameraToView(cameraView)" title="この構図へカメラを移動する">このPoseへカメラ移動</button>
-                    <button type="button" class="secondary" @click="testAutoCaptureView(cameraView)" title="この構図をテスト撮影する">テスト撮影</button>
-                    <button type="button" class="secondary" @click="resetCameraPoseToDefault(cameraView)" title="この構図を初期Poseへ戻す">初期Poseへ戻す</button>
-                    <button type="button" class="secondary" @click="duplicateAutoCaptureView(cameraView)" title="この構図を複製する">複製</button>
-                    <button type="button" class="secondary danger-button" @click="deleteAutoCaptureView(cameraView)" title="この構図を削除する">削除</button>
-                  </div>
-                  <p v-if="autoCaptureTestResults[cameraView.id]" :class="['setting-note', autoCaptureTestResults[cameraView.id].ok ? 'ok' : 'warning']">
-                    {{ autoCaptureTestResults[cameraView.id].message }}
-                  </p>
-                  <div v-if="autoCaptureTestResults[cameraView.id]" class="auto-capture-test-result">
-                    <small>更新: {{ autoCaptureTestResults[cameraView.id].updatedAt }}</small>
-                    <div v-if="autoCaptureTestResults[cameraView.id].results.length" class="test-result-list">
-                      <div v-for="(result, resultIndex) in autoCaptureTestResults[cameraView.id].results" :key="cameraView.id + '-test-' + resultIndex" class="test-result-item">
-                        <img v-if="result.thumbnail" :src="result.thumbnail" alt="" class="test-result-thumb" />
-                        <dl class="test-result-meta">
-                          <div><dt>保存先</dt><dd>{{ result.outputPath || result.sourcePath || 'なし' }}</dd></div>
-                          <div><dt>sidecar</dt><dd>{{ result.sidecarPath || 'なし' }}</dd></div>
-                          <div><dt>Discord URL</dt><dd>{{ result.url || 'なし' }}</dd></div>
-                          <div v-if="result.error"><dt>エラー</dt><dd>{{ result.error }}</dd></div>
-                        </dl>
-                        <button type="button" class="secondary" @click="revealAutoCaptureResult(result)" :disabled="!(result.outputPath || result.sourcePath)" :title="(result.outputPath || result.sourcePath) ? '撮影結果を保存先で表示する' : '表示できる保存先がありません'">表示</button>
-                      </div>
-                    </div>
-                  </div>
-                </article>
+              <div class="settings-overview-controls">
+                <button type="button" class="secondary" title="構図設定の詳細画面を開きます。" aria-label="構図設定の詳細設定" @click="openAutoCaptureDetail('composition')">詳細設定</button>
               </div>
-              <p v-else class="empty">構図プリセットがありません。</p>
-            </section>
+            </div>
             <div class="setting-row">
               <div>
                 <strong>自動撮影スケジュール</strong>

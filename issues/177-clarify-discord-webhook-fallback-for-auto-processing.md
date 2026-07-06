@@ -15,6 +15,7 @@ VRChat写真自動処理、スクリーンショット自動処理、自動撮�
 - [x] VRChat写真用Webhook URL欄で、空欄時は通常投稿用Webhook URLを使うことが表示される。
 - [x] スクリーンショット用Webhook URL欄で、空欄時は通常投稿用Webhook URLを使うことが表示される。
 - [x] 自動撮影用Webhook URL欄で、空欄時は通常投稿用Webhook URLを使うことが表示される。
+- [x] 専用Webhook URL空欄時の表示では、通常投稿用Webhook URLの一部を表示せず「空欄のため通常投稿用Webhook URLへ送信します。」とだけ表示する。
 - [x] 通常投稿用Webhook URLが設定済みなら、専用Webhook空欄だけを理由に保存時確認ダイアログを出さない。
 - [x] 通常投稿用Webhook URLも専用Webhook URLも空欄で、Discord投稿ONかつ対象自動処理が有効な場合は、送信先未設定として確認ダイアログを出す。
 - [x] 実際のVRChat写真/スクリーンショット/自動撮影の投稿処理が通常投稿用Webhook URLへフォールバックする。
@@ -24,3 +25,4 @@ VRChat写真自動処理、スクリーンショット自動処理、自動撮�
 - 2026-07-02: VRChat写真/スクリーンショットの自動処理は、専用Webhookが空欄なら `Config.Discord.WebhookURL` が通常投稿用として使われる既存挙動を確認した。
 - 2026-07-02: 自動撮影は `AutoCaptureRunner.finalizeAutoCaptureImage` で自動撮影用Webhookが空欄の場合に通常投稿用Webhookへフォールバックする既存挙動を確認した。
 - 2026-07-02: フロントエンドの保存前確認を、実効Webhook URLが未設定の自動処理だけに限定した。
+- 2026-07-07: フォールバック先が通常投稿用Webhook URLであることだけを示し、マスク済みURL断片は表示しない。
