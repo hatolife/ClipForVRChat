@@ -5,4 +5,4 @@
 - [x] Spout2の `IsUpdated()` を受信ループで消費する
 - [x] diagnose summaryにreceiver update回数を出す
 - [x] 構文チェックとCTestを通す
-- [ ] rc43を作成して実機確認する
+- [x] rc43を作成して実機確認する

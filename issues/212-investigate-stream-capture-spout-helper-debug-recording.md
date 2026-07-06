@@ -19,13 +19,13 @@
 
 ## 受け入れ条件
 
-- [ ] 実機環境で `spout-capture.exe --list-senders` の結果を記録する。
-- [ ] 実機環境で `spout-capture.exe --capture` の単体実行結果、終了コード、JSON、出力PNGの有無を記録する。
-- [ ] `--debug-dir` / `--debug-frames` の出力有無と、`frames.jsonl`、frame metadata、`.rgba` の内容傾向を確認する。
-- [ ] `spout-capture.exe --diagnose` でsender一覧、frame番号、ReceiveImage成否、RGBA統計を時系列で記録できる。
+- [x] 実機環境で `spout-capture.exe --list-senders` の結果を記録する。
+- [x] 実機環境で `spout-capture.exe --capture` の単体実行結果、終了コード、JSON、出力PNGの有無を記録する。
+- [x] `--debug-dir` / `--debug-frames` の出力有無と、`frames.jsonl`、frame metadata、`.rgba` の内容傾向を確認する。
+- [x] `spout-capture.exe --diagnose` でsender一覧、frame番号、ReceiveImage成否、RGBA統計を時系列で記録できる。
 - [ ] ClipForVRChatのテスト撮影ログから、helper実行引数、debug_dir、debug_frames、helper JSON、出力ファイル検証結果を確認する。
-- [ ] helper単体失敗か、ClipForVRChat統合部失敗か、VRChat Stream Camera/sender側失敗かを判断する。
-- [ ] 原因に応じて修正チケットまたは既存チケットへの追記内容を決める。
+- [x] helper単体失敗か、ClipForVRChat統合部失敗か、VRChat Stream Camera/sender側失敗かを判断する。
+- [x] 原因に応じて修正チケットまたは既存チケットへの追記内容を決める。
 
 ## 調査計画
 
@@ -70,3 +70,5 @@
 - 2026-07-07: 別プロセスcaptureでsenderが消える可能性を避けるため、`--diagnose --output <png>` で診断中に有効フレームを検出した場合、同一プロセス内で最初の有効フレームをPNG保存できるようにする。
 - 2026-07-07: `v0.1.8-rc42` 分離版をDownloadsへ展開し、`--version` は `v0.1.8-622eb23`、`--help` に `--diagnose --output file.png` が含まれることを確認した。OSC OFF/ON後に `--diagnose --output ... --duration-ms 15000 --interval-ms 500 --debug-frames 4` を実行すると、30 samplesすべて `VRCSender1` を検出し、`receiveSuccesses=29` だが `validFrames=0`、`blankFrames=29`、`firstFrame=0`、`lastFrame=0`、`transparentRatio=1`、`outputWritten=false`。
 - 2026-07-07: Spout2側コメントと実装を確認したところ、sender更新時は `ReceiveImage()` がtrueを返してもピクセルバッファは未書き込みで、受信側は `IsUpdated()` を呼んで更新状態を消費し、バッファ再確保などを行う前提だった。現状は `IsUpdated()` を呼んでいないため、`m_bUpdated` が残り続け、以降の `ReceiveImage()` が即trueを返して空バッファを解析している可能性が高い。
+- 2026-07-07: `ReceiveImage()` 後に `IsUpdated()` を消費し、更新通知の回はピクセル解析しない修正を `v0.1.8-rc43` に入れた。rc43分離版 `/mnt/c/Users/user/Downloads/ClipForVRChat-v0.1.8-rc43-windows-amd64-separated/spout-capture.exe` は `v0.1.8-737ca7b`。OSC OFF/ON後の `--diagnose --output ... --duration-ms 15000 --interval-ms 500 --debug-frames 4` は `diagnose_success`、`receiverUpdates=1`、`receiveSuccesses=28`、`validFrames=27`、`blankFrames=1`、`transparentRatio=0`、`outputWritten=true`。
+- 2026-07-07: rc43でdiagnose終了直後の別プロセス `--capture --sender VRCSender1` は従来通り `sender_not_found` になったが、OSC OFF/ON直後に `--capture --sender VRCSender1 --output ... --debug-dir ... --debug-frames 4` を実行すると成功し、`capture.png` (`1365750` bytes) とdebug frame 2件を出力した。アプリ側には既に空sender時のOSC OFF/ON再試行を入れているため、helper単体の主因は `IsUpdated()` 未処理、sender消失対策はOSC再トグルで成立する見込み。
