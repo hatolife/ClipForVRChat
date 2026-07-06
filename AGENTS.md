@@ -9,6 +9,7 @@
 - GUIが表示されない、起動画面で止まる、フロントエンドエラー、Wails/HTML/Vue/API初期化不具合を扱う場合は、作業前に `docs/frontend-runtime-troubleshooting.md` を確認する。新しい既知パターンを同定した場合は、原因、同定方法、対処方法を同ドキュメントへ追記する。
 - `src/frontend/src/main.js` のVue templateを変更した場合は、`node scripts/check-frontend-template-literals.mjs` と `node scripts/check-wails-api-surface.mjs` を実行する。
 - 作業は意味のある単位で細かくコミットする。
+- コミットメッセージの件名はConventional Commits形式にする。例: `fix(ui): prevent empty state overlap`、`docs(issues): close release checklist`、`ci(release): validate prerelease tags`。履歴を書き換えた後や複数コミットを作った後は、必要に応じて `node scripts/check-commit-subjects.mjs <range>` で確認する。
 - Release成果物の確認が必要な変更では、GitHub ActionsのCI/Releaseステータスを確認する。
 - リリース時は `issues/README.md` の対象チケットについて、対応バージョン欄をリリースするバージョンに更新する。
 - Release workflowを変更した場合は、GitHub Release本文が `RELEASE_NOTES.md` の該当バージョンから作成されること、Release添付ファイル一覧、zip内ファイル一覧を確認する。不要な公開鍵ファイルなど、仕様外の成果物を添付・同梱しない。

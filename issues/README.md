@@ -42,6 +42,7 @@
 | 202 | [Spout helperに録画デバッグ出力を追加し起動コンソールを隠す](202-add-spout-helper-debug-recording-and-hide-console.md) | 要確認 | `v0.1.8` | Spout helperで受信RGBAフレームとmetadata/logを保存できるデバッグ引数を追加し、テスト撮影から有効化できるようにする。 |
 | 208 | [自動撮影説明を改善し、カメラ自動起動/終了を既定OFFにする](208-improve-auto-capture-help-and-disable-camera-auto-open-close.md) | 要確認 | `v0.1.8` | 自動撮影説明とAvatarBeacon状態表示を整理し、Camera OSCの不安定さを避けるためカメラ自動起動/終了を設定化して既定OFFにする。 |
 | 217 | [v0.1.8-a44とv0.1.8-b2でRelease workflowを確認する](217-confirm-a43-b1-release-creation.md) | 要対応 | 未定 | CI設定変更を含む `v0.1.8-a44` と `v0.1.8-b2` でalpha/betaタグのRelease作成を確認する。 |
+| 218 | [直近コミットメッセージがConventional Commitsから外れた原因を調査する](218-investigate-conventional-commit-regression.md) | 要対応 | 未定 | 直近コミットメッセージがAngular風の形式から外れた原因を調べ、再発防止を追加する。 |
 
 ## 状態の意味
 
