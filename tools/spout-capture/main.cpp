@@ -371,7 +371,7 @@ struct DebugRecorder {
     std::ostringstream metadata;
     metadata << "{\"capturedAt\":\"" << timestamp_utc()
              << "\",\"session\":\"" << json_escape(session_id) << "\""
-             << "\",\"index\":" << dumped_frames
+             << ",\"index\":" << dumped_frames
              << ",\"senderFrame\":" << sender_frame
              << ",\"width\":" << width
              << ",\"height\":" << height

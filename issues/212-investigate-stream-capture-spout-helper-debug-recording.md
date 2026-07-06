@@ -57,3 +57,8 @@
 ## 実装メモ
 
 - 2026-07-07: 現在の仮説は「`spout-capture.exe` 自体が有効フレームを録画できていない可能性が高い」。まずhelper単体のsender列挙、capture、debug録画を確認してから、ClipForVRChat統合部へ進む。
+- 2026-07-07: `v0.1.8-rc40` 分離版の `/mnt/c/Users/user/Downloads/ClipForVRChat-v0.1.8-rc40-windows-amd64-separated/spout-capture.exe` を使って、helper単体の `--version`、sender列挙、capture、debug録画を確認する。
+- 2026-07-07: `--version` は `v0.1.8-7f242a9`。初回 `--list-senders` は `senders=[]` だったが、ゲーム内カメラ起動済み状態で再実行すると `VRCSender1` (`1920x1080`, hostPath=`C:\Program Files (x86)\Steam\steamapps\common\VRChat\VRChat.exe`) を検出した。
+- 2026-07-07: `--capture --sender VRCSender1 --timeout-ms 10000 --debug-dir ... --debug-frames 30` は exit code 3、`code=capture_blank_frame`。`receiveAttempts=314`、`receiveSuccesses=313` で受信自体は成功しているが、`firstFrame=0`、`lastReceivedFrame=0`、`frame=0` のまま進まない。`frameStats` は `mean=0`、`stddev=0`、`transparentRatio=1` で全透明。
+- 2026-07-07: debug録画は30フレーム分の `.rgba` と `.json` を出力した。各 `.rgba` は `8294400` bytes (`1920*1080*4`)。1枚目と30枚目は `cmp` で完全一致し、先頭64 bytesも全て `00`。helperはsenderへ接続してフレーム受信に成功しているが、VRChat側senderが全ゼロRGBAかつframe番号0のまま更新されていない状態と判断する。
+- 2026-07-07: 調査中に `frames.jsonl` / per-frame `.json` の `session` フィールドに余分な `"` が入り、不正JSONになるバグを確認した。撮影失敗の主因ではないが、デバッグ解析を阻害するため `tools/spout-capture/main.cpp` で修正した。
