@@ -837,7 +837,7 @@ func (r AutoCaptureRunner) applyCameraViewAndOptions(client oscClient, view Came
 	logPath := r.Config.DiagnosticLogPath
 	if r.Config.AutoCapture.Capture.PreplacedLocalAnchor {
 		diagAutoCapture(logPath, "camera pose/options skipped: view_id=%q preplaced_local_anchor=true", view.ID)
-		return nil
+		return r.applyAutoLevelRollBeforeShot(client, view.ID)
 	}
 	if err := r.applyCameraView(client, view); err != nil {
 		return err
@@ -851,7 +851,33 @@ func (r AutoCaptureRunner) applyCameraViewAndOptions(client oscClient, view Came
 		sendOptionalBool(client, "/usercamera/LocalPlayer", view.LocalPlayer) +
 		sendOptionalBool(client, "/usercamera/RemotePlayer", view.RemotePlayer) +
 		sendOptionalBool(client, "/usercamera/Environment", view.Environment)
+	if err := r.applyAutoLevelRollBeforeShot(client, view.ID); err != nil {
+		return err
+	}
 	diagAutoCapture(logPath, "shot optional_params sent: view_id=%q count=%d", view.ID, sentOptions)
+	return nil
+}
+
+func (r AutoCaptureRunner) applyAutoLevelRollBeforeShot(client oscClient, viewID string) error {
+	logPath := r.Config.DiagnosticLogPath
+	enabled := true
+	if r.Config.AutoCapture.Capture.AutoLevelRollBeforeShot != nil {
+		enabled = *r.Config.AutoCapture.Capture.AutoLevelRollBeforeShot
+	}
+	if !enabled {
+		diagAutoCapture(logPath, "auto level roll skipped: view_id=%q auto_level_roll_before_shot=false", viewID)
+		return nil
+	}
+	if client.conn == nil {
+		diagAutoCapture(logPath, "auto level roll skipped: view_id=%q reason=%q", viewID, "osc_not_open")
+		return nil
+	}
+	diagAutoCapture(logPath, "osc send begin: address=%q value=%t view_id=%q detail=%q", "/usercamera/AutoLevelRoll", true, viewID, "before_shot")
+	if err := client.sendBool("/usercamera/AutoLevelRoll", true); err != nil {
+		diagAutoCapture(logPath, "osc send error: address=%q value=%t view_id=%q detail=%q err=%v", "/usercamera/AutoLevelRoll", true, viewID, "before_shot", err)
+		return err
+	}
+	diagAutoCapture(logPath, "osc send success: address=%q value=%t view_id=%q detail=%q", "/usercamera/AutoLevelRoll", true, viewID, "before_shot")
 	return nil
 }
 

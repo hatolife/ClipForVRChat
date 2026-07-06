@@ -37,6 +37,15 @@ func TestDefaultAutoCaptureConfig(t *testing.T) {
 	if !cfg.AutoCapture.Restore.Enabled || !cfg.AutoCapture.Restore.PreferSnapshot || cfg.AutoCapture.Restore.SnapshotFreshnessSec != 10 {
 		t.Fatalf("unexpected restore defaults: %+v", cfg.AutoCapture.Restore)
 	}
+	if cfg.AutoCapture.Capture.AutoLevelRollBeforeShot == nil || !*cfg.AutoCapture.Capture.AutoLevelRollBeforeShot {
+		t.Fatalf("AutoLevelRollBeforeShot should be enabled by default: %+v", cfg.AutoCapture.Capture)
+	}
+	if cfg.AutoCapture.Capture.OpenCameraBeforeBatch || cfg.AutoCapture.Capture.CloseCameraAfterBatch {
+		t.Fatalf("camera auto open/close should default off: %+v", cfg.AutoCapture.Capture)
+	}
+	if !cfg.AutoCapture.Restore.Fallback.AutoLevelRoll {
+		t.Fatalf("restore fallback AutoLevelRoll should be enabled by default: %+v", cfg.AutoCapture.Restore.Fallback)
+	}
 	if cfg.AutoCapture.Views[0].ID != "front" || cfg.AutoCapture.Views[0].Calibrated || cfg.AutoCapture.Views[0].Zoom == nil {
 		t.Fatalf("unexpected first view: %+v", cfg.AutoCapture.Views[0])
 	}
@@ -69,6 +78,9 @@ func TestAutoCaptureConfigNormalize(t *testing.T) {
 	if cfg.AutoCapture.Capture.OpenCameraBeforeBatch || cfg.AutoCapture.Capture.CloseCameraAfterBatch {
 		t.Fatalf("camera auto open/close should default off: %+v", cfg.AutoCapture.Capture)
 	}
+	if cfg.AutoCapture.Capture.AutoLevelRollBeforeShot == nil || !*cfg.AutoCapture.Capture.AutoLevelRollBeforeShot {
+		t.Fatalf("AutoLevelRollBeforeShot should default on: %+v", cfg.AutoCapture.Capture)
+	}
 	if cfg.AutoCapture.Capture.PreplacedLocalAnchor {
 		t.Fatalf("PreplacedLocalAnchor should default off: %+v", cfg.AutoCapture.Capture)
 	}
@@ -80,6 +92,9 @@ func TestAutoCaptureConfigNormalize(t *testing.T) {
 	}
 	if !cfg.AutoCapture.Restore.Enabled || !cfg.AutoCapture.Restore.PreferSnapshot || cfg.AutoCapture.Restore.Fallback.Zoom != 45 {
 		t.Fatalf("restore normalize failed: %+v", cfg.AutoCapture.Restore)
+	}
+	if !cfg.AutoCapture.Restore.Fallback.AutoLevelRoll {
+		t.Fatalf("restore fallback AutoLevelRoll should default on: %+v", cfg.AutoCapture.Restore.Fallback)
 	}
 }
 
@@ -425,10 +440,57 @@ func TestAutoCaptureRunnerRunOnceSkipsCameraAutoOpenWhenDisabled(t *testing.T) {
 	}
 
 	samples := readOSCPacketSamples(t, conn)
+	hasAutoLevelRoll := false
 	for _, sample := range samples {
 		switch sample.Address {
 		case "/usercamera/Mode", "/usercamera/SmoothMovement", "/usercamera/Streaming":
 			t.Fatalf("camera auto-open packet should not be sent when disabled: %+v all=%+v", sample, samples)
+		}
+		if sample.Address == "/usercamera/AutoLevelRoll" && sample.HasBool && sample.Bool {
+			hasAutoLevelRoll = true
+		}
+	}
+	if !hasAutoLevelRoll {
+		t.Fatalf("AutoLevelRoll=true packet not found: %+v", samples)
+	}
+}
+
+func TestAutoCaptureRunnerRunOnceCanDisableAutoLevelRollBeforeShot(t *testing.T) {
+	conn, port := listenOSCUserCameraPackets(t)
+	defer conn.Close()
+
+	cfg := DefaultConfig()
+	cfg.AutoCapture.OSC.Host = "127.0.0.1"
+	cfg.AutoCapture.OSC.SendPort = port
+	cfg.AutoCapture.Restore.Enabled = false
+	cfg.AutoCapture.Capture.Mode = "stream"
+	cfg.AutoCapture.Capture.OpenCameraBeforeBatch = false
+	cfg.AutoCapture.Capture.CloseCameraAfterBatch = false
+	cfg.AutoCapture.Capture.AutoLevelRollBeforeShot = boolPtr(false)
+	cfg.AutoCapture.Stream.SpoutHelperPath = filepath.Join(t.TempDir(), "missing-spout-capture.exe")
+	cfg.AutoCapture.Output.Directory = t.TempDir()
+	cfg.AutoCapture.Presence.WatchOutputLog = false
+	cfg.AutoCapture.Views = []CameraViewConfig{{
+		ID:              "front",
+		Name:            "front",
+		Enabled:         true,
+		CoordinateSpace: "world",
+		Calibrated:      true,
+		SettleDelayMS:   1,
+	}}
+
+	results, err := (AutoCaptureRunner{Config: cfg}).RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("RunOnce error = %v", err)
+	}
+	if len(results) != 1 || results[0].Error == "" {
+		t.Fatalf("results = %+v, want one failed stream shot", results)
+	}
+
+	samples := readOSCPacketSamples(t, conn)
+	for _, sample := range samples {
+		if sample.Address == "/usercamera/AutoLevelRoll" {
+			t.Fatalf("AutoLevelRoll packet should not be sent when disabled: %+v all=%+v", sample, samples)
 		}
 	}
 }

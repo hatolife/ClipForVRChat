@@ -232,6 +232,43 @@ func TestLoadConfigPreservesExplicitCaptureOnStartFalse(t *testing.T) {
 	}
 }
 
+func TestLoadConfigDefaultsAutoLevelRollBeforeShotWhenMissing(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(`{"autoCapture":{"capture":{"mode":"stream"}}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := LoadConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.AutoCapture.Capture.AutoLevelRollBeforeShot == nil || !*got.AutoCapture.Capture.AutoLevelRollBeforeShot {
+		t.Fatalf("AutoLevelRollBeforeShot = %v, want true when field is missing", got.AutoCapture.Capture.AutoLevelRollBeforeShot)
+	}
+	if got.AutoCapture.Capture.CloseCameraAfterBatch {
+		t.Fatalf("CloseCameraAfterBatch = %t, want false by default", got.AutoCapture.Capture.CloseCameraAfterBatch)
+	}
+	if !got.AutoCapture.Restore.Fallback.AutoLevelRoll {
+		t.Fatalf("Restore fallback AutoLevelRoll = %t, want true when field is missing", got.AutoCapture.Restore.Fallback.AutoLevelRoll)
+	}
+}
+
+func TestLoadConfigPreservesExplicitAutoLevelRollBeforeShotFalse(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(`{"autoCapture":{"capture":{"autoLevelRollBeforeShot":false},"restore":{"fallback":{"autoLevelRoll":false}}}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := LoadConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.AutoCapture.Capture.AutoLevelRollBeforeShot == nil || *got.AutoCapture.Capture.AutoLevelRollBeforeShot {
+		t.Fatalf("AutoLevelRollBeforeShot = %v, want false when field is explicit", got.AutoCapture.Capture.AutoLevelRollBeforeShot)
+	}
+	if got.AutoCapture.Restore.Fallback.AutoLevelRoll {
+		t.Fatalf("Restore fallback AutoLevelRoll = %t, want false when field is explicit", got.AutoCapture.Restore.Fallback.AutoLevelRoll)
+	}
+}
+
 func TestConfigPathUsesExecutableDirectory(t *testing.T) {
 	got := ConfigPath(filepath.Join("C:", "tools", "ClipForVRChat.exe"))
 	if filepath.Base(got) != "config.json" {

@@ -15,6 +15,8 @@
 - カメラ自動起動と自動終了のON/OFF設定を用意し、既定OFFにする。
 - カメラ自動起動OFFのときは、ユーザーがゲーム内でカメラを起動しておく前提の動作にする。
 - Camera OSCのVRChat側不具合が解消するまでは、カメラ自動起動/自動終了の設定項目を通常UIに表示しない。
+- 自動撮影時はUser CameraのAuto Level Rollを既定ONにし、ロールが傾いた状態で撮影しにくくする。
+- 自動撮影後にCameraを終了しない状態を既定値として維持する。
 
 ## 受け入れ条件
 
@@ -28,12 +30,18 @@
 - [x] カメラ自動起動、自動終了の設定項目が通常UIに表示されない。
 - [x] カメラ自動起動OFF時に `/usercamera/Mode`、`/usercamera/SmoothMovement`、`/usercamera/Streaming=true` を事前送信しない。
 - [x] カメラ自動終了OFF時に `/usercamera/Streaming=false` と `/usercamera/Close` を撮影後に送信しない。
+- [x] 自動撮影時に `/usercamera/AutoLevelRoll=true` を既定で送信する。
+- [x] 既存設定ファイルでAuto Level Roll設定が未指定の場合も既定ONになる。
+- [x] `closeCameraAfterBatch` は既定OFFのまま維持され、明示ON時だけ撮影後にCamera終了を送る。
 
 ## 実装メモ
 
 - `openCameraBeforeBatch` を追加し、既定OFFにした。
 - 既存の `closeCameraAfterBatch` も既定OFFに変更した。
+- `autoLevelRollBeforeShot` を追加し、既定ONにした。未指定と明示OFFを区別するため内部型は `*bool` とする。
 - `openCameraBeforeBatch=false` のとき、撮影前のCamera Mode切り替え、SmoothMovement、Streaming開始、Stream撮影直前の再送を行わない。
+- `autoLevelRollBeforeShot=true` のとき、各ショットのPose/任意カメラ設定適用後に `/usercamera/AutoLevelRoll=true` を送る。
 - AvatarBeacon受信状態は自動撮影タブでもポーリングする。
 - Camera OSC不具合の説明はVRChat Feedbackの報告を参照する。
 - 2026-07-07: 自動起動/自動終了は既定OFFのまま、通常UIからは非表示にした。
+- 2026-07-07: 追加要望として、撮影時のAuto Level Roll既定ONと、撮影後にCameraを終了しない既定値維持を扱う。

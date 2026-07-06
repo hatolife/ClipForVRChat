@@ -138,16 +138,17 @@ type AutoCaptureScheduleConfig struct {
 }
 
 type AutoCaptureCaptureConfig struct {
-	Mode                  string `json:"mode"`
-	ConcurrentMode        string `json:"concurrentMode"`
-	RequestedCameraCount  int    `json:"requestedCameraCount"`
-	MultiBackend          string `json:"multiBackend"`
-	FallbackToSequential  bool   `json:"fallbackToSequential"`
-	PreplacedLocalAnchor  bool   `json:"preplacedLocalAnchor"`
-	OpenCameraBeforeBatch bool   `json:"openCameraBeforeBatch"`
-	CloseCameraAfterBatch bool   `json:"closeCameraAfterBatch"`
-	SettleDelayMS         int    `json:"settleDelayMs"`
-	ButtonReleaseDelayMS  int    `json:"buttonReleaseDelayMs"`
+	Mode                    string `json:"mode"`
+	ConcurrentMode          string `json:"concurrentMode"`
+	RequestedCameraCount    int    `json:"requestedCameraCount"`
+	MultiBackend            string `json:"multiBackend"`
+	FallbackToSequential    bool   `json:"fallbackToSequential"`
+	PreplacedLocalAnchor    bool   `json:"preplacedLocalAnchor"`
+	OpenCameraBeforeBatch   bool   `json:"openCameraBeforeBatch"`
+	CloseCameraAfterBatch   bool   `json:"closeCameraAfterBatch"`
+	AutoLevelRollBeforeShot *bool  `json:"autoLevelRollBeforeShot"`
+	SettleDelayMS           int    `json:"settleDelayMs"`
+	ButtonReleaseDelayMS    int    `json:"buttonReleaseDelayMs"`
 }
 
 type AutoCaptureStreamConfig struct {
@@ -370,15 +371,16 @@ func DefaultAutoCaptureConfig() AutoCaptureConfig {
 			CaptureOnStart:             true,
 		},
 		Capture: AutoCaptureCaptureConfig{
-			Mode:                  "stream",
-			ConcurrentMode:        "sequential",
-			RequestedCameraCount:  1,
-			MultiBackend:          "dolly_multi",
-			FallbackToSequential:  true,
-			OpenCameraBeforeBatch: false,
-			CloseCameraAfterBatch: false,
-			SettleDelayMS:         1500,
-			ButtonReleaseDelayMS:  200,
+			Mode:                    "stream",
+			ConcurrentMode:          "sequential",
+			RequestedCameraCount:    1,
+			MultiBackend:            "dolly_multi",
+			FallbackToSequential:    true,
+			OpenCameraBeforeBatch:   false,
+			CloseCameraAfterBatch:   false,
+			AutoLevelRollBeforeShot: boolConfigPtr(true),
+			SettleDelayMS:           1500,
+			ButtonReleaseDelayMS:    200,
 		},
 		Stream: AutoCaptureStreamConfig{
 			SpoutHelperPath:  "spout-capture.exe",
@@ -567,6 +569,9 @@ func (c *AutoCaptureConfig) Normalize() {
 	if c.Capture.ButtonReleaseDelayMS < 200 {
 		c.Capture.ButtonReleaseDelayMS = 200
 	}
+	if c.Capture.AutoLevelRollBeforeShot == nil {
+		c.Capture.AutoLevelRollBeforeShot = boolConfigPtr(true)
+	}
 	c.Stream.SpoutHelperPath = strings.Trim(strings.TrimSpace(c.Stream.SpoutHelperPath), `"`)
 	if c.Stream.SpoutHelperPath == "" {
 		c.Stream.SpoutHelperPath = "spout-capture.exe"
@@ -710,7 +715,7 @@ func defaultAutoCaptureUserCameraFallbackConfig() AutoCaptureUserCameraFallbackC
 		Environment:            true,
 		GreenScreen:            false,
 		LookAtMe:               false,
-		AutoLevelRoll:          false,
+		AutoLevelRoll:          true,
 		AutoLevelPitch:         false,
 		Flying:                 false,
 		TriggerTakesPhotos:     false,

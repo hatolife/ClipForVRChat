@@ -206,6 +206,7 @@ const vueApp = createApp({
       if (autoCapture.capture.preplacedLocalAnchor === undefined) autoCapture.capture.preplacedLocalAnchor = false
       if (autoCapture.capture.openCameraBeforeBatch === undefined) autoCapture.capture.openCameraBeforeBatch = false
       if (autoCapture.capture.closeCameraAfterBatch === undefined) autoCapture.capture.closeCameraAfterBatch = false
+      if (autoCapture.capture.autoLevelRollBeforeShot === undefined) autoCapture.capture.autoLevelRollBeforeShot = true
       autoCapture.stream ||= {}
       if (autoCapture.stream.debugRecordingEnabled === undefined) autoCapture.stream.debugRecordingEnabled = false
       if (!autoCapture.stream.debugFrameCount) autoCapture.stream.debugFrameCount = 8
@@ -241,6 +242,7 @@ const vueApp = createApp({
       if (restoreFallback.remotePlayer === undefined) restoreFallback.remotePlayer = true
       if (restoreFallback.environment === undefined) restoreFallback.environment = true
       if (restoreFallback.greenScreen === undefined) restoreFallback.greenScreen = false
+      if (restoreFallback.autoLevelRoll === undefined) restoreFallback.autoLevelRoll = true
       autoCapture.views ||= []
       return autoCapture
     },
