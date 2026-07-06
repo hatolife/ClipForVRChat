@@ -2362,9 +2362,10 @@ const vueApp = createApp({
           <section v-if="settingsTab === 'osc'" class="settings-group" role="tabpanel">
             <h3>OSC</h3>
             <div class="settings-explainer">
-              <strong>VRChat OSCの送受信と転送を設定します。</strong>
-              <p>ClipForVRChatがVRChatからのOSC受信ポートをlistenしている間、同じポートを他アプリが安定して同時受信できる前提にはできません。</p>
-              <p>他アプリが受信ポートを変更できる場合は、ここで転送先ポートを作り、他アプリ側をそのポートへ向けることで競合を避けられます。受信ポートを変更できない他アプリの競合は、この機能では解消できません。</p>
+              <strong>VRChat OSCの送受信と、他アプリへのOSC転送を設定します。</strong>
+              <p>VRChatから届くOSCは、通常1つの受信ポートを1つのアプリがlistenします。ClipForVRChatがそのポートを使っている間、別アプリも同じポートで安定して同時受信できる前提にはできません。</p>
+              <p>他アプリも同じOSCを使いたい場合は、ClipForVRChatを受信役にし、ここで別の転送先ポートを追加してください。他アプリ側はVRChat標準の受信ポートではなく、その転送先ポートをlistenする構成にします。</p>
+              <p>他アプリ側の受信ポートを変更できない場合や、他アプリが同じVRChat受信ポートを直接listenする必要がある場合、この転送機能だけでは競合を解消できません。</p>
             </div>
             <div class="setting-row">
               <div><strong>OSCホスト</strong><p>VRChat OSCへ接続し、VRChatからのOSCを受信するホストです。</p></div>
