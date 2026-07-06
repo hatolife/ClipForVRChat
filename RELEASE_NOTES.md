@@ -17,7 +17,7 @@
 - Stream Camera(Spout)取得の起動待ち、空フレーム待ち、PNG書き出し、失敗画像の隔離を改善し、Stream方式の撮影失敗を減らしました。
 - 自動撮影後にUser CameraのMode、Pose、Streaming、Zoom、Exposure、mask類などをできるだけ撮影前の状態へ戻すようにしました。
 - 構図の「現在Poseを取得」で、直近のUser Camera Zoomも拡大率として保存するようにしました。
-- ローカルアンカー配置済みカメラを使うフォールバックモードを既定ONにし、OFF時はAvatarBeacon basis不足などの通常撮影エラーを確認できるようにしました。
+- ローカルアンカー配置済みカメラを使うフォールバックモードを追加し、自動ON/OFFを個別に設定できるようにしました。自動ON/OFFはどちらも既定OFFです。
 - 自動撮影の詳細設定画面でも「保存」「閉じる」ボタンを表示するようにしました。
 - 別フォルダや別バージョンのClipForVRChatでも同じWindowsユーザーでは単一起動になるようにし、OSC port競合を避けました。
 - 起動中の進捗表示、frontend template検査、Wails API surface検査を追加し、GUI起動不具合を切り分けやすくしました。

@@ -30,6 +30,10 @@ var (
 
 const avatarBeaconAutoFallbackAfter = 30 * time.Second
 
+func appBoolConfigPtr(value bool) *bool {
+	return &value
+}
+
 func isGoTestBinary(path string) bool {
 	name := strings.ToLower(filepath.Base(path))
 	return strings.HasSuffix(name, ".test") || strings.HasSuffix(name, ".test.exe")
@@ -1691,7 +1695,7 @@ func (a *App) waitForAutoCaptureStartReadiness(ctx context.Context, cfg appcore.
 			appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait: avatar_osc_status=%q fresh=%t auto_fallback=%t age_ms=%d error=%q", snapshot.Status, snapshot.Fresh, snapshot.AutoFallback, snapshot.AgeMS, snapshot.Error)
 			lastBasisStatus = snapshot.Status
 		}
-		if snapshot.AutoFallback {
+		if snapshot.AutoFallback && cfg.AutoCapture.Capture.AutoEnablePreplaced {
 			appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait: avatar_osc auto fallback enabled age_ms=%d threshold_ms=%d", snapshot.AgeMS, avatarBeaconAutoFallbackAfter.Milliseconds())
 			if !cfg.AutoCapture.Presence.WatchOutputLog {
 				appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait complete: auto_fallback=true world_metadata=disabled")
@@ -2595,8 +2599,15 @@ func (a *App) prepareAutoCaptureConfigForRunLocked(cfg appcore.Config) (appcore.
 	source := normalizePlayerLocalBasisSource(cfg.AutoCapture.PlayerLocal.BasisSource)
 	if source == appcore.PlayerLocalBasisSourceAvatarOSC {
 		snapshot := a.latestAvatarOSCBasisSnapshotLocked(cfg, now)
-		if snapshot.AutoFallback && !cfg.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
-			appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "avatar osc basis stale while fallback mode disabled: status=%q last=%q age_ms=%d threshold_ms=%d err=%q", snapshot.Status, snapshot.LastReceivedAddress, snapshot.AgeMS, avatarBeaconAutoFallbackAfter.Milliseconds(), snapshot.Error)
+		if cfg.AutoCapture.Capture.AutoEnablePreplaced && (snapshot.AutoFallback || !snapshot.Fresh) {
+			enableFallback := true
+			cfg.AutoCapture.Capture.PreplacedLocalAnchor = appBoolConfigPtr(enableFallback)
+			appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "avatar osc auto fallback enable applied: enabled=%t status=%q fresh=%t last=%q age_ms=%d threshold_ms=%d err=%q", enableFallback, snapshot.Status, snapshot.Fresh, snapshot.LastReceivedAddress, snapshot.AgeMS, avatarBeaconAutoFallbackAfter.Milliseconds(), snapshot.Error)
+		} else if cfg.AutoCapture.Capture.AutoDisablePreplaced && snapshot.Fresh {
+			cfg.AutoCapture.Capture.PreplacedLocalAnchor = appBoolConfigPtr(false)
+			appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "avatar osc auto fallback disable applied: status=%q fresh=%t last=%q age_ms=%d err=%q", snapshot.Status, snapshot.Fresh, snapshot.LastReceivedAddress, snapshot.AgeMS, snapshot.Error)
+		} else if snapshot.AutoFallback && !cfg.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
+			appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "avatar osc basis stale while fallback mode disabled: auto_enable_fallback=false status=%q last=%q age_ms=%d threshold_ms=%d err=%q", snapshot.Status, snapshot.LastReceivedAddress, snapshot.AgeMS, avatarBeaconAutoFallbackAfter.Milliseconds(), snapshot.Error)
 		}
 	}
 	if cfg.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {

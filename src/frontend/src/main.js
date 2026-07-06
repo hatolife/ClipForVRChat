@@ -228,7 +228,9 @@ const vueApp = createApp({
       autoCapture.playerLocal.basisSource ||= 'avatar_osc'
       autoCapture.playerLocal.avatarOsc ||= {}
       autoCapture.capture ||= {}
-      if (autoCapture.capture.preplacedLocalAnchor === undefined) autoCapture.capture.preplacedLocalAnchor = true
+      if (autoCapture.capture.preplacedLocalAnchor === undefined) autoCapture.capture.preplacedLocalAnchor = false
+      if (autoCapture.capture.autoEnablePreplacedLocalAnchor === undefined) autoCapture.capture.autoEnablePreplacedLocalAnchor = false
+      if (autoCapture.capture.autoDisablePreplacedLocalAnchor === undefined) autoCapture.capture.autoDisablePreplacedLocalAnchor = false
       if (autoCapture.capture.openCameraBeforeBatch === undefined) autoCapture.capture.openCameraBeforeBatch = false
       if (autoCapture.capture.closeCameraAfterBatch === undefined) autoCapture.capture.closeCameraAfterBatch = false
       if (autoCapture.capture.autoLevelRollBeforeShot === undefined) autoCapture.capture.autoLevelRollBeforeShot = true
@@ -517,6 +519,9 @@ const vueApp = createApp({
         'autoCapture.osc.poseFreshnessSec': '現在Pose取得の有効秒数',
         'autoCapture.osc.forward.enabled': 'OSC転送',
         'autoCapture.osc.forward.mode': '転送モード',
+        'autoCapture.capture.autoEnablePreplacedLocalAnchor': 'フォールバックモードを自動ON',
+        'autoCapture.capture.autoDisablePreplacedLocalAnchor': 'フォールバックモードを自動OFF',
+        'autoCapture.capture.preplacedLocalAnchor': 'フォールバックモード',
         'autoCapture.playerLocal.basisSource': 'プレイヤー基準の取得元',
         'autoCapture.playerLocal.calibrated': 'manual基準Pose',
         'autoCapture.playerLocal.updatedAt': 'manual基準Pose',
@@ -548,6 +553,23 @@ const vueApp = createApp({
       if (path.startsWith('autoCapture.presence.')) return '同席ユーザー情報'
       if (path.startsWith('autoCapture.playerLocal.')) return 'プレイヤー基準'
       return '設定'
+    },
+    changedSettingPathList() {
+      if (!this.hasUnsavedSettings) return []
+      let baseline
+      try {
+        baseline = JSON.parse(this.settingsBaseline || '{}')
+      } catch {
+        return []
+      }
+      return this.changedSettingPaths(baseline, this.state.config)
+    },
+    settingChanged(...prefixes) {
+      const paths = this.changedSettingPathList()
+      return paths.some((path) => prefixes.some((prefix) => path === prefix || path.startsWith(`${prefix}.`)))
+    },
+    settingRowChangedClass(...prefixes) {
+      return { 'unsaved-setting-row': this.settingChanged(...prefixes) }
     },
     rememberSettingsBaseline() {
       this.settingsBaseline = this.serializeSettings(this.state.settingsBaselineConfig || this.state.config)
@@ -739,6 +761,7 @@ const vueApp = createApp({
     openAutoCaptureDetail(viewId) {
       const enabled =
         viewId === 'composition' ||
+        viewId === 'fallback' ||
         viewId === 'capture' ||
         viewId === 'metadata' ||
         (viewId === 'schedule' && this.autoCaptureSettings.schedule.enabled) ||
@@ -753,6 +776,7 @@ const vueApp = createApp({
     },
     autoCaptureDetailTitle() {
       if (this.autoCaptureDetailView === 'composition') return '構図設定'
+      if (this.autoCaptureDetailView === 'fallback') return 'フォールバックモード'
       if (this.autoCaptureDetailView === 'capture') return '撮影・出力'
       if (this.autoCaptureDetailView === 'metadata') return '保存・投稿・復元'
       if (this.autoCaptureDetailView === 'schedule') return '自動撮影スケジュール'
@@ -761,6 +785,7 @@ const vueApp = createApp({
     },
     autoCaptureDetailDescription() {
       if (this.autoCaptureDetailView === 'composition') return '撮影する構図、座標系、Pose、拡大率、並び順を設定します。'
+      if (this.autoCaptureDetailView === 'fallback') return 'フォールバックモードの自動ON/OFFを設定します。'
       if (this.autoCaptureDetailView === 'capture') return 'Stream方式のSpout受信、出力先、保存形式、ファイル名を設定します。'
       if (this.autoCaptureDetailView === 'metadata') return 'sidecar、画像メタデータ、同席ユーザー情報、Discord投稿、撮影後復元を設定します。'
       if (this.autoCaptureDetailView === 'schedule') return '自動撮影の開始条件と繰り返し間隔を設定します。'
@@ -1626,6 +1651,7 @@ const vueApp = createApp({
       this.avatarOscStatusLoading = true
       try {
         this.avatarOscBasisStatus = this.normalizeAvatarOSCBasisStatus(await api.GetAvatarOSCBasisStatus())
+        this.applyAutoFallbackModeFromStatus()
       } catch (err) {
         this.avatarOscBasisStatus = {
           available: false,
@@ -1642,6 +1668,17 @@ const vueApp = createApp({
         }
       } finally {
         this.avatarOscStatusLoading = false
+      }
+    },
+    applyAutoFallbackModeFromStatus() {
+      const capture = this.autoCaptureSettings?.capture
+      if (!this.isSettings || !capture || !this.avatarOscBasisStatus) return
+      const shouldEnable = Boolean(this.avatarOscBasisStatus.autoFallback || !this.avatarOscBasisStatus.available)
+      const shouldDisable = Boolean(this.avatarOscBasisStatus.available)
+      if (shouldEnable && capture.autoEnablePreplacedLocalAnchor && capture.preplacedLocalAnchor !== true) {
+        capture.preplacedLocalAnchor = true
+      } else if (shouldDisable && capture.autoDisablePreplacedLocalAnchor && capture.preplacedLocalAnchor !== false) {
+        capture.preplacedLocalAnchor = false
       }
     },
     shouldPollAvatarOSCBasisStatus() {
@@ -2269,7 +2306,7 @@ const vueApp = createApp({
                     </div>
                   </div>
                   <div v-if="autoCaptureViews.length" class="view-list">
-                    <article v-for="(cameraView, index) in autoCaptureViews" :key="cameraView.id" class="view-card">
+                    <article v-for="(cameraView, index) in autoCaptureViews" :key="cameraView.id" class="view-card" :class="{ 'unsaved-setting-row': settingChanged('autoCapture.views.' + index) }">
                       <div class="view-card-main">
                         <label class="switch compact-switch" :title="cameraView.enabled ? '撮影する' : '撮影しない'">
                           <input type="checkbox" v-model="cameraView.enabled" />
@@ -2534,8 +2571,19 @@ const vueApp = createApp({
                 </div>
               </template>
             </div>
+              <template v-else-if="autoCaptureDetailView === 'fallback'">
+                <div class="setting-row" :class="settingRowChangedClass('autoCapture.capture.autoEnablePreplacedLocalAnchor')">
+                  <div><strong>フォールバックモードを自動ON</strong><p>AvatarBeacon basisを一定時間受信できない場合に、フォールバックモードをONにします。</p></div>
+                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.capture.autoEnablePreplacedLocalAnchor" /><span></span></label>
+                </div>
+                <div class="setting-row" :class="settingRowChangedClass('autoCapture.capture.autoDisablePreplacedLocalAnchor')">
+                  <div><strong>フォールバックモードを自動OFF</strong><p>AvatarBeacon basisを受信できた場合に、フォールバックモードをOFFにします。</p></div>
+                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.capture.autoDisablePreplacedLocalAnchor" /><span></span></label>
+                </div>
+              </template>
+            </div>
             <template v-else>
-            <div class="setting-row">
+            <div class="setting-row" :class="settingRowChangedClass('autoCapture.capture.preplacedLocalAnchor')">
               <div>
                 <strong>フォールバックモード</strong>
                 <p>アバターギミック未導入の場合フォールバックモードのみ実行可能です。</p>
@@ -2543,9 +2591,12 @@ const vueApp = createApp({
                 <p>VRChat内でカメラをローカルアンカーで配置し、出しっぱなしにしてください。</p>
                 <p>ClipForVRChatが定期的に撮影だけ自動実行します。</p>
               </div>
-              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.capture.preplacedLocalAnchor" /><span></span></label>
+              <div class="settings-overview-controls">
+                <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.capture.preplacedLocalAnchor" /><span></span></label>
+                <button type="button" class="secondary" title="フォールバックモードの自動ON/OFF設定を開きます。" aria-label="フォールバックモードの詳細設定" @click="openAutoCaptureDetail('fallback')">詳細設定</button>
+              </div>
             </div>
-            <div class="setting-row">
+            <div class="setting-row" :class="settingRowChangedClass('autoCapture.views')">
               <div>
                 <strong>構図設定</strong>
                 <p>撮影する構図、座標系、Pose、拡大率、並び順を設定します。</p>
@@ -2603,25 +2654,25 @@ const vueApp = createApp({
               <p>他アプリも同じOSCを使いたい場合は、ClipForVRChatを受信役にし、ここで別の転送先ポートを追加してください。他アプリ側はVRChat標準の受信ポートではなく、その転送先ポートをlistenする構成にします。</p>
               <p>他アプリ側の受信ポートを変更できない場合や、他アプリが同じVRChat受信ポートを直接listenする必要がある場合、この転送機能だけでは競合を解消できません。</p>
             </div>
-            <div class="setting-row">
+            <div class="setting-row" :class="settingRowChangedClass('autoCapture.osc.vrcHost')">
               <div><strong>OSCホスト</strong><p>VRChat OSCへ接続し、VRChatからのOSCを受信するホストです。</p></div>
               <label>
                 <input v-model="autoCaptureSettings.osc.vrcHost" placeholder="127.0.0.1" />
               </label>
             </div>
-            <div class="setting-row">
+            <div class="setting-row" :class="settingRowChangedClass('autoCapture.osc.vrcInPort')">
               <div><strong>OSC送信ポート</strong><p>外部アプリからVRChatへ送るUDPポートです。</p></div>
               <label>
                 <input type="number" min="1" max="65535" step="1" v-model.number="autoCaptureSettings.osc.vrcInPort" />
               </label>
             </div>
-            <div class="setting-row">
+            <div class="setting-row" :class="settingRowChangedClass('autoCapture.osc.appOutPort')">
               <div><strong>OSC受信ポート</strong><p>VRChatから外部アプリへ届くUDPポートです。ClipForVRChatはここを代表してlistenします。</p></div>
               <label>
                 <input type="number" min="1" max="65535" step="1" v-model.number="autoCaptureSettings.osc.appOutPort" />
               </label>
             </div>
-            <div class="setting-row">
+            <div class="setting-row" :class="settingRowChangedClass('autoCapture.osc.poseFreshnessSec')">
               <div><strong>現在Pose取得の有効秒数</strong><p>「現在Poseを取得」を押した時に、何秒以内にVRChatから受信したPoseなら取得に使うかです。撮影間隔ではありません。</p></div>
               <label>
                 <input type="number" min="1" step="1" v-model.number="autoCaptureSettings.osc.poseFreshnessSec" />
@@ -2633,7 +2684,7 @@ const vueApp = createApp({
                 <button type="button" class="secondary" @click="resetCameraOSC" title="User CameraのOSC状態を初期化する">カメラOSCをリセット</button>
               </div>
             </div>
-            <div class="setting-row">
+            <div class="setting-row" :class="settingRowChangedClass('autoCapture.playerLocal.basisSource', 'autoCapture.playerLocal.basisPose', 'autoCapture.playerLocal.calibrated')">
               <div><strong>プレイヤー基準の取得元</strong><p>AvatarBeaconを使う avatar_osc が通常の取得元です。manual は専用ギミックなしで手動保存した基準Poseを使うフォールバックです。</p></div>
               <div class="settings-control-stack">
                 <select v-model="autoCaptureSettings.playerLocal.basisSource">
@@ -2662,11 +2713,11 @@ const vueApp = createApp({
                 <p v-if="avatarOscBasisStatus?.error" class="setting-note warning">エラー: {{ avatarOscBasisStatus.error }}</p>
               </div>
             </div>
-            <div class="setting-row">
+            <div class="setting-row" :class="settingRowChangedClass('autoCapture.osc.forward.enabled')">
               <div><strong>OSC転送</strong><p>VRChatから受信したOSC packetを、他アプリ用の別ポートへUDP転送します。</p></div>
               <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.osc.forward.enabled" /><span></span></label>
             </div>
-            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.osc.forward.enabled }">
+            <div class="setting-row" :class="[{ disabled: !autoCaptureSettings.osc.forward.enabled }, settingRowChangedClass('autoCapture.osc.forward.mode')]">
               <div><strong>転送モード</strong><p>通常は全転送です。unhandled onlyではClipForVRChatが使うUser Camera OSCとAvatar Parameterを転送しません。</p></div>
               <label>
                 <select v-model="autoCaptureSettings.osc.forward.mode" :disabled="!autoCaptureSettings.osc.forward.enabled">

@@ -43,6 +43,9 @@ func TestDefaultAutoCaptureConfig(t *testing.T) {
 	if cfg.AutoCapture.Capture.OpenCameraBeforeBatch || cfg.AutoCapture.Capture.CloseCameraAfterBatch {
 		t.Fatalf("camera auto open/close should default off: %+v", cfg.AutoCapture.Capture)
 	}
+	if cfg.AutoCapture.Capture.PreplacedLocalAnchorEnabled() || cfg.AutoCapture.Capture.AutoEnablePreplaced || cfg.AutoCapture.Capture.AutoDisablePreplaced {
+		t.Fatalf("fallback mode and auto fallback should default off: %+v", cfg.AutoCapture.Capture)
+	}
 	if !cfg.AutoCapture.Restore.Fallback.AutoLevelRoll {
 		t.Fatalf("restore fallback AutoLevelRoll should be enabled by default: %+v", cfg.AutoCapture.Restore.Fallback)
 	}
@@ -81,8 +84,11 @@ func TestAutoCaptureConfigNormalize(t *testing.T) {
 	if cfg.AutoCapture.Capture.AutoLevelRollBeforeShot == nil || !*cfg.AutoCapture.Capture.AutoLevelRollBeforeShot {
 		t.Fatalf("AutoLevelRollBeforeShot should default on: %+v", cfg.AutoCapture.Capture)
 	}
-	if !cfg.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
-		t.Fatalf("PreplacedLocalAnchor should default on: %+v", cfg.AutoCapture.Capture)
+	if cfg.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
+		t.Fatalf("PreplacedLocalAnchor should default off: %+v", cfg.AutoCapture.Capture)
+	}
+	if cfg.AutoCapture.Capture.AutoEnablePreplaced || cfg.AutoCapture.Capture.AutoDisablePreplaced {
+		t.Fatalf("auto fallback controls should default off: %+v", cfg.AutoCapture.Capture)
 	}
 	if len(cfg.AutoCapture.Views) != 3 {
 		t.Fatalf("default views = %d, want 3", len(cfg.AutoCapture.Views))

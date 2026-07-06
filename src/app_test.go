@@ -977,6 +977,8 @@ func TestAppPrepareAutoCaptureConfigKeepsFallbackOffAfterAvatarBeaconTimeout(t *
 	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
 	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
 	app.state.Config.AutoCapture.Capture.PreplacedLocalAnchor = appBoolPtr(false)
+	app.state.Config.AutoCapture.Capture.AutoEnablePreplaced = false
+	app.state.Config.AutoCapture.Capture.AutoDisablePreplaced = false
 	app.avatarOSCBasisSamples = map[string]avatarOSCBasisSample{
 		"coord/x":       {Float: 0.8, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
 		"coord/xSign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
@@ -1003,12 +1005,14 @@ func TestAppPrepareAutoCaptureConfigKeepsFallbackOffAfterAvatarBeaconTimeout(t *
 	}
 }
 
-func TestAppPrepareAutoCaptureConfigKeepsFallbackOnWhenAvatarBeaconReceived(t *testing.T) {
+func TestAppPrepareAutoCaptureConfigKeepsFallbackOnWhenAutoFallbackDisabled(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
 	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
 	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
 	app.state.Config.AutoCapture.Capture.PreplacedLocalAnchor = appBoolPtr(true)
+	app.state.Config.AutoCapture.Capture.AutoEnablePreplaced = false
+	app.state.Config.AutoCapture.Capture.AutoDisablePreplaced = false
 	app.avatarOSCBasisSamples = readyAvatarOSCBasisSamples(time.Now().Add(-5 * time.Second))
 
 	app.mu.Lock()
@@ -1019,6 +1023,47 @@ func TestAppPrepareAutoCaptureConfigKeepsFallbackOnWhenAvatarBeaconReceived(t *t
 	}
 	if !cfg.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
 		t.Fatal("fallback mode should remain on when AvatarBeacon basis was received")
+	}
+}
+
+func TestAppPrepareAutoCaptureConfigAutoFallbackEnablesFallbackAfterAvatarBeaconTimeout(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+	now := time.Now()
+	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
+	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
+	app.state.Config.AutoCapture.Capture.PreplacedLocalAnchor = appBoolPtr(false)
+	app.state.Config.AutoCapture.Capture.AutoEnablePreplaced = true
+	app.avatarOSCBasisSamples = readyAvatarOSCBasisSamples(now.Add(-31 * time.Second))
+
+	app.mu.Lock()
+	cfg, err := app.prepareAutoCaptureConfigForRunLocked(app.state.Config)
+	app.mu.Unlock()
+	if err != nil {
+		t.Fatalf("prepareAutoCaptureConfigForRunLocked error = %v", err)
+	}
+	if !cfg.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
+		t.Fatal("fallback mode should turn on when auto fallback is enabled and AvatarBeacon basis is stale")
+	}
+}
+
+func TestAppPrepareAutoCaptureConfigAutoFallbackDisablesFallbackWhenAvatarBeaconReady(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
+	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
+	app.state.Config.AutoCapture.Capture.PreplacedLocalAnchor = appBoolPtr(true)
+	app.state.Config.AutoCapture.Capture.AutoDisablePreplaced = true
+	app.avatarOSCBasisSamples = readyAvatarOSCBasisSamples(time.Now().Add(-5 * time.Second))
+
+	app.mu.Lock()
+	cfg, err := app.prepareAutoCaptureConfigForRunLocked(app.state.Config)
+	app.mu.Unlock()
+	if err != nil {
+		t.Fatalf("prepareAutoCaptureConfigForRunLocked error = %v", err)
+	}
+	if cfg.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
+		t.Fatal("fallback mode should turn off when auto fallback is enabled and AvatarBeacon basis is ready")
 	}
 }
 
@@ -1208,11 +1253,12 @@ func TestAppWaitForAutoCaptureStartReadinessWaitsForAvatarOSCBasis(t *testing.T)
 	}
 }
 
-func TestAppWaitForAutoCaptureStartReadinessFallsBackWithoutAvatarOSCBasis(t *testing.T) {
+func TestAppWaitForAutoCaptureStartReadinessAutoFallbacksWithoutAvatarOSCBasis(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
 	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
 	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
+	app.state.Config.AutoCapture.Capture.AutoEnablePreplaced = true
 	ctx := context.Background()
 	start := time.Now()
 	err := app.waitForAutoCaptureStartReadiness(ctx, app.state.Config, 50*time.Millisecond)

@@ -416,6 +416,13 @@ button:disabled {
   font-weight: 700;
 }
 
+.setting-row.unsaved-setting-row,
+.view-card.unsaved-setting-row {
+  border-color: #d99f22;
+  background: #fff9e8;
+  box-shadow: inset 3px 0 0 #d99f22;
+}
+
 .settings-group {
   display: grid;
   gap: 14px;
