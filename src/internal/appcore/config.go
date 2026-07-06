@@ -143,6 +143,7 @@ type AutoCaptureCaptureConfig struct {
 	RequestedCameraCount  int    `json:"requestedCameraCount"`
 	MultiBackend          string `json:"multiBackend"`
 	FallbackToSequential  bool   `json:"fallbackToSequential"`
+	PreplacedLocalAnchor  bool   `json:"preplacedLocalAnchor"`
 	OpenCameraBeforeBatch bool   `json:"openCameraBeforeBatch"`
 	CloseCameraAfterBatch bool   `json:"closeCameraAfterBatch"`
 	SettleDelayMS         int    `json:"settleDelayMs"`

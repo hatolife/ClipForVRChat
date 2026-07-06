@@ -122,6 +122,9 @@ func MoveUserCameraToView(ctx context.Context, cfg Config, viewID string) error 
 	if !found {
 		return fmt.Errorf("構図が見つかりません: %s", viewID)
 	}
+	if ac.Capture.PreplacedLocalAnchor {
+		return fmt.Errorf("ローカルアンカー配置済みカメラを使うフォールバックモードでは、ClipForVRChatからカメラ移動は送信しません。VRChat内でUser Cameraをローカルアンカーにして配置してください")
+	}
 	logPath := cfg.DiagnosticLogPath
 	client := oscClient{host: ac.OSC.Host, port: ac.OSC.SendPort}
 	diagAutoCapture(logPath, "move camera open begin: target=%s:%d view_id=%q", ac.OSC.Host, ac.OSC.SendPort, viewID)
@@ -198,11 +201,12 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) (results []Result, err e
 	cfg.Normalize()
 	ac := cfg.AutoCapture
 	logPath := cfg.DiagnosticLogPath
-	diagAutoCapture(logPath, "run_once begin: mode=%q schedule_enabled=%t capture_on_start=%t interval_sec=%d open_before_batch=%t close_after_batch=%t button_release_ms=%d settle_ms=%d",
+	diagAutoCapture(logPath, "run_once begin: mode=%q schedule_enabled=%t capture_on_start=%t interval_sec=%d preplaced_local_anchor=%t open_before_batch=%t close_after_batch=%t button_release_ms=%d settle_ms=%d",
 		ac.Capture.Mode,
 		ac.Schedule.Enabled,
 		ac.Schedule.CaptureOnStart,
 		ac.Schedule.CaptureIntervalSec,
+		ac.Capture.PreplacedLocalAnchor,
 		ac.Capture.OpenCameraBeforeBatch,
 		ac.Capture.CloseCameraAfterBatch,
 		ac.Capture.ButtonReleaseDelayMS,
@@ -251,8 +255,10 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) (results []Result, err e
 	}
 	defer client.close()
 	streamStarted := false
-	if ac.Restore.Enabled {
+	if ac.Restore.Enabled && !ac.Capture.PreplacedLocalAnchor {
 		defer r.restoreUserCameraState(client)
+	} else if ac.Capture.PreplacedLocalAnchor {
+		diagAutoCapture(logPath, "camera restore skipped: preplaced_local_anchor=true")
 	}
 	defer func() {
 		if err == nil || !streamStarted {
@@ -266,7 +272,7 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) (results []Result, err e
 		diagAutoCapture(logPath, "stream cleanup success: reason=%q", "run_once_error")
 	}()
 	diagAutoCapture(logPath, "osc open success: target=%s:%d", ac.OSC.Host, ac.OSC.SendPort)
-	if ac.Capture.OpenCameraBeforeBatch {
+	if ac.Capture.OpenCameraBeforeBatch && !ac.Capture.PreplacedLocalAnchor {
 		cameraMode := 1
 		if ac.Capture.Mode == "stream" {
 			cameraMode = 2
@@ -307,6 +313,8 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) (results []Result, err e
 				diagAutoCapture(logPath, "stream start wait complete")
 			}
 		}
+	} else if ac.Capture.PreplacedLocalAnchor {
+		diagAutoCapture(logPath, "camera auto open skipped: preplaced_local_anchor=true capture_mode=%q", ac.Capture.Mode)
 	} else {
 		diagAutoCapture(logPath, "camera auto open skipped: open_before_batch=false capture_mode=%q", ac.Capture.Mode)
 	}
@@ -336,7 +344,9 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) (results []Result, err e
 			successCount++
 		}
 	}
-	if ac.Capture.CloseCameraAfterBatch && (successCount > 0 || ac.Capture.Mode == "stream") {
+	if ac.Capture.CloseCameraAfterBatch && ac.Capture.PreplacedLocalAnchor {
+		diagAutoCapture(logPath, "camera close skipped: preplaced_local_anchor=true")
+	} else if ac.Capture.CloseCameraAfterBatch && (successCount > 0 || ac.Capture.Mode == "stream") {
 		if ac.Capture.Mode == "stream" {
 			diagAutoCapture(logPath, "osc button release begin: address=%q detail=%q", "/usercamera/Streaming", "stream_stop")
 			if err := sendCameraBoolCompat(client, logPath, "/usercamera/Streaming", false, "stream_stop"); err != nil {
@@ -766,19 +776,9 @@ func (r AutoCaptureRunner) capturePhotoShot(ctx context.Context, client oscClien
 		view.SettleDelayMS,
 		view.CaptureDelayMS,
 	)
-	if err := r.applyCameraView(client, view); err != nil {
+	if err := r.applyCameraViewAndOptions(client, view); err != nil {
 		return Result{Name: name, Error: err.Error()}
 	}
-	sentOptions := sendOptionalFloat(client, "/usercamera/Zoom", view.Zoom) +
-		sendOptionalFloat(client, "/usercamera/Exposure", view.Exposure) +
-		sendOptionalFloat(client, "/usercamera/FocalDistance", view.FocalDistance) +
-		sendOptionalFloat(client, "/usercamera/Aperture", view.Aperture) +
-		sendOptionalBool(client, "/usercamera/LookAtMe", view.LookAtMe) +
-		sendOptionalBool(client, "/usercamera/ShowUIInCamera", view.ShowUIInCamera) +
-		sendOptionalBool(client, "/usercamera/LocalPlayer", view.LocalPlayer) +
-		sendOptionalBool(client, "/usercamera/RemotePlayer", view.RemotePlayer) +
-		sendOptionalBool(client, "/usercamera/Environment", view.Environment)
-	diagAutoCapture(logPath, "shot optional_params sent: view_id=%q count=%d", view.ID, sentOptions)
 	settle := time.Duration(cfg.Capture.SettleDelayMS) * time.Millisecond
 	if view.SettleDelayMS > 0 {
 		settle = time.Duration(view.SettleDelayMS) * time.Millisecond
@@ -832,16 +832,14 @@ func (r AutoCaptureRunner) applyCameraView(client oscClient, view CameraViewConf
 	return nil
 }
 
-func (r AutoCaptureRunner) captureStreamShot(ctx context.Context, client oscClient, batchID string, shotID string, index int, view CameraViewConfig, sidecarUsers []PresenceUser, discordUsers []PresenceUser, confidence string, world AutoCaptureVRChatMetadata) Result {
-	cfg := r.Config.AutoCapture
+func (r AutoCaptureRunner) applyCameraViewAndOptions(client oscClient, view CameraViewConfig) error {
 	logPath := r.Config.DiagnosticLogPath
-	name := view.Name
-	if name == "" {
-		name = view.ID
+	if r.Config.AutoCapture.Capture.PreplacedLocalAnchor {
+		diagAutoCapture(logPath, "camera pose/options skipped: view_id=%q preplaced_local_anchor=true", view.ID)
+		return nil
 	}
-	diagAutoCapture(logPath, "stream shot begin: batch_id=%q shot_id=%q index=%d view_id=%q view_name=%q", batchID, shotID, index, view.ID, name)
 	if err := r.applyCameraView(client, view); err != nil {
-		return Result{Name: name, Error: err.Error()}
+		return err
 	}
 	sentOptions := sendOptionalFloat(client, "/usercamera/Zoom", view.Zoom) +
 		sendOptionalFloat(client, "/usercamera/Exposure", view.Exposure) +
@@ -853,6 +851,20 @@ func (r AutoCaptureRunner) captureStreamShot(ctx context.Context, client oscClie
 		sendOptionalBool(client, "/usercamera/RemotePlayer", view.RemotePlayer) +
 		sendOptionalBool(client, "/usercamera/Environment", view.Environment)
 	diagAutoCapture(logPath, "shot optional_params sent: view_id=%q count=%d", view.ID, sentOptions)
+	return nil
+}
+
+func (r AutoCaptureRunner) captureStreamShot(ctx context.Context, client oscClient, batchID string, shotID string, index int, view CameraViewConfig, sidecarUsers []PresenceUser, discordUsers []PresenceUser, confidence string, world AutoCaptureVRChatMetadata) Result {
+	cfg := r.Config.AutoCapture
+	logPath := r.Config.DiagnosticLogPath
+	name := view.Name
+	if name == "" {
+		name = view.ID
+	}
+	diagAutoCapture(logPath, "stream shot begin: batch_id=%q shot_id=%q index=%d view_id=%q view_name=%q", batchID, shotID, index, view.ID, name)
+	if err := r.applyCameraViewAndOptions(client, view); err != nil {
+		return Result{Name: name, Error: err.Error()}
+	}
 	settle := time.Duration(cfg.Capture.SettleDelayMS) * time.Millisecond
 	if view.SettleDelayMS > 0 {
 		settle = time.Duration(view.SettleDelayMS) * time.Millisecond
@@ -896,6 +908,10 @@ func (r AutoCaptureRunner) captureStreamShot(ctx context.Context, client oscClie
 
 func (r AutoCaptureRunner) ensureStreamCameraForSpoutCapture(ctx context.Context, client oscClient, viewID string) error {
 	logPath := r.Config.DiagnosticLogPath
+	if r.Config.AutoCapture.Capture.PreplacedLocalAnchor {
+		diagAutoCapture(logPath, "stream camera refresh skipped: preplaced_local_anchor=true view_id=%q", viewID)
+		return nil
+	}
 	if !r.Config.AutoCapture.Capture.OpenCameraBeforeBatch {
 		diagAutoCapture(logPath, "stream camera refresh skipped: open_before_batch=false view_id=%q", viewID)
 		return nil

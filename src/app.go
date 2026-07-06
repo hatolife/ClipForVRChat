@@ -1547,6 +1547,14 @@ func (a *App) runAutoCaptureScheduler(ctx context.Context, cfg appcore.Config) {
 func (a *App) waitForAutoCaptureStartReadiness(ctx context.Context, cfg appcore.Config, timeout time.Duration) error {
 	cfg.Normalize()
 	logPath := appcore.DiagnosticLogPath(a.configPath)
+	if cfg.AutoCapture.Capture.PreplacedLocalAnchor {
+		appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait: avatar_osc skipped preplaced_local_anchor=true")
+		if !cfg.AutoCapture.Presence.WatchOutputLog {
+			appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait complete: preplaced_local_anchor=true world_metadata=disabled")
+			return nil
+		}
+		return a.waitForWorldStable(ctx, cfg, timeout, "preplaced_local_anchor")
+	}
 	if timeout <= 0 {
 		timeout = 30 * time.Second
 	}
@@ -1607,6 +1615,46 @@ func (a *App) waitForAutoCaptureStartReadiness(ctx context.Context, cfg appcore.
 				return fmt.Errorf("VRChat output_logから現在world情報を取得または安定確認できず、開始時撮影を待機し続けました")
 			}
 			return fmt.Errorf("開始時撮影の準備完了を待機し続けました")
+		case <-ticker.C:
+		}
+	}
+}
+
+func (a *App) waitForWorldStable(ctx context.Context, cfg appcore.Config, timeout time.Duration, reason string) error {
+	logPath := appcore.DiagnosticLogPath(a.configPath)
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+	pollInterval := 250 * time.Millisecond
+	if timeout < pollInterval {
+		pollInterval = timeout
+	}
+	deadline := time.NewTimer(timeout)
+	defer deadline.Stop()
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+	var candidate appcore.AutoCaptureVRChatMetadata
+	var candidateAt time.Time
+	stableDuration := 3 * time.Second
+	for {
+		world := appcore.SnapshotVRChatWorld(cfg.AutoCapture.Presence.OutputLogDirectory)
+		if world.WorldID == "" && world.InstanceID == "" {
+			candidate = appcore.AutoCaptureVRChatMetadata{}
+			candidateAt = time.Time{}
+			appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait: reason=%q world_metadata=unavailable", reason)
+		} else if world.WorldID != candidate.WorldID || world.InstanceID != candidate.InstanceID {
+			candidate = world
+			candidateAt = time.Now()
+			appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait: reason=%q world_metadata candidate world_id=%q instance_id=%q stable_for_ms=0", reason, world.WorldID, world.InstanceID)
+		} else if time.Since(candidateAt) >= stableDuration {
+			appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait complete: reason=%q world_metadata_stable=true world_id=%q instance_id=%q stable_for_ms=%d", reason, world.WorldID, world.InstanceID, time.Since(candidateAt).Milliseconds())
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-deadline.C:
+			return fmt.Errorf("VRChat output_logから現在world情報を取得または安定確認できず、開始時撮影を待機し続けました")
 		case <-ticker.C:
 		}
 	}
@@ -2358,6 +2406,10 @@ func (a *App) prepareAutoCaptureConfigForRunLocked(cfg appcore.Config) (appcore.
 	now := time.Now()
 	if cfg.AutoCapture.Restore.Enabled && cfg.AutoCapture.Restore.PreferSnapshot {
 		cfg.AutoCapture.Restore.Snapshot = a.latestUserCameraStateLocked(cfg, now)
+	}
+	if cfg.AutoCapture.Capture.PreplacedLocalAnchor {
+		appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "avatar osc basis resolve skipped: preplaced_local_anchor=true")
+		return cfg, nil
 	}
 	source := normalizePlayerLocalBasisSource(cfg.AutoCapture.PlayerLocal.BasisSource)
 	if source != "avatar_osc" {

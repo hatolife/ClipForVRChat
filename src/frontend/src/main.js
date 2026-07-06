@@ -203,6 +203,7 @@ const vueApp = createApp({
       autoCapture.playerLocal.basisSource ||= 'avatar_osc'
       autoCapture.playerLocal.avatarOsc ||= {}
       autoCapture.capture ||= {}
+      if (autoCapture.capture.preplacedLocalAnchor === undefined) autoCapture.capture.preplacedLocalAnchor = false
       if (autoCapture.capture.openCameraBeforeBatch === undefined) autoCapture.capture.openCameraBeforeBatch = false
       if (autoCapture.capture.closeCameraAfterBatch === undefined) autoCapture.capture.closeCameraAfterBatch = false
       autoCapture.stream ||= {}
@@ -604,7 +605,7 @@ const vueApp = createApp({
       return '自動撮影設定'
     },
     autoCaptureDetailDescription() {
-      if (this.autoCaptureDetailView === 'composition') return '撮影する構図、座標系、Pose、拡大率、並び順を設定します。'
+      if (this.autoCaptureDetailView === 'composition') return '撮影する構図、フォールバック、座標系、Pose、拡大率、並び順を設定します。'
       if (this.autoCaptureDetailView === 'capture') return 'Stream方式のSpout受信、出力先、保存形式、ファイル名を設定します。'
       if (this.autoCaptureDetailView === 'metadata') return 'sidecar、画像メタデータ、同席ユーザー情報、Discord投稿、撮影後復元を設定します。'
       if (this.autoCaptureDetailView === 'schedule') return '自動撮影の開始条件と繰り返し間隔を設定します。'
@@ -1229,6 +1230,10 @@ const vueApp = createApp({
     },
     async moveCameraToView(view) {
       if (!view?.id) return
+      if (this.autoCaptureSettings.capture?.preplacedLocalAnchor) {
+        this.error = 'フォールバックモード中は、VRChat内で配置済みのローカルアンカーCameraを使うため、カメラ移動は送信しません。'
+        return
+      }
       if (!api?.MoveCameraToView) {
         this.error = 'カメラ移動APIが利用できません。'
         return
@@ -2026,11 +2031,16 @@ const vueApp = createApp({
               </template>
               <template v-else-if="autoCaptureDetailView === 'composition'">
                 <section class="auto-capture-views" aria-label="構図設定">
+                  <div class="setting-row">
+                    <div><strong>フォールバックモード</strong><p>VRChat内でUser Cameraをローカルアンカーにして事前配置し、ClipForVRChatは構図PoseやZoomを送らず撮影だけ実行します。</p></div>
+                    <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.capture.preplacedLocalAnchor" /><span></span></label>
+                  </div>
                   <div class="auto-capture-views-header">
                     <div>
                       <h4>構図設定</h4>
                       <p>「撮影する」がONの構図を上から順番に撮影します。</p>
-                      <p>プレイヤー基準構図はAvatarBeaconの受信状態がreadyのときに自動追従します。</p>
+                      <p v-if="autoCaptureSettings.capture.preplacedLocalAnchor">フォールバックモード中は、各構図のPose、拡大率、表示対象はOSC送信されません。</p>
+                      <p v-else>プレイヤー基準構図はAvatarBeaconの受信状態がreadyのときに自動追従します。</p>
                     </div>
                     <div class="button-row">
                       <button type="button" class="secondary" @click="resetCameraViewsToDefaults" title="初期の3構図へ戻す">初期3構図に戻す</button>
@@ -2075,7 +2085,7 @@ const vueApp = createApp({
                         <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, 1)" :disabled="index === autoCaptureViews.length - 1" :title="index === autoCaptureViews.length - 1 ? '末尾なので下へ移動できません' : 'この構図を下へ移動'">↓</button>
                         <button type="button" class="secondary" @click="addCurrentCameraPoseAsView(cameraView)" title="現在のPoseを構図として追加する">現在Poseから追加</button>
                         <button type="button" class="secondary" @click="saveCurrentCameraPoseToView(cameraView)" title="現在のPoseをこの構図へ保存する">現在Poseを保存</button>
-                        <button type="button" class="secondary" @click="moveCameraToView(cameraView)" title="この構図へカメラを移動する">このPoseへカメラ移動</button>
+                        <button type="button" class="secondary" @click="moveCameraToView(cameraView)" :disabled="autoCaptureSettings.capture.preplacedLocalAnchor" :title="autoCaptureSettings.capture.preplacedLocalAnchor ? 'フォールバックモード中はVRChat内で配置済みのローカルアンカーCameraを使います' : 'この構図へカメラを移動する'">このPoseへカメラ移動</button>
                         <button type="button" class="secondary" @click="testAutoCaptureView(cameraView)" title="この構図をテスト撮影する">テスト撮影</button>
                         <button type="button" class="secondary" @click="resetCameraPoseToDefault(cameraView)" title="この構図を初期Poseへ戻す">初期Poseへ戻す</button>
                         <button type="button" class="secondary" @click="duplicateAutoCaptureView(cameraView)" title="この構図を複製する">複製</button>

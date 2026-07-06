@@ -179,3 +179,4 @@
 | 207 | [設定保存時に変更後の設定値を診断ログへ出力する](207-log-config-values-after-settings-save.md) | 完了 | 未定 | 設定保存成功/失敗時に診断ログを出し、Webhook設定有無とフォールバック状態を秘密情報なしで追えるようにした。 |
 | 209 | [構図カードの未キャリブレーション表示を分かりやすくする](209-clarify-camera-view-calibration-label.md) | 完了 | 未定 | 構図カードから内部状態のキャリブレーション表示を削除し、撮影対象と座標系だけを表示する。 |
 | 210 | [構図設定の拡大率が常に最低値になる](210-fix-auto-capture-view-zoom-range.md) | 完了 | 未定 | 構図ZoomのUI範囲、初期値、既存設定補正をUser Camera Zoomの扱いに合わせた。 |
+| 211 | [ローカルアンカー配置済みカメラを使うフォールバックモードを追加する](211-add-preplaced-local-anchor-fallback-mode.md) | 完了 | 未定 | VRChat内でローカルアンカー配置済みのカメラを使い、ClipForVRChatは撮影だけ操作するフォールバックを追加した。 |

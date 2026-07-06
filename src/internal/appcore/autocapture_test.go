@@ -69,6 +69,9 @@ func TestAutoCaptureConfigNormalize(t *testing.T) {
 	if cfg.AutoCapture.Capture.OpenCameraBeforeBatch || cfg.AutoCapture.Capture.CloseCameraAfterBatch {
 		t.Fatalf("camera auto open/close should default off: %+v", cfg.AutoCapture.Capture)
 	}
+	if cfg.AutoCapture.Capture.PreplacedLocalAnchor {
+		t.Fatalf("PreplacedLocalAnchor should default off: %+v", cfg.AutoCapture.Capture)
+	}
 	if len(cfg.AutoCapture.Views) != 3 {
 		t.Fatalf("default views = %d, want 3", len(cfg.AutoCapture.Views))
 	}
@@ -94,6 +97,28 @@ func TestAutoCaptureConfigNormalizeMigratesOldCameraViewZoom(t *testing.T) {
 	}
 	if cfg.AutoCapture.Views[1].Zoom == nil || *cfg.AutoCapture.Views[1].Zoom != 72.5 {
 		t.Fatalf("valid zoom = %v, want 72.5", cfg.AutoCapture.Views[1].Zoom)
+	}
+}
+
+func TestPreplacedLocalAnchorSkipsPoseResolve(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.AutoCapture.Capture.PreplacedLocalAnchor = true
+	view := DefaultCameraViews()[0]
+	view.CoordinateSpace = "player_local"
+	cfg.AutoCapture.PlayerLocal.Calibrated = false
+	runner := AutoCaptureRunner{Config: cfg}
+	if err := runner.applyCameraViewAndOptions(oscClient{}, view); err != nil {
+		t.Fatalf("applyCameraViewAndOptions with preplaced local anchor returned error: %v", err)
+	}
+}
+
+func TestMoveUserCameraToViewRejectsPreplacedLocalAnchorBeforeOSCOpen(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.AutoCapture.Capture.PreplacedLocalAnchor = true
+	cfg.AutoCapture.OSC.Host = "bad host name"
+	err := MoveUserCameraToView(context.Background(), cfg, cfg.AutoCapture.Views[0].ID)
+	if err == nil || !strings.Contains(err.Error(), "フォールバックモード") {
+		t.Fatalf("MoveUserCameraToView error = %v, want fallback mode rejection", err)
 	}
 }
 

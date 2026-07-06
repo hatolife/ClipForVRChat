@@ -1,0 +1,30 @@
+# ローカルアンカー配置済みカメラを使うフォールバックモードを追加する
+
+## 問題
+
+`player_local` 構図は通常 AvatarBeacon などの基準Poseが必要で、アバターギミックなしでは使いにくい。
+一方、VRChat内でユーザーがUser Cameraをローカルアンカーにして事前配置すれば、ClipForVRChatはカメラPoseを動かさず撮影操作だけ送る運用ができる。
+
+## 期待する挙動
+
+構図設定の上にフォールバックモードのON/OFFを置き、ONのときはユーザーがVRChat内でローカルアンカー配置したカメラをそのまま使う。
+ClipForVRChatは構図PoseやZoomなどを送らず、撮影に必要な最小限のOSCだけを送る。
+
+## 受け入れ条件
+
+- 構図設定の上にフォールバックモードON/OFFのトグルを表示する。
+- フォールバックONではPhoto方式で `/usercamera/Capture` のみ送る。
+- フォールバックONではStream方式でPose/Zoom/Mode/Streaming等を送らず、現在のSpout映像を取得する。
+- フォールバックONでは `player_local` basis未受信でも撮影に進める。
+- フォールバックONでは「このPoseへカメラ移動」を送信しない。
+- 既定はOFFで、従来の構図制御は維持する。
+
+## 対応内容
+
+- `autoCapture.capture.preplacedLocalAnchor` を追加し、既定OFFにした。
+- 構図設定画面の先頭にフォールバックモードのトグルを追加した。
+- フォールバックONではCamera Mode、Streaming、Pose、Zoom、表示マスク、Close、復元送信をスキップする。
+- Photo方式では撮影時に `/usercamera/Capture` だけ送る。
+- Stream方式ではOSCでカメラ操作をせず、現在のSpout映像を取得する。
+- フォールバックONではAvatarBeacon basis待ちとbasis解決をスキップする。
+- フォールバックONでは「このPoseへカメラ移動」をUI/API双方で送信しない。
