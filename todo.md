@@ -1,10 +1,10 @@
-# Release note/Asset整理チェックリスト
+# 自動撮影UI/カメラ自動操作対応チェックリスト
 
-- [x] issue 205 を追加する
-- [x] リリースノート書式の文書を更新する
-- [x] Release workflowの通常zip内容を変更する
-- [x] Release upload対象を4種類に絞る
-- [x] RELEASE_NOTES/SPECを実態に合わせる
-- [x] 検証を実行する
-- [x] issue 205 を完了扱いにする
-- [ ] コミットする
+- [x] issue 208 を追加する
+- [x] 詳細設定画面でタブ/保存/閉じる/概要説明を隠す
+- [x] 自動撮影説明とAvatarBeacon状態表示を更新する
+- [x] カメラ自動起動/終了設定を追加し既定OFFにする
+- [x] 自動起動OFF時にCamera OSC起動送信を抑止する
+- [x] 自動終了OFF時にCamera OSC終了送信を抑止する
+- [x] ローカル検証を実行する
+- [x] 変更をコミットする

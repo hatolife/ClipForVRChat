@@ -198,11 +198,12 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) (results []Result, err e
 	cfg.Normalize()
 	ac := cfg.AutoCapture
 	logPath := cfg.DiagnosticLogPath
-	diagAutoCapture(logPath, "run_once begin: mode=%q schedule_enabled=%t capture_on_start=%t interval_sec=%d close_after_batch=%t button_release_ms=%d settle_ms=%d",
+	diagAutoCapture(logPath, "run_once begin: mode=%q schedule_enabled=%t capture_on_start=%t interval_sec=%d open_before_batch=%t close_after_batch=%t button_release_ms=%d settle_ms=%d",
 		ac.Capture.Mode,
 		ac.Schedule.Enabled,
 		ac.Schedule.CaptureOnStart,
 		ac.Schedule.CaptureIntervalSec,
+		ac.Capture.OpenCameraBeforeBatch,
 		ac.Capture.CloseCameraAfterBatch,
 		ac.Capture.ButtonReleaseDelayMS,
 		ac.Capture.SettleDelayMS,
@@ -265,45 +266,49 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) (results []Result, err e
 		diagAutoCapture(logPath, "stream cleanup success: reason=%q", "run_once_error")
 	}()
 	diagAutoCapture(logPath, "osc open success: target=%s:%d", ac.OSC.Host, ac.OSC.SendPort)
-	cameraMode := 1
-	if ac.Capture.Mode == "stream" {
-		cameraMode = 2
-	}
-	diagAutoCapture(logPath, "osc send begin: address=%q value=%d capture_mode=%q", "/usercamera/Mode", cameraMode, ac.Capture.Mode)
-	if err := client.sendInt("/usercamera/Mode", int32(cameraMode)); err != nil {
-		diagAutoCapture(logPath, "osc send error: address=%q err=%v", "/usercamera/Mode", err)
-		return nil, err
-	}
-	diagAutoCapture(logPath, "osc send success: address=%q value=%d capture_mode=%q", "/usercamera/Mode", cameraMode, ac.Capture.Mode)
-	modeWait := 2500 * time.Millisecond
-	diagAutoCapture(logPath, "camera mode wait begin: duration_ms=%d", modeWait.Milliseconds())
-	if !sleepContext(ctx, modeWait) {
-		diagAutoCapture(logPath, "camera mode wait cancelled: err=%v", ctx.Err())
-		return nil, ctx.Err()
-	}
-	diagAutoCapture(logPath, "camera mode wait complete")
-	if ac.Capture.Mode == "stream" {
-		diagAutoCapture(logPath, "osc send begin: address=%q value=%t detail=%q", "/usercamera/SmoothMovement", true, "stream_prepare")
-		if err := client.sendBool("/usercamera/SmoothMovement", true); err != nil {
-			diagAutoCapture(logPath, "osc send error: address=%q detail=%q err=%v", "/usercamera/SmoothMovement", "stream_prepare", err)
+	if ac.Capture.OpenCameraBeforeBatch {
+		cameraMode := 1
+		if ac.Capture.Mode == "stream" {
+			cameraMode = 2
+		}
+		diagAutoCapture(logPath, "osc send begin: address=%q value=%d capture_mode=%q", "/usercamera/Mode", cameraMode, ac.Capture.Mode)
+		if err := client.sendInt("/usercamera/Mode", int32(cameraMode)); err != nil {
+			diagAutoCapture(logPath, "osc send error: address=%q err=%v", "/usercamera/Mode", err)
 			return nil, err
 		}
-		diagAutoCapture(logPath, "osc send success: address=%q value=%t detail=%q", "/usercamera/SmoothMovement", true, "stream_prepare")
-		diagAutoCapture(logPath, "osc button press begin: address=%q detail=%q", "/usercamera/Streaming", "stream_start")
-		if err := sendCameraBoolCompat(client, logPath, "/usercamera/Streaming", true, "stream_start"); err != nil {
-			return nil, err
+		diagAutoCapture(logPath, "osc send success: address=%q value=%d capture_mode=%q", "/usercamera/Mode", cameraMode, ac.Capture.Mode)
+		modeWait := 2500 * time.Millisecond
+		diagAutoCapture(logPath, "camera mode wait begin: duration_ms=%d", modeWait.Milliseconds())
+		if !sleepContext(ctx, modeWait) {
+			diagAutoCapture(logPath, "camera mode wait cancelled: err=%v", ctx.Err())
+			return nil, ctx.Err()
 		}
-		streamStarted = true
-		diagAutoCapture(logPath, "osc button press success: address=%q detail=%q", "/usercamera/Streaming", "stream_start")
-		startDelay := time.Duration(ac.Stream.StartDelayMS) * time.Millisecond
-		if startDelay > 0 {
-			diagAutoCapture(logPath, "stream start wait begin: duration_ms=%d", startDelay.Milliseconds())
-			if !sleepContext(ctx, startDelay) {
-				diagAutoCapture(logPath, "stream start wait cancelled: err=%v", ctx.Err())
-				return nil, ctx.Err()
+		diagAutoCapture(logPath, "camera mode wait complete")
+		if ac.Capture.Mode == "stream" {
+			diagAutoCapture(logPath, "osc send begin: address=%q value=%t detail=%q", "/usercamera/SmoothMovement", true, "stream_prepare")
+			if err := client.sendBool("/usercamera/SmoothMovement", true); err != nil {
+				diagAutoCapture(logPath, "osc send error: address=%q detail=%q err=%v", "/usercamera/SmoothMovement", "stream_prepare", err)
+				return nil, err
 			}
-			diagAutoCapture(logPath, "stream start wait complete")
+			diagAutoCapture(logPath, "osc send success: address=%q value=%t detail=%q", "/usercamera/SmoothMovement", true, "stream_prepare")
+			diagAutoCapture(logPath, "osc button press begin: address=%q detail=%q", "/usercamera/Streaming", "stream_start")
+			if err := sendCameraBoolCompat(client, logPath, "/usercamera/Streaming", true, "stream_start"); err != nil {
+				return nil, err
+			}
+			streamStarted = true
+			diagAutoCapture(logPath, "osc button press success: address=%q detail=%q", "/usercamera/Streaming", "stream_start")
+			startDelay := time.Duration(ac.Stream.StartDelayMS) * time.Millisecond
+			if startDelay > 0 {
+				diagAutoCapture(logPath, "stream start wait begin: duration_ms=%d", startDelay.Milliseconds())
+				if !sleepContext(ctx, startDelay) {
+					diagAutoCapture(logPath, "stream start wait cancelled: err=%v", ctx.Err())
+					return nil, ctx.Err()
+				}
+				diagAutoCapture(logPath, "stream start wait complete")
+			}
 		}
+	} else {
+		diagAutoCapture(logPath, "camera auto open skipped: open_before_batch=false capture_mode=%q", ac.Capture.Mode)
 	}
 	results = make([]Result, 0, len(views))
 	for i, view := range views {
@@ -891,6 +896,10 @@ func (r AutoCaptureRunner) captureStreamShot(ctx context.Context, client oscClie
 
 func (r AutoCaptureRunner) ensureStreamCameraForSpoutCapture(ctx context.Context, client oscClient, viewID string) error {
 	logPath := r.Config.DiagnosticLogPath
+	if !r.Config.AutoCapture.Capture.OpenCameraBeforeBatch {
+		diagAutoCapture(logPath, "stream camera refresh skipped: open_before_batch=false view_id=%q", viewID)
+		return nil
+	}
 	diagAutoCapture(logPath, "stream camera refresh begin: view_id=%q", viewID)
 	if err := client.sendInt("/usercamera/Mode", 2); err != nil {
 		diagAutoCapture(logPath, "stream camera refresh error: address=%q view_id=%q err=%v", "/usercamera/Mode", viewID, err)

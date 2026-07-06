@@ -137,6 +137,7 @@ type AutoCaptureCaptureConfig struct {
 	RequestedCameraCount  int    `json:"requestedCameraCount"`
 	MultiBackend          string `json:"multiBackend"`
 	FallbackToSequential  bool   `json:"fallbackToSequential"`
+	OpenCameraBeforeBatch bool   `json:"openCameraBeforeBatch"`
 	CloseCameraAfterBatch bool   `json:"closeCameraAfterBatch"`
 	SettleDelayMS         int    `json:"settleDelayMs"`
 	ButtonReleaseDelayMS  int    `json:"buttonReleaseDelayMs"`
@@ -367,7 +368,8 @@ func DefaultAutoCaptureConfig() AutoCaptureConfig {
 			RequestedCameraCount:  1,
 			MultiBackend:          "dolly_multi",
 			FallbackToSequential:  true,
-			CloseCameraAfterBatch: true,
+			OpenCameraBeforeBatch: false,
+			CloseCameraAfterBatch: false,
 			SettleDelayMS:         1500,
 			ButtonReleaseDelayMS:  200,
 		},

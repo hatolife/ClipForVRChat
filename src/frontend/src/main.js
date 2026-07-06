@@ -63,6 +63,7 @@ const vueApp = createApp({
       pendingSettingsLeave: null,
       autoCaptureDetailView: '',
       pendingAutoPostConfirmation: null,
+      autoCaptureHelpExpanded: false,
       pendingDropPaths: [],
       historyDragSelecting: false,
       historySelectionAdditive: false,
@@ -148,6 +149,24 @@ const vueApp = createApp({
       if (this.isSettings) return 'settings'
       return this.view
     },
+    isAutoCaptureDetailActive() {
+      return this.isSettings && this.settingsTab === 'autoCapture' && Boolean(this.autoCaptureDetailView)
+    },
+    autoCaptureAvatarBeaconOK() {
+      const status = this.avatarOscBasisStatus
+      return Boolean(status && status.available && !status.error)
+    },
+    autoCaptureAvatarBeaconStatusLine() {
+      if (!this.autoCaptureAvatarBeaconOK) return '現在のAvatarBeacon受信状態: エラー'
+      const status = this.avatarOscBasisStatus
+      const position = status?.position || {}
+      const fmt = (value) => (Number.isFinite(Number(value)) ? Number(value).toFixed(3) : '-')
+      const yaw = Number.isFinite(Number(status?.yaw)) ? `${Number(status.yaw).toFixed(3)}°` : '-°'
+      return `現在のAvatarBeacon受信状態: 成功 ${fmt(position.x)}, ${fmt(position.y)}, ${fmt(position.z)}, ${yaw}`
+    },
+    shouldShowAutoCaptureHelpDetails() {
+      return this.autoCaptureHelpExpanded || !this.autoCaptureAvatarBeaconOK
+    },
     hasUnsavedSettings() {
       if (!this.isSettings || !this.state.config || !this.settingsBaseline) return false
       return this.serializeSettings(this.state.config) !== this.settingsBaseline
@@ -184,6 +203,8 @@ const vueApp = createApp({
       autoCapture.playerLocal.basisSource ||= 'avatar_osc'
       autoCapture.playerLocal.avatarOsc ||= {}
       autoCapture.capture ||= {}
+      if (autoCapture.capture.openCameraBeforeBatch === undefined) autoCapture.capture.openCameraBeforeBatch = false
+      if (autoCapture.capture.closeCameraAfterBatch === undefined) autoCapture.capture.closeCameraAfterBatch = false
       autoCapture.stream ||= {}
       if (autoCapture.stream.debugRecordingEnabled === undefined) autoCapture.stream.debugRecordingEnabled = false
       if (!autoCapture.stream.debugFrameCount) autoCapture.stream.debugFrameCount = 8
@@ -1434,14 +1455,17 @@ const vueApp = createApp({
       }
     },
     shouldPollAvatarOSCBasisStatus() {
-      return this.isSettings && this.settingsTab === 'osc'
+      return this.isSettings && (this.settingsTab === 'osc' || this.settingsTab === 'autoCapture')
     },
     syncSettingsTabRuntime() {
-      if (this.settingsTab === 'osc') {
+      if (this.settingsTab === 'osc' || this.settingsTab === 'autoCapture') {
         this.startAvatarOSCBasisStatusPolling()
-        void this.startOSCLogSubscription()
       } else {
         this.stopAvatarOSCBasisStatusPolling()
+      }
+      if (this.settingsTab === 'osc') {
+        void this.startOSCLogSubscription()
+      } else {
         this.stopOSCLogSubscription()
       }
     },
@@ -1886,14 +1910,14 @@ const vueApp = createApp({
             <h2>設定</h2>
             <p v-if="state.message" class="message" :class="{ warning: isError }">{{ state.message }}</p>
           </div>
-          <div v-if="state.config" class="settings-title-actions">
+          <div v-if="state.config && !isAutoCaptureDetailActive" class="settings-title-actions">
             <button @click="saveSettings()" :disabled="saving" :title="saving ? '保存中です' : '設定を保存する'">{{ saving ? '保存中' : '保存' }}</button>
             <button class="secondary" @click="closeSettings" title="設定画面を閉じる">閉じる</button>
             <span v-if="saved" class="saved">保存しました</span>
           </div>
         </div>
         <div v-if="state.config" class="settings-layout">
-          <div class="settings-topbar">
+          <div v-if="!isAutoCaptureDetailActive" class="settings-topbar">
             <div class="settings-tabs" role="tablist" aria-label="設定カテゴリ">
               <button
                 v-for="tab in settingsTabs"
@@ -1927,12 +1951,28 @@ const vueApp = createApp({
 
           <section v-if="settingsTab === 'autoCapture'" class="settings-group" role="tabpanel">
             <h3>自動撮影</h3>
-            <div class="settings-explainer">
-              <strong>VRChatのUser CameraをOSCで操作し、指定間隔で写真を撮影する機能です。</strong>
-              <p>player_local構図は、AvatarBeaconを導入したアバターから受け取る avatar_osc basis を前提に自動追従します。AvatarBeaconは別途アバターへ導入する専用ギミックです。</p>
-              <p>Stream方式ではVRChatのStream Camera(Spout)映像を直接受信して静止画として保存します。Photo方式はVRChat標準写真を使うフォールバックで、連射時にVRChat側のシャッター音が鳴ります。</p>
-              <p>正面、背後、斜めの初期構図にはプレーヤーを写す想定のPoseと拡大率が入っています。構図ごとのテスト撮影で見え方を確認できます。</p>
-              <p>v0.1.8では撮影時の解像度変更は行わず、VRChat側の現在のカメラ解像度設定で保存します。</p>
+            <div v-if="!autoCaptureDetailView" class="settings-explainer">
+              <strong>自動撮影は、VRChatのカメラをOSCで操作し、自動で定期的に撮影する機能です。</strong>
+              <p :class="['setting-note', autoCaptureAvatarBeaconOK ? 'ok' : 'warning']">{{ autoCaptureAvatarBeaconStatusLine }}</p>
+              <div v-if="autoCaptureAvatarBeaconOK" class="settings-explainer-actions">
+                <button type="button" class="secondary" @click="autoCaptureHelpExpanded = !autoCaptureHelpExpanded" :title="shouldShowAutoCaptureHelpDetails ? '自動撮影の詳細情報を閉じる' : '自動撮影の詳細情報を開く'">{{ shouldShowAutoCaptureHelpDetails ? '詳細情報を閉じる' : '詳細情報' }}</button>
+              </div>
+              <div v-if="shouldShowAutoCaptureHelpDetails" class="settings-explainer-detail">
+                <p>自動撮影を有効にするには2つの作業が必要です。</p>
+                <ol>
+                  <li>アバターギミックを設定</li>
+                  <li>ゲーム内でカメラを起動する</li>
+                </ol>
+                <h4>1. アバターギミックについて</h4>
+                <p>自動撮影では、アバターの正面、背面、斜めなど、アバター基準でカメラ位置を自動配置する機能を用意しています。</p>
+                <p>ワールド座標系でアバターの正面位置を計算するにはアバターの位置情報が必要ですが、公式の方法ではワールド内のアバター位置を取得できません。そのため、公式機能だけではアバター基準の自動配置を実現できません。</p>
+                <p>ClipForVRChatでは、ワールド内のプレイヤー位置をOSCで送信するアバターギミック AvatarBeacon を用意しています。AvatarBeaconをアバターに導入すると、Hipsの座標とHeadの向きをOSCで送信できます。</p>
+                <p>ClipForVRChatはAvatarBeaconから受信した位置と向きを使ってカメラ位置を計算し、アバター基準の自動撮影を実現します。</p>
+                <h4>2. ゲーム内カメラについて</h4>
+                <p>本来は公式機能によりOSCでカメラの表示/非表示を切り替えられますが、現在はCamera UIを閉じるとCamera OSCが効かない不具合が報告されています。</p>
+                <p>公式で対応されるまでは、ゲーム内でカメラを手動で起動しておく必要があります。対応され次第、自動でカメラをON/OFFする機能を有効化する予定です。</p>
+                <button type="button" class="link-button inline" @click="openURL('https://feedback.vrchat.com/bug-reports/p/camera-osc-does-not-work-unless-camera-ui-is-open')" title="VRChat FeedbackのCamera OSC不具合報告を開く">VRChat Feedback: Camera OSC does not work unless Camera UI is open</button>
+              </div>
             </div>
             <div v-if="autoCaptureDetailView" class="settings-detail-view">
               <div class="settings-detail-header">
@@ -2128,13 +2168,21 @@ const vueApp = createApp({
               </div>
             </div>
             <div class="setting-row">
-              <div><strong>撮影方式</strong><p>StreamはStream Camera(Spout)映像を保存します。PhotoはVRChat標準写真を使うためシャッター音が出ます。</p></div>
+              <div><strong>撮影方式</strong><p>Stream方式ではVRChatのStream Cameraで動画を撮り、画像として保存します。<br />Photo方式はVRChatの標準カメラを使います。撮影時にシャッター音が鳴ります。</p></div>
               <label>
                 <select v-model="autoCaptureSettings.capture.mode">
                   <option value="stream">Stream</option>
                   <option value="photo">Photo</option>
                 </select>
               </label>
+            </div>
+            <div class="setting-row">
+              <div><strong>撮影前にカメラを自動起動</strong><p>OFFの場合、ゲーム内でカメラを手動で起動してから自動撮影します。現在はOFF推奨です。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.capture.openCameraBeforeBatch" /><span></span></label>
+            </div>
+            <div class="setting-row">
+              <div><strong>撮影後にカメラを自動終了</strong><p>OFFの場合、撮影後もゲーム内カメラの状態を維持します。現在はOFF推奨です。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.capture.closeCameraAfterBatch" /><span></span></label>
             </div>
             <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
               <div><strong>Spout helper</strong><p>Stream Camera(Spout)映像を受信する同梱ヘルパーです。通常は初期値のまま使います。</p></div>

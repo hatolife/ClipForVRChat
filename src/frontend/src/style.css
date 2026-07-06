@@ -401,6 +401,25 @@ button:disabled {
   line-height: 1.6;
 }
 
+.settings-explainer-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.settings-explainer-detail {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-explainer-detail h4 {
+  margin: 6px 0 0;
+}
+
+.settings-explainer-detail ol {
+  margin: 0;
+  padding-left: 22px;
+}
+
 label {
   display: grid;
   gap: 7px;

@@ -63,6 +63,9 @@ func TestAutoCaptureConfigNormalize(t *testing.T) {
 	if cfg.AutoCapture.Capture.RequestedCameraCount != 4 {
 		t.Fatalf("RequestedCameraCount = %d, want 4", cfg.AutoCapture.Capture.RequestedCameraCount)
 	}
+	if cfg.AutoCapture.Capture.OpenCameraBeforeBatch || cfg.AutoCapture.Capture.CloseCameraAfterBatch {
+		t.Fatalf("camera auto open/close should default off: %+v", cfg.AutoCapture.Capture)
+	}
 	if len(cfg.AutoCapture.Views) != 3 {
 		t.Fatalf("default views = %d, want 3", len(cfg.AutoCapture.Views))
 	}
@@ -273,6 +276,7 @@ func TestAutoCaptureRunnerRunOnceReleasesStreamingOnCancellation(t *testing.T) {
 	cfg.AutoCapture.OSC.SendPort = port
 	cfg.AutoCapture.Restore.Enabled = false
 	cfg.AutoCapture.Capture.Mode = "stream"
+	cfg.AutoCapture.Capture.OpenCameraBeforeBatch = true
 	cfg.AutoCapture.Capture.CloseCameraAfterBatch = false
 	cfg.AutoCapture.Capture.SettleDelayMS = 1500
 	cfg.AutoCapture.Stream.StartDelayMS = 0
@@ -341,6 +345,46 @@ func TestAutoCaptureRunnerRunOnceReleasesStreamingOnCancellation(t *testing.T) {
 	}
 	if !hasStreamStopInt {
 		t.Fatalf("stream stop compat int packet not found: %+v", samples)
+	}
+}
+
+func TestAutoCaptureRunnerRunOnceSkipsCameraAutoOpenWhenDisabled(t *testing.T) {
+	conn, port := listenOSCUserCameraPackets(t)
+	defer conn.Close()
+
+	cfg := DefaultConfig()
+	cfg.AutoCapture.OSC.Host = "127.0.0.1"
+	cfg.AutoCapture.OSC.SendPort = port
+	cfg.AutoCapture.Restore.Enabled = false
+	cfg.AutoCapture.Capture.Mode = "stream"
+	cfg.AutoCapture.Capture.OpenCameraBeforeBatch = false
+	cfg.AutoCapture.Capture.CloseCameraAfterBatch = false
+	cfg.AutoCapture.Stream.SpoutHelperPath = filepath.Join(t.TempDir(), "missing-spout-capture.exe")
+	cfg.AutoCapture.Output.Directory = t.TempDir()
+	cfg.AutoCapture.Presence.WatchOutputLog = false
+	cfg.AutoCapture.Views = []CameraViewConfig{{
+		ID:              "front",
+		Name:            "front",
+		Enabled:         true,
+		CoordinateSpace: "world",
+		Calibrated:      true,
+		SettleDelayMS:   1,
+	}}
+
+	results, err := (AutoCaptureRunner{Config: cfg}).RunOnce(context.Background())
+	if err != nil {
+		t.Fatalf("RunOnce error = %v", err)
+	}
+	if len(results) != 1 || results[0].Error == "" {
+		t.Fatalf("results = %+v, want one failed stream shot", results)
+	}
+
+	samples := readOSCPacketSamples(t, conn)
+	for _, sample := range samples {
+		switch sample.Address {
+		case "/usercamera/Mode", "/usercamera/SmoothMovement", "/usercamera/Streaming":
+			t.Fatalf("camera auto-open packet should not be sent when disabled: %+v all=%+v", sample, samples)
+		}
 	}
 }
 
