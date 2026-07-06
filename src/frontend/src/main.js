@@ -2034,7 +2034,13 @@ const vueApp = createApp({
               <template v-else-if="autoCaptureDetailView === 'composition'">
                 <section class="auto-capture-views" aria-label="構図設定">
                   <div class="setting-row">
-                    <div><strong>フォールバックモード</strong><p>VRChat内でUser Cameraをローカルアンカーにして事前配置し、ClipForVRChatは構図PoseやZoomを送らず撮影だけ実行します。</p></div>
+                    <div>
+                      <strong>フォールバックモード</strong>
+                      <p>アバターギミック未導入の場合フォールバックモードのみ実行可能です。</p>
+                      <p>フォールバックモードで自動撮影する場合、ClipForVRChatは正しい位置にカメラを移動できません。</p>
+                      <p>VRChat内でカメラをローカルアンカーで配置し、出しっぱなしにしてください。</p>
+                      <p>ClipForVRChatが定期的に撮影だけ自動実行します。</p>
+                    </div>
                     <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.capture.preplacedLocalAnchor" /><span></span></label>
                   </div>
                   <div class="auto-capture-views-header">
