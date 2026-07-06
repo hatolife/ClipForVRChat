@@ -17,6 +17,7 @@ ClipForVRChatは構図PoseやZoomなどを送らず、撮影に必要な最小�
 - フォールバックONではStream方式でPose/Zoom/Mode/Streaming等を送らず、現在のSpout映像を取得する。
 - フォールバックONでは `player_local` basis未受信でも撮影に進める。
 - フォールバックONでは「このPoseへカメラ移動」を送信しない。
+- フォールバックONでは、OFF時だけ使う構図Pose、Zoom、座標系、現在Pose保存、初期Poseリセットの操作をグレーアウトして混乱を防ぐ。
 - 既定はOFFで、従来の構図制御は維持する。
 
 ## 対応内容
@@ -28,3 +29,7 @@ ClipForVRChatは構図PoseやZoomなどを送らず、撮影に必要な最小�
 - Stream方式ではOSCでカメラ操作をせず、現在のSpout映像を取得する。
 - フォールバックONではAvatarBeacon basis待ちとbasis解決をスキップする。
 - フォールバックONでは「このPoseへカメラ移動」をUI/API双方で送信しない。
+
+## 追加対応
+
+- 2026-07-07: フォールバックON時に、構図カード内のPose/Zoom/座標系など、撮影時に送信されないOFF用設定をグレーアウトする。

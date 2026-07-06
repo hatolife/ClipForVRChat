@@ -830,6 +830,15 @@ small {
   padding: 7px 8px;
 }
 
+.pose-grid.disabled {
+  opacity: 0.52;
+}
+
+.pose-grid.disabled input,
+.view-fields select:disabled {
+  cursor: not-allowed;
+}
+
 .view-actions {
   justify-content: flex-end;
 }
