@@ -1701,11 +1701,18 @@ const vueApp = createApp({
         <div>
           <h1>{{ info.name }}</h1>
         </div>
-        <nav>
-          <button :class="{ active: activeView === 'settings' }" @click="toggleSettings" title="設定画面を開く">設定</button>
-          <button :class="{ active: activeView === 'help' }" @click="toggleHelp" title="使い方を開く">使い方</button>
-          <button :class="{ active: activeView === 'about' || activeView === 'licenses' }" @click="toggleAbout" title="情報画面を開く">情報</button>
-        </nav>
+        <div class="header-actions">
+          <nav>
+            <button :class="{ active: activeView === 'settings' }" @click="toggleSettings" title="設定画面を開く">設定</button>
+            <button :class="{ active: activeView === 'help' }" @click="toggleHelp" title="使い方を開く">使い方</button>
+            <button :class="{ active: activeView === 'about' || activeView === 'licenses' }" @click="toggleAbout" title="情報画面を開く">情報</button>
+          </nav>
+          <div v-if="isSettings && state.config" class="header-settings-actions">
+            <button @click="saveSettings()" :disabled="saving" :title="saving ? '保存中です' : '設定を保存する'">{{ saving ? '保存中' : '保存' }}</button>
+            <button class="secondary" @click="closeSettings" title="設定画面を閉じる">閉じる</button>
+            <span v-if="saved" class="saved">保存しました</span>
+          </div>
+        </div>
       </header>
 
       <div v-if="shouldShowUpdateBanner || shouldShowDiscordWebhookWarning" class="banner-stack">
@@ -1949,11 +1956,6 @@ const vueApp = createApp({
           <div>
             <h2>設定</h2>
             <p v-if="state.message" class="message" :class="{ warning: isError }">{{ state.message }}</p>
-          </div>
-          <div v-if="state.config" class="settings-title-actions">
-            <button @click="saveSettings()" :disabled="saving" :title="saving ? '保存中です' : '設定を保存する'">{{ saving ? '保存中' : '保存' }}</button>
-            <button class="secondary" @click="closeSettings" title="設定画面を閉じる">閉じる</button>
-            <span v-if="saved" class="saved">保存しました</span>
           </div>
         </div>
         <div v-if="state.config && isAutoCaptureDetailActive" class="settings-detail-backbar">
