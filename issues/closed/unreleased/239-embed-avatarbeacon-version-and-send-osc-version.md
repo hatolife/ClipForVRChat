@@ -1,0 +1,46 @@
+# AvatarBeaconにバージョン情報を埋め込みOSCで通知する
+
+## 指示
+
+```text
+アバターギミックのどこかにバージョン番号を仕込みたい
+UnityからPrefabをアバターに追加した状態でhierarchyのGameObjectを選択したときinspectorで見られるといい
+ゲーム内で見られる必要はない
+Prefabの名前とかはやめてほしい 別バージョンのunitypackageインポートしたとき上書きされなくなるので。
+Prefab内のGameObject名として保持するのはあり。inspectorで見られなくてもこれはこれでいい
+
+これとは別にAssets/PoppoWorks/AvatarBeacon/以下のどこかにバージョン番号載せたい
+unitypackage化した状態でimportされたときにちゃんと上書きされることを想定してほしい
+つまりファイル名として保持しないでほしい。上書きされないので残り続ける。
+
+また、OSCの送信時に1回だけバージョン番号を送信するようにしてほしい
+
+上記どれもci等でちゃんと更新されるようにしてほしい
+バージョン番号の記載する作業を自動化してほしい
+```
+
+## 文脈
+
+AvatarBeaconはアプリとは別にUnityへimportしてアバターへ追加するPrefab/assetとして配布される。リリースごとにAvatarBeacon source zipがCIで作成されるため、手作業でバージョン表記を直す運用だと漏れやすい。
+
+## 解釈
+
+Prefab asset名やファイル名にはバージョンを入れず、同じパス・同じPrefabとしてimport時に上書きされる内容へバージョンを埋め込む。リリースタグやCIビルド値から、Prefab内GameObject名、Assets/PoppoWorks/AvatarBeacon配下の固定ファイル内容、OSCで1回送る値を自動更新する。
+
+## 問題
+
+AvatarBeaconをUnityへimportした後に、導入済みギミックやassetがどのバージョン由来か確認しにくい。また手作業でバージョン番号を書き換える方式では、リリース時の更新漏れが起きる。
+
+## 期待する挙動
+
+Unity上でPrefab追加後にHierarchy/InspectorまたはPrefab内GameObject名からバージョンを確認できる。`Assets/PoppoWorks/AvatarBeacon/` 配下にも固定ファイル名のassetとしてバージョン情報があり、unitypackage import時に同じファイルが上書きされる。アプリはOSC送信時に一度だけバージョン番号を送信する。
+
+## 受け入れ条件
+
+- Prefabファイル名や公開assetファイル名にバージョン番号を入れない。
+- Prefab内にバージョン番号を確認できる固定位置の情報を追加する。
+- `Assets/PoppoWorks/AvatarBeacon/` 配下に固定ファイル名でバージョン情報を持つassetを追加する。
+- CI/ReleaseでAvatarBeaconのバージョン情報がビルド対象バージョンへ自動更新される。
+- CIでバージョン情報の更新漏れを検出する。
+- OSC送信時に1回だけAvatarBeacon/アプリ側のバージョン番号を送信する。
+- 既存のAvatarBeacon source zip作成とRelease asset作成が通る。

@@ -206,3 +206,4 @@
 | 236 | [closed issue一覧の昇順とissue記録形式を修正する](unreleased/236-sort-closed-issue-index-and-preserve-user-instructions.md) | 完了 | 未定 | closed issue一覧を昇順に直し、昇順チェックと原文付きissue記録ルールを追加した。 |
 | 237 | [構図削除後に初期3構図へ戻すとグレーアウトする](unreleased/237-fix-reset-default-views-disabled-after-delete.md) | 完了 | 未定 | 初期3構図へ戻した後も、フォールバックOFFなら構図が操作できる状態になるようにした。 |
 | 238 | [未保存変更のある設定項目を行としてハイライトする](unreleased/238-highlight-unsaved-setting-rows.md) | 完了 | 未定 | 未保存変更のある主要な設定行と構図カードを画面上でハイライトするようにした。 |
+| 239 | [AvatarBeaconにバージョン情報を埋め込みOSCで通知する](unreleased/239-embed-avatarbeacon-version-and-send-osc-version.md) | 完了 | 未定 | AvatarBeaconのPrefab/source内へ固定名でバージョン情報を埋め込み、OSC送信時に1回だけバージョン番号を送信し、CI/Releaseで自動更新する。 |

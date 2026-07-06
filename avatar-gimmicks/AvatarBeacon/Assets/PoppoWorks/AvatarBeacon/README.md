@@ -17,6 +17,11 @@ Unity プロジェクトへ import すると、配布先は `Assets/PoppoWorks/A
 Prefab内GameObjectの役割と削除判断は、リポジトリ側の `docs/avatarbeacon-spec.md` に記録しています。
 座標測定の基準GameObjectは `WorldOriginAnchor` です。これは原点基準のContact Receiver群であり、手動で移動・回転させないでください。
 
+## バージョン確認
+
+`Version.txt` にAvatarBeaconの配布バージョンを記録します。ファイル名は固定なので、Unity package import時に同じassetとして上書きされます。
+Prefab内には `AvatarBeacon Version ...` という無効化済みGameObjectがあります。Prefabをアバターへ追加した後、Hierarchyで展開するとバージョン確認用の目印として使えます。
+
 ## 使い方
 
 1. アバターの root 配下に `AvatarBeacon.prefab` を配置します。

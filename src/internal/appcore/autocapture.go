@@ -34,6 +34,26 @@ var oscTraceMu sync.RWMutex
 var oscTraceHandler func(OSCTraceEvent)
 var oscTraceHandlerID uint64
 var autoCaptureListSpoutSenders = ListSpoutSenders
+var oscVersionNotice = struct {
+	sync.Mutex
+	version string
+	sent    bool
+}{
+	version: "dev",
+}
+
+const avatarBeaconVersionOSCAddress = "/avatar/parameters/AvatarBeacon/version"
+
+func SetOSCVersionNotice(version string) {
+	version = strings.TrimSpace(version)
+	if version == "" {
+		version = "dev"
+	}
+	oscVersionNotice.Lock()
+	oscVersionNotice.version = version
+	oscVersionNotice.sent = false
+	oscVersionNotice.Unlock()
+}
 
 func SetOSCTraceHandler(handler func(OSCTraceEvent)) func() {
 	oscTraceMu.Lock()
@@ -2268,6 +2288,12 @@ func (c oscClient) sendBool(address string, value bool) error {
 	return c.send(address, tag, func(buf []byte) []byte { return buf })
 }
 
+func (c oscClient) sendString(address string, value string) error {
+	return c.send(address, ",s", func(buf []byte) []byte {
+		return appendOSCString(buf, value)
+	})
+}
+
 func SendDebugOSCLine(cfg AutoCaptureOSCConfig, line string) (DebugOSCSendResult, error) {
 	address, typeTags, appendArgs, err := parseDebugOSCLine(line)
 	target := fmt.Sprintf("%s:%d", strings.TrimSpace(cfg.Host), cfg.SendPort)
@@ -2420,7 +2446,30 @@ func (c oscClient) send(address string, typeTags string, appendArgs func([]byte)
 	if c.conn == nil {
 		return fmt.Errorf("OSC接続が開かれていません")
 	}
+	c.sendVersionNoticeIfNeeded(address)
 	packet := buildOSCPacket(address, typeTags, appendArgs)
+	return c.writePacket(packet, address, typeTags)
+}
+
+func (c oscClient) sendVersionNoticeIfNeeded(address string) {
+	if address == avatarBeaconVersionOSCAddress {
+		return
+	}
+	oscVersionNotice.Lock()
+	if oscVersionNotice.sent {
+		oscVersionNotice.Unlock()
+		return
+	}
+	version := oscVersionNotice.version
+	oscVersionNotice.sent = true
+	oscVersionNotice.Unlock()
+	packet := buildOSCPacket(avatarBeaconVersionOSCAddress, ",s", func(buf []byte) []byte {
+		return appendOSCString(buf, version)
+	})
+	_ = c.writePacket(packet, avatarBeaconVersionOSCAddress, ",s")
+}
+
+func (c oscClient) writePacket(packet []byte, address string, typeTags string) error {
 	_, err := c.conn.Write(packet)
 	status := "ok"
 	errText := ""

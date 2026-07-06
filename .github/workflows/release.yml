@@ -230,6 +230,13 @@ jobs:
             ForEach-Object { "$($_.Hash.ToLower())  $env:ASSET_PREFIX-windows-amd64-separated.zip" } |
             Set-Content "dist/$env:ASSET_PREFIX-windows-amd64-separated.zip.sha256"
 
+      - name: Update AvatarBeacon version metadata
+        env:
+          TAG_NAME: ${{ steps.version.outputs.version }}
+        run: |
+          node scripts/update-avatarbeacon-version.mjs "$env:TAG_NAME"
+          node scripts/update-avatarbeacon-version.mjs "$env:TAG_NAME" --check
+
       - name: Package AvatarBeacon source zip
         shell: pwsh
         env:
@@ -256,6 +263,7 @@ jobs:
             "README.md",
             "Assets/PoppoWorks/AvatarBeacon",
             "Assets/PoppoWorks/AvatarBeacon/README.md",
+            "Assets/PoppoWorks/AvatarBeacon/Version.txt",
             "Assets/PoppoWorks/AvatarBeacon/LICENSES/YL-ATG-MIT.txt"
           )
           foreach ($path in $required) {
@@ -355,6 +363,7 @@ jobs:
             "README.md",
             "Assets/PoppoWorks/AvatarBeacon",
             "Assets/PoppoWorks/AvatarBeacon/README.md",
+            "Assets/PoppoWorks/AvatarBeacon/Version.txt",
             "Assets/PoppoWorks/AvatarBeacon/LICENSES/YL-ATG-MIT.txt"
           )
           foreach ($path in $avatarRequired) {

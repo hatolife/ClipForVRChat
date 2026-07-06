@@ -239,7 +239,7 @@ func TestResetUserCameraOSCUsesStreamingCompatAndKeepsOtherSettingsUntouched(t *
 		t.Fatal(err)
 	}
 
-	samples := readOSCPacketSamples(t, conn)
+	samples := withoutVersionNoticePackets(readOSCPacketSamples(t, conn))
 	if len(samples) != 5 {
 		t.Fatalf("packet count = %d, want 5: %+v", len(samples), samples)
 	}
@@ -288,7 +288,7 @@ func TestSendCameraButtonReleasesOnCancellation(t *testing.T) {
 		t.Fatal("expected cancellation error")
 	}
 
-	samples := readOSCPacketSamples(t, conn)
+	samples := withoutVersionNoticePackets(readOSCPacketSamples(t, conn))
 	if len(samples) != 2 {
 		t.Fatalf("packet count = %d, want 2: %+v", len(samples), samples)
 	}
@@ -400,7 +400,7 @@ func TestAutoCaptureRunnerRunOnceReleasesStreamingOnCancellation(t *testing.T) {
 		t.Fatal("expected at least one shot result before cancellation")
 	}
 
-	samples := readOSCPacketSamples(t, conn)
+	samples := withoutVersionNoticePackets(readOSCPacketSamples(t, conn))
 	hasStreamStart := false
 	hasStreamStop := false
 	hasStreamStartInt := false
@@ -471,7 +471,7 @@ func TestAutoCaptureRunnerRunOnceSkipsCameraAutoOpenWhenDisabled(t *testing.T) {
 		t.Fatalf("results = %+v, want one failed stream shot", results)
 	}
 
-	samples := readOSCPacketSamples(t, conn)
+	samples := withoutVersionNoticePackets(readOSCPacketSamples(t, conn))
 	hasAutoLevelRoll := false
 	for _, sample := range samples {
 		switch sample.Address {
@@ -558,7 +558,7 @@ func TestRecoverEmptySpoutSenderListTogglesStreaming(t *testing.T) {
 		t.Fatalf("sender list calls = %d, want 2", calls)
 	}
 
-	samples := readOSCPacketSamples(t, conn)
+	samples := withoutVersionNoticePackets(readOSCPacketSamples(t, conn))
 	want := []struct {
 		boolVal *bool
 		intVal  *int
@@ -632,6 +632,8 @@ type oscPacketSample struct {
 	HasBool  bool
 	Int      int
 	HasInt   bool
+	String   string
+	HasStr   bool
 }
 
 func readOSCPacketSamples(t *testing.T, conn net.PacketConn) []oscPacketSample {
@@ -669,11 +671,29 @@ func readOSCPacketSamples(t *testing.T, conn net.PacketConn) []oscPacketSample {
 					t.Fatalf("OSC int packet too short: %v", buf[:n])
 				}
 				sample.Int = int(int32(binary.BigEndian.Uint32(payload[:4])))
+			case 's':
+				sample.HasStr = true
+				str, _, ok := readOSCString(payload, 0)
+				if !ok {
+					t.Fatalf("OSC string packet could not be decoded: %v", buf[:n])
+				}
+				sample.String = str
 			}
 		}
 		samples = append(samples, sample)
 	}
 	return samples
+}
+
+func withoutVersionNoticePackets(samples []oscPacketSample) []oscPacketSample {
+	filtered := make([]oscPacketSample, 0, len(samples))
+	for _, sample := range samples {
+		if sample.Address == avatarBeaconVersionOSCAddress {
+			continue
+		}
+		filtered = append(filtered, sample)
+	}
+	return filtered
 }
 
 func boolPtr(value bool) *bool {
@@ -715,6 +735,45 @@ func TestAutoCapturePhotoDirectoryUsesAutoPhotoSetting(t *testing.T) {
 	cfg.AutoPhoto.PhotoDirectory = filepath.Join("C:", "VRChat", "Photos")
 	if got := autoCapturePhotoDirectory(cfg); got != cfg.AutoPhoto.PhotoDirectory {
 		t.Fatalf("photo dir = %q, want %q", got, cfg.AutoPhoto.PhotoDirectory)
+	}
+}
+
+func TestOSCClientSendsVersionNoticeOnce(t *testing.T) {
+	conn, port := listenOSCUserCameraPackets(t)
+	defer conn.Close()
+
+	SetOSCVersionNotice("v9.8.7-b6")
+	client := oscClient{host: "127.0.0.1", port: port}
+	if err := client.open(); err != nil {
+		t.Fatal(err)
+	}
+	defer client.close()
+	if err := client.sendInt("/usercamera/Mode", 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.sendBool("/usercamera/Streaming", true); err != nil {
+		t.Fatal(err)
+	}
+
+	samples := readOSCPacketSamples(t, conn)
+	versionPackets := 0
+	modePackets := 0
+	streamingPackets := 0
+	for _, sample := range samples {
+		switch sample.Address {
+		case avatarBeaconVersionOSCAddress:
+			versionPackets++
+			if !sample.HasStr || sample.String != "v9.8.7-b6" {
+				t.Fatalf("version sample = %+v, want string v9.8.7-b6", sample)
+			}
+		case "/usercamera/Mode":
+			modePackets++
+		case "/usercamera/Streaming":
+			streamingPackets++
+		}
+	}
+	if versionPackets != 1 || modePackets != 1 || streamingPackets != 1 {
+		t.Fatalf("packets version=%d mode=%d streaming=%d samples=%+v", versionPackets, modePackets, streamingPackets, samples)
 	}
 }
 

@@ -152,6 +152,11 @@ jobs:
             throw "build/bin/ClipForVRChat.exe was not created"
           }
 
+      - name: Update AvatarBeacon version metadata
+        run: |
+          node scripts/update-avatarbeacon-version.mjs ci
+          node scripts/update-avatarbeacon-version.mjs ci --check
+
       - name: Package AvatarBeacon source zip
         shell: pwsh
         run: |
@@ -177,6 +182,7 @@ jobs:
             "README.md",
             "Assets/PoppoWorks/AvatarBeacon",
             "Assets/PoppoWorks/AvatarBeacon/README.md",
+            "Assets/PoppoWorks/AvatarBeacon/Version.txt",
             "Assets/PoppoWorks/AvatarBeacon/LICENSES/YL-ATG-MIT.txt"
           )
           foreach ($path in $required) {

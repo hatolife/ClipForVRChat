@@ -36,6 +36,7 @@ func main() {
 	if handled, exitCode := handleCLIArgs(os.Args[1:], stdout, stderr); handled {
 		os.Exit(exitCode)
 	}
+	appcore.SetOSCVersionNotice(appVersion())
 
 	args := os.Args[1:]
 	if len(args) == 1 && strings.EqualFold(filepath.Ext(args[0]), ".zip") {

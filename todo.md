@@ -1,8 +1,7 @@
-# issue 235-238 fallback/issue/ui修正
+# issue 239 AvatarBeaconバージョン埋め込み
 
 - [x] 原文付きチケットを作成する
-- [x] 自動フォールバック切替設定を実装する
-- [x] closed READMEの昇順と再発防止を実装する
-- [x] 構図リセット後のグレーアウトを修正する
-- [x] 未保存変更項目の行ハイライトを実装する
+- [x] AvatarBeacon version assetとPrefab内表示を追加する
+- [x] CI/Releaseの自動更新と検査を追加する
+- [x] OSC送信時の1回だけversion通知を追加する
 - [x] 関連チェックを実行する
