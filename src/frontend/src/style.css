@@ -832,6 +832,17 @@ small {
   color: #263746;
 }
 
+.osc-debug-send {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.osc-debug-send input {
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+}
+
 .pose-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(96px, 1fr));

@@ -253,6 +253,22 @@ func (a *App) GetOSCLogEntries() []OSCLogEntry {
 	return append([]OSCLogEntry(nil), a.oscLogEntries...)
 }
 
+func (a *App) SendDebugOSC(line string) (appcore.DebugOSCSendResult, error) {
+	a.mu.Lock()
+	cfg := a.state.Config
+	cfg.Normalize()
+	logPath := appcore.DiagnosticLogPath(a.configPath)
+	a.logUserActionLocked("debug_osc_send", strings.TrimSpace(line))
+	a.mu.Unlock()
+	result, err := appcore.SendDebugOSCLine(cfg.AutoCapture.OSC, line)
+	if err != nil {
+		appcore.AppendDiagnosticLog(logPath, "debug osc send failed: target=%q address=%q types=%q err=%v", result.Target, result.Address, result.TypeTags, err)
+		return result, err
+	}
+	appcore.AppendDiagnosticLog(logPath, "debug osc send success: target=%q address=%q types=%q", result.Target, result.Address, result.TypeTags)
+	return result, nil
+}
+
 func (a *App) OpenURL(rawURL string) error {
 	trustedURL, err := trustedExternalURL(rawURL)
 	if err != nil {

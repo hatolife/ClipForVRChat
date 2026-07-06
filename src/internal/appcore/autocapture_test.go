@@ -327,6 +327,30 @@ func TestOSCTraceHandlerCapturesSendPackets(t *testing.T) {
 	}
 }
 
+func TestParseDebugOSCLine(t *testing.T) {
+	address, typeTags, appendArgs, err := parseDebugOSCLine("/avatar/parameters/debug true i:3 f:1.5 s:note 7 2.25 label")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if address != "/avatar/parameters/debug" {
+		t.Fatalf("address = %q", address)
+	}
+	if typeTags != ",Tifsifs" {
+		t.Fatalf("typeTags = %q", typeTags)
+	}
+	packet := buildOSCPacket(address, typeTags, appendArgs)
+	gotAddress, gotTypes, payload, ok := ParseOSCPacket(packet)
+	if !ok {
+		t.Fatal("ParseOSCPacket failed")
+	}
+	if gotAddress != address || gotTypes != typeTags {
+		t.Fatalf("parsed = %q %q, want %q %q", gotAddress, gotTypes, address, typeTags)
+	}
+	if len(payload) == 0 {
+		t.Fatal("payload is empty")
+	}
+}
+
 func TestAutoCaptureRunnerRunOnceReleasesStreamingOnCancellation(t *testing.T) {
 	conn, port := listenOSCUserCameraPackets(t)
 	defer conn.Close()

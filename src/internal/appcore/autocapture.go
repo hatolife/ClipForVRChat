@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -67,6 +68,21 @@ type AutoCaptureEvent struct {
 	Path    string `json:"path"`
 	Error   string `json:"error"`
 	Message string `json:"message"`
+}
+
+type DebugOSCSendResult struct {
+	OK       bool   `json:"ok"`
+	Message  string `json:"message"`
+	Target   string `json:"target"`
+	Address  string `json:"address"`
+	TypeTags string `json:"typeTags"`
+}
+
+type debugOSCArg struct {
+	tag   byte
+	intV  int32
+	float float32
+	str   string
 }
 
 type PresenceUser struct {
@@ -2250,6 +2266,154 @@ func (c oscClient) sendBool(address string, value bool) error {
 		tag = ",T"
 	}
 	return c.send(address, tag, func(buf []byte) []byte { return buf })
+}
+
+func SendDebugOSCLine(cfg AutoCaptureOSCConfig, line string) (DebugOSCSendResult, error) {
+	address, typeTags, appendArgs, err := parseDebugOSCLine(line)
+	target := fmt.Sprintf("%s:%d", strings.TrimSpace(cfg.Host), cfg.SendPort)
+	result := DebugOSCSendResult{
+		OK:       false,
+		Target:   target,
+		Address:  address,
+		TypeTags: typeTags,
+	}
+	if err != nil {
+		result.Message = err.Error()
+		return result, err
+	}
+	client := &oscClient{host: strings.TrimSpace(cfg.Host), port: cfg.SendPort}
+	if client.host == "" {
+		client.host = "127.0.0.1"
+	}
+	if client.port <= 0 || client.port > 65535 {
+		err := fmt.Errorf("OSC送信先portが不正です: %d", client.port)
+		result.Target = fmt.Sprintf("%s:%d", client.host, client.port)
+		result.Message = err.Error()
+		return result, err
+	}
+	result.Target = fmt.Sprintf("%s:%d", client.host, client.port)
+	if err := client.open(); err != nil {
+		result.Message = err.Error()
+		return result, err
+	}
+	defer client.close()
+	if err := client.send(address, typeTags, appendArgs); err != nil {
+		result.Message = err.Error()
+		return result, err
+	}
+	result.OK = true
+	result.Message = "OSCを送信しました"
+	return result, nil
+}
+
+func parseDebugOSCLine(line string) (string, string, func([]byte) []byte, error) {
+	fields := strings.Fields(strings.TrimSpace(line))
+	if len(fields) == 0 {
+		return "", "", nil, fmt.Errorf("OSC入力が空です")
+	}
+	address := fields[0]
+	if !strings.HasPrefix(address, "/") {
+		return "", "", nil, fmt.Errorf("OSC addressは / から始めてください")
+	}
+	args := make([]debugOSCArg, 0, len(fields)-1)
+	typeTags := ","
+	for _, raw := range fields[1:] {
+		arg, err := parseDebugOSCArg(raw)
+		if err != nil {
+			return "", "", nil, err
+		}
+		args = append(args, arg)
+		typeTags += string(arg.tag)
+	}
+	return address, typeTags, func(buf []byte) []byte {
+		for _, arg := range args {
+			switch arg.tag {
+			case 'i':
+				var raw [4]byte
+				binary.BigEndian.PutUint32(raw[:], uint32(arg.intV))
+				buf = append(buf, raw[:]...)
+			case 'f':
+				var raw [4]byte
+				binary.BigEndian.PutUint32(raw[:], math.Float32bits(arg.float))
+				buf = append(buf, raw[:]...)
+			case 's':
+				buf = appendOSCString(buf, arg.str)
+			case 'T', 'F':
+			}
+		}
+		return buf
+	}, nil
+}
+
+func parseDebugOSCArg(raw string) (debugOSCArg, error) {
+	value := strings.TrimSpace(raw)
+	lower := strings.ToLower(value)
+	var arg debugOSCArg
+	switch {
+	case strings.HasPrefix(lower, "i:"):
+		parsed, err := strconv.ParseInt(value[2:], 10, 32)
+		if err != nil {
+			return arg, fmt.Errorf("int引数が不正です: %s", value)
+		}
+		arg.tag = 'i'
+		arg.intV = int32(parsed)
+		return arg, nil
+	case strings.HasPrefix(lower, "f:"):
+		parsed, err := strconv.ParseFloat(value[2:], 32)
+		if err != nil {
+			return arg, fmt.Errorf("float引数が不正です: %s", value)
+		}
+		arg.tag = 'f'
+		arg.float = float32(parsed)
+		return arg, nil
+	case strings.HasPrefix(lower, "s:"):
+		arg.tag = 's'
+		arg.str = value[2:]
+		return arg, nil
+	case strings.HasPrefix(lower, "b:"):
+		boolValue, ok := parseDebugOSCBool(value[2:])
+		if !ok {
+			return arg, fmt.Errorf("bool引数が不正です: %s", value)
+		}
+		if boolValue {
+			arg.tag = 'T'
+		} else {
+			arg.tag = 'F'
+		}
+		return arg, nil
+	}
+	if boolValue, ok := parseDebugOSCBool(value); ok {
+		if boolValue {
+			arg.tag = 'T'
+		} else {
+			arg.tag = 'F'
+		}
+		return arg, nil
+	}
+	if parsed, err := strconv.ParseInt(value, 10, 32); err == nil {
+		arg.tag = 'i'
+		arg.intV = int32(parsed)
+		return arg, nil
+	}
+	if parsed, err := strconv.ParseFloat(value, 32); err == nil {
+		arg.tag = 'f'
+		arg.float = float32(parsed)
+		return arg, nil
+	}
+	arg.tag = 's'
+	arg.str = value
+	return arg, nil
+}
+
+func parseDebugOSCBool(value string) (bool, bool) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "true", "t", "1", "on":
+		return true, true
+	case "false", "f", "0", "off":
+		return false, true
+	default:
+		return false, false
+	}
 }
 
 func (c oscClient) send(address string, typeTags string, appendArgs func([]byte) []byte) error {

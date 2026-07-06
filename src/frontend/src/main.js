@@ -81,6 +81,9 @@ const vueApp = createApp({
       oscLogEntries: [],
       oscLogFilter: '',
       oscLogUnsubscribe: null,
+      debugOSCInput: '/avatar/parameters/debug true',
+      debugOSCSending: false,
+      debugOSCResult: null,
       startupLoading: true,
       startupStatus: 'フロントエンドを初期化しています。',
       startupError: ''
@@ -339,7 +342,19 @@ const vueApp = createApp({
       }
     },
     filteredOSCLogEntries() {
-      const entries = this.oscLogEntries || []
+      const entries = (this.oscLogEntries || []).filter((entry) => entry?.direction !== 'send')
+      const query = String(this.oscLogFilter || '').trim()
+      if (!query) return entries
+      let re
+      try {
+        re = new RegExp(query)
+      } catch {
+        return []
+      }
+      return entries.filter((entry) => re.test(this.formatOSCLogLine(entry)))
+    },
+    filteredOSCSendLogEntries() {
+      const entries = (this.oscLogEntries || []).filter((entry) => entry?.direction === 'send')
       const query = String(this.oscLogFilter || '').trim()
       if (!query) return entries
       let re
@@ -1589,6 +1604,35 @@ const vueApp = createApp({
         this.toast = ''
       }, 3000)
     },
+    async copyVisibleOSCSendLog() {
+      const text = this.filteredOSCSendLogEntries.map((entry) => this.formatOSCLogLine(entry)).join('\n')
+      await this.copy(text)
+      this.toast = '表示中のOSC送信ログをコピーしました'
+      setTimeout(() => {
+        this.toast = ''
+      }, 3000)
+    },
+    async sendDebugOSC() {
+      const line = String(this.debugOSCInput || '').trim()
+      if (!line || this.debugOSCSending) return
+      if (!api?.SendDebugOSC) {
+        this.debugOSCResult = { ok: false, message: 'OSC送信APIが利用できません。' }
+        return
+      }
+      this.debugOSCSending = true
+      this.debugOSCResult = null
+      try {
+        const result = await api.SendDebugOSC(line)
+        this.debugOSCResult = result || { ok: true, message: 'OSCを送信しました' }
+        if (api?.GetOSCLogEntries) {
+          this.oscLogEntries = await api.GetOSCLogEntries()
+        }
+      } catch (err) {
+        this.debugOSCResult = { ok: false, message: startupErrorMessage(err) }
+      } finally {
+        this.debugOSCSending = false
+      }
+    },
     async checkForUpdate() {
       if (!api?.CheckForUpdate || this.updateSettings.checkEnabled === false) {
         this.updateInfo = { available: false, currentVersion: '', currentReleaseTime: '', latestVersion: '', latestReleasePublished: '', url: '' }
@@ -2484,11 +2528,11 @@ const vueApp = createApp({
                 <button type="button" class="secondary" @click="addOSCForwardTarget" :disabled="!autoCaptureSettings.osc.forward.enabled" :title="autoCaptureSettings.osc.forward.enabled ? 'OSC転送先を追加する' : 'OSC転送をONにすると追加できます'">転送先を追加</button>
               </div>
             </div>
-            <section class="osc-log-panel" aria-label="OSCログ">
+            <section class="osc-log-panel" aria-label="OSC受信ログ">
               <div class="osc-log-header">
                 <div>
-                  <h4>OSCログ</h4>
-                  <p>送受信とforwardの一時ログです。通常の診断ログファイルには保存されません。</p>
+                  <h4>OSC受信ログ</h4>
+                  <p>受信とforwardの一時ログです。通常の診断ログファイルには保存されません。</p>
                 </div>
                 <button type="button" class="secondary" @click="copyVisibleOSCLog" :disabled="filteredOSCLogEntries.length === 0" :title="filteredOSCLogEntries.length === 0 ? 'コピーできるOSCログがありません' : '表示中のOSCログをコピーする'">表示中ログをコピー</button>
               </div>
@@ -2505,6 +2549,40 @@ const vueApp = createApp({
                 </div>
                 <p v-if="filteredOSCLogEntries.length === 0" class="empty">表示できるOSCログはありません。</p>
               </div>
+            </section>
+            <section class="osc-log-panel" aria-label="OSC送信ログ">
+              <div class="osc-log-header">
+                <div>
+                  <h4>OSC送信ログ</h4>
+                  <p>ClipForVRChatから送信したOSCだけを表示します。</p>
+                </div>
+                <button type="button" class="secondary" @click="copyVisibleOSCSendLog" :disabled="filteredOSCSendLogEntries.length === 0" :title="filteredOSCSendLogEntries.length === 0 ? 'コピーできるOSC送信ログがありません' : '表示中のOSC送信ログをコピーする'">表示中ログをコピー</button>
+              </div>
+              <div class="osc-log-list" role="log" aria-live="polite">
+                <div v-for="entry in filteredOSCSendLogEntries" :key="'send-' + entry.seq" class="osc-log-row">
+                  <span class="osc-log-time">{{ entry.time || '-' }}</span>
+                  <span :class="['status-pill', entry.status === 'error' || entry.status === 'invalid' ? 'warning' : entry.status === 'skipped' ? 'muted' : 'ok']">{{ oscLogDirectionLabel(entry.direction) }}</span>
+                  <span class="osc-log-main">{{ formatOSCLogLine(entry) }}</span>
+                </div>
+                <p v-if="filteredOSCSendLogEntries.length === 0" class="empty">表示できるOSC送信ログはありません。</p>
+              </div>
+            </section>
+            <section class="osc-log-panel" aria-label="OSCデバッグ送信">
+              <div class="osc-log-header">
+                <div>
+                  <h4>OSCデバッグ送信</h4>
+                  <p>現在のVRChat OSC送信先へ任意のOSCを送信します。例: /avatar/parameters/debug true、/usercamera/Zoom f:60、/avatar/parameters/count i:3</p>
+                </div>
+              </div>
+              <div class="osc-debug-send">
+                <input v-model="debugOSCInput" @keydown.enter.prevent="sendDebugOSC" placeholder="/avatar/parameters/debug true" />
+                <button type="button" @click="sendDebugOSC" :disabled="debugOSCSending || !String(debugOSCInput || '').trim()" :title="debugOSCSending ? '送信中です' : '入力したOSCを送信する'">{{ debugOSCSending ? '送信中' : '送信' }}</button>
+              </div>
+              <p v-if="debugOSCResult" :class="['setting-note', debugOSCResult.ok ? 'ok' : 'warning']">
+                {{ debugOSCResult.message }}
+                <span v-if="debugOSCResult.target"> / {{ debugOSCResult.target }}</span>
+                <span v-if="debugOSCResult.address"> / {{ debugOSCResult.address }} {{ debugOSCResult.typeTags }}</span>
+              </p>
             </section>
           </section>
 
