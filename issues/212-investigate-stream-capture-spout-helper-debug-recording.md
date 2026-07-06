@@ -22,6 +22,7 @@
 - [ ] 実機環境で `spout-capture.exe --list-senders` の結果を記録する。
 - [ ] 実機環境で `spout-capture.exe --capture` の単体実行結果、終了コード、JSON、出力PNGの有無を記録する。
 - [ ] `--debug-dir` / `--debug-frames` の出力有無と、`frames.jsonl`、frame metadata、`.rgba` の内容傾向を確認する。
+- [ ] `spout-capture.exe --diagnose` でsender一覧、frame番号、ReceiveImage成否、RGBA統計を時系列で記録できる。
 - [ ] ClipForVRChatのテスト撮影ログから、helper実行引数、debug_dir、debug_frames、helper JSON、出力ファイル検証結果を確認する。
 - [ ] helper単体失敗か、ClipForVRChat統合部失敗か、VRChat Stream Camera/sender側失敗かを判断する。
 - [ ] 原因に応じて修正チケットまたは既存チケットへの追記内容を決める。
@@ -62,3 +63,5 @@
 - 2026-07-07: `--capture --sender VRCSender1 --timeout-ms 10000 --debug-dir ... --debug-frames 30` は exit code 3、`code=capture_blank_frame`。`receiveAttempts=314`、`receiveSuccesses=313` で受信自体は成功しているが、`firstFrame=0`、`lastReceivedFrame=0`、`frame=0` のまま進まない。`frameStats` は `mean=0`、`stddev=0`、`transparentRatio=1` で全透明。
 - 2026-07-07: debug録画は30フレーム分の `.rgba` と `.json` を出力した。各 `.rgba` は `8294400` bytes (`1920*1080*4`)。1枚目と30枚目は `cmp` で完全一致し、先頭64 bytesも全て `00`。helperはsenderへ接続してフレーム受信に成功しているが、VRChat側senderが全ゼロRGBAかつframe番号0のまま更新されていない状態と判断する。
 - 2026-07-07: 調査中に `frames.jsonl` / per-frame `.json` の `session` フィールドに余分な `"` が入り、不正JSONになるバグを確認した。撮影失敗の主因ではないが、デバッグ解析を阻害するため `tools/spout-capture/main.cpp` で修正した。
+- 2026-07-07: 続きの調査補助として、1回のcaptureではなく一定時間のsender/receive/frame stats推移を記録する `spout-capture.exe --diagnose` を追加した。stdoutはsummary JSONのみ、`--debug-dir` 配下へ `diagnose.jsonl`、`diagnose-summary.json`、既存形式のframe dumpを出力する。
+- 2026-07-07: ローカル検証は `ctest --test-dir /tmp/cfvrc-spout-logic-diagnose --output-on-failure` と `x86_64-w64-mingw32-g++ -std=c++17 -Wall -Wextra -fsyntax-only -I/tmp/cfvrc-spout-mingw-diagnose/_deps/spout2-src/SPOUTSDK/SpoutLibrary tools/spout-capture/main.cpp`。MinGWでの完全ビルドはSpout2側include `Shellapi.h` / `Commctrl.h` の大文字小文字問題で停止したため、CI/MSVCまたは実Windowsビルドでの確認が必要。

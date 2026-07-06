@@ -44,11 +44,14 @@ struct SenderInfo {
 struct Options {
   bool list_senders = false;
   bool capture = false;
+  bool diagnose = false;
   bool show_version = false;
   std::string sender;
   std::filesystem::path output;
   std::filesystem::path debug_dir;
   int timeout_ms = 10000;
+  int duration_ms = 10000;
+  int interval_ms = 250;
   int debug_frames = 0;
   bool debug_frames_set = false;
 };
@@ -104,7 +107,9 @@ void print_help() {
             << "spout-capture --version\n"
             << "spout-capture --list-senders\n"
             << "spout-capture --capture [--sender name] --output file.png --timeout-ms 10000\n"
-            << "              [--debug-dir directory] [--debug-frames 8]\n";
+            << "              [--debug-dir directory] [--debug-frames 8]\n"
+            << "spout-capture --diagnose --debug-dir directory [--sender name]\n"
+            << "              [--duration-ms 10000] [--interval-ms 250] [--debug-frames 8]\n";
 }
 
 void print_version() {
@@ -112,20 +117,25 @@ void print_version() {
             << json_escape(helper_version()) << "\"}\n";
 }
 
+void write_senders_json(std::ostream &out, const std::vector<SenderInfo> &senders) {
+  out << "[";
+  for (size_t i = 0; i < senders.size(); ++i) {
+    if (i > 0) {
+      out << ",";
+    }
+    out << "{\"name\":\"" << json_escape(senders[i].name) << "\",\"width\":"
+        << senders[i].width << ",\"height\":" << senders[i].height
+        << ",\"hostPath\":\"" << json_escape(senders[i].host_path) << "\"}";
+  }
+  out << "]";
+}
+
 void print_error(const std::string &code, const std::string &message, const std::vector<SenderInfo> &senders = {}) {
   std::cout << "{\"ok\":false,\"code\":\"" << json_escape(code)
             << "\",\"message\":\"" << json_escape(message) << "\"";
   if (!senders.empty()) {
-    std::cout << ",\"senders\":[";
-    for (size_t i = 0; i < senders.size(); ++i) {
-      if (i > 0) {
-        std::cout << ",";
-      }
-      std::cout << "{\"name\":\"" << json_escape(senders[i].name) << "\",\"width\":"
-                << senders[i].width << ",\"height\":" << senders[i].height
-                << ",\"hostPath\":\"" << json_escape(senders[i].host_path) << "\"}";
-    }
-    std::cout << "]";
+    std::cout << ",\"senders\":";
+    write_senders_json(std::cout, senders);
   }
   std::cout << "}\n";
 }
@@ -155,16 +165,8 @@ void print_capture_error(const std::string &code, const std::string &message, co
     std::cout << ",\"debugDir\":\"" << json_escape(debug_dir) << "\",\"debugFrames\":" << debug_frames;
   }
   if (!senders.empty()) {
-    std::cout << ",\"senders\":[";
-    for (size_t i = 0; i < senders.size(); ++i) {
-      if (i > 0) {
-        std::cout << ",";
-      }
-      std::cout << "{\"name\":\"" << json_escape(senders[i].name) << "\",\"width\":"
-                << senders[i].width << ",\"height\":" << senders[i].height
-                << ",\"hostPath\":\"" << json_escape(senders[i].host_path) << "\"}";
-    }
-    std::cout << "]";
+    std::cout << ",\"senders\":";
+    write_senders_json(std::cout, senders);
   }
   std::cout << "}\n";
 }
@@ -190,6 +192,8 @@ bool parse_args(int argc, char **argv, Options *options, std::string *error) {
       options->list_senders = true;
     } else if (arg == "--capture") {
       options->capture = true;
+    } else if (arg == "--diagnose") {
+      options->diagnose = true;
     } else if (arg == "--version") {
       options->show_version = true;
     } else if (arg == "--sender") {
@@ -221,6 +225,16 @@ bool parse_args(int argc, char **argv, Options *options, std::string *error) {
         *error = "--timeout-ms requires an integer value";
         return false;
       }
+    } else if (arg == "--duration-ms") {
+      if (++i >= argc || !parse_int(argv[i], &options->duration_ms)) {
+        *error = "--duration-ms requires an integer value";
+        return false;
+      }
+    } else if (arg == "--interval-ms") {
+      if (++i >= argc || !parse_int(argv[i], &options->interval_ms)) {
+        *error = "--interval-ms requires an integer value";
+        return false;
+      }
     } else if (arg == "--help" || arg == "-h") {
       print_help();
       std::exit(0);
@@ -233,16 +247,42 @@ bool parse_args(int argc, char **argv, Options *options, std::string *error) {
     print_version();
     std::exit(0);
   }
-  if (options->list_senders == options->capture) {
-    *error = "specify exactly one of --list-senders or --capture";
+  int modes = 0;
+  if (options->list_senders) {
+    modes++;
+  }
+  if (options->capture) {
+    modes++;
+  }
+  if (options->diagnose) {
+    modes++;
+  }
+  if (modes != 1) {
+    *error = "specify exactly one of --list-senders, --capture, or --diagnose";
     return false;
   }
   if (options->capture && options->output.empty()) {
     *error = "--capture requires --output";
     return false;
   }
+  if (options->diagnose && options->debug_dir.empty()) {
+    *error = "--diagnose requires --debug-dir";
+    return false;
+  }
   if (options->timeout_ms < 100) {
     options->timeout_ms = 100;
+  }
+  if (options->duration_ms < 100) {
+    options->duration_ms = 100;
+  }
+  if (options->duration_ms > 120000) {
+    options->duration_ms = 120000;
+  }
+  if (options->interval_ms < 30) {
+    options->interval_ms = 30;
+  }
+  if (options->interval_ms > 5000) {
+    options->interval_ms = 5000;
   }
   if (!options->debug_dir.empty()) {
     if (options->debug_frames <= 0) {
@@ -304,6 +344,15 @@ std::string timestamp_file_utc() {
   char timestamp[32] = {};
   std::strftime(timestamp, sizeof(timestamp), "%Y%m%dT%H%M%SZ", &utc);
   return timestamp;
+}
+
+void write_frame_stats_json(std::ostream &out, const FrameStats &stats) {
+  out << "{\"samples\":" << stats.samples
+      << ",\"mean\":" << stats.mean
+      << ",\"stddev\":" << stats.stddev
+      << ",\"nearWhiteRatio\":" << stats.near_white_ratio
+      << ",\"nearBlackRatio\":" << stats.near_black_ratio
+      << ",\"transparentRatio\":" << stats.transparent_ratio << "}";
 }
 
 struct DebugRecorder {
@@ -377,12 +426,9 @@ struct DebugRecorder {
              << ",\"height\":" << height
              << ",\"format\":\"rgba8\""
              << ",\"rawPath\":\"" << json_escape(raw_path.u8string()) << "\""
-             << ",\"frameStats\":{\"samples\":" << stats.samples
-             << ",\"mean\":" << stats.mean
-             << ",\"stddev\":" << stats.stddev
-             << ",\"nearWhiteRatio\":" << stats.near_white_ratio
-             << ",\"nearBlackRatio\":" << stats.near_black_ratio
-             << ",\"transparentRatio\":" << stats.transparent_ratio << "}}";
+             << ",\"frameStats\":";
+    write_frame_stats_json(metadata, stats);
+    metadata << "}";
     std::ofstream json(json_path);
     if (json) {
       json << metadata.str() << "\n";
@@ -604,16 +650,236 @@ SenderSelection wait_for_sender(SPOUTHANDLE spout, const std::string &requested,
 
 int list_senders(SPOUTHANDLE spout) {
   auto senders = sorted_senders(spout);
-  std::cout << "{\"ok\":true,\"senders\":[";
-  for (size_t i = 0; i < senders.size(); ++i) {
-    if (i > 0) {
-      std::cout << ",";
-    }
-    std::cout << "{\"name\":\"" << json_escape(senders[i].name) << "\",\"width\":"
-              << senders[i].width << ",\"height\":" << senders[i].height
-              << ",\"hostPath\":\"" << json_escape(senders[i].host_path) << "\"}";
+  std::cout << "{\"ok\":true,\"senders\":";
+  write_senders_json(std::cout, senders);
+  std::cout << "}\n";
+  return 0;
+}
+
+struct DiagnoseSummary {
+  int samples = 0;
+  int sender_samples = 0;
+  int empty_sender_samples = 0;
+  int ambiguous_sender_samples = 0;
+  int receive_attempts = 0;
+  int receive_successes = 0;
+  int valid_frames = 0;
+  int blank_frames = 0;
+  int64_t first_frame = -1;
+  int64_t last_frame = -1;
+  bool frame_advanced = false;
+  std::string sender_name;
+  unsigned int width = 0;
+  unsigned int height = 0;
+  FrameStats last_stats;
+};
+
+std::string diagnose_code(const DiagnoseSummary &summary) {
+  if (summary.valid_frames > 0) {
+    return "diagnose_success";
   }
-  std::cout << "]}\n";
+  if (summary.receive_successes > 0) {
+    return "diagnose_blank_frame";
+  }
+  if (summary.frame_advanced) {
+    return "diagnose_receive_stalled";
+  }
+  if (summary.sender_samples > 0) {
+    return "diagnose_no_new_frame";
+  }
+  if (summary.ambiguous_sender_samples > 0) {
+    return "diagnose_sender_ambiguous";
+  }
+  return "diagnose_no_sender";
+}
+
+std::string diagnose_message(const std::string &code) {
+  if (code == "diagnose_success") {
+    return "診断中に有効なSpout映像フレームを確認しました。";
+  }
+  if (code == "diagnose_blank_frame") {
+    return "Spoutフレームは受信できましたが、診断中は有効な映像になりませんでした。";
+  }
+  if (code == "diagnose_receive_stalled") {
+    return "Spout senderのフレーム番号は進みましたが、画像を受信できませんでした。";
+  }
+  if (code == "diagnose_no_new_frame") {
+    return "Spout senderは見つかりましたが、診断中に新しいフレームを確認できませんでした。";
+  }
+  if (code == "diagnose_sender_ambiguous") {
+    return "複数のSpout senderがあり、自動選択できませんでした。";
+  }
+  return "診断中にSpout senderを検出できませんでした。";
+}
+
+void write_diagnose_summary_json(std::ostream &out, const DiagnoseSummary &summary,
+                                 const Options &options, const std::string &code,
+                                 const std::filesystem::path &timeline_path,
+                                 const std::filesystem::path &summary_path,
+                                 int debug_frames) {
+  out << "{\"ok\":true"
+      << ",\"code\":\"" << json_escape(code) << "\""
+      << ",\"message\":\"" << json_escape(diagnose_message(code)) << "\""
+      << ",\"debugDir\":\"" << json_escape(options.debug_dir.u8string()) << "\""
+      << ",\"durationMs\":" << options.duration_ms
+      << ",\"intervalMs\":" << options.interval_ms
+      << ",\"samples\":" << summary.samples
+      << ",\"senderName\":\"" << json_escape(summary.sender_name) << "\""
+      << ",\"senderSamples\":" << summary.sender_samples
+      << ",\"emptySenderSamples\":" << summary.empty_sender_samples
+      << ",\"ambiguousSenderSamples\":" << summary.ambiguous_sender_samples
+      << ",\"width\":" << summary.width
+      << ",\"height\":" << summary.height
+      << ",\"firstFrame\":" << summary.first_frame
+      << ",\"lastFrame\":" << summary.last_frame
+      << ",\"frameAdvanced\":" << (summary.frame_advanced ? "true" : "false")
+      << ",\"receiveAttempts\":" << summary.receive_attempts
+      << ",\"receiveSuccesses\":" << summary.receive_successes
+      << ",\"validFrames\":" << summary.valid_frames
+      << ",\"blankFrames\":" << summary.blank_frames
+      << ",\"lastFrameStats\":";
+  write_frame_stats_json(out, summary.last_stats);
+  out << ",\"timelinePath\":\"" << json_escape(timeline_path.u8string()) << "\""
+      << ",\"summaryPath\":\"" << json_escape(summary_path.u8string()) << "\""
+      << ",\"debugFrames\":" << debug_frames
+      << "}";
+}
+
+int diagnose(SPOUTHANDLE spout, const Options &options) {
+  DebugRecorder debug;
+  std::string debug_error;
+  debug.start(options, &debug_error);
+  if (!debug_error.empty()) {
+    print_error("debug_record_error", "Spout debug録画の準備に失敗しました: " + debug_error);
+    return 6;
+  }
+  const std::filesystem::path timeline_path = options.debug_dir / "diagnose.jsonl";
+  const std::filesystem::path summary_path = options.debug_dir / "diagnose-summary.json";
+  std::ofstream timeline(timeline_path, std::ios::app);
+  if (!timeline) {
+    print_error("debug_record_error", "Spout diagnose timelineを開けませんでした: " + timeline_path.u8string());
+    return 6;
+  }
+
+  DiagnoseSummary summary;
+  std::vector<unsigned char> pixels;
+  unsigned int width = 0;
+  unsigned int height = 0;
+  HANDLE handle = nullptr;
+  DWORD format = 0;
+  std::string receiver_name;
+  const auto started = std::chrono::steady_clock::now();
+  const auto deadline = started + std::chrono::milliseconds(options.duration_ms);
+
+  while (std::chrono::steady_clock::now() < deadline) {
+    const auto now = std::chrono::steady_clock::now();
+    const int64_t elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - started).count();
+    SenderSelection selection = choose_sender(spout, options.sender);
+    summary.samples++;
+    if (selection.senders.empty()) {
+      summary.empty_sender_samples++;
+    }
+    if (selection.code == "sender_ambiguous") {
+      summary.ambiguous_sender_samples++;
+    }
+
+    bool receive_attempted = false;
+    bool receive_ok = false;
+    FrameStats stats;
+    int64_t sender_frame = -1;
+    std::string frame_state = "no_sender";
+    width = 0;
+    height = 0;
+    handle = nullptr;
+    format = 0;
+    if (!selection.name.empty()) {
+      summary.sender_samples++;
+      if (receiver_name != selection.name) {
+        spout->SetReceiverName(selection.name.c_str());
+        receiver_name = selection.name;
+        debug.log_event("diagnose sender selected name=\"" + selection.name + "\"");
+      }
+      summary.sender_name = selection.name;
+      sender_frame = spout->GetSenderFrame();
+      if (summary.first_frame < 0) {
+        summary.first_frame = sender_frame;
+      } else if (sender_frame != summary.last_frame) {
+        summary.frame_advanced = true;
+      }
+      summary.last_frame = sender_frame;
+
+      spout->GetSenderInfo(selection.name.c_str(), width, height, handle, format);
+      summary.width = width;
+      summary.height = height;
+      if (width > 0 && height > 0) {
+        pixels.assign(static_cast<size_t>(width) * static_cast<size_t>(height) * 4, 0);
+        receive_attempted = true;
+        summary.receive_attempts++;
+        if (spout->ReceiveImage(pixels.data(), GL_RGBA, false, 0)) {
+          receive_ok = true;
+          summary.receive_successes++;
+          stats = analyze_rgba_frame(pixels, width, height);
+          summary.last_stats = stats;
+          debug.dump_frame(pixels, width, height, sender_frame, stats);
+          if (is_blank_frame(stats)) {
+            summary.blank_frames++;
+            frame_state = "blank";
+          } else {
+            summary.valid_frames++;
+            frame_state = "valid";
+          }
+        } else {
+          frame_state = "receive_failed";
+        }
+      } else {
+        frame_state = "zero_size_sender";
+      }
+    } else if (!selection.code.empty()) {
+      frame_state = selection.code;
+    }
+
+    timeline << "{\"capturedAt\":\"" << timestamp_utc()
+             << "\",\"elapsedMs\":" << elapsed_ms
+             << ",\"senders\":";
+    write_senders_json(timeline, selection.senders);
+    timeline << ",\"selectedSender\":\"" << json_escape(selection.name) << "\""
+             << ",\"senderFound\":" << (!selection.name.empty() ? "true" : "false")
+             << ",\"width\":" << width
+             << ",\"height\":" << height
+             << ",\"senderFrame\":" << sender_frame
+             << ",\"frameAdvanced\":" << (summary.frame_advanced ? "true" : "false")
+             << ",\"receiveAttempted\":" << (receive_attempted ? "true" : "false")
+             << ",\"receiveOK\":" << (receive_ok ? "true" : "false")
+             << ",\"frameState\":\"" << json_escape(frame_state) << "\""
+             << ",\"frameStats\":";
+    write_frame_stats_json(timeline, stats);
+    timeline << "}\n";
+    timeline.flush();
+
+    const auto next_tick = now + std::chrono::milliseconds(options.interval_ms);
+    if (next_tick < deadline) {
+      std::this_thread::sleep_until(next_tick);
+    } else {
+      break;
+    }
+  }
+
+  const std::string code = diagnose_code(summary);
+  std::ofstream summary_file(summary_path);
+  if (summary_file) {
+    write_diagnose_summary_json(summary_file, summary, options, code, timeline_path, summary_path, debug.dumped_frames);
+    summary_file << "\n";
+  } else {
+    debug.log_event("diagnose summary file open failed path=\"" + summary_path.u8string() + "\"");
+  }
+  debug.log_event("diagnose complete code=\"" + code +
+                  "\" samples=" + std::to_string(summary.samples) +
+                  " sender_samples=" + std::to_string(summary.sender_samples) +
+                  " receive_successes=" + std::to_string(summary.receive_successes) +
+                  " valid_frames=" + std::to_string(summary.valid_frames) +
+                  " blank_frames=" + std::to_string(summary.blank_frames));
+  write_diagnose_summary_json(std::cout, summary, options, code, timeline_path, summary_path, debug.dumped_frames);
+  std::cout << "\n";
   return 0;
 }
 
@@ -738,6 +1004,8 @@ int main(int argc, char **argv) {
   int rc = 0;
   if (options.list_senders) {
     rc = list_senders(spout);
+  } else if (options.diagnose) {
+    rc = diagnose(spout, options);
   } else {
     rc = capture(spout, options);
   }

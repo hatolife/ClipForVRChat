@@ -1,7 +1,7 @@
-# issue 214 Spout sender空回復チェックリスト
+# issue 212 Spout diagnose実装チェックリスト
 
-- [x] sender空時の回復チケットを作成する
-- [x] Spout取得直前のsender事前チェックを追加する
-- [x] sender 0件時だけStreaming OFF/ON回復を追加する
-- [x] 回復挙動のテストを追加する
-- [x] Go testを実行する
+- [x] 212にdiagnose補助機能の受け入れ条件を追記する
+- [x] `spout-capture --diagnose` のCLI引数を追加する
+- [x] diagnose summary JSONとdebug JSONLを出力する
+- [x] 既存C++ロジックテストを通す
+- [ ] Windows helperのビルド/実行確認を行う
