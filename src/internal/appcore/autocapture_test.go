@@ -40,6 +40,9 @@ func TestDefaultAutoCaptureConfig(t *testing.T) {
 	if cfg.AutoCapture.Views[0].ID != "front" || cfg.AutoCapture.Views[0].Calibrated || cfg.AutoCapture.Views[0].Zoom == nil {
 		t.Fatalf("unexpected first view: %+v", cfg.AutoCapture.Views[0])
 	}
+	if *cfg.AutoCapture.Views[0].Zoom != 45 {
+		t.Fatalf("front view zoom = %v, want 45", *cfg.AutoCapture.Views[0].Zoom)
+	}
 	if cfg.AutoCapture.Views[0].CoordinateSpace != "player_local" || cfg.AutoCapture.Views[0].Pose.Position.Z != 1.0 {
 		t.Fatalf("default front view pose was not initialized: %+v", cfg.AutoCapture.Views[0])
 	}
@@ -74,6 +77,23 @@ func TestAutoCaptureConfigNormalize(t *testing.T) {
 	}
 	if !cfg.AutoCapture.Restore.Enabled || !cfg.AutoCapture.Restore.PreferSnapshot || cfg.AutoCapture.Restore.Fallback.Zoom != 45 {
 		t.Fatalf("restore normalize failed: %+v", cfg.AutoCapture.Restore)
+	}
+}
+
+func TestAutoCaptureConfigNormalizeMigratesOldCameraViewZoom(t *testing.T) {
+	oldZoom := 1.0
+	validZoom := 72.5
+	cfg := DefaultConfig()
+	cfg.AutoCapture.Views = []CameraViewConfig{
+		{ID: "old", Name: "旧Zoom", Zoom: &oldZoom},
+		{ID: "valid", Name: "有効Zoom", Zoom: &validZoom},
+	}
+	cfg.Normalize()
+	if cfg.AutoCapture.Views[0].Zoom == nil || *cfg.AutoCapture.Views[0].Zoom != 45 {
+		t.Fatalf("old zoom = %v, want 45", cfg.AutoCapture.Views[0].Zoom)
+	}
+	if cfg.AutoCapture.Views[1].Zoom == nil || *cfg.AutoCapture.Views[1].Zoom != 72.5 {
+		t.Fatalf("valid zoom = %v, want 72.5", cfg.AutoCapture.Views[1].Zoom)
 	}
 }
 

@@ -1080,7 +1080,7 @@ const vueApp = createApp({
           position: { x: 0, y: 0, z: 0, ...(overrides.pose?.position || {}) },
           rotation: { x: 0, y: 0, z: 0, ...(overrides.pose?.rotation || {}) }
         },
-        zoom: overrides.zoom ?? null,
+        zoom: overrides.zoom ?? 45,
         exposure: overrides.exposure ?? null,
         focalDistance: overrides.focalDistance ?? null,
         aperture: overrides.aperture ?? null,
@@ -2068,7 +2068,7 @@ const vueApp = createApp({
                         <label><small>回転 X</small><input type="number" step="0.001" v-model.number="cameraView.pose.rotation.x" /></label>
                         <label><small>回転 Y</small><input type="number" step="0.001" v-model.number="cameraView.pose.rotation.y" /></label>
                         <label><small>回転 Z</small><input type="number" step="0.001" v-model.number="cameraView.pose.rotation.z" /></label>
-                        <label><small>拡大率</small><input type="number" min="0.1" max="10" step="0.01" v-model.number="cameraView.zoom" /></label>
+                        <label><small>拡大率</small><input type="number" min="20" max="150" step="0.1" v-model.number="cameraView.zoom" /></label>
                       </div>
                       <div class="view-actions">
                         <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, -1)" :disabled="index === 0" :title="index === 0 ? '先頭なので上へ移動できません' : 'この構図を上へ移動'">↑</button>

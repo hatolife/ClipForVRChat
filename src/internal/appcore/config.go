@@ -18,6 +18,12 @@ const (
 	oldTitleFFmpegInputArgs   = "-f gdigrab -framerate 30 -i title=VRChat"
 )
 
+const (
+	userCameraZoomMin     = 20
+	userCameraZoomMax     = 150
+	userCameraZoomDefault = 45
+)
+
 type Config struct {
 	Image              ImageConfig              `json:"image"`
 	Output             OutputConfig             `json:"output"`
@@ -742,7 +748,7 @@ func (c *AutoCaptureUserCameraFallbackConfig) Normalize() {
 	if c.Mode < 0 || c.Mode > 6 {
 		c.Mode = 0
 	}
-	c.Zoom = clampFiniteDefault(c.Zoom, 20, 150, 45)
+	c.Zoom = clampFiniteDefault(c.Zoom, userCameraZoomMin, userCameraZoomMax, userCameraZoomDefault)
 	c.Exposure = clampFiniteDefault(c.Exposure, 0, 10, 4)
 	c.FocalDistance = clampFiniteDefault(c.FocalDistance, 0, 10, 1.5)
 	c.Aperture = clampFiniteDefault(c.Aperture, 1.4, 32, 15)
@@ -891,6 +897,10 @@ func (v *CameraViewConfig) Normalize(index int) {
 	if v.CaptureDelayMS < 0 {
 		v.CaptureDelayMS = 0
 	}
+	if v.Zoom != nil {
+		zoom := clampFiniteDefault(*v.Zoom, userCameraZoomMin, userCameraZoomMax, userCameraZoomDefault)
+		v.Zoom = float64ConfigPtr(zoom)
+	}
 }
 
 func DefaultVRChatPhotoDirectory() string {
@@ -945,15 +955,15 @@ func defaultCameraViews() []CameraViewConfig {
 		defaultCameraView("front", "正面", 0, "player_local", CameraPoseConfig{
 			Position: CameraVector3Config{X: 0, Y: 0, Z: 1.0},
 			Rotation: CameraVector3Config{X: 0, Y: 180, Z: 0},
-		}, 1.0),
+		}, userCameraZoomDefault),
 		defaultCameraView("back", "背後", 1, "player_local", CameraPoseConfig{
 			Position: CameraVector3Config{X: 0, Y: 0.35, Z: -1.6},
 			Rotation: CameraVector3Config{X: 12, Y: 0, Z: 0},
-		}, 1.0),
+		}, userCameraZoomDefault),
 		defaultCameraView("diagonal", "斜め", 2, "player_local", CameraPoseConfig{
 			Position: CameraVector3Config{X: 0.8, Y: 0.2, Z: 1.1},
 			Rotation: CameraVector3Config{X: 8, Y: -145, Z: 0},
-		}, 1.0),
+		}, userCameraZoomDefault),
 	}
 }
 
