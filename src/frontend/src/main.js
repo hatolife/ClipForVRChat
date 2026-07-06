@@ -1131,6 +1131,11 @@ const vueApp = createApp({
         this.normalizeAutoCaptureViewOrders()
       }
     },
+    deleteLastAutoCaptureView() {
+      const views = this.autoCaptureViews
+      if (!views.length) return
+      this.deleteAutoCaptureView(views[views.length - 1])
+    },
     addOSCForwardTarget() {
       const forward = this.autoCaptureSettings.osc.forward
       forward.targets.push({ host: '127.0.0.1', port: 9101 })
@@ -2127,6 +2132,10 @@ const vueApp = createApp({
                     </article>
                   </div>
                   <p v-else class="empty">構図設定がありません。</p>
+                  <div class="composition-count-actions" aria-label="構図の追加削除">
+                    <button type="button" class="secondary composition-count-button" @click="addAutoCaptureView" title="構図を追加する">＋</button>
+                    <button type="button" class="secondary composition-count-button" @click="deleteLastAutoCaptureView" :disabled="!autoCaptureViews.length" :title="autoCaptureViews.length ? '末尾の構図を削除する' : '削除できる構図がありません'">－</button>
+                  </div>
                 </section>
               </template>
               <template v-else-if="autoCaptureDetailView === 'capture'">
