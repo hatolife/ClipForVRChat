@@ -180,3 +180,4 @@
 | 209 | [構図カードの未キャリブレーション表示を分かりやすくする](unreleased/209-clarify-camera-view-calibration-label.md) | 完了 | 未定 | 構図カードから内部状態のキャリブレーション表示を削除し、撮影対象と座標系だけを表示する。 |
 | 210 | [構図設定の拡大率が常に最低値になる](unreleased/210-fix-auto-capture-view-zoom-range.md) | 完了 | 未定 | 構図ZoomのUI範囲、初期値、既存設定補正をUser Camera Zoomの扱いに合わせた。 |
 | 211 | [ローカルアンカー配置済みカメラを使うフォールバックモードを追加する](unreleased/211-add-preplaced-local-anchor-fallback-mode.md) | 完了 | 未定 | VRChat内でローカルアンカー配置済みのカメラを使い、ClipForVRChatは撮影だけ操作するフォールバックを追加した。 |
+| 213 | [完了済みissueを対応バージョンごとのフォルダに整理する](maintenance-only/213-organize-closed-issues-by-version.md) | 完了 | 整理のみ | 完了済みissueを対応バージョン別フォルダへ移動し、READMEリンクと運用ルールを更新した。 |

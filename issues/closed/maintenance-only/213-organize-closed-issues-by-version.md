@@ -13,7 +13,7 @@
 
 ## 受け入れ条件
 
-- [ ] `issues/closed/` 配下の完了済みissue Markdownが対応バージョン別フォルダへ移動されている。
-- [ ] `issues/closed/README.md` のリンクが移動後パスへ更新されている。
-- [ ] `issues/README.md` と `AGENTS.md` の完了済みissue移動ルールが新しい配置と矛盾しない。
-- [ ] 移動後に壊れたMarkdownリンクがないことを確認する。
+- [x] `issues/closed/` 配下の完了済みissue Markdownが対応バージョン別フォルダへ移動されている。
+- [x] `issues/closed/README.md` のリンクが移動後パスへ更新されている。
+- [x] `issues/README.md` と `AGENTS.md` の完了済みissue移動ルールが新しい配置と矛盾しない。
+- [x] 移動後に壊れたMarkdownリンクがないことを確認する。
