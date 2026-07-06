@@ -1,8 +1,8 @@
-# Stream方式撮影失敗 調査チェックリスト
+# 完了済みissue整理チェックリスト
 
-- [x] 既存issueを確認する
-- [x] 調査チケットを作成する
-- [ ] spout-capture.exe単体でsender列挙を確認する
-- [ ] spout-capture.exe単体でcaptureとdebug録画を確認する
-- [ ] ClipForVRChat経由のhelper実行引数とdebug出力を確認する
-- [ ] 原因の層を特定し、修正方針を決める
+- [x] 既存issue構成を確認する
+- [x] 整理チケットを作成する
+- [ ] 対応バージョン別の移動先を決める
+- [ ] 完了済みissueを移動してREADMEリンクを更新する
+- [ ] Markdownリンクと差分を確認する
+- [ ] 整理チケットを完了扱いへ移動する
