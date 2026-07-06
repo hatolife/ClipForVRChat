@@ -2,7 +2,7 @@
 
 ## 問題
 
-`v0.1.8-rc13` では `ClipForVRChat.exe`、`spout-capture.exe`、`SpoutLibrary.dll` が分かれており、利用者が改竄確認する対象が増えている。
+`v0.1.8-a13` では `ClipForVRChat.exe`、`spout-capture.exe`、`SpoutLibrary.dll` が分かれており、利用者が改竄確認する対象が増えている。
 [#170](closed/investigation-only/170-investigate-single-exe-distribution-for-spout.md) の追加調査でC案を採用する方針になったため、通常利用者向けの主導線を単一exeへ戻したい。
 
 ## 期待する挙動
@@ -38,5 +38,5 @@ Releaseの主成果物は `ClipForVRChat-vX.Y.Z-windows-amd64.exe` とし、本�
 ## 要確認
 
 - GitHub Actions上でWindows CIが成功すること。
-- `v0.1.8-rcN` Releaseで、Release本文の主リンク、添付ファイル一覧、分離版zip内ファイル一覧が仕様通りであること。
+- `v0.1.8-aN` / `v0.1.8-bN` / `v0.1.8-rcN` Releaseで、Release本文の主リンク、添付ファイル一覧、分離版zip内ファイル一覧が仕様通りであること。
 - Windows実機で、通常版exe単体から内蔵helperが展開され、Stream Camera(Spout)のsender一覧取得とテスト撮影ができること。

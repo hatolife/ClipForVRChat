@@ -1,8 +1,8 @@
-# rc30 Release workflowのWindowsテストcleanup失敗を安定化する
+# a30 Release workflowのWindowsテストcleanup失敗を安定化する
 
 ## 問題
 
-`v0.1.8-rc30` の GitHub Actions Release workflow が、Windows上の `go test ./...` で失敗した。
+`v0.1.8-a30` の GitHub Actions Release workflow が、Windows上の `go test ./...` で失敗した。
 
 失敗箇所は `TestAppRestartCameraPoseReceiverRestartsWhenForwardConfigChanges` の `TempDir RemoveAll cleanup` で、テスト本体のassertではなく、一時ディレクトリ削除時に `The directory is not empty` が出ている。
 
@@ -37,5 +37,5 @@ OSC受信器の再起動条件、特にforward設定変更時に受信器が再�
 
 ## 検証結果
 
-- `v0.1.8-rc34` のRelease workflowとbranch CIでWindows `go test ./...` が通過した。
-- rc30で発生した `TestAppRestartCameraPoseReceiverRestartsWhenForwardConfigChanges` の `TempDir RemoveAll cleanup` 失敗は再発していない。
+- `v0.1.8-a34` のRelease workflowとbranch CIでWindows `go test ./...` が通過した。
+- a30で発生した `TestAppRestartCameraPoseReceiverRestartsWhenForwardConfigChanges` の `TempDir RemoveAll cleanup` 失敗は再発していない。

@@ -1,8 +1,8 @@
-# rc25でSpout PNG保存が失敗し、AvatarBeacon受信状態の説明が冗長
+# a25でSpout PNG保存が失敗し、AvatarBeacon受信状態の説明が冗長
 
 ## 問題
 
-`v0.1.8-rc25` のStream方式テスト撮影で、Spout helperが `PNG encoder does not support RGBA` を返し、撮影結果が失敗する。
+`v0.1.8-a25` のStream方式テスト撮影で、Spout helperが `PNG encoder does not support RGBA` を返し、撮影結果が失敗する。
 ログでは `auto-capture spout capture helper error: code="png_write_error"` として記録されている。
 
 また、自動撮影タブのAvatarBeacon受信状態に `coord/* と forward/* がログsummaryに出るかで確認します。専用ギミック未導入、OSC無効、parameter欠落、鮮度切れでは自動追従できません。` のような常時説明が表示され、通常操作時には情報量が多すぎる。

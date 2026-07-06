@@ -259,7 +259,7 @@ v0.1.8では、不要機能を追加しないことよりも、YL-ATGで成立�
 
 ## OSC送信されない場合の確認
 
-`v0.1.8-rc16` 実機確認では、AvatarBeacon導入時にOSC Avatar Parametersが送信されていないように見える報告があった。
+`v0.1.8-a16` 実機確認では、AvatarBeacon導入時にOSC Avatar Parametersが送信されていないように見える報告があった。
 この場合、次を優先して切り分ける。
 
 - VRChatのOSCが有効で、送信先がClipForVRChatの受信ポートに合っているか。

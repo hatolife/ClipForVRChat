@@ -1,8 +1,8 @@
-# rc35でStream Camera起動済みでもSpout有効映像待ちがtimeoutする
+# a35でStream Camera起動済みでもSpout有効映像待ちがtimeoutする
 
 ## 問題
 
-`v0.1.8-rc35` のテスト撮影で、VRChat内のStream Cameraを起動し、SpoutもONにしているにもかかわらず、Stream方式のSpout取得が次のエラーで失敗する。
+`v0.1.8-a35` のテスト撮影で、VRChat内のStream Cameraを起動し、SpoutもONにしているにもかかわらず、Stream方式のSpout取得が次のエラーで失敗する。
 
 ```text
 Spout取得に失敗しました: Spoutフレームは取得できましたが、timeout内に有効な映像になりませんでした。VRChat Stream Cameraの映像が表示されているか確認してください。
@@ -10,7 +10,7 @@ Spout取得に失敗しました: Spoutフレームは取得できましたが�
 
 ユーザー提供ログ:
 
-- `/mnt/c/Users/user/Downloads/ClipForVRChat-v0.1.8-rc35-windows-amd64/logs/2026-07-04.log`
+- `/mnt/c/Users/user/Downloads/ClipForVRChat-v0.1.8-a35-windows-amd64/logs/2026-07-04.log`
 
 ログ上は `VRCSender1` senderを検出し、`1920x1080` のSpoutフレームも取得している。
 ただし helper の `frameStats` は `mean=0`, `stddev=0`, `near_black=1.0000`, `frame=0` で、timeout内に黒フレームしか取得できていない。
@@ -23,7 +23,7 @@ Spout取得に失敗しました: Spoutフレームは取得できましたが�
 
 ## 受け入れ条件
 
-- [x] rc35ログを確認し、sender未検出ではなく黒フレーム継続で失敗していることを記録する。
+- [x] a35ログを確認し、sender未検出ではなく黒フレーム継続で失敗していることを記録する。
 - [x] `spout-capture` helper側で、frame counter、受信待機、黒フレーム判定、timeout処理を再調査する。
 - [x] frame番号が増えていない場合、frame番号は増えているがreceiveできない場合、receiveできたが黒い場合を区別してログ/JSONへ出す。
 - [x] Go側でhelper JSONの `code` / `message` / `frameStats` を分類し、sender missing / no new frame / black frame / transparent or blank frame を切り分けやすくする。

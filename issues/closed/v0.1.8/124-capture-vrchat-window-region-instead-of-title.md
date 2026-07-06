@@ -2,7 +2,7 @@
 
 ## 問題
 
-v0.1.8-rc11では `ffmpeg -f gdigrab -i title=VRChat` でVRChatウィンドウを取得しているが、実機では白画像として保存される。
+v0.1.8-a11では `ffmpeg -f gdigrab -i title=VRChat` でVRChatウィンドウを取得しているが、実機では白画像として保存される。
 VRChatのGPU描画をウィンドウtitle指定で取得できず、ウィンドウ面だけが白く取得されている可能性が高い。
 
 ## 期待する挙動

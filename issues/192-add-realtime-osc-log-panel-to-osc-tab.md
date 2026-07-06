@@ -80,4 +80,4 @@ OSCタブの最下部に、ClipForVRChatが送受信したOSCをリアルタイ�
 - [x] `cd src && GOCACHE=/tmp/clipforvrchat-go-cache go test ./...`
 - [x] `node scripts/check-frontend-template-literals.mjs`
 - [x] `node scripts/check-wails-api-surface.mjs`
-- [x] `v0.1.8-rc34` のbranch CIとRelease workflowが成功した。
+- [x] `v0.1.8-a34` のbranch CIとRelease workflowが成功した。

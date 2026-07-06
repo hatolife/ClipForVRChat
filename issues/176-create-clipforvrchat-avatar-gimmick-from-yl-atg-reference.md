@@ -4,7 +4,7 @@
 
 `avatar_osc` による `player_local` basis受信はアプリ側に実装済みだが、VRChatアバターへ導入するアバターギミック本体がまだリポジトリに存在しない。
 ユーザーが参考資料として `ATG_ForAvatar_V0.0.3.unitypackage` と展開済みディレクトリを配置したため、これを調査材料にしつつ、汎用アバターギミック `AvatarBeacon` のPrefab/Assetを作成する必要がある。
-2026-07-02時点の `v0.1.8-rc16` 実機確認では、AvatarBeacon導入時にVRChatからOSC Avatar Parametersが送信されていないように見えるため、PrefabがOSC output条件を満たしているか追加確認が必要。
+2026-07-02時点の `v0.1.8-a16` 実機確認では、AvatarBeacon導入時にVRChatからOSC Avatar Parametersが送信されていないように見えるため、PrefabがOSC output条件を満たしているか追加確認が必要。
 
 YL-ATGはMIT Licenseだが、Prefab、FBX、Material、構成、パラメータ設計など元プロジェクトに権利がある部分をコピーまたは改変する場合、著作権表示とライセンス表記を正しく保持する必要がある。
 
@@ -138,7 +138,7 @@ AvatarBeaconでは、ClipForVRChat専用名を避け、次の汎用parameterを�
 - [x] AvatarBeacon Prefab内GameObjectの役割、必要性、削除判断を仕様書に記録する。
 - [x] Expression Parameter枠、Contact数、Modular Avatar/VRCSDK依存、Performance Rankへの影響をREADMEに書く。
 - [ ] Unity上でimportし、`Assets/PoppoWorks/AvatarBeacon/...` に展開されることを確認する。
-- [ ] `v0.1.8-rc16` でOSCが送信されない原因を特定し、Prefab/導入手順/VRChat OSC設定のいずれが原因か切り分ける。
+- [ ] `v0.1.8-a16` でOSCが送信されない原因を特定し、Prefab/導入手順/VRChat OSC設定のいずれが原因か切り分ける。
 - [x] `avatar_osc` statusと10秒summary logでOSC未送信とparameter不一致を切り分けられるようにする。
 - [ ] ClipForVRChatが実機VRChatから新鮮なposition/yawを受信し、`player_local` 構図の追従撮影に使えることを確認する。
 - [x] YL-ATGからコピー・改変した部分の有無と範囲を記録する。
@@ -160,19 +160,19 @@ AvatarBeaconでは、ClipForVRChat専用名を避け、次の汎用parameterを�
 - YL-ATG由来Assetを直接取り込む場合、MIT License上の再配布条件を満たすだけでなく、ClipForVRChat側の配布物から利用者が由来を確認できる状態にする。
 - 2026-07-02: `CFVRC/basis/*` は汎用ギミック名として不適切なため、AvatarBeacon既定parameterを `coord/*` と `forward/*` へ変更する。
 - 2026-07-02: `docs/avatarbeacon-spec.md` にPrefab構造、GameObjectごとの役割、削除候補、Unity実機確認なしに削るべきでない要素を記録した。
-- 2026-07-02: ユーザー実機確認で `v0.1.8-rc16` のAvatarBeaconからOSCが送信されていないように見えるとの報告あり。`localOnly` parameter、Expression Parameters登録、VRChat OSC config生成、Contact receiverの動作条件を優先して調査する。
+- 2026-07-02: ユーザー実機確認で `v0.1.8-a16` のAvatarBeaconからOSCが送信されていないように見えるとの報告あり。`localOnly` parameter、Expression Parameters登録、VRChat OSC config生成、Contact receiverの動作条件を優先して調査する。
 - 2026-07-02: VRChat公式OSC仕様ではPublished AvatarのOSC config JSONにある `output.address` が値変化時に送信される。実機切り分けでは `Reset OSC Config`、avatar ID別JSONの `coord/*` / `forward/*` 出力、Avatar Dynamics Contact / Avatar Interactions有効化、ClipForVRChatのraw受信件数を確認する。
-- 2026-07-02: rc16時点の `SaveObject` はPrefab上、`avatar_beacon/save` を操作するMA Menu Itemであり、`coord/*` / `forward/*` のContact経路やClipForVRChatのbasis復元から参照されていない。用途不明な名前のまま残さない。
+- 2026-07-02: a16時点の `SaveObject` はPrefab上、`avatar_beacon/save` を操作するMA Menu Itemであり、`coord/*` / `forward/*` のContact経路やClipForVRChatのbasis復元から参照されていない。用途不明な名前のまま残さない。
 - 2026-07-02: `player_local` basis用途ではHeadよりHipsの方がプレイヤー位置に近いため、`point` の既定MA Bone ProxyをHeadからHipsへ変更する。
 - 2026-07-02: `point` はMA Bone Proxy付きの追跡アンカーであり、複数のConstraintが参照するため残す。`arrow` mesh/materialは可視化用途のみでOSC送信に直接関与しないため削除する。
 - 2026-07-02: YL-ATGの座標取得方式を `docs/avatarbeacon-spec.md` に追記した。VRChat clientやワールドAPIから座標を直接読むのではなく、Constraintで配置したContact Sender/ReceiverのProximity値を使い、magnitude/sign parameterへ分解してOSC Avatar Parametersとして外部へ出す方式。
 - 2026-07-04: ユーザー実機確認で `avatar_osc 受信状態: stale / prefix: coord`、`raw: 55 / last: Ahoge_Angle`、position/yawが0、エラー `stale avatar OSC basis` の報告あり。VRChat OSC自体は他Avatar Parameterを受信できているが、AvatarBeaconの `coord/*` / `forward/*` が鮮度切れになっている状態と判断する。次の修正では、内部エラー名ではなく、AvatarBeacon座標parameterが止まっていること、OSC config reset、アバター再読み込み、Avatar Dynamics Contact / Avatar Interactions確認へ誘導する表示にする。
 - 2026-07-04: AvatarBeacon実機切り分けのため、basis対象外も含めOSC受信内容をすべて診断ログへ出す。parseできたpacketはaddress/type/value/source/bytes、parse不能packetはbytesとhex previewを出す。
-- 2026-07-04: `v0.1.8-rc22` 実機確認で `avatar_osc 受信状態: stale / prefix: coord`、`raw: 15 / last: forward/y`、basis age約21秒の報告あり。OSC経路と一部AvatarBeacon basis parameter受信は確認できているため、ログから `coord/*` / `forward/*` の全12parameterが揃っているか、どのparameterだけ更新停止しているかを確認する。
-- 2026-07-04: rc22ログでは `coord/x,y,z` と `forward/x,y,z` は受信済み。`coord/zSign` と `forward/xSign` はログ上未確認だが、符号parameterは省略時に正方向として扱うためstaleの直接原因ではない。直接原因は、設定画面を開いた直後に同じ `127.0.0.1:9001` へOSC受信器を再bindしようとして `Only one usage of each socket address` で失敗し、その後既存受信器も `context canceled` で停止して受信器が残らなかったこと。加えて、basis鮮度時刻をbasis構成parameterの最古時刻で計算しており、VRChat OSCの値変化時送信と相性が悪く、変化しない軸だけでstaleになり得るため、basis対象parameterの最新受信時刻を見るよう修正する。
+- 2026-07-04: `v0.1.8-a22` 実機確認で `avatar_osc 受信状態: stale / prefix: coord`、`raw: 15 / last: forward/y`、basis age約21秒の報告あり。OSC経路と一部AvatarBeacon basis parameter受信は確認できているため、ログから `coord/*` / `forward/*` の全12parameterが揃っているか、どのparameterだけ更新停止しているかを確認する。
+- 2026-07-04: a22ログでは `coord/x,y,z` と `forward/x,y,z` は受信済み。`coord/zSign` と `forward/xSign` はログ上未確認だが、符号parameterは省略時に正方向として扱うためstaleの直接原因ではない。直接原因は、設定画面を開いた直後に同じ `127.0.0.1:9001` へOSC受信器を再bindしようとして `Only one usage of each socket address` で失敗し、その後既存受信器も `context canceled` で停止して受信器が残らなかったこと。加えて、basis鮮度時刻をbasis構成parameterの最古時刻で計算しており、VRChat OSCの値変化時送信と相性が悪く、変化しない軸だけでstaleになり得るため、basis対象parameterの最新受信時刻を見るよう修正する。
 - 2026-07-04: AvatarBeaconをv0.1.8で使う前提にするため、新規設定、空文字、basisSource欠落設定のプレイヤー基準取得元初期値を `avatar_osc` に変更する。未知値のfallbackは従来通り `manual` とし、壊れたconfigを暗黙にOSC依存へ切り替えない。
-- 2026-07-04: `v0.1.8-rc23` Release workflow成功。Releaseはprerelease、添付8件、exe/separated zip/AvatarBeacon source zipのsha256一致、exe署名Good signature、分離版zipは想定7ファイル、AvatarBeacon source zipは `Assets/PoppoWorks/AvatarBeacon/...` に展開できる12ファイルであることを確認した。
-- 2026-07-04: rc23実機ログでは `coord/x,y,z` と `forward/x,y,z`、`forward/xSign/ySign/zSign` を受信できており、positionは復元値とUI表示が一致していた。一方、06:32:14直前の `forward/x,z` からはyaw約45度を復元できる値が来ているのにUIは0度表示だった。原因はfrontendが `pose.position` は見るが `pose.rotation.y` をyaw候補に含めていないため、Go APIが返す `pose.rotation.y` を表示していなかったこと。
+- 2026-07-04: `v0.1.8-a23` Release workflow成功。Releaseはprerelease、添付8件、exe/separated zip/AvatarBeacon source zipのsha256一致、exe署名Good signature、分離版zipは想定7ファイル、AvatarBeacon source zipは `Assets/PoppoWorks/AvatarBeacon/...` に展開できる12ファイルであることを確認した。
+- 2026-07-04: a23実機ログでは `coord/x,y,z` と `forward/x,y,z`、`forward/xSign/ySign/zSign` を受信できており、positionは復元値とUI表示が一致していた。一方、06:32:14直前の `forward/x,z` からはyaw約45度を復元できる値が来ているのにUIは0度表示だった。原因はfrontendが `pose.position` は見るが `pose.rotation.y` をyaw候補に含めていないため、Go APIが返す `pose.rotation.y` を表示していなかったこと。
 - 2026-07-04: `avatar_osc` 受信状態は更新ボタンなしでも自動撮影タブ表示中に数秒間隔で自動更新する。basis受信確認はUIのraw/lastへ寄せ、診断ログは全OSC packet連続出力をやめ、invalid/error、User Camera Pose、basis resolve状態変化、10秒ごとのAvatar OSC summaryを中心に絞る。summaryにはstatus、raw、last、position/yaw、`coord/*` / `forward/*` の最新値と受信時刻を出す。
 - 2026-07-04: AvatarBeaconから `AvatarBeacon Debug` / `Debug OSC Ping` / `avatar_beacon/debug/ping` を削除する。basis復元に使わないデバッグ専用menu/parameterでExpression Parameter枠を余分に使うため、配布ギミックは `coord/*` / `forward/*` の12parameterだけに絞る。OSC疎通確認はClipForVRChatのraw/lastと10秒summaryに出る `coord/*` / `forward/*` の受信有無で行う。
 - 2026-07-04: AvatarBeacon Prefab内の子GameObjectに残っている `1e-15` 相当の座標値、`-0`、ほぼ0のQuaternion成分など、Unity YAML上の誤差に見える値を正規化する。Contact Receiverの符号判定位置やConstraintの実値は機能に関わるため、見た目だけで0にしない。

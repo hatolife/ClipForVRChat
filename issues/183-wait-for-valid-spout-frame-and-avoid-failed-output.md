@@ -2,7 +2,7 @@
 
 ## 問題
 
-`v0.1.8-rc26` のStream方式テスト撮影で、カメラ起動後にSpout senderは取得できているが、保存されたPNGが完全に透明になり、アプリ側で `取得画像がほぼ透明です` と失敗する。
+`v0.1.8-a26` のStream方式テスト撮影で、カメラ起動後にSpout senderは取得できているが、保存されたPNGが完全に透明になり、アプリ側で `取得画像がほぼ透明です` と失敗する。
 
 実機出力PNGを確認すると、1920x1080 RGBA の全チャンネルが0で、VRChat映像ではなくSpout起動直後の空フレームを保存している状態だった。
 
@@ -31,10 +31,10 @@ Stream方式では、Spoutの `ReceiveImage` が成功しただけで終了せ�
 
 ## 対応メモ
 
-- 2026-07-04: rc26の実機出力PNGを確認し、1920x1080 RGBAの全チャンネルが0の空フレームであることを確認した。
+- 2026-07-04: a26の実機出力PNGを確認し、1920x1080 RGBAの全チャンネルが0の空フレームであることを確認した。
 - 2026-07-04: Spout helperで受信フレームのluma統計を取り、全黒/全白に近い初期フレームはtimeout内で待ち直すようにした。
 - 2026-07-04: 保存前にalphaを255へ正規化し、RGBが有効なVRChat映像を透明PNGにしないようにした。
 - 2026-07-04: Go側は `.tmp` へhelper出力し、画像検証成功後だけ最終パスへrenameするようにした。
-- 2026-07-04: rc28のRelease workflowでMSVCの `max` macro衝突によりSpout helper buildが失敗したため、`(std::max)(...)` でmacro展開を避けるようにした。
-- 2026-07-04: `v0.1.8-rc29` のRelease workflowでWindows Spout helper build、埋め込みhelper抽出テスト、Wails build、Release asset検証が通った。
+- 2026-07-04: a28のRelease workflowでMSVCの `max` macro衝突によりSpout helper buildが失敗したため、`(std::max)(...)` でmacro展開を避けるようにした。
+- 2026-07-04: `v0.1.8-a29` のRelease workflowでWindows Spout helper build、埋め込みhelper抽出テスト、Wails build、Release asset検証が通った。
 - ローカル検証: `go test ./...`、frontend build、template literal check、Wails API surface check、Spout helper object compile。

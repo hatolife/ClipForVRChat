@@ -163,13 +163,13 @@
 | 165 | [v0.1.8未完了項目の実装前調査](v0.1.8/165-plan-v018-incomplete-implementation.md) | 完了 | `v0.1.8` | 未完了項目を実装可能な粒度に調査し、各issueへ実装方針を追記する。 |
 | 167 | [Codex Security findingsを現在HEADで再検証し修正する](v0.1.8/167-remediate-codex-security-findings-2026-07-01.md) | 完了 | `v0.1.8` | Codex Security findingsを現在HEADで再検証し、未修正または部分修正の問題だけを安全に修正する。 |
 | 169 | [Spout同梱バイナリの必要性と安全性説明を追加する](v0.1.8/169-document-spout-binary-necessity-and-safety.md) | 完了 | `v0.1.8` | `spout-capture.exe` と `SpoutLibrary.dll` の必要性、安全性の根拠、利用者の確認観点をREADME/SPEC/Release Notesへ追記する。 |
-| 170 | [Spout同梱バイナリを単一exe配布に戻せるか調査する](investigation-only/170-investigate-single-exe-distribution-for-spout.md) | 完了 | 調査のみ | v0.1.8-rc13で増えた `spout-capture.exe` / `SpoutLibrary.dll` を利用者から見て単一exeへ寄せられるか調査した。 |
+| 170 | [Spout同梱バイナリを単一exe配布に戻せるか調査する](investigation-only/170-investigate-single-exe-distribution-for-spout.md) | 完了 | 調査のみ | v0.1.8-a13で増えた `spout-capture.exe` / `SpoutLibrary.dll` を利用者から見て単一exeへ寄せられるか調査した。 |
 | 172 | [player_local基準Poseの挙動を見直す](v0.1.8/172-clarify-or-redesign-player-local-basis-behavior.md) | 完了 | `v0.1.8` | `player_local` の basis source を AvatarBeacon の `avatar_osc` 既定と `manual` フォールバックで整理し、README/verification docsを更新した。 |
 | 174 | [Release本文先頭にダウンロード導線を置き、通常配布zipへ必要物をまとめる](v0.1.8/174-release-top-download-zip-with-avatar-package.md) | 完了 | `v0.1.8` | Release本文の最上部に通常配布zipへの大きなダウンロードリンクを置き、手動添付するアバターギミック用unitypackageも利用者向けに案内する。 |
 | 186 | [完了済みissueをclosedディレクトリへ移動する](maintenance-only/186-move-completed-issues-to-closed.md) | 完了 | 整理のみ | `issues/README.md` で完了扱いのissueを `issues/closed/` へ移動し、一覧リンクを更新する。 |
-| 190 | [カメラ撮影機能終了時に一時OSC状態を確実に解除する](v0.1.8-rc31/190-make-camera-osc-reset-streaming-compat.md) | 完了 | `v0.1.8-rc31` | カメラOSCリセットと撮影終了時の `/usercamera/Streaming=false` などを通常のStream制御と同じbool+numeric互換送信に揃え、成否にかかわらず一時OSC状態を解除する。 |
-| 193 | [rc30 Release workflowのWindowsテストcleanup失敗を安定化する](v0.1.8-rc34/193-stabilize-rc30-windows-release-test-cleanup.md) | 完了 | `v0.1.8-rc34` | Windows CIでOSC受信器テスト終了時の一時ディレクトリcleanupが診断ログ/UDP listener停止と競合しないよう、receiver終了待ちを追加した。 |
-| 194 | [CIのWails Build application工程が長時間完了しない](v0.1.8-rc34/194-investigate-ci-wails-build-hang.md) | 完了 | `v0.1.8-rc34` | Windows `wails build` がbindings生成で止まる問題に対し、bindings生成skip、WebView2 strategy、mod同期抑止、timeout/verboseを追加した。 |
+| 190 | [カメラ撮影機能終了時に一時OSC状態を確実に解除する](v0.1.8-a31/190-make-camera-osc-reset-streaming-compat.md) | 完了 | `v0.1.8-a31` | カメラOSCリセットと撮影終了時の `/usercamera/Streaming=false` などを通常のStream制御と同じbool+numeric互換送信に揃え、成否にかかわらず一時OSC状態を解除する。 |
+| 193 | [a30 Release workflowのWindowsテストcleanup失敗を安定化する](v0.1.8-a34/193-stabilize-a30-windows-release-test-cleanup.md) | 完了 | `v0.1.8-a34` | Windows CIでOSC受信器テスト終了時の一時ディレクトリcleanupが診断ログ/UDP listener停止と競合しないよう、receiver終了待ちを追加した。 |
+| 194 | [CIのWails Build application工程が長時間完了しない](v0.1.8-a34/194-investigate-ci-wails-build-hang.md) | 完了 | `v0.1.8-a34` | Windows `wails build` がbindings生成で止まる問題に対し、bindings生成skip、WebView2 strategy、mod同期抑止、timeout/verboseを追加した。 |
 | 198 | [world ID を Avatar OSC で送れるか調査する](v0.1.8/198-world-id-avatar-osc-feasibility-investigation.md) | 断念 | `v0.1.8` | AvatarBeacon単体で現在world ID文字列をOSC送信する公式手段が確認できないため断念し、VRChat output log由来のworld/instance取得を代替とする。 |
 | 203 | [Spout2ライセンス表記の配布方法を確認する](investigation-only/203-confirm-spout2-license-distribution.md) | 完了 | 調査のみ | `Spout2-LICENSE.txt` は公開zipへ同梱継続が妥当で、アプリ内OSS表示だけで代替するにはBSD-2-Clause本文表示が必要。 |
 | 204 | [アプリ内OSSライセンス表示でライセンス本文を確認できるようにする](unreleased/204-show-full-oss-license-text-in-app.md) | 完了 | 未定 | Spout2のBSD-2-Clause本文をアプリ内OSSライセンス画面で確認できるようにし、zip内個別ライセンスファイル代替の前提を整えた。 |
@@ -181,6 +181,6 @@
 | 210 | [構図設定の拡大率が常に最低値になる](unreleased/210-fix-auto-capture-view-zoom-range.md) | 完了 | 未定 | 構図ZoomのUI範囲、初期値、既存設定補正をUser Camera Zoomの扱いに合わせた。 |
 | 211 | [ローカルアンカー配置済みカメラを使うフォールバックモードを追加する](unreleased/211-add-preplaced-local-anchor-fallback-mode.md) | 完了 | 未定 | VRChat内でローカルアンカー配置済みのカメラを使い、ClipForVRChatは撮影だけ操作するフォールバックを追加した。 |
 | 213 | [完了済みissueを対応バージョンごとのフォルダに整理する](maintenance-only/213-organize-closed-issues-by-version.md) | 完了 | 整理のみ | 完了済みissueを対応バージョン別フォルダへ移動し、READMEリンクと運用ルールを更新した。 |
-| 212 | [Stream方式撮影失敗をSpout helper録画から切り分ける](v0.1.8-rc43/212-investigate-stream-capture-spout-helper-debug-recording.md) | 完了 | `v0.1.8-rc43` | Spout helper単体と本体経由の実機確認で、`IsUpdated()` 未処理による透明フレームを修正し、Stream方式撮影成功を確認した。 |
-| 214 | [Spout senderが空のときStreamingをOFF/ONして再確認する](v0.1.8-rc43/214-retry-spout-sender-after-streaming-toggle.md) | 完了 | `v0.1.8-rc43` | sender一覧が空のときOSCでStreamingをOFF/ONして再確認し、本体経由でsender復帰からcapture成功まで確認した。 |
+| 212 | [Stream方式撮影失敗をSpout helper録画から切り分ける](v0.1.8-a43/212-investigate-stream-capture-spout-helper-debug-recording.md) | 完了 | `v0.1.8-a43` | Spout helper単体と本体経由の実機確認で、`IsUpdated()` 未処理による透明フレームを修正し、Stream方式撮影成功を確認した。 |
+| 214 | [Spout senderが空のときStreamingをOFF/ONして再確認する](v0.1.8-a43/214-retry-spout-sender-after-streaming-toggle.md) | 完了 | `v0.1.8-a43` | sender一覧が空のときOSCでStreamingをOFF/ONして再確認し、本体経由でsender復帰からcapture成功まで確認した。 |
 | 215 | [alpha/beta/rcを分けたバージョニング規則を定義する](maintenance-only/215-define-alpha-beta-rc-versioning.md) | 完了 | 整理のみ | RCを正式リリース直前確認に限定し、alpha/beta/rc/正式版のタグ規則、CI/CD対象、勝手なスコープ縮小禁止を明文化した。 |

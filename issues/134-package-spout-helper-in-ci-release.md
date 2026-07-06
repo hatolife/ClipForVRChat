@@ -32,7 +32,7 @@ zip内容検証でも必要ファイルの存在と不要ファイルの不在�
 ## 再監査メモ
 
 - 2026-07-01: [#164](closed/v0.1.8/164-audit-v018-completed-items.md) の再監査で未達が見つかったため、完了扱いを取り消して `要対応` に戻した。
-- 2026-07-01: `v0.1.8-rc13` のCI/Releaseで `LINK : fatal error LNK1181: cannot open input file 'SpoutLibrary_static.lib'` が発生した。Spout2 SDKは `SpoutLibrary_static` ではなく `SpoutLibrary` DLLターゲットを公開しているため、CMakeのリンク対象とRelease同梱物を修正する。
+- 2026-07-01: `v0.1.8-a13` のCI/Releaseで `LINK : fatal error LNK1181: cannot open input file 'SpoutLibrary_static.lib'` が発生した。Spout2 SDKは `SpoutLibrary_static` ではなく `SpoutLibrary` DLLターゲットを公開しているため、CMakeのリンク対象とRelease同梱物を修正する。
 
 ## 実装前調査メモ
 
@@ -67,7 +67,7 @@ zip内容検証でも必要ファイルの存在と不要ファイルの不在�
 - `tools/spout-capture/CMakeLists.txt` を `SpoutLibrary` DLLターゲットへ変更し、post-buildで `SpoutLibrary.dll` を `spout-capture.exe` と同じフォルダへコピーするようにした。
 - CI/Releaseの検証とRelease zip必須ファイルに `SpoutLibrary.dll` を追加した。
 - `release/v0.1.8` のCI run `28494855637` で `Build Spout helper`、`Check Spout helper`、Wails build まで成功した。
-- `v0.1.8-rc13` tagは修正前コミット `ba73625` で既にpush済みのため、Release run `28494613941` は失敗済み。タグのforce更新は禁止ルールがあるため、Release成果物の再作成には明示許可を得て `v0.1.8-rc13` を付け直すか、次のRCタグを作る必要がある。
+- `v0.1.8-a13` tagは修正前コミット `ba73625` で既にpush済みのため、Release run `28494613941` は失敗済み。タグのforce更新は禁止ルールがあるため、Release成果物の再作成には明示許可を得て `v0.1.8-a13` を付け直すか、次のRCタグを作る必要がある。
 
 確認方法:
 

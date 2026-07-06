@@ -2,7 +2,7 @@
 
 ## 問題
 
-CI/Release assetsに添付される `ClipForVRChat-v0.1.8-rc37-build-metadata.json` が、利用者向け成果物なのか検証向け成果物なのか分かりにくい。
+CI/Release assetsに添付される `ClipForVRChat-v0.1.8-a37-build-metadata.json` が、利用者向け成果物なのか検証向け成果物なのか分かりにくい。
 
 ## 期待する挙動
 

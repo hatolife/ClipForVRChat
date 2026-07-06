@@ -2,7 +2,7 @@
 
 ## 問題
 
-v0.1.8-rc13ではStream Camera(Spout)方式のために `ClipForVRChat.exe`、`spout-capture.exe`、`SpoutLibrary.dll` が分かれている。
+v0.1.8-a13ではStream Camera(Spout)方式のために `ClipForVRChat.exe`、`spout-capture.exe`、`SpoutLibrary.dll` が分かれている。
 v0.1.7までは利用者が主に `ClipForVRChat.exe` だけを改竄確認すればよかったが、複数バイナリになると確認対象が増え、PGP署名やハッシュ確認の手間が増える。
 
 ## 期待する挙動
@@ -22,7 +22,7 @@ v0.1.7までは利用者が主に `ClipForVRChat.exe` だけを改竄確認す�
 ### 現行構成
 
 - `v0.1.7` のRelease workflowは `ClipForVRChat.exe`、README、LICENSE、公開鍵URLをzipへ入れ、`ClipForVRChat.exe` に対する detached PGP署名 `.exe.asc` を添付していた。
-- `v0.1.8-rc13` のRelease workflowは `Build Spout helper` で `spout-capture.exe` を作り、同じ出力フォルダの `SpoutLibrary.dll` も `dist/ClipForVRChat/` へコピーする。
+- `v0.1.8-a13` のRelease workflowは `Build Spout helper` で `spout-capture.exe` を作り、同じ出力フォルダの `SpoutLibrary.dll` も `dist/ClipForVRChat/` へコピーする。
 - 現行の `.exe.asc` は `dist/ClipForVRChat/ClipForVRChat.exe` だけを対象にしている。zipのsha256はあるが、実行される `spout-capture.exe` と `SpoutLibrary.dll` をPGP署名で個別確認する導線はない。
 - アプリ本体は `src/internal/appcore/spout.go` で `spout-capture.exe` を別プロセスとして呼び出す。これによりSpout/DirectX/OpenGL/DLLロードの失敗を本体プロセスから隔離している。
 - Spout2 `2.007.015` の公式CMakeでは `SpoutLibrary` は `add_library(SpoutLibrary SHARED ...)` であり、公式コメントでも `SpoutLibrary.dll` を実行ファイルと同じフォルダに置く前提になっている。
@@ -211,7 +211,7 @@ OBSでVRChatを映せる経路は大きく2種類ある。
    - plugin実装も `SpoutLibrary` をリンクし、Spout DLL類をplugin配下へコピーする構成になっている。
 
 したがって、OBSでStream Cameraを直接受けられる場合も、実体はSpout受信であり、ClipForVRChatが既に採用している方向と同じ。
-OBS標準の画面キャプチャへ戻せば追加DLL問題は避けやすいが、それは「Stream Camera映像そのもの」ではなく、v0.1.8-rc12以前の白画像・画面周辺キャプチャ問題へ戻る。
+OBS標準の画面キャプチャへ戻せば追加DLL問題は避けやすいが、それは「Stream Camera映像そのもの」ではなく、v0.1.8-a12以前の白画像・画面周辺キャプチャ問題へ戻る。
 OBS Spout plugin方式を採用してもSpout native依存は残るため、exe/dll分割問題の根本解決にはならない。
 
 ### 追加調査で確認した外部一次情報

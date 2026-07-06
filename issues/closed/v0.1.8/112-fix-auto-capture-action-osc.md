@@ -2,7 +2,7 @@
 
 ## 問題
 
-v0.1.8-rc1 の自動撮影で「撮影後のVRChat写真ファイルを検出できませんでした」と表示され、VRChat側にも写真が保存されない。`/usercamera/Capture` をbool押下として送っているため、VRChatのAction OSCとして認識されていない可能性がある。
+v0.1.8-a1 の自動撮影で「撮影後のVRChat写真ファイルを検出できませんでした」と表示され、VRChat側にも写真が保存されない。`/usercamera/Capture` をbool押下として送っているため、VRChatのAction OSCとして認識されていない可能性がある。
 
 ## 期待する挙動
 

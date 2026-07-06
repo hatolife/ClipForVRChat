@@ -2,7 +2,7 @@
 
 ## 問題
 
-`v0.1.8-rc36` で自動撮影タブの「このPoseへカメラ移動」を押すと、`playerLocal.basisSource` が `avatar_osc` でAvatarBeacon受信もreadyになっているにもかかわらず、次のmanual基準Poseエラーが出る。
+`v0.1.8-a36` で自動撮影タブの「このPoseへカメラ移動」を押すと、`playerLocal.basisSource` が `avatar_osc` でAvatarBeacon受信もreadyになっているにもかかわらず、次のmanual基準Poseエラーが出る。
 
 ```text
 プレイヤー基準Poseが未設定のため、player_local構図を撮影できません。自動撮影タブで現在Poseをプレイヤー基準として保存してください
@@ -10,7 +10,7 @@
 
 また、カメラ移動先が常にワールド座標のように見え、プレイヤーの位置と向きを基準にしたローカル構図として移動できていない。
 
-rc36ログでは `auto-capture move camera open begin` 後に `auto-capture camera pose resolve error` が出ており、撮影本体の `run_once` では `player_local` の `resolved_pose` が計算されている。
+a36ログでは `auto-capture move camera open begin` 後に `auto-capture camera pose resolve error` が出ており、撮影本体の `run_once` では `player_local` の `resolved_pose` が計算されている。
 このため、カメラ移動APIだけが古いmanual基準の解決経路を使っている可能性が高い。
 
 ## 期待する挙動

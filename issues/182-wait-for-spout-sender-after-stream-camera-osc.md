@@ -2,7 +2,7 @@
 
 ## 問題
 
-`v0.1.8-rc26` のStream方式テスト撮影で、アプリは `/usercamera/Mode=2`、`/usercamera/SmoothMovement=true`、`/usercamera/Streaming=true` を送信しているが、Spout helperが起動直後のsender一覧だけを見て `Spout senderがありません` と即失敗する。
+`v0.1.8-a26` のStream方式テスト撮影で、アプリは `/usercamera/Mode=2`、`/usercamera/SmoothMovement=true`、`/usercamera/Streaming=true` を送信しているが、Spout helperが起動直後のsender一覧だけを見て `Spout senderがありません` と即失敗する。
 
 実機ログでは `Streaming=true` 送信から約3秒後に helper を起動しているが、helper側は `--timeout-ms 10000` をフレーム取得待ちにしか使っておらず、sender出現待ちには使っていない。そのためVRChat側のStream Camera/Spout sender生成が遅い場合に、カメラ自動起動を送っていても失敗する。
 

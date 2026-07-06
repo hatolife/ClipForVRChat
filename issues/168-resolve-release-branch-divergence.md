@@ -2,7 +2,7 @@
 
 ## 問題
 
-`release/v0.1.8` が `origin/release/v0.1.8` に対して `ahead 3, behind 2` となり、ローカル修正とremote上のreport追加/rc13 status記録が分岐している。
+`release/v0.1.8` が `origin/release/v0.1.8` に対して `ahead 3, behind 2` となり、ローカル修正とremote上のreport追加/a13 status記録が分岐している。
 
 ## 期待する挙動
 
