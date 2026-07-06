@@ -1,7 +1,8 @@
-# OSC転送UI説明改善チェックリスト
+# Stream方式撮影失敗 調査チェックリスト
 
 - [x] 既存issueを確認する
-- [x] issue 189 にUI説明改善を追記する
-- [x] OSCタブの説明文を更新する
-- [x] フロントエンドtemplate検証を実行する
-- [x] 変更をコミットする
+- [x] 調査チケットを作成する
+- [ ] spout-capture.exe単体でsender列挙を確認する
+- [ ] spout-capture.exe単体でcaptureとdebug録画を確認する
+- [ ] ClipForVRChat経由のhelper実行引数とdebug出力を確認する
+- [ ] 原因の層を特定し、修正方針を決める
