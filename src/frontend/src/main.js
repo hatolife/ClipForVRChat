@@ -1950,7 +1950,7 @@ const vueApp = createApp({
             <h2>設定</h2>
             <p v-if="state.message" class="message" :class="{ warning: isError }">{{ state.message }}</p>
           </div>
-          <div v-if="state.config && !isAutoCaptureDetailActive" class="settings-title-actions">
+          <div v-if="state.config" class="settings-title-actions">
             <button @click="saveSettings()" :disabled="saving" :title="saving ? '保存中です' : '設定を保存する'">{{ saving ? '保存中' : '保存' }}</button>
             <button class="secondary" @click="closeSettings" title="設定画面を閉じる">閉じる</button>
             <span v-if="saved" class="saved">保存しました</span>
