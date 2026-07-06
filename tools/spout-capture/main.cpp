@@ -663,6 +663,7 @@ struct DiagnoseSummary {
   int ambiguous_sender_samples = 0;
   int receive_attempts = 0;
   int receive_successes = 0;
+  int receiver_updates = 0;
   int valid_frames = 0;
   int blank_frames = 0;
   int64_t first_frame = -1;
@@ -739,6 +740,7 @@ void write_diagnose_summary_json(std::ostream &out, const DiagnoseSummary &summa
       << ",\"frameAdvanced\":" << (summary.frame_advanced ? "true" : "false")
       << ",\"receiveAttempts\":" << summary.receive_attempts
       << ",\"receiveSuccesses\":" << summary.receive_successes
+      << ",\"receiverUpdates\":" << summary.receiver_updates
       << ",\"validFrames\":" << summary.valid_frames
       << ",\"blankFrames\":" << summary.blank_frames
       << ",\"lastFrameStats\":";
@@ -797,6 +799,7 @@ int diagnose(SPOUTHANDLE spout, const Options &options) {
 
     bool receive_attempted = false;
     bool receive_ok = false;
+    bool receiver_updated = false;
     FrameStats stats;
     int64_t sender_frame = -1;
     std::string frame_state = "no_sender";
@@ -828,35 +831,42 @@ int diagnose(SPOUTHANDLE spout, const Options &options) {
         receive_attempted = true;
         summary.receive_attempts++;
         if (spout->ReceiveImage(pixels.data(), GL_RGBA, false, 0)) {
-          receive_ok = true;
-          summary.receive_successes++;
-          stats = analyze_rgba_frame(pixels, width, height);
-          summary.last_stats = stats;
-          debug.dump_frame(pixels, width, height, sender_frame, stats);
-          if (is_blank_frame(stats)) {
-            summary.blank_frames++;
-            frame_state = "blank";
+          if (spout->IsUpdated()) {
+            receiver_updated = true;
+            summary.receiver_updates++;
+            frame_state = "receiver_updated";
+            debug.log_event("diagnose receiver updated sender_frame=" + std::to_string(sender_frame));
           } else {
-            summary.valid_frames++;
-            frame_state = "valid";
-            if (summary.output_requested && !summary.output_written && summary.output_error.empty()) {
-              std::error_code ec;
-              if (!options.output.parent_path().empty()) {
-                std::filesystem::create_directories(options.output.parent_path(), ec);
-              }
-              if (ec) {
-                summary.output_error = "output directory could not be created: " + ec.message();
-                debug.log_event("diagnose output directory error=\"" + summary.output_error + "\"");
-              } else {
-                std::vector<unsigned char> output_pixels = pixels;
-                force_opaque_alpha(output_pixels);
-                std::string write_error;
-                if (write_png_wic(options.output, width, height, output_pixels, &write_error)) {
-                  summary.output_written = true;
-                  debug.log_event("diagnose output written path=\"" + options.output.u8string() + "\"");
+            receive_ok = true;
+            summary.receive_successes++;
+            stats = analyze_rgba_frame(pixels, width, height);
+            summary.last_stats = stats;
+            debug.dump_frame(pixels, width, height, sender_frame, stats);
+            if (is_blank_frame(stats)) {
+              summary.blank_frames++;
+              frame_state = "blank";
+            } else {
+              summary.valid_frames++;
+              frame_state = "valid";
+              if (summary.output_requested && !summary.output_written && summary.output_error.empty()) {
+                std::error_code ec;
+                if (!options.output.parent_path().empty()) {
+                  std::filesystem::create_directories(options.output.parent_path(), ec);
+                }
+                if (ec) {
+                  summary.output_error = "output directory could not be created: " + ec.message();
+                  debug.log_event("diagnose output directory error=\"" + summary.output_error + "\"");
                 } else {
-                  summary.output_error = write_error;
-                  debug.log_event("diagnose output write failed error=\"" + write_error + "\"");
+                  std::vector<unsigned char> output_pixels = pixels;
+                  force_opaque_alpha(output_pixels);
+                  std::string write_error;
+                  if (write_png_wic(options.output, width, height, output_pixels, &write_error)) {
+                    summary.output_written = true;
+                    debug.log_event("diagnose output written path=\"" + options.output.u8string() + "\"");
+                  } else {
+                    summary.output_error = write_error;
+                    debug.log_event("diagnose output write failed error=\"" + write_error + "\"");
+                  }
                 }
               }
             }
@@ -883,6 +893,7 @@ int diagnose(SPOUTHANDLE spout, const Options &options) {
              << ",\"frameAdvanced\":" << (summary.frame_advanced ? "true" : "false")
              << ",\"receiveAttempted\":" << (receive_attempted ? "true" : "false")
              << ",\"receiveOK\":" << (receive_ok ? "true" : "false")
+             << ",\"receiverUpdated\":" << (receiver_updated ? "true" : "false")
              << ",\"frameState\":\"" << json_escape(frame_state) << "\""
              << ",\"outputWritten\":" << (summary.output_written ? "true" : "false")
              << ",\"frameStats\":";
@@ -910,6 +921,7 @@ int diagnose(SPOUTHANDLE spout, const Options &options) {
                   "\" samples=" + std::to_string(summary.samples) +
                   " sender_samples=" + std::to_string(summary.sender_samples) +
                   " receive_successes=" + std::to_string(summary.receive_successes) +
+                  " receiver_updates=" + std::to_string(summary.receiver_updates) +
                   " valid_frames=" + std::to_string(summary.valid_frames) +
                   " blank_frames=" + std::to_string(summary.blank_frames));
   write_diagnose_summary_json(std::cout, summary, options, code, timeline_path, summary_path, debug.dumped_frames);
@@ -960,6 +972,11 @@ int capture(SPOUTHANDLE spout, const Options &options) {
     pixels.assign(static_cast<size_t>(width) * static_cast<size_t>(height) * 4, 0);
     observation.receive_attempts++;
     if (spout->ReceiveImage(pixels.data(), GL_RGBA, false, 0)) {
+      if (spout->IsUpdated()) {
+        debug.log_event("receiver updated sender_frame=" + std::to_string(current_frame));
+        std::this_thread::sleep_for(std::chrono::milliseconds(30));
+        continue;
+      }
       observation.saw_receive_success = true;
       observation.receive_successes++;
       observation.last_received_frame = current_frame;

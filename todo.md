@@ -1,6 +1,8 @@
-# issue 212 Spout diagnose capture統合チェックリスト
+# issue 212 Spout IsUpdated対応チェックリスト
 
-- [x] 別プロセスcaptureでsenderが消える挙動を212に記録する
-- [x] `--diagnose --output` で同一プロセスPNG保存を追加する
-- [x] summary JSONにoutput結果を出す
+- [x] rc42を作成してDownloadsへ展開する
+- [x] rc42の `--diagnose --output` を実機確認する
+- [x] Spout2の `IsUpdated()` を受信ループで消費する
+- [x] diagnose summaryにreceiver update回数を出す
 - [x] 構文チェックとCTestを通す
+- [ ] rc43を作成して実機確認する
