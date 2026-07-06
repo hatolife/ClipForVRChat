@@ -216,6 +216,7 @@ const vueApp = createApp({
       }
       const autoCapture = this.state.config.autoCapture
       autoCapture.schedule ||= {}
+      if (autoCapture.schedule.captureOnStart === undefined) autoCapture.schedule.captureOnStart = true
       autoCapture.osc ||= {}
       autoCapture.osc.forward ||= {}
       if (autoCapture.osc.forward.enabled === undefined) autoCapture.osc.forward.enabled = false

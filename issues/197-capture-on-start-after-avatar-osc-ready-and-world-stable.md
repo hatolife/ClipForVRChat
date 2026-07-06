@@ -57,6 +57,7 @@ AvatarBeaconを前提にした `player_local` 構図では、撮影直後の位�
 
 ## 実装メモ
 
+- 2026-07-07追記: ユーザー指示「開始時に撮影を規定値でONに」に基づき、backend既定値だけでなくfrontend側の欠損補正でも `captureOnStart` をONにする。
 - `CaptureOnStart` の初期値変更は、単純なdefault変更だけだと既存configの明示OFFと区別できない可能性がある。
 - 現状の `AutoCaptureScheduleConfig.CaptureOnStart` は plain `bool` で、未設定と明示 `false` をJSON上で区別できない。
   - 定義: `src/internal/appcore/config.go`
