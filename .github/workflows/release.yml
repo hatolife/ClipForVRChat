@@ -35,25 +35,29 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref }}
+          fetch-depth: 0
 
       - name: Prepare version
         id: version
         shell: pwsh
         env:
           TAG_NAME: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag_name }}
-          COMMIT_SHA: ${{ github.sha }}
         run: |
           $tagName = $env:TAG_NAME
           if ($tagName -notmatch '^v\d+\.\d+\.\d+(-(a|b|rc)\d+)?$') {
             throw "Release tag must match vX.Y.Z, vX.Y.Z-aN, vX.Y.Z-bN, or vX.Y.Z-rcN: $tagName"
           }
-          $shortSha = $env:COMMIT_SHA.Substring(0, 7)
+          $commitSha = git rev-parse HEAD
+          $shortSha = git rev-parse --short=7 HEAD
           $releaseTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
           $isPrerelease = $tagName -match '^v\d+\.\d+\.\d+-(a|b|rc)\d+$'
           $assetPrefix = "ClipForVRChat-$tagName"
           $avatarAssetPrefix = "AvatarBeacon-$tagName-source"
           "app_version=$tagName.$shortSha" >> $env:GITHUB_OUTPUT
           "version=$tagName" >> $env:GITHUB_OUTPUT
+          "commit_sha=$commitSha" >> $env:GITHUB_OUTPUT
           "revision=$shortSha" >> $env:GITHUB_OUTPUT
           "release_time=$releaseTime" >> $env:GITHUB_OUTPUT
           "asset_prefix=$assetPrefix" >> $env:GITHUB_OUTPUT
@@ -277,7 +281,7 @@ jobs:
         shell: pwsh
         env:
           TAG_NAME: ${{ steps.version.outputs.version }}
-          COMMIT_SHA: ${{ github.sha }}
+          COMMIT_SHA: ${{ steps.version.outputs.commit_sha }}
           APP_FULL_VERSION: ${{ steps.version.outputs.app_version }}
           APP_VERSION: ${{ steps.version.outputs.version }}
           APP_REVISION: ${{ steps.version.outputs.revision }}
@@ -458,9 +462,42 @@ jobs:
 
       - name: Prepare release notes
         if: steps.version.outputs.draft == 'false'
+        shell: pwsh
         env:
           TAG_NAME: ${{ steps.version.outputs.version }}
-        run: node scripts/extract-release-notes.mjs "$env:TAG_NAME" RELEASE_NOTES.md dist/release-body.md --fallback-rc-notes
+        run: |
+          $tagName = $env:TAG_NAME
+          $releaseNotesPath = "RELEASE_NOTES.md"
+          $outPath = "dist/release-body.md"
+          $content = Get-Content -Raw -Encoding UTF8 $releaseNotesPath
+
+          function Find-ReleaseNotesSection([string] $version) {
+            $escapedVersion = [regex]::Escape($version)
+            $pattern = "(?ms)^## $escapedVersion\s*`$([\s\S]*?)(?=^## v\d+\.\d+\.\d+(?:-(?:a|b|rc)\d+)?\s*`$|(?![\s\S]))"
+            $match = [regex]::Match($content, $pattern)
+            if ($match.Success) {
+              return $match.Groups[1].Value.Trim()
+            }
+            return $null
+          }
+
+          $sourceVersion = $tagName
+          $body = Find-ReleaseNotesSection $tagName
+          if (-not $body) {
+            $preMatch = [regex]::Match($tagName, '^(v\d+\.\d+\.\d+)-(?:a|b|rc)\d+$')
+            if ($preMatch.Success) {
+              $sourceVersion = $preMatch.Groups[1].Value
+              $body = Find-ReleaseNotesSection $sourceVersion
+            }
+          }
+          if (-not $body) {
+            throw "release notes for $tagName were not found in $releaseNotesPath"
+          }
+          if ($sourceVersion -ne $tagName) {
+            $body = $body -replace [regex]::Escape($sourceVersion), $tagName
+          }
+          New-Item -ItemType Directory -Force -Path (Split-Path -Parent $outPath) | Out-Null
+          Set-Content -Encoding UTF8 -NoNewline -Path $outPath -Value ($body + "`n")
 
       - name: Prepare draft release notes
         if: steps.version.outputs.draft == 'true'
