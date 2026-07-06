@@ -1,8 +1,7 @@
-# issue 212 Spout helper原因調査チェックリスト
+# issue 214 Spout sender空回復チェックリスト
 
-- [x] 既存チケットを確認して今回の調査対象を追記する
-- [x] rc40分離版 `spout-capture.exe` のバージョンと単体起動可否を確認する
-- [x] sender列挙結果を確認する
-- [x] capture/debug録画の結果を確認する
-- [x] 原因仮説と次の修正方針を記録する
-- [ ] debug録画JSONの不正形式修正を検証する
+- [x] sender空時の回復チケットを作成する
+- [x] Spout取得直前のsender事前チェックを追加する
+- [x] sender 0件時だけStreaming OFF/ON回復を追加する
+- [x] 回復挙動のテストを追加する
+- [x] Go testを実行する
