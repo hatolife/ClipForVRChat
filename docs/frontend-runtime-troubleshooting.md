@@ -69,6 +69,55 @@ cd src && GOCACHE=/tmp/clipforvrchat-go-cache go test ./...
 
 Release workflowでは `Check frontend template literals` が通っていることも確認する。
 
+## よくある原因: runtime templateのタグ不整合
+
+`src/frontend/src/main.js` はVue Single File Componentではなく、`createApp({ template: \`...\` })` のruntime templateを使っている。そのため、`npm run build` が成功しても、template内のHTML/Vue構文不整合はアプリ起動時のVue mountまで検出されないことがある。
+
+例:
+
+```html
+<template v-if="mode === 'a'">
+  <div>...</div>
+</template>
+</div>
+<template v-else-if="mode === 'b'">
+  <div>...</div>
+</template>
+```
+
+この例では `v-if` と `v-else-if` の間に余分な `</div>` が入り、Vue compilerが `Element is missing end tag.` や `Invalid end tag.` を出す。配布版では `frontend_mount_error` として `SyntaxError: https://vuejs.org/error-reference/#compiler-24` などが記録される。
+
+## この原因であるという同定方法
+
+次の条件が揃う場合、このパターンを疑う。
+
+1. ログに `frontend_script_loaded api=available` が出ている。
+2. `api GetInitialState begin` が出ていない。
+3. `frontend_mount_error` または `frontend_error` に `compiler-24`、`Element is missing end tag.`、`Invalid end tag.` のいずれかが出ている。
+4. `src/frontend/src/main.js` のVue template内で、`v-if` / `v-else-if` / `v-else` の連鎖や閉じタグを最近変更している。
+
+確認コマンド:
+
+```bash
+node scripts/check-vue-runtime-template.mjs
+```
+
+## 対処方法
+
+`src/frontend/src/main.js` のtemplate内で、エラー行付近のタグ対応と `v-if` / `v-else-if` / `v-else` の隣接関係を修正する。`v-else-if` と `v-else` は、対応する `v-if` の直後に置き、間に別要素や余分な閉じタグを挟まない。
+
+修正後は最低限、次を実行する。
+
+```bash
+node scripts/check-frontend-template-literals.mjs
+node scripts/check-vue-runtime-template.mjs
+node scripts/check-wails-api-surface.mjs
+npm run build
+cd src && GOCACHE=/tmp/clipforvrchat-go-cache go test ./...
+```
+
+Release workflowでは `Check Vue runtime template` が通っていることも確認する。
+
 ## UI表示不具合時の基本順序
 
 1. 最新の `logs/YYYY-MM-DD.log` を読む。

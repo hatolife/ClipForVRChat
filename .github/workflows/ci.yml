@@ -75,6 +75,9 @@ jobs:
       - name: Check frontend template literals
         run: node scripts/check-frontend-template-literals.mjs
 
+      - name: Check Vue runtime template
+        run: node scripts/check-vue-runtime-template.mjs
+
       - name: Check Wails API surface
         run: node scripts/check-wails-api-surface.mjs
 

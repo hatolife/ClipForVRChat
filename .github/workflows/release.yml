@@ -94,6 +94,9 @@ jobs:
       - name: Check frontend template literals
         run: node scripts/check-frontend-template-literals.mjs
 
+      - name: Check Vue runtime template
+        run: node scripts/check-vue-runtime-template.mjs
+
       - name: Test Go packages
         working-directory: src
         run: go test ./...

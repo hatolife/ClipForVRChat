@@ -2570,7 +2570,6 @@ const vueApp = createApp({
                   <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.restore.fallback.greenScreen" :disabled="!autoCaptureSettings.restore.enabled" /><span></span></label>
                 </div>
               </template>
-            </div>
               <template v-else-if="autoCaptureDetailView === 'fallback'">
                 <div class="setting-row" :class="settingRowChangedClass('autoCapture.capture.autoEnablePreplacedLocalAnchor')">
                   <div><strong>フォールバックモードを自動ON</strong><p>AvatarBeacon basisを一定時間受信できない場合に、フォールバックモードをONにします。</p></div>
