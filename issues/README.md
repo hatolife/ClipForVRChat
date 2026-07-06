@@ -41,7 +41,6 @@
 | 201 | [a36でStream Camera起動済みでもSpout取得が透明フレームになる](201-a36-spout-transparent-frame-with-stream-camera-active.md) | 要確認 | `v0.1.8` | sender frame番号不変かつ全透明のSpout失敗を明確なエラー文で切り分ける。helper改善は実機確認が必要。 |
 | 202 | [Spout helperに録画デバッグ出力を追加し起動コンソールを隠す](202-add-spout-helper-debug-recording-and-hide-console.md) | 要確認 | `v0.1.8` | Spout helperで受信RGBAフレームとmetadata/logを保存できるデバッグ引数を追加し、テスト撮影から有効化できるようにする。 |
 | 208 | [自動撮影説明を改善し、カメラ自動起動/終了を既定OFFにする](208-improve-auto-capture-help-and-disable-camera-auto-open-close.md) | 要確認 | `v0.1.8` | 自動撮影説明とAvatarBeacon状態表示を整理し、Camera OSCの不安定さを避けるためカメラ自動起動/終了を設定化して既定OFFにする。 |
-| 216 | [v0.1.8既存RCタグをalpha/beta扱いへ整理する](216-reclassify-v018-rc-tags-to-alpha-beta.md) | 要対応 | 未定 | 既存の `v0.1.8-a1..a43` を alpha、`b1` を beta としてタグ・記録・分類を整理する。 |
 
 ## 状態の意味
 

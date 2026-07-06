@@ -28,8 +28,18 @@
 ## タグ操作メモ
 
 - `v0.1.8-a1..a43` と `v0.1.8-b1` を旧タグと同じcommitへ作成する。
-- 2026-07-07: ローカルでは `v0.1.8-a1..a43` と `v0.1.8-b1` を旧タグと同じcommitへ作成し、commit対応が一致することを確認した。リモートへは未push。
+- 2026-07-07: ローカルでは `v0.1.8-a1..a43` と `v0.1.8-b1` を旧タグと同じcommitへ作成し、commit対応が一致することを確認した。
+- 2026-07-07: `release/v0.1.8` の記録更新commitをpushした。
+- 2026-07-07: Release workflowを一時停止し、`v0.1.8-rc44` GitHub Releaseを削除したうえで、`v0.1.8-a1..a43` と `v0.1.8-b1` をremoteへpushした。
+- 2026-07-07: 旧 `v0.1.8-rc1..rc44` をremote/localから削除し、Release workflowを再有効化した。
 - `v*` タグpushはRelease workflowを起動するため、新タグを一括pushすると最大44本のRelease workflowが走る。さらに、新タグが指す旧commit上のRelease workflowは `a/b` タグを受け付けない可能性が高いため、通常pushでは失敗する見込み。
 - リモートタグを整理する場合は、Release workflowを一時停止してタグ参照だけ移すか、失敗するRelease workflowを許容してpushするかを決めてから実施する。
 - 新タグのcommit対応を確認してから、旧 `v0.1.8-rc1..rc44` のremote/localタグを削除する。
 - 既存GitHub Releaseが残っている場合は、タグ削除とは別にRelease削除または再作成を確認する。
+
+## 完了確認
+
+- `gh workflow list --repo hatolife/ClipForVRChat` で Release workflow が active であることを確認した。
+- `git ls-remote --tags origin 'v0.1.8-a*' 'v0.1.8-b*' 'v0.1.8-rc*'` でremoteに `v0.1.8-a1..a43` と `v0.1.8-b1` があり、旧 `v0.1.8-rc*` がないことを確認した。
+- `git tag --list 'v0.1.8-a*' 'v0.1.8-b*' 'v0.1.8-rc*'` でlocalに `v0.1.8-a1..a43` と `v0.1.8-b1` があり、旧 `v0.1.8-rc*` がないことを確認した。
+- `gh release list --repo hatolife/ClipForVRChat --limit 20` で `v0.1.8-rc44` Releaseが残っていないことを確認した。
