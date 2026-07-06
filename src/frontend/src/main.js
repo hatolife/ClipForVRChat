@@ -2057,7 +2057,6 @@ const vueApp = createApp({
                           </label>
                           <div class="view-meta">
                             <span :class="['status-pill', cameraView.enabled ? 'ok' : 'muted']">{{ cameraView.enabled ? '撮影する' : '撮影しない' }}</span>
-                            <span :class="['status-pill', cameraView.calibrated ? 'ok' : 'muted']">{{ cameraView.calibrated ? 'キャリブレーション済み' : '未キャリブレーション' }}</span>
                             <span class="status-pill">{{ coordinateSpaceLabel(cameraView.coordinateSpace) }}</span>
                           </div>
                         </div>

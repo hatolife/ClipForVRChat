@@ -177,3 +177,4 @@
 | 205 | [Release build metadata assetの意図を確認する](205-investigate-release-build-metadata-asset.md) | 完了 | 調査のみ | Release assetに添付されるbuild metadata JSONの生成箇所、内容、添付意図を確認した。 |
 | 206 | [自動撮影機能を使用するための条件を整理する](206-investigate-auto-capture-user-requirements.md) | 完了 | 調査のみ | 自動撮影を使うための前提条件、方式別条件、構図基準、任意機能の条件を整理した。 |
 | 207 | [設定保存時に変更後の設定値を診断ログへ出力する](207-log-config-values-after-settings-save.md) | 完了 | 未定 | 設定保存成功/失敗時に診断ログを出し、Webhook設定有無とフォールバック状態を秘密情報なしで追えるようにした。 |
+| 209 | [構図カードの未キャリブレーション表示を分かりやすくする](209-clarify-camera-view-calibration-label.md) | 完了 | 未定 | 構図カードから内部状態のキャリブレーション表示を削除し、撮影対象と座標系だけを表示する。 |
