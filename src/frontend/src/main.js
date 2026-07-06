@@ -610,7 +610,7 @@ const vueApp = createApp({
       return '自動撮影設定'
     },
     autoCaptureDetailDescription() {
-      if (this.autoCaptureDetailView === 'composition') return '撮影する構図、フォールバック、座標系、Pose、拡大率、並び順を設定します。'
+      if (this.autoCaptureDetailView === 'composition') return '撮影する構図、座標系、Pose、拡大率、並び順を設定します。'
       if (this.autoCaptureDetailView === 'capture') return 'Stream方式のSpout受信、出力先、保存形式、ファイル名を設定します。'
       if (this.autoCaptureDetailView === 'metadata') return 'sidecar、画像メタデータ、同席ユーザー情報、Discord投稿、撮影後復元を設定します。'
       if (this.autoCaptureDetailView === 'schedule') return '自動撮影の開始条件と繰り返し間隔を設定します。'
@@ -2046,16 +2046,6 @@ const vueApp = createApp({
               </template>
               <template v-else-if="autoCaptureDetailView === 'composition'">
                 <section class="auto-capture-views" aria-label="構図設定">
-                  <div class="setting-row">
-                    <div>
-                      <strong>フォールバックモード</strong>
-                      <p>アバターギミック未導入の場合フォールバックモードのみ実行可能です。</p>
-                      <p>フォールバックモードで自動撮影する場合、ClipForVRChatは正しい位置にカメラを移動できません。</p>
-                      <p>VRChat内でカメラをローカルアンカーで配置し、出しっぱなしにしてください。</p>
-                      <p>ClipForVRChatが定期的に撮影だけ自動実行します。</p>
-                    </div>
-                    <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.capture.preplacedLocalAnchor" /><span></span></label>
-                  </div>
                   <div class="auto-capture-views-header">
                     <div>
                       <h4>構図設定</h4>
@@ -2251,13 +2241,6 @@ const vueApp = createApp({
                   <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.discord.enabled" /><span></span></label>
                 </div>
                 <div class="setting-row" :class="{ disabled: !autoCaptureSettings.discord.enabled }">
-                  <div><strong>自動撮影用Webhook URL</strong><p>通常投稿とは別の投稿先にしたい場合だけ入力します。空の場合は通常投稿用Webhook URLへ投稿します。</p></div>
-                  <label>
-                    <input type="password" v-model="autoCaptureSettings.discord.webhookUrl" placeholder="空なら通常投稿用Webhook URLを使用" :disabled="!autoCaptureSettings.discord.enabled" />
-                    <p v-if="autoCaptureSettings.discord.enabled" :class="['setting-note', webhookFallbackNoteClass(autoCaptureSettings.discord.webhookUrl, autoCaptureSettings.discord.enabled)]">{{ webhookFallbackNote(autoCaptureSettings.discord.webhookUrl, autoCaptureSettings.discord.enabled) }}</p>
-                  </label>
-                </div>
-                <div class="setting-row" :class="{ disabled: !autoCaptureSettings.discord.enabled }">
                   <div><strong>Discordに画像を添付する</strong><p>OFFの場合は撮影情報の本文だけを投稿します。画像はローカル保存先とsidecar JSONで保持します。</p></div>
                   <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.discord.includeImages" :disabled="!autoCaptureSettings.discord.enabled" /><span></span></label>
                 </div>
@@ -2342,6 +2325,16 @@ const vueApp = createApp({
               </template>
             </div>
             <template v-else>
+            <div class="setting-row">
+              <div>
+                <strong>フォールバックモード</strong>
+                <p>アバターギミック未導入の場合フォールバックモードのみ実行可能です。</p>
+                <p>フォールバックモードで自動撮影する場合、ClipForVRChatは正しい位置にカメラを移動できません。</p>
+                <p>VRChat内でカメラをローカルアンカーで配置し、出しっぱなしにしてください。</p>
+                <p>ClipForVRChatが定期的に撮影だけ自動実行します。</p>
+              </div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.capture.preplacedLocalAnchor" /><span></span></label>
+            </div>
             <div class="setting-row">
               <div>
                 <strong>構図設定</strong>
@@ -2599,6 +2592,13 @@ const vueApp = createApp({
               <label>
                 <input type="password" v-model="state.config.screenshotAutoPost.webhookUrl" placeholder="空なら通常投稿用Webhook URLを使用" :disabled="!state.config.output.uploadDiscord || !state.config.screenshotAutoPost.enabled" />
                 <p v-if="state.config.output.uploadDiscord && state.config.screenshotAutoPost.enabled" :class="['setting-note', webhookFallbackNoteClass(state.config.screenshotAutoPost.webhookUrl, state.config.screenshotAutoPost.enabled)]">{{ webhookFallbackNote(state.config.screenshotAutoPost.webhookUrl, state.config.screenshotAutoPost.enabled) }}</p>
+              </label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord || !state.config.autoCapture.discord.enabled }">
+              <div><strong>自動撮影用Webhook URL</strong><p>通常投稿とは別の投稿先にしたい場合だけ入力します。空の場合は通常投稿用Webhook URLへ投稿します。</p></div>
+              <label>
+                <input type="password" v-model="state.config.autoCapture.discord.webhookUrl" placeholder="空なら通常投稿用Webhook URLを使用" :disabled="!state.config.output.uploadDiscord || !state.config.autoCapture.discord.enabled" />
+                <p v-if="state.config.output.uploadDiscord && state.config.autoCapture.discord.enabled" :class="['setting-note', webhookFallbackNoteClass(state.config.autoCapture.discord.webhookUrl, state.config.autoCapture.discord.enabled)]">{{ webhookFallbackNote(state.config.autoCapture.discord.webhookUrl, state.config.autoCapture.discord.enabled) }}</p>
               </label>
             </div>
           </section>

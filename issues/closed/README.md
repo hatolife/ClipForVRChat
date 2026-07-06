@@ -186,6 +186,8 @@
 | 222 | [フォールバックモードを既定ONにしOFF時は通常撮影失敗を許容する](v0.1.8-b4/222-default-enable-preplaced-local-anchor-toggle.md) | 完了 | `v0.1.8-b4` | ローカルアンカー配置済みカメラのフォールバックを既定ONにし、OFF時は自動フォールバックせず通常撮影の失敗を見えるようにした。 |
 | 223 | [保存/閉じるボタンを上部ナビ右へ移動する](unreleased/223-move-settings-actions-to-header-nav.md) | 完了 | 未定 | 設定画面中の保存/閉じる操作を、設定/使い方/情報ボタンの右側へ移動した。 |
 | 224 | [終了時にSpout helper展開キャッシュを削除する](unreleased/224-clean-spout-helper-cache-on-exit.md) | 完了 | 未定 | `%LOCALAPPDATA%\ClipForVRChat\spout-helper` に展開された内蔵Spout helperの管理キャッシュをアプリ終了時に削除するようにした。 |
+| 225 | [自動撮影用Webhook URLをDiscord投稿タブへ移動する](unreleased/225-move-autocapture-webhook-to-discord-tab.md) | 完了 | 未定 | 自動撮影用Webhook URLをDiscord投稿タブへ移し、投稿先設定を同じ場所にまとめた。 |
+| 226 | [フォールバックモードを構図設定の上へ移動する](unreleased/226-move-fallback-mode-above-composition.md) | 完了 | 未定 | 自動撮影タブ概要で構図設定の上にフォールバックモードを表示し、詳細画面に入らず切り替えられるようにした。 |
 | 213 | [完了済みissueを対応バージョンごとのフォルダに整理する](maintenance-only/213-organize-closed-issues-by-version.md) | 完了 | 整理のみ | 完了済みissueを対応バージョン別フォルダへ移動し、READMEリンクと運用ルールを更新した。 |
 | 212 | [Stream方式撮影失敗をSpout helper録画から切り分ける](v0.1.8-a43/212-investigate-stream-capture-spout-helper-debug-recording.md) | 完了 | `v0.1.8-a43` | Spout helper単体と本体経由の実機確認で、`IsUpdated()` 未処理による透明フレームを修正し、Stream方式撮影成功を確認した。 |
 | 214 | [Spout senderが空のときStreamingをOFF/ONして再確認する](v0.1.8-a43/214-retry-spout-sender-after-streaming-toggle.md) | 完了 | `v0.1.8-a43` | sender一覧が空のときOSCでStreamingをOFF/ONして再確認し、本体経由でsender復帰からcapture成功まで確認した。 |
