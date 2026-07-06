@@ -42,9 +42,8 @@
 - `vX.Y.Z-aW` / `vX.Y.Z-bW` / `vX.Y.Z-rcW` タグのGitHub Releaseは prerelease として作成される。Release本文は原則として `RELEASE_NOTES.md` の同じバージョン見出しから作成し、専用見出しがない場合は対応する `vX.Y.Z` の見出しを使う。
 - 正式リリースは `vX.Y.Z` 形式のタグを打つ。GitHub Releaseは draft でも prerelease でもない通常Releaseとして作成される。
 - `vX.Y.Z` / `vX.Y.Z-aW` / `vX.Y.Z-bW` / `vX.Y.Z-rcW` 以外の `v*` タグは原則として作成しない。検証目的で一時タグが必要な場合は、GitHub Releaseを公開しない運用に留め、確認後にタグとReleaseを削除する。
-- `RELEASE_NOTES.md` の各バージョン本文は、GitHub Release本文としてそのまま使われるため、次の書式に揃える。
-  - 先頭は `# vX.Y.Z`。
-  - 続けて `## ダウンロード` を置き、`- [プログラムのダウンロード](https://github.com/hatolife/ClipForVRChat/releases/download/vX.Y.Z/ClipForVRChat-vX.Y.Z-windows-amd64.zip)` の1行を置く。
+- `RELEASE_NOTES.md` の各バージョン本文は、GitHub Release本文として使われるため、次の書式に揃える。GitHub Releaseのタイトルにバージョン番号が表示されるため、本文先頭に `# vX.Y.Z` のようなバージョン見出しを置かない。
+  - 先頭は `## ダウンロード` を置き、`- [プログラムのダウンロード](https://github.com/hatolife/ClipForVRChat/releases/download/vX.Y.Z/ClipForVRChat-vX.Y.Z-windows-amd64.zip)` の1行を置く。
   - 続けて `### 更新内容` を置き、直前の正式バージョンから見て結果的に何が変わったかを端的に列挙する。RCごとの細かい修正差分や内部作業の羅列にしない。
   - 最後に `### 比較` を置き、`https://github.com/hatolife/ClipForVRChat/compare/vA.B.C...vX.Y.Z` を置く。
 - GitHub Releaseへ公開添付するCI生成Assetは、通常利用者向けzip、単一exe署名asc、検証・切り分け用separated zip、AvatarBeacon source zipの4種類に絞る。sha256、個別exe、build metadataは公開Assetとして添付しない。

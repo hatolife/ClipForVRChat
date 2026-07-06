@@ -18,6 +18,8 @@ const findSection = (sectionVersion) => {
   const pattern = new RegExp(`^## ${escapedVersion}\\s*$([\\s\\S]*?)(?=^## v\\d+\\.\\d+\\.\\d+(?:-(?:a|b|rc)\\d+)?\\s*$|(?![\\s\\S]))`, 'm')
   return content.match(pattern)
 }
+const stripVersionHeading = (markdown) =>
+  markdown.replace(/^# v\d+\.\d+\.\d+(?:-(?:a|b|rc)\d+)?[ \t]*(?:\r?\n|$)/, '').trimStart()
 
 let match = findSection(version)
 let sourceVersion = version
@@ -51,6 +53,12 @@ if (!body) {
 if (sourceVersion !== version) {
   const escapedSourceVersion = sourceVersion.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   body = body.replace(new RegExp(escapedSourceVersion, 'g'), version)
+}
+
+body = stripVersionHeading(body)
+if (!body) {
+  console.error(`release notes for ${version} are empty after removing the version heading`)
+  process.exit(1)
 }
 
 fs.mkdirSync(path.dirname(outPath), { recursive: true })

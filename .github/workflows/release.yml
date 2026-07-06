@@ -462,42 +462,9 @@ jobs:
 
       - name: Prepare release notes
         if: steps.version.outputs.draft == 'false'
-        shell: pwsh
         env:
           TAG_NAME: ${{ steps.version.outputs.version }}
-        run: |
-          $tagName = $env:TAG_NAME
-          $releaseNotesPath = "RELEASE_NOTES.md"
-          $outPath = "dist/release-body.md"
-          $content = Get-Content -Raw -Encoding UTF8 $releaseNotesPath
-
-          function Find-ReleaseNotesSection([string] $version) {
-            $escapedVersion = [regex]::Escape($version)
-            $pattern = "(?ms)^## $escapedVersion\s*`$([\s\S]*?)(?=^## v\d+\.\d+\.\d+(?:-(?:a|b|rc)\d+)?\s*`$|(?![\s\S]))"
-            $match = [regex]::Match($content, $pattern)
-            if ($match.Success) {
-              return $match.Groups[1].Value.Trim()
-            }
-            return $null
-          }
-
-          $sourceVersion = $tagName
-          $body = Find-ReleaseNotesSection $tagName
-          if (-not $body) {
-            $preMatch = [regex]::Match($tagName, '^(v\d+\.\d+\.\d+)-(?:a|b|rc)\d+$')
-            if ($preMatch.Success) {
-              $sourceVersion = $preMatch.Groups[1].Value
-              $body = Find-ReleaseNotesSection $sourceVersion
-            }
-          }
-          if (-not $body) {
-            throw "release notes for $tagName were not found in $releaseNotesPath"
-          }
-          if ($sourceVersion -ne $tagName) {
-            $body = $body -replace [regex]::Escape($sourceVersion), $tagName
-          }
-          New-Item -ItemType Directory -Force -Path (Split-Path -Parent $outPath) | Out-Null
-          Set-Content -Encoding UTF8 -NoNewline -Path $outPath -Value ($body + "`n")
+        run: node scripts/extract-release-notes.mjs "$env:TAG_NAME" RELEASE_NOTES.md dist/release-body.md --fallback-rc-notes
 
       - name: Prepare draft release notes
         if: steps.version.outputs.draft == 'true'

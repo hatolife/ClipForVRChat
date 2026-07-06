@@ -2,8 +2,6 @@
 
 ## v0.1.8
 
-# v0.1.8
-
 ## ダウンロード
 
 - [プログラムのダウンロード](https://github.com/hatolife/ClipForVRChat/releases/download/v0.1.8/ClipForVRChat-v0.1.8-windows-amd64.zip)
