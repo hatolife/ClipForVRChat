@@ -92,7 +92,6 @@
 
 - F01 `Remote-player mask opt-out is silently reset`: explicit `false` をNormalizeで既定trueへ戻さない。
 - F08 `Unsaved draft can activate auto-post watchers`: 画像引数処理でresults modeへ入る場合、runtime watcher configを保存済みconfigへ戻す。
-- F17 `Auto-post warning suppressed when webhook is configured`: 自動写真/スクショ側は現HEADで大部分軽減済み。自動撮影側はF02の仕様判断に従属するため、今回の修正対象は残存する単純警告漏れが確認できた場合のみ。
 - F33/F34 `Screenshots ... wrong Discord webhook`: screenshot watcherの空WebhookがAutoPhoto webhookへfallbackしないようにする。
 
 #### 診断ログ・秘密情報redaction
@@ -127,6 +126,7 @@
 | --- | --- | --- | --- |
 | F09 | Debug OSC input is written verbatim to diagnostics | 現HEADの `SendDebugOSC` はraw lineを診断ログへ書かず、target/address/typesと結果だけを記録している。 | 対応済み扱い |
 | F16 | Unbounded OSC packet logging enables log DoS | 現HEADではOSCログはメモリ上 `maxOSCLogEntries=1000` に制限され、永続化も専用ログへthrottleされている。追加強化はF18/F14側で扱う。 | 軽減済み |
+| F17 | Auto-post warning suppressed when webhook is configured | 現HEADの `autoPostConfirmationItems` は、VRChat写真自動処理とスクリーンショット自動処理について、Webhook設定済みでも `output.uploadDiscord` かつ自動処理ONなら保存前確認へ出す。自動撮影側の同意境界はF02の仕様判断に従属する。 | 写真/スクショは対応済み扱い、自動撮影はF02従属 |
 | F19 | Metadata failures can lead to unvalidated Discord uploads | 後続実装確認が必要だが、画像decode/metadataの扱いとDiscord upload経路が複数に分かれるため、F38/F33/F34/F41完了後に再確認する。 | 後続再確認 |
 | F20 | Release notes step uses wrong env syntax on Windows | 現HEADのRelease workflowはPowerShellで `$env:...`、bashで環境変数を使い分けている。 | 対応済み扱い |
 | F29 | Hidden auto-processing folders can exfiltrate images | `issues/293` の対応で監視フォルダUI表示と保存前確認が追加済み。 | 対応済み扱い |
@@ -217,4 +217,4 @@
 - 重大な仕様変更・運用判断待ち: F02, F07, F11, F30, F37, F43, F44。今回の即時修正からは除外し、上記分類表の理由に沿って別途仕様判断する。
 - 追加情報・方針確認待ち: F05, F12。外部URL許可リストへ追加するhostを決める必要があるため、今回の即時修正からは除外した。
 - 後続再確認: F19。F33/F34/F38/F41の修正後に、metadata失敗時のDiscord upload経路が未検証投稿にならないか再確認する。
-- HEAD確認済み・重複・軽減済み: F09, F16, F20, F29, F40。追加コード修正は不要として扱った。
+- HEAD確認済み・重複・軽減済み: F09, F16, F17, F20, F29, F40。追加コード修正は不要として扱った。
