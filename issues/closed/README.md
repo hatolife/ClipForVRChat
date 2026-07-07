@@ -258,3 +258,4 @@
 | 289 | [Spout2取得をhash検証付きarchiveへ固定し更新運用を明文化する](unreleased/289-pin-spout2-archive-and-release-update-policy.md) | 完了 | 未定 | Spout2 revision更新運用をAGENTS.mdへ記載し、FetchContent取得を不変commit archiveとSHA256検証へ変更した。 |
 | 290 | [設定由来ffmpeg実行セキュリティレポートを解説する](investigation-only/290-explain-security-report-config-controlled-ffmpeg.md) | 完了 | 調査のみ | 外部JSON設定から任意ローカル実行ファイルをffmpegとして起動できるfindingの内容を整理した。 |
 | 291 | [設定由来のffmpeg実行パスを制限する](unreleased/291-restrict-config-controlled-ffmpeg-execution.md) | 完了 | 未定 | 外部JSON設定から任意実行ファイルをffmpegとして起動できないよう、ffmpeg実行名を既定名に限定し解決済みパスだけを実行するようにした。 |
+| 292 | [隠れた監視フォルダによる画像流出セキュリティレポートを解説する](investigation-only/292-explain-security-report-hidden-watch-directory-exfiltration.md) | 完了 | 調査のみ | 外部JSON設定から隠れた自動処理監視フォルダとWebhookを有効化できるfindingの内容を整理した。 |
