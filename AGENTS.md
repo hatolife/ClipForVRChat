@@ -48,3 +48,11 @@
   - 続けて `### 更新内容` を置き、直前の正式バージョンから見て結果的に何が変わったかを端的に列挙する。RCごとの細かい修正差分や内部作業の羅列にしない。
   - 最後に `### 比較` を置き、`https://github.com/hatolife/ClipForVRChat/compare/vA.B.C...vX.Y.Z` を置く。
 - GitHub Releaseへ公開添付するCI生成Assetは、通常利用者向けzip、単一exe署名asc、検証・切り分け用separated zip、AvatarBeacon source zipの4種類に絞る。sha256、個別exe、build metadataは公開Assetとして添付しない。
+
+## Spout2 revision更新運用
+
+- Spout2の取得元revisionは、Releaseごとに自動更新しない。固定したcommit/archiveを使い、更新理由がある場合だけ明示的なissueで変更する。
+- `vX.Y.Z-a1`、`vX.Y.Z-b1`、`vX.Y.Z-rc1` を作成する前に、Spout2 revisionを更新すべきか調査する。更新すべきと判断した場合は、その段階の `a2`、`b2`、`rc2` で更新が反映されるように作業する。
+- `vX.Y.Z-a2`、`vX.Y.Z-b2`、`vX.Y.Z-rc2` を作成する前に、直前の `a1`、`b1`、`rc1` でSpout2更新要否の確認が正しく行われたかを確認する。確認漏れ、判断誤り、またはVRChat側更新などで再確認が必要な場合は、そのタイミングで確認と更新処理を行う。
+- VRChatの現在バージョンに更新があった場合は、Stream Camera/Spout挙動への影響を前向きに疑い、Spout2更新要否を積極的に確認する。更新すべきと判断した場合は、固定revision、archive hash、Release metadata、ライセンス表記、Spout helper動作確認をまとめて更新する。
+- Spout2 revisionを更新する場合は、旧revision、新revision、対応するupstream tag、archive URL、archive SHA256、更新理由、CI/Release build結果、`spout-capture.exe --help` / `--version` / `--list-senders`、Stream撮影の実機確認結果、ライセンス差分確認をissueへ記録する。
