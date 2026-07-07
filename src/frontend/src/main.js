@@ -299,9 +299,9 @@ const vueApp = createApp({
     settingsTabs() {
       return [
         { id: 'feature', label: '機能' },
+        { id: 'process', label: '処理' },
         { id: 'autoCapture', label: '自動撮影' },
         { id: 'osc', label: 'OSC' },
-        { id: 'process', label: '処理' },
         { id: 'webhook', label: 'Discord投稿' },
         { id: 'other', label: 'その他' }
       ]
