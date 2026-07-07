@@ -277,3 +277,4 @@
 | 308 | [Codex Security findings 19:48 CSVの即時修正をサブエージェントで監督する](unreleased/308-supervise-security-findings-1948-subagents.md) | 完了 | 未定 | 仕様変更・追加情報待ちを除いた19:48 CSVの即時修正対象を作業単位へ分け、サブエージェントに委任して統合した。 |
 | 309 | [Codex Security findings 19:48 CSVの修正作業結果をレポートへ追記する](unreleased/309-append-security-findings-1948-work-report.md) | 完了 | 未定 | 19:48 CSV基準の対応内容、テスト、保留理由、コミットを管理レポートへ追記した。 |
 | 312 | [Auto-photo scan capによる旧画像漏えいを再検証する](unreleased/312-revalidate-autophoto-scan-cap-old-photo-leak.md) | 完了 | 未定 | 追加情報を再検証し、既存の全件baseline scan修正で旧画像投稿とstarvationが解消済みであることを確認した。 |
+| 314 | [issue原文引用で秘密情報を永続化しない](unreleased/314-redact-secrets-in-verbatim-issue-quotes.md) | 完了 | 未定 | issueの原文引用ルールに、Webhook URLやtokenなどの秘密情報をredactする例外を追加した。 |

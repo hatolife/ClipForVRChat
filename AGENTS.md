@@ -3,7 +3,7 @@
 ## 作業ルール
 
 - ユーザーから不具合、改善、仕様変更、調査依頼などの指示があった場合は、まず `issues/` に日本語のチケットを作成または追記してから作業する。
-- チケットには先頭から「指示」「文脈」「解釈」を書き、その後に「問題」「期待する挙動」「受け入れ条件」を簡潔に書く。「指示」にはユーザー発言を誤字も含めて原文のまま引用する。
+- チケットには先頭から「指示」「文脈」「解釈」を書き、その後に「問題」「期待する挙動」「受け入れ条件」を簡潔に書く。「指示」にはユーザー発言を誤字も含めて原文のまま引用する。ただし、秘密情報・プライバシー情報は原文引用よりredactionを優先し、コミット前に `[REDACTED: 種類]` 形式へ置換する。対象例は Discord Webhook URL/token、ユーザー名を含むローカルパス、QRコード由来URL、診断ログ内のsecret/token/key/API credentialなどとする。例: `[REDACTED: discord webhook url]`、`[REDACTED: discord webhook token]`、`[REDACTED: local user path]`、`[REDACTED: qr url]`、`[REDACTED: diagnostic log secret]`。redaction後も指示の意図と作業判断に必要な文脈が残るように、秘密値の周辺文は可能な限り保持する。
 - 既存チケットに該当する場合は、新規作成ではなく該当チケットを更新する。
 - 作業が完了したチケットは `issues/README.md` から該当行を外し、`issues/closed/README.md` へ状態 `完了` の行として移動する。チケットファイルも対応バージョンに応じて `issues/closed/vX.Y.Z/` などの分類フォルダへ移動し、`issues/closed/README.md` のリンクは移動後のファイルを指す形にする。
 - GUIが表示されない、起動画面で止まる、フロントエンドエラー、Wails/HTML/Vue/API初期化不具合を扱う場合は、作業前に `docs/frontend-runtime-troubleshooting.md` を確認する。新しい既知パターンを同定した場合は、原因、同定方法、対処方法を同ドキュメントへ追記する。
