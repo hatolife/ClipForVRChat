@@ -232,3 +232,4 @@
 | 265 | [AvatarBeaconを専用リポジトリへ配置する](avatarbeacon-v0.0.1/265-extract-avatarbeacon-to-dedicated-repository.md) | 完了 | `AvatarBeacon v0.0.1` | 既存AvatarBeacon元ファイルを専用リポジトリへ初期配置し、CI設定、push、最新main CI確認を行った。 |
 | 266 | [AvatarBeacon READMEを作り直し、ClipForVRChat側をsubmodule化する](unreleased/266-rewrite-avatarbeacon-readme-and-use-submodule.md) | 完了 | 未定 | AvatarBeacon READMEを利用者向けに全面改稿し、ClipForVRChat側のAvatarBeaconをsubmodule参照へ置き換えた。 |
 | 267 | [exeへD&Dされた画像以外のパスをGPG暗号化する](unreleased/267-encrypt-non-image-exe-drop-paths.md) | 完了 | 未定 | exeへ渡されたパスを画像なら入力画像、画像以外のファイルやフォルダならGPG暗号化対象として扱うようにした。 |
+| 268 | [自動撮影用Webhook URLが想定外にグレーアウトする](unreleased/268-fix-auto-capture-webhook-url-unexpected-disabled.md) | 完了 | 未定 | 自動撮影用Webhook URL欄を自動撮影Discord投稿OFF時でも編集できるようにした。 |

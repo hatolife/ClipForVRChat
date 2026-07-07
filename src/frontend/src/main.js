@@ -3061,11 +3061,11 @@ const vueApp = createApp({
                 <p v-if="state.config.output.uploadDiscord && state.config.screenshotAutoPost.enabled" :class="['setting-note', webhookFallbackNoteClass(state.config.screenshotAutoPost.webhookUrl, state.config.screenshotAutoPost.enabled)]">{{ webhookFallbackNote(state.config.screenshotAutoPost.webhookUrl, state.config.screenshotAutoPost.enabled) }}</p>
               </label>
             </div>
-            <div class="setting-row" :class="[{ disabled: !state.config.output.uploadDiscord || !state.config.autoCapture.discord.enabled }, settingRowChangedClass('autoCapture.discord.webhookUrl')]">
+            <div class="setting-row" :class="[{ disabled: !state.config.output.uploadDiscord }, settingRowChangedClass('autoCapture.discord.webhookUrl')]">
               <div><strong>自動撮影用Webhook URL</strong><p>通常投稿とは別の投稿先にしたい場合だけ入力します。空の場合は通常投稿用Webhook URLへ投稿します。</p></div>
               <label>
-                <input type="password" v-model="state.config.autoCapture.discord.webhookUrl" placeholder="空なら通常投稿用Webhook URLを使用" :disabled="!state.config.output.uploadDiscord || !state.config.autoCapture.discord.enabled" />
-                <p v-if="state.config.output.uploadDiscord && state.config.autoCapture.discord.enabled" :class="['setting-note', webhookFallbackNoteClass(state.config.autoCapture.discord.webhookUrl, state.config.autoCapture.discord.enabled)]">{{ webhookFallbackNote(state.config.autoCapture.discord.webhookUrl, state.config.autoCapture.discord.enabled) }}</p>
+                <input type="password" v-model="state.config.autoCapture.discord.webhookUrl" placeholder="空なら通常投稿用Webhook URLを使用" :disabled="!state.config.output.uploadDiscord" />
+                <p v-if="state.config.output.uploadDiscord" :class="['setting-note', state.config.autoCapture.discord.enabled ? webhookFallbackNoteClass(state.config.autoCapture.discord.webhookUrl, state.config.autoCapture.discord.enabled) : 'muted']">{{ state.config.autoCapture.discord.enabled ? webhookFallbackNote(state.config.autoCapture.discord.webhookUrl, state.config.autoCapture.discord.enabled) : '自動撮影のDiscord投稿をONにすると、この送信先設定を使います。' }}</p>
               </label>
             </div>
           </section>
