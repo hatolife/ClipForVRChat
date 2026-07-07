@@ -182,4 +182,5 @@ AvatarBeaconでは、ClipForVRChat専用名を避け、次の汎用parameterを�
 - 2026-07-04: `avatar_osc 受信状態` の最終受信表示は時刻だけにし、raw/lastの詳細確認は10秒summaryログへ寄せる。
 - 2026-07-04: positionはHips追従の `point` から維持し、yaw/forwardはHead追従の専用アンカーから取得する。アプリ側OSC parameterは `coord/*` / `forward/*` のまま変えない。
 - 2026-07-07: 顔や視点中心の撮影構図へ合わせるため、`point` の既定MA Bone ProxyをHeadへ戻す。`HeadForwardAnchor` は既存forward/yaw用Constraintの参照先として残す。
+- 2026-07-07: `point` がHead基準になったことで `HeadForwardAnchor` は不要になったため削除し、forward/yaw用Constraintも `point` を参照する構成へ戻す。
 - 2026-07-04: 自動撮影UIはAvatarBeacon導入を基本導線にし、manual basisは専用ギミックなしのフォールバック/高度設定として扱う。
