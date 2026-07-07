@@ -21,6 +21,11 @@ env:
   GOVULNCHECK_VERSION: "v1.1.4"
   AVATARBEACON_PACKAGE_URL: "https://github.com/hatolife/AvatarBeacon/releases/download/v0.0.1/AvatarBeacon_v0.0.1.unitypackage"
   AVATARBEACON_PACKAGE_NAME: "AvatarBeacon_v0.0.1.unitypackage"
+  AVATARBEACON_PACKAGE_SIGNATURE_URL: "https://github.com/hatolife/AvatarBeacon/releases/download/v0.0.1/AvatarBeacon_v0.0.1.unitypackage.asc"
+  AVATARBEACON_PACKAGE_SIGNATURE_NAME: "AvatarBeacon_v0.0.1.unitypackage.asc"
+  RELEASE_SIGNING_FINGERPRINT: "BE40AA8D082F493F613BC07221DC34861B40E77D"
+  RELEASE_SIGNING_KEY_UID: "release-signing@hato.life"
+  RELEASE_SIGNING_KEY_URL: "https://keys.openpgp.org/vks/v1/by-fingerprint/BE40AA8D082F493F613BC07221DC34861B40E77D"
 
 jobs:
   build:
@@ -170,10 +175,14 @@ jobs:
         env:
           AVATARBEACON_PACKAGE_URL: ${{ env.AVATARBEACON_PACKAGE_URL }}
           AVATARBEACON_PACKAGE_NAME: ${{ env.AVATARBEACON_PACKAGE_NAME }}
+          AVATARBEACON_PACKAGE_SIGNATURE_URL: ${{ env.AVATARBEACON_PACKAGE_SIGNATURE_URL }}
+          AVATARBEACON_PACKAGE_SIGNATURE_NAME: ${{ env.AVATARBEACON_PACKAGE_SIGNATURE_NAME }}
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
-          $packagePath = Join-Path "dist" $env:AVATARBEACON_PACKAGE_NAME
+          $packagePath = "dist/$env:AVATARBEACON_PACKAGE_NAME"
+          $signaturePath = "dist/$env:AVATARBEACON_PACKAGE_SIGNATURE_NAME"
           Invoke-WebRequest -Uri $env:AVATARBEACON_PACKAGE_URL -OutFile $packagePath
+          Invoke-WebRequest -Uri $env:AVATARBEACON_PACKAGE_SIGNATURE_URL -OutFile $signaturePath
           if (!(Test-Path $packagePath)) {
             throw "AvatarBeacon package was not downloaded: $packagePath"
           }
@@ -181,11 +190,77 @@ jobs:
           if ($item.Length -le 0) {
             throw "AvatarBeacon package is empty: $packagePath"
           }
+          if (!(Test-Path $signaturePath)) {
+            throw "AvatarBeacon package signature was not downloaded: $signaturePath"
+          }
+          $signatureItem = Get-Item $signaturePath
+          if ($signatureItem.Length -le 0) {
+            throw "AvatarBeacon package signature is empty: $signaturePath"
+          }
           $hash = (Get-FileHash $packagePath -Algorithm SHA256).Hash.ToLower()
+          $signatureHash = (Get-FileHash $signaturePath -Algorithm SHA256).Hash.ToLower()
           "package_path=$packagePath" >> $env:GITHUB_OUTPUT
           "package_name=$env:AVATARBEACON_PACKAGE_NAME" >> $env:GITHUB_OUTPUT
           "package_url=$env:AVATARBEACON_PACKAGE_URL" >> $env:GITHUB_OUTPUT
           "package_sha256=$hash" >> $env:GITHUB_OUTPUT
+          "signature_path=$signaturePath" >> $env:GITHUB_OUTPUT
+          "signature_name=$env:AVATARBEACON_PACKAGE_SIGNATURE_NAME" >> $env:GITHUB_OUTPUT
+          "signature_url=$env:AVATARBEACON_PACKAGE_SIGNATURE_URL" >> $env:GITHUB_OUTPUT
+          "signature_sha256=$signatureHash" >> $env:GITHUB_OUTPUT
+
+      - name: Verify AvatarBeacon package signature
+        shell: bash
+        env:
+          AVATARBEACON_PACKAGE_PATH: ${{ steps.avatarbeacon.outputs.package_path }}
+          AVATARBEACON_PACKAGE_SIGNATURE_PATH: ${{ steps.avatarbeacon.outputs.signature_path }}
+          RELEASE_SIGNING_FINGERPRINT: ${{ env.RELEASE_SIGNING_FINGERPRINT }}
+          RELEASE_SIGNING_KEY_UID: ${{ env.RELEASE_SIGNING_KEY_UID }}
+          RELEASE_SIGNING_KEY_URL: ${{ env.RELEASE_SIGNING_KEY_URL }}
+        run: |
+          package_path="${AVATARBEACON_PACKAGE_PATH//\\//}"
+          signature_path="${AVATARBEACON_PACKAGE_SIGNATURE_PATH//\\//}"
+          expected_fingerprint="$(printf '%s' "$RELEASE_SIGNING_FINGERPRINT" | tr -d '[:space:]' | tr '[:lower:]' '[:upper:]')"
+          test -s "$package_path"
+          test -s "$signature_path"
+          if [[ ! "$expected_fingerprint" =~ ^[0-9A-F]{40}$ ]]; then
+            echo "RELEASE_SIGNING_FINGERPRINT must be a 40-character OpenPGP fingerprint" >&2
+            exit 1
+          fi
+
+          export GNUPGHOME="$(mktemp -d)"
+          chmod 700 "$GNUPGHOME"
+          curl --fail --location --silent --show-error "$RELEASE_SIGNING_KEY_URL" --output release-signing-public-key.asc
+          gpg --batch --import release-signing-public-key.asc
+
+          key_listing="$(gpg --batch --with-colons --fingerprint "$expected_fingerprint")"
+          actual_fingerprint="$(printf '%s\n' "$key_listing" | awk -F: '$1 == "fpr" { print toupper($10); exit }')"
+          if [[ "$actual_fingerprint" != "$expected_fingerprint" ]]; then
+            echo "release-signing key fingerprint mismatch: expected $expected_fingerprint but imported $actual_fingerprint" >&2
+            exit 1
+          fi
+          if ! printf '%s\n' "$key_listing" | grep -Fq "$RELEASE_SIGNING_KEY_UID"; then
+            echo "release-signing key UID was not found: $RELEASE_SIGNING_KEY_UID" >&2
+            exit 1
+          fi
+
+          if ! gpg --batch --status-fd 1 --verify "$signature_path" "$package_path" > gpg-verify-status.txt 2>&1; then
+            cat gpg-verify-status.txt
+            exit 1
+          fi
+          cat gpg-verify-status.txt
+          if ! awk -v expected="$expected_fingerprint" '
+            $1 == "[GNUPG:]" && $2 == "VALIDSIG" {
+              signer = toupper($3)
+              primary = toupper($NF)
+              if (signer == expected || primary == expected) {
+                found = 1
+              }
+            }
+            END { exit found ? 0 : 1 }
+          ' gpg-verify-status.txt; then
+            echo "AvatarBeacon package signature was not made by the expected release-signing key" >&2
+            exit 1
+          fi
 
       - name: Prepare package directory
         shell: pwsh
@@ -275,6 +350,11 @@ jobs:
           AVATARBEACON_PACKAGE_URL: ${{ steps.avatarbeacon.outputs.package_url }}
           AVATARBEACON_PACKAGE_NAME: ${{ steps.avatarbeacon.outputs.package_name }}
           AVATARBEACON_PACKAGE_SHA256: ${{ steps.avatarbeacon.outputs.package_sha256 }}
+          AVATARBEACON_PACKAGE_SIGNATURE_URL: ${{ steps.avatarbeacon.outputs.signature_url }}
+          AVATARBEACON_PACKAGE_SIGNATURE_NAME: ${{ steps.avatarbeacon.outputs.signature_name }}
+          AVATARBEACON_PACKAGE_SIGNATURE_SHA256: ${{ steps.avatarbeacon.outputs.signature_sha256 }}
+          RELEASE_SIGNING_FINGERPRINT: ${{ env.RELEASE_SIGNING_FINGERPRINT }}
+          RELEASE_SIGNING_KEY_UID: ${{ env.RELEASE_SIGNING_KEY_UID }}
         run: |
           $metadata = [ordered]@{
             tag = $env:TAG_NAME
@@ -297,10 +377,18 @@ jobs:
               package = $env:AVATARBEACON_PACKAGE_NAME
               packageSha256 = $env:AVATARBEACON_PACKAGE_SHA256
               source = $env:AVATARBEACON_PACKAGE_URL
+              signature = $env:AVATARBEACON_PACKAGE_SIGNATURE_NAME
+              signatureSha256 = $env:AVATARBEACON_PACKAGE_SIGNATURE_SHA256
+              signatureSource = $env:AVATARBEACON_PACKAGE_SIGNATURE_URL
+              signatureVerifiedWith = [ordered]@{
+                uid = $env:RELEASE_SIGNING_KEY_UID
+                fingerprint = $env:RELEASE_SIGNING_FINGERPRINT
+              }
               distribution = "included in normal and separated zip"
             }
           }
           $metadata | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 "dist/$env:ASSET_PREFIX-build-metadata.json"
+          Remove-Item "dist/$env:AVATARBEACON_PACKAGE_SIGNATURE_NAME" -Force
 
       - name: Validate release assets
         shell: pwsh
@@ -309,12 +397,14 @@ jobs:
           TAG_NAME: ${{ steps.version.outputs.version }}
           AVATARBEACON_PACKAGE_NAME: ${{ env.AVATARBEACON_PACKAGE_NAME }}
         run: |
+          $distRoot = (Resolve-Path "dist").Path
           $expectedUserZipSignature = "$env:ASSET_PREFIX-windows-amd64.exe.asc"
           $expectedAvatarBeaconPackage = $env:AVATARBEACON_PACKAGE_NAME
           $unexpected = Get-ChildItem dist -Recurse -File | Where-Object {
             $_.Name -like "*release-signing-public-key.asc" -or
             $_.Name -like "AvatarBeacon-*-source.zip" -or
             $_.Name -like "AvatarBeacon-*-source.zip.sha256" -or
+            ($_.DirectoryName -eq $distRoot -and $_.Extension -eq ".asc" -and $_.Name -ne $expectedUserZipSignature) -or
             ($_.FullName -like "*\dist\ClipForVRChat\*" -and $_.Extension -eq ".asc") -or
             ($_.FullName -like "*\dist\ClipForVRChat-user-package\*" -and $_.Extension -eq ".asc" -and $_.Name -ne $expectedUserZipSignature)
           }

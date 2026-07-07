@@ -251,3 +251,5 @@
 | 282 | [v0.1.8-b16確認後にmasterをdevelopで上書きする](maintenance-only/282-overwrite-master-with-develop-after-b16.md) | 完了 | 整理のみ | `master` を `develop` と同じ履歴へ上書きしてpushし、不要な作業ブランチを削除した。 |
 | 283 | [カメラ移動時の飛行モードON時間を短くする](v0.1.8-rc1/283-shorten-usercamera-flying-during-pose-move.md) | 完了 | `v0.1.8-rc1` | カメラPose送信直前だけ飛行モードをONにし、移動後すぐOFFへ戻してRC1を作成した。 |
 | 284 | [外部AvatarBeacon package同梱セキュリティレポートを解説する](investigation-only/284-explain-security-report-avatarbeacon-unverified-package.md) | 完了 | 調査のみ | 外部AvatarBeacon `.unitypackage` を検証せずRelease zipへ同梱するfindingの内容を整理した。 |
+| 285 | [外部AvatarBeacon unitypackageのPGP署名をRelease workflowで検証する](unreleased/285-verify-avatarbeacon-unitypackage-signature.md) | 完了 | 未定 | Release workflowでAvatarBeacon `.unitypackage.asc` を取得し、release-signing鍵のfingerprint/UID/署名を検証してから配布zipへ同梱するようにした。 |
+| 286 | [Spout helper隣接exe優先セキュリティレポートを解説する](investigation-only/286-explain-security-report-spout-helper-binary-planting.md) | 完了 | 調査のみ | 署名済み単一exeでも同じフォルダの未署名 `spout-capture.exe` が優先実行され得るfindingの内容を整理した。 |

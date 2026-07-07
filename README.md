@@ -106,7 +106,7 @@ Stream方式はVRChat Stream CameraのSpout映像を内蔵の `spout-capture.exe
 
 安全性を確認しやすいように、`spout-capture.exe` の役割は限定しています。利用可能なSpout senderの列挙、指定senderからの1フレーム受信、指定された保存先へのPNG書き込み、結果JSONの出力だけを行います。Discord Webhook URLや設定ファイルを読み取らず、画像や設定を外部へ送信するネットワーク通信も行いません。`SpoutLibrary.dll` はSpout2 SDKの実行時DLLで、`spout-capture.exe` がsender列挙とフレーム受信に使います。ヘルパーのソースは `tools/spout-capture/main.cpp`、ビルド設定は `tools/spout-capture/CMakeLists.txt` にあり、Spout2はBSD 2-Clause Licenseの `SpoutLibrary` を使用します。
 
-配布物を確認するときは、公式Releaseまたは公式配布元から通常利用者向けzipを取得してください。通常利用者向けzipには `ClipForVRChat.exe`、`ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc`、`Release-signing-public-key.url`、`README.md`、`LICENSE`、`AvatarBeacon_v0.0.1.unitypackage` が入ります。PGP署名まで確認する場合は、zip内の `ClipForVRChat.exe` と `.exe.asc` を検証してください。
+配布物を確認するときは、公式Releaseまたは公式配布元から通常利用者向けzipを取得してください。通常利用者向けzipには `ClipForVRChat.exe`、`ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc`、`Release-signing-public-key.url`、`README.md`、`LICENSE`、`AvatarBeacon_v0.0.1.unitypackage` が入ります。Release buildでは、同梱する `AvatarBeacon_v0.0.1.unitypackage` をAvatarBeacon Releaseの `.asc` 署名と `release-signing@hato.life` の固定fingerprintで検証します。PGP署名まで確認する場合は、zip内の `ClipForVRChat.exe` と `.exe.asc` を検証してください。
 
 Release Assetsには、検証・切り分け用に `ClipForVRChat-vX.Y.Z-windows-amd64-separated.zip` も添付します。このzipには `ClipForVRChat.exe`、`spout-capture.exe`、`SpoutLibrary.dll`、`Spout2-LICENSE.txt`、`AvatarBeacon_v0.0.1.unitypackage` が入ります。helper単体確認や外部helper指定での切り分けが必要な場合だけ使用してください。`spout-capture.exe` だけ、または `SpoutLibrary.dll` だけではStream方式は動作しません。
 

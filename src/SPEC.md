@@ -823,6 +823,7 @@ GitHub Release には、検証・切り分け用の分離版zipも添付しま�
 分離版zipで `spout-capture.exe` または `SpoutLibrary.dll` が欠けている場合は、v0.1.8のStream方式として不完全です。
 
 AvatarBeaconの配布packageは別リポジトリのReleaseから取得し、ClipForVRChatのGitHub Release公開Assetとしては添付せず、通常zipと分離版zipの中に含めます。
+Release workflowは同じAvatarBeacon Releaseの `.unitypackage.asc` も取得し、`release-signing@hato.life` の公開鍵fingerprint `BE40 AA8D 082F 493F 613B C072 21DC 3486 1B40 E77D` とUIDを確認してから `gpg --verify` します。署名検証に失敗したAvatarBeacon packageは配布zipへ同梱しません。
 
 - `AvatarBeacon_v0.0.1.unitypackage`
 
@@ -832,7 +833,7 @@ AvatarBeaconの配布packageは別リポジトリのReleaseから取得し、Cli
 - Spout2はBSD 2-Clause Licenseの `SpoutLibrary` を使用し、GPL-3.0のSpoutRecorder由来コードをコピー、リンク、派生利用しません。
 - `spout-capture.exe` はClipForVRChat本体からタイムアウト付きで起動されるCLI helperで、常駐サービスや自動起動項目として登録しません。
 - `spout-capture.exe` はネットワーク送信を行わず、入力はSpout sender、出力は指定されたPNGファイルと標準出力JSONに限定します。
-- Release確認では、GitHub Release本文が `RELEASE_NOTES.md` から作成されること、Release添付ファイルが通常利用者向けzip、単一exe署名asc、分離版zipの3種類だけであること、各zip内に `AvatarBeacon_v0.0.1.unitypackage` が含まれること、AvatarBeacon source zipや不要なSpoutRecorder由来ファイル、デバッグ成果物が含まれないことを確認します。
+- Release確認では、GitHub Release本文が `RELEASE_NOTES.md` から作成されること、Release添付ファイルが通常利用者向けzip、単一exe署名asc、分離版zipの3種類だけであること、各zip内に署名検証済みの `AvatarBeacon_v0.0.1.unitypackage` が含まれること、AvatarBeacon source zipや不要なSpoutRecorder由来ファイル、デバッグ成果物が含まれないことを確認します。
 
 Release asset にはsha256、個別exe、build metadataを添付しません。
 
