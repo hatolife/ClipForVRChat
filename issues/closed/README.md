@@ -209,7 +209,7 @@
 | 239 | [AvatarBeaconにバージョン情報を埋め込みOSCで通知する](unreleased/239-embed-avatarbeacon-version-and-send-osc-version.md) | 完了 | 未定 | AvatarBeaconのPrefab/source内へ固定名でバージョン情報を埋め込み、OSC送信時に1回だけバージョン番号を送信し、CI/Releaseで自動更新する。 |
 | 240 | [b6でGUIが表示されないVue compiler errorを調査する](unreleased/240-investigate-b6-gui-vue-compiler-error.md) | 完了 | 未定 | `v0.1.8-b6` のVue runtime templateタグ不整合を修正し、compiler検査をCI/Releaseに追加した。 |
 | 242 | [設定内のカメラ姿勢Pose表記を日本語へ変更する](unreleased/242-localize-settings-camera-pose-labels.md) | 完了 | 未定 | 設定UI内のカメラ姿勢を表す `Pose` を日本語表記へ置き換えた。 |
-| 243 | [`/usercamera/Close` が送信されないようにする](unreleased/243-stop-sending-usercamera-close.md) | 完了 | 未定 | カメラOSCリセットと旧 `closeCameraAfterBatch` 設定値由来の `/usercamera/Close` 送信を止めた。 |
+| 243 | [`/usercamera/Close` が送信されないようにする](v0.1.8-b10/243-stop-sending-usercamera-close.md) | 完了 | `v0.1.8-b10` | カメラOSCリセットと旧 `closeCameraAfterBatch` 設定値由来の `/usercamera/Close` 送信を止めた。 |
 | 246 | [OSCデバッグ送信説明、AvatarBeaconログフィルター、b7 basis受信判定を修正する](unreleased/246-fix-osc-debug-avatarbeacon-filter-and-b7-basis-status.md) | 完了 | 未定 | OSCデバッグ送信説明、AvatarBeacon以外ログフィルター、README日本語化、version GameObjectのEditorOnly化、b7 main受信判定とPose受信ログ量を修正した。 |
 | 247 | [その他タブにPC起動時自動起動トグルを追加する](unreleased/247-add-startup-shortcut-toggle-to-other-settings.md) | 完了 | 未定 | 更新タブをその他へ変更し、Startupフォルダの固定名ショートカットでPC起動時自動起動をON/OFFできるようにした。 |
 | 248 | [未保存変更の対象設定ラベルをハイライトする](unreleased/248-highlight-unsaved-setting-labels.md) | 完了 | 未定 | 未保存変更チップに対応する設定行とタブボタンをハイライトし、変更箇所を分かりやすくした。 |
@@ -219,4 +219,4 @@
 | 252 | [起動中にexeへドラッグしたファイルを既存インスタンスへ渡す](unreleased/252-forward-exe-drop-paths-to-running-instance.md) | 完了 | 未定 | 単一起動中に2つ目のexeへ渡されたファイル引数を既存インスタンスへ転送し、通常のドロップ処理で扱うようにした。 |
 | 253 | [不具合報告zipとgpgのファイル名に添付可否を付ける](unreleased/253-prefix-diagnostic-package-filenames.md) | 完了 | 未定 | 不具合報告用の暗号化前zipと添付用gpgのファイル名先頭に、添付可否が分かる文言を付けるようにした。 |
 | 254 | [不具合報告についての説明文を更新する](unreleased/254-rewrite-diagnostic-report-description.md) | 完了 | 未定 | 情報タブの不具合報告説明を、zip/gpgの役割、添付対象、公開鍵による手動暗号化案内が分かる文面へ更新した。 |
-| 255 | [OSC送受信ログを分けて保持し不具合報告zipに含める](unreleased/255-persist-osc-send-receive-logs-in-diagnostic-zip.md) | 完了 | 未定 | `logs/osc_send.jsonl` と `logs/osc_recieve.jsonl` に最新1000件のOSC送受信ログをJSON Linesで保存し、診断zipへ含めるようにした。 |
+| 255 | [OSC送受信ログを分けて保持し不具合報告zipに含める](v0.1.8-b10/255-persist-osc-send-receive-logs-in-diagnostic-zip.md) | 完了 | `v0.1.8-b10` | `logs/osc_send.jsonl` と `logs/osc_recieve.jsonl` に最新1000件のOSC送受信ログをJSON Linesで保存し、診断zipへ含めるようにした。 |
