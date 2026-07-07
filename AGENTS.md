@@ -14,6 +14,7 @@
 - Release成果物の確認が必要な変更では、GitHub ActionsのCI/Releaseステータスを確認する。
 - リリース時は `issues/README.md` の対象チケットについて、対応バージョン欄をリリースするバージョンに更新する。
 - Release workflowを変更した場合は、GitHub Release本文が `RELEASE_NOTES.md` の該当バージョンから作成されること、Release添付ファイル一覧、zip内ファイル一覧を確認する。不要な公開鍵ファイルなど、仕様外の成果物を添付・同梱しない。
+- Windows向けC++で `windows.h` やWindows依存ライブラリをincludeする場合は、`min` / `max` macroと標準ライブラリ名の衝突を前提に確認する。`std::min` / `std::max` / `std::numeric_limits<T>::max()` は、必要に応じて `(std::min)(...)` / `(std::max)(...)` / `(std::numeric_limits<T>::max)()` のようにparenthesized callで書く。`NOMINMAX` を `windows.h` より前に定義する方法も使えるが、include順や依存headerの都合で効かない場合があるため、MSVC/Windows CIで確認する。
 
 ## todo.md運用
 

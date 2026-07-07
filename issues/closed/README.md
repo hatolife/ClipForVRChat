@@ -283,3 +283,5 @@
 | 314 | [issue原文引用で秘密情報を永続化しない](unreleased/314-redact-secrets-in-verbatim-issue-quotes.md) | 完了 | 未定 | issueの原文引用ルールに、Webhook URLやtokenなどの秘密情報をredactする例外を追加した。 |
 | 315 | [非表示タブのWebhook/自動投稿設定を保存前確認する](unreleased/315-confirm-hidden-webhook-autopost-settings-before-save.md) | 完了 | 未定 | Webhook、自動投稿、監視フォルダ、自動撮影スケジュールの重要差分を保存前確認に表示し、確認なしで保存されないようにした。 |
 | 316 | [Release署名鍵をビルドジョブから分離する](unreleased/316-isolate-release-signing-secrets-from-build-job.md) | 完了 | 未定 | Release workflowをbuild/sign/package/releaseへ分割し、署名secretを署名専用jobだけへ渡すようにした。 |
+| 317 | [v0.1.8-rc3 release candidateを作成する](maintenance-only/317-create-v018-rc3.md) | 完了 | 整理のみ | `v0.1.8-rc3` を作成し、Release workflow、GitHub Release、公開Asset、zip内容を確認した。 |
+| 318 | [Windows C++のmin/max macro衝突対策を再発防止として記録する](unreleased/318-document-windows-minmax-macro-prevention.md) | 完了 | 未定 | Windows header由来の `min` / `max` macro衝突対策をAGENTS.mdへ明文化した。 |
