@@ -26,8 +26,15 @@ Pose送信に必要な最短範囲だけ `/usercamera/Flying` をONにし、Pose
 
 ## 受け入れ条件
 
-- [ ] `/usercamera/Pose` 送信直前に `/usercamera/Flying=true` を送信する。
-- [ ] `/usercamera/Pose` 送信直後に `/usercamera/Flying=false` を送信する。
-- [ ] Pose送信失敗時も可能な限り `/usercamera/Flying=false` を送信する。
-- [ ] 既存の自動撮影テストが通る。
-- [ ] `v0.1.8-rc1` タグを作成し、Release workflowと配布Assetを確認する。
+- [x] `/usercamera/Pose` 送信直前に `/usercamera/Flying=true` を送信する。
+- [x] `/usercamera/Pose` 送信直後に `/usercamera/Flying=false` を送信する。
+- [x] Pose送信失敗時も可能な限り `/usercamera/Flying=false` を送信する。
+- [x] 既存の自動撮影テストが通る。
+- [x] `v0.1.8-rc1` タグを作成し、Release workflowと配布Assetを確認する。
+
+## 結果
+
+- `applyCameraView` でPose送信直前に `/usercamera/Flying=true`、Pose送信直後に `/usercamera/Flying=false` を送るようにした。
+- Pose送信が失敗した場合も `/usercamera/Flying=false` を送信するテストを追加した。
+- `v0.1.8-rc1` のRelease workflowが成功し、GitHub Releaseがprereleaseとして公開された。
+- 通常zipと分離zipの内容を確認した。

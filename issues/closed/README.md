@@ -249,3 +249,4 @@
 | 280 | [待機カメラ位置の詳細設定ボタンを押せるようにする](v0.1.8-b16/280-fix-idle-camera-detail-button-disabled.md) | 完了 | `v0.1.8-b16` | 待機カメラ位置の詳細設定を開けるようにし、構図ごとの明るさと表示対象マスクも設定できるようにした。 |
 | 281 | [v0.1.8-b16 betaを作成する](maintenance-only/281-create-v018-b16-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b16` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |
 | 282 | [v0.1.8-b16確認後にmasterをdevelopで上書きする](maintenance-only/282-overwrite-master-with-develop-after-b16.md) | 完了 | 整理のみ | `master` を `develop` と同じ履歴へ上書きしてpushし、不要な作業ブランチを削除した。 |
+| 283 | [カメラ移動時の飛行モードON時間を短くする](v0.1.8-rc1/283-shorten-usercamera-flying-during-pose-move.md) | 完了 | `v0.1.8-rc1` | カメラPose送信直前だけ飛行モードをONにし、移動後すぐOFFへ戻してRC1を作成した。 |
