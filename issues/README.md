@@ -44,6 +44,7 @@
 | 228 | [全Markdownドキュメントを現状仕様に合わせて更新する](228-update-all-markdown-documents.md) | 要対応 | 未定 | リポジトリ内のMarkdownを横断確認し、古い説明や矛盾を現状仕様に合わせて整理する。 |
 | 241 | [AvatarBeacon_mainとAvatarBeacon_12を追加しparameter pathをavatar_beacon配下へ変更する](241-add-avatarbeacon-main-and-12-prefabs-with-prefixed-parameters.md) | 要確認 | 未定 | AvatarBeaconのmain方式Prefabを通常版として追加し、12方式Prefabと `avatar_beacon/...` parameter pathへ移行する。 |
 | 280 | [待機カメラ位置の詳細設定ボタンを押せるようにする](280-fix-idle-camera-detail-button-disabled.md) | 要対応 | `v0.1.8-b16` | 待機カメラ位置の詳細設定画面を開けないUI不具合、構図ごとの明るさ設定不足、他ユーザーマスクOFFを修正し、betaで確認する。 |
+| 281 | [v0.1.8-b16 betaを作成する](281-create-v018-b16-beta.md) | 要対応 | `v0.1.8-b16` | 待機カメラ位置、明るさ、マスク修正を含むbetaを作成しRelease成果物を確認する。 |
 
 ## 状態の意味
 
