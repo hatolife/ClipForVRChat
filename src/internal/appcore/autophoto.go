@@ -27,13 +27,14 @@ type autoPhotoScanStatus struct {
 }
 
 type AutoPhotoWatcher struct {
-	Config     Config
-	Directory  string
-	WebhookURL string
-	Interval   time.Duration
-	Handler    func(AutoPhotoEvent)
-	Process    func(string) Result
-	seen       map[string]time.Time
+	Config             Config
+	Directory          string
+	ExcludeDirectories []string
+	WebhookURL         string
+	Interval           time.Duration
+	Handler            func(AutoPhotoEvent)
+	Process            func(string) Result
+	seen               map[string]time.Time
 }
 
 func (w *AutoPhotoWatcher) Run(ctx context.Context) {
@@ -41,7 +42,7 @@ func (w *AutoPhotoWatcher) Run(ctx context.Context) {
 		w.Interval = 2 * time.Second
 	}
 	var status autoPhotoScanStatus
-	w.seen, status = scanPhotoFilesWithStatus(w.directory())
+	w.seen, status = scanPhotoFilesWithExcludesStatus(w.directory(), w.ExcludeDirectories)
 	w.emitScanStatus(status)
 	ticker := time.NewTicker(w.Interval)
 	defer ticker.Stop()
@@ -56,7 +57,7 @@ func (w *AutoPhotoWatcher) Run(ctx context.Context) {
 }
 
 func (w *AutoPhotoWatcher) tick() {
-	current, status := scanPhotoFilesWithStatus(w.directory())
+	current, status := scanPhotoFilesWithExcludesStatus(w.directory(), w.ExcludeDirectories)
 	w.emitScanStatus(status)
 	processed := 0
 	for _, path := range sortedPhotoPaths(current) {
@@ -161,6 +162,14 @@ func scanPhotoFilesWithStatus(dir string) (map[string]time.Time, autoPhotoScanSt
 }
 
 func scanPhotoFilesLimitedWithStatus(dir string, maxFiles int) (map[string]time.Time, autoPhotoScanStatus) {
+	return scanPhotoFilesLimitedWithExcludesStatus(dir, maxFiles, nil)
+}
+
+func scanPhotoFilesWithExcludesStatus(dir string, excludes []string) (map[string]time.Time, autoPhotoScanStatus) {
+	return scanPhotoFilesLimitedWithExcludesStatus(dir, MaxAutoPhotoScanFiles, excludes)
+}
+
+func scanPhotoFilesLimitedWithExcludesStatus(dir string, maxFiles int, excludes []string) (map[string]time.Time, autoPhotoScanStatus) {
 	files := make(map[string]time.Time)
 	if strings.TrimSpace(dir) == "" {
 		return files, autoPhotoScanStatus{Error: "自動投稿の監視フォルダが未設定です。"}
@@ -176,6 +185,8 @@ func scanPhotoFilesLimitedWithStatus(dir string, maxFiles int) (map[string]time.
 		return files, autoPhotoScanStatus{Error: "自動投稿の監視フォルダにファイルが指定されています。"}
 	}
 	status := autoPhotoScanStatus{}
+	root := cleanAbsPath(dir)
+	excludeDirs := cleanAbsPaths(excludes)
 	paths := make([]string, 0, maxFiles)
 	_ = filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
@@ -184,7 +195,13 @@ func scanPhotoFilesLimitedWithStatus(dir string, maxFiles int) (map[string]time.
 			}
 			return nil
 		}
-		if entry.IsDir() || !isSupportedPhotoPath(path) {
+		if entry.IsDir() {
+			if shouldSkipAutoPhotoScanDir(root, path, excludeDirs) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !isSupportedPhotoPath(path) {
 			return nil
 		}
 		if len(paths) >= maxFiles {
@@ -203,6 +220,47 @@ func scanPhotoFilesLimitedWithStatus(dir string, maxFiles int) (map[string]time.
 		files[path] = info.ModTime()
 	}
 	return files, status
+}
+
+func cleanAbsPaths(paths []string) []string {
+	cleaned := make([]string, 0, len(paths))
+	for _, path := range paths {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			continue
+		}
+		cleaned = append(cleaned, cleanAbsPath(path))
+	}
+	return cleaned
+}
+
+func cleanAbsPath(path string) string {
+	cleaned := filepath.Clean(path)
+	if abs, err := filepath.Abs(cleaned); err == nil {
+		cleaned = abs
+	}
+	return filepath.Clean(cleaned)
+}
+
+func shouldSkipAutoPhotoScanDir(root string, path string, excludeDirs []string) bool {
+	if len(excludeDirs) == 0 {
+		return false
+	}
+	current := cleanAbsPath(path)
+	for _, exclude := range excludeDirs {
+		if !samePath(current, exclude) {
+			continue
+		}
+		if samePath(current, root) {
+			return false
+		}
+		return true
+	}
+	return false
+}
+
+func samePath(a string, b string) bool {
+	return strings.EqualFold(filepath.Clean(a), filepath.Clean(b))
 }
 
 func isSupportedPhotoPath(path string) bool {

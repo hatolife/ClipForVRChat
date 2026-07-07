@@ -107,6 +107,38 @@ func TestAutoPhotoWatcherUsesExplicitDirectory(t *testing.T) {
 	}
 }
 
+func TestAutoPhotoWatcherExcludesAutoCaptureOutputDirectory(t *testing.T) {
+	vrchatDir := t.TempDir()
+	autoCaptureDir := filepath.Join(vrchatDir, "VRC-AutoCapture")
+	if err := os.MkdirAll(autoCaptureDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	vrchatPath := filepath.Join(vrchatDir, "vrchat.png")
+	autoCapturePath := filepath.Join(autoCaptureDir, "auto-capture.png")
+	for _, path := range []string{vrchatPath, autoCapturePath} {
+		if err := os.WriteFile(path, []byte("x"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var processed []string
+	watcher := AutoPhotoWatcher{
+		Config:             Config{AutoPhoto: AutoPhotoConfig{PhotoDirectory: vrchatDir}},
+		ExcludeDirectories: []string{autoCaptureDir},
+		seen:               map[string]time.Time{},
+		Process: func(path string) Result {
+			processed = append(processed, path)
+			return Result{Name: filepath.Base(path), SourcePath: path}
+		},
+	}
+
+	watcher.tick()
+
+	if len(processed) != 1 || processed[0] != vrchatPath {
+		t.Fatalf("processed = %v, want only %q", processed, vrchatPath)
+	}
+}
+
 func TestAutoPhotoWatcherProcessDoesNotForceDiscordUpload(t *testing.T) {
 	dir := t.TempDir()
 	source := filepath.Join(dir, "source.png")

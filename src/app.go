@@ -1656,11 +1656,12 @@ func (a *App) restartAutoPhotoWatcher(cfg appcore.Config) {
 	}
 	if cfg.AutoPhoto.Enabled {
 		watcher := appcore.AutoPhotoWatcher{
-			Config:     cfg,
-			Directory:  cfg.AutoPhoto.PhotoDirectory,
-			WebhookURL: cfg.AutoPhoto.WebhookURL,
-			Interval:   time.Duration(cfg.AutoPhoto.ScanIntervalSeconds) * time.Second,
-			Handler:    handler,
+			Config:             cfg,
+			Directory:          cfg.AutoPhoto.PhotoDirectory,
+			ExcludeDirectories: []string{cfg.AutoCapture.Output.Directory},
+			WebhookURL:         cfg.AutoPhoto.WebhookURL,
+			Interval:           time.Duration(cfg.AutoPhoto.ScanIntervalSeconds) * time.Second,
+			Handler:            handler,
 		}
 		go watcher.Run(ctx)
 	}
