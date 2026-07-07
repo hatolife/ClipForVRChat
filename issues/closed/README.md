@@ -250,3 +250,4 @@
 | 281 | [v0.1.8-b16 betaを作成する](maintenance-only/281-create-v018-b16-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b16` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |
 | 282 | [v0.1.8-b16確認後にmasterをdevelopで上書きする](maintenance-only/282-overwrite-master-with-develop-after-b16.md) | 完了 | 整理のみ | `master` を `develop` と同じ履歴へ上書きしてpushし、不要な作業ブランチを削除した。 |
 | 283 | [カメラ移動時の飛行モードON時間を短くする](v0.1.8-rc1/283-shorten-usercamera-flying-during-pose-move.md) | 完了 | `v0.1.8-rc1` | カメラPose送信直前だけ飛行モードをONにし、移動後すぐOFFへ戻してRC1を作成した。 |
+| 284 | [外部AvatarBeacon package同梱セキュリティレポートを解説する](investigation-only/284-explain-security-report-avatarbeacon-unverified-package.md) | 完了 | 調査のみ | 外部AvatarBeacon `.unitypackage` を検証せずRelease zipへ同梱するfindingの内容を整理した。 |
