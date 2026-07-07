@@ -117,7 +117,7 @@
 - F14 `OSC forwarding can self-loop and cause UDP DoS`: wildcard bind時のsame-port local targetを保守的にself-forward扱いにする。
 - F23 `COM shell calls are made without OS-thread pinning`: `reveal_windows.go` のCOM呼び出しを `runtime.LockOSThread` で囲む。
 - F25/F26 `Explorer reveal ...`: Wails APIでも管理output配下のファイルだけExplorer表示できるようにする。
-- F27/F28 `Output format ...`: Discord/clipboard-only出力でも実際に使われるformat/qualityをUIで変更できるようにする。
+- F27/F28 `Output format ...`: Discord-only出力でも実際に使われるformat/qualityをUIで変更できるようにする。
 - F35/F36 `Update URL ...`: API応答の `html_url` をそのまま使わず、公式GitHub Release URLを構築または厳格検証する。
 - F42 `Accepted drops are not cancelled...`: drop eventで `preventDefault` / `stopPropagation` し、意図しないWebView navigationを防ぐ。
 
@@ -136,15 +136,85 @@
 
 | Work | 対象finding | 担当 | 状態 | 主なファイル | メモ |
 | --- | --- | --- | --- | --- | --- |
+| W1 | F01, F03, F31, F32, F33, F34 | Raman | 完了 | `src/internal/appcore/config.go`, `src/internal/appcore/autophoto.go`, tests | 自動投稿・RemotePlayer・scan status |
+| W2 | F39, F41 | Harvey | 完了 | `src/internal/appcore/qrcode.go`, `src/internal/appcore/clipboard*.go`, tests | QR upscale/clipboard PNG上限 |
+| W3 | F04, F21, F22 | Heisenberg | 完了 | `src/diagnostic_package.go`, `src/diagnostic_package_test.go` | CLI/ZIP暗号化の入力上限 |
+| W4 | F15, F23, F25, F26, F35, F36 | Newton | 完了 | `src/single_instance.go`, `src/reveal_windows.go`, `src/app.go`, `src/internal/appcore/update.go`, tests | IPC/Explorer/update境界 |
+| W5 | F27, F28, F42 | Sagan | 完了 | `src/frontend/src/main.js` | 出力形式UI/drop cancellation |
+| W6 | F10 | Hooke | 完了 | `tools/spout-capture/main.cpp` | Spout sender dimension上限 |
+| W7 | F06, F08, F13, F14, F18, F24, F38 | メインエージェント | 完了 | `src/main.go`, `src/app.go`, `src/app_diagnostic.go`, tests | draft/runtime境界、OSC/cache、診断ログredaction |
 
 ## 作業結果
 
-- 未着手
+### W1: 自動投稿・RemotePlayer・scan status
+
+- F01のために、`AutoCaptureConfig.Normalize` の `RemotePlayer` 補完条件を「nil のときだけ既定値を入れる」処理へ変更し、ユーザーが明示した `RemotePlayer=false` を保存後も維持するようにした。
+- F03のために、auto-photo watcher の tick 処理を「stable判定後にskipされたファイルも `processed` に数える」処理へ変更し、skip対象を大量投入して `MaxAutoPhotoProcessPerTick` を迂回できないようにした。
+- F31/F32のために、auto-photo watcher に直前のscan statusを保持する処理を追加し、同じ missing/inaccessible/scan-limit error を連続tickで結果へ重複追加しないようにした。
+- F33/F34のために、`AutoPhotoWatcher.webhookURL()` を「明示された `WebhookURL` だけをoverrideとして返す」処理へ変更し、screenshot auto-post の空Webhookが `AutoPhoto.WebhookURL` へ誤ってfallbackしないようにした。
+
+### W2: QR upscale / clipboard PNG 上限
+
+- F39のために、QR検出の拡大variant生成を「拡大後の推定総ピクセル数が `MaxImagePixels` 以下の場合だけ生成する」処理へ変更し、細長い画像で2x/3x/4x画像が巨大化しないようにした。
+- F41のために、Windows native clipboard PNG読み出しを「`GlobalSize` を確認して既存の入力byte上限を超える場合は `unsafe.Slice` / `make` / `copy` の前に拒否する」処理へ変更し、巨大clipboard dataでアプリがメモリを使い切らないようにした。
+- F41のために、native clipboard PNGで上限超過を検出した場合は汎用clipboard読み取りへフォールスルーせずエラーを返す処理へ変更し、巨大データの再試行経路を閉じた。
+
+### W3: CLI/ZIP暗号化入力上限
+
+- F04/F21/F22のために、CLI暗号化のroot入力検証を `os.Stat` から `os.Lstat` ベースへ変更し、FIFO、device、symlinkなどの非通常ファイルを暗号化前に拒否するようにした。
+- F04/F21/F22のために、単一ファイル暗号化を「通常ファイルかつ上限サイズ以下の場合だけ `os.ReadFile` へ進む」処理へ変更し、巨大ファイルを全量メモリへ読み込まないようにした。
+- F04/F21/F22のために、ディレクトリ暗号化を「zip化前に深さ、件数、単体サイズ、総サイズを検証する」処理へ変更し、巨大ツリーを `bytes.Buffer` へ展開しないようにした。
+
+### W4: IPC / Explorer / update URL / COM境界
+
+- F15のために、single-instance IPCの受信処理を「`io.LimitReader` 相当の上限付きdecodeとtoken/command/path件数/長さ検証を通す」処理へ変更し、localhostから巨大JSONを送られてもメモリを使い切らないようにした。
+- F15のために、IPC送信側もpath件数/長さを送信前に検証する処理へ変更し、自プロセス経由でも上限外requestを作らないようにした。
+- F23のために、Windows Shell APIによるExplorer表示処理を `runtime.LockOSThread` / `UnlockOSThread` で囲む処理へ変更し、COM初期化と解放が同じOS threadで行われるようにした。
+- F25/F26のために、`RevealFileInExplorer` のpath解決を `ResolveHistoryOutputPath` から `ResolveManagedHistoryOutputPath` へ変更し、rendererから渡された任意pathではなく、設定された管理output配下の既存ファイルだけをExplorer表示できるようにした。
+- F35/F36のために、update確認結果のURL生成を「API応答の `html_url` を採用する」処理から「取得したtag名で公式GitHub Release URLを構築する」処理へ変更し、改ざん応答で任意URLを開かないようにした。
+
+### W5: frontend出力形式UI / drop cancellation
+
+- F27/F28のために、出力形式とJPEG品質の編集可否を「ローカル保存ONのときだけ有効」から「ローカル保存またはDiscord投稿がONのときに有効」へ変更し、Discord-onlyでも実際に投稿へ使われるformat/qualityを設定できるようにした。
+- F42のために、window drop handler を `preventDefault()` と `stopPropagation()` を呼ぶ処理へ変更し、Wails file-drop後にWebViewがドロップされたURL/fileへ遷移しないようにした。
+
+### W6: Spout sender dimension上限
+
+- F10のために、Spout senderの幅/高さを使う前に `validate_sender_dimensions` 相当の共通検証を通す処理へ変更し、capture/diagnoseの両方で異常寸法を拒否するようにした。
+- F10のために、`width * height * 4` の計算をoverflow-safeなhelper経由へ変更し、巨大値や乗算overflowで小さいbufferを確保しないようにした。
+- F10のために、異常寸法時の戻り値をthrow/未定義動作から `sender_dimension_error` のJSON diagnostic errorへ変更し、利用者と診断ログで原因を判別できるようにした。
+
+### W7: draft/runtime境界・OSC・診断ログ
+
+- F08のために、画像引数処理へ入る直前のUI stateを「未保存draftの `state.Config` のまま」から「保存済み `cfg` を `state.Config` に戻し、draft metadataを解除する」処理へ変更し、results modeで起動するwatcherが未保存draftのWebhook/監視設定を使わないようにした。
+- F06のために、avatar OSC fallback判定を「任意の `/avatar/parameters` 受信があればfallbackを止める」処理から「設定されたbasis parameterを受信した場合だけfallbackを止める」処理へ変更し、無関係parameterでpreplaced fallbackが抑止されないようにした。
+- F13のために、world安定待ちとavatar OSC session resetの診断ログを「raw `instance_id` を出す」処理から「`instance_id` を `<redacted-vrchat-instance-id>` に置き換える」処理へ変更し、private instance情報を診断ログへ残さないようにした。
+- F14のために、OSC forwardのself判定を「wildcard bindではloopback/unspecifiedだけself扱い」から「wildcard bindでは同じportのローカルinterface宛もself扱い」へ変更し、`0.0.0.0:<port>` 受信時にLAN IP同portへ転送して自己ループしないようにした。
+- F18のために、avatar OSC sample保存を「mapへ無制限に追加」から「最大 `maxAvatarOSCSamples` 件へ制限し、古い非basis sampleを優先削除する」処理へ変更し、任意parameter名の大量送信でメモリが増え続けないようにした。
+- F24のために、起動診断summaryへ入れるoutput/auto-photo/screenshot/auto-capture directoryを「raw path文字列」から「`RedactDiagnosticText` 適用済み文字列」へ変更し、ユーザー名や個人フォルダ名が診断ログに残りにくいようにした。
+- F38のために、Discord webhook URLを含むエラー文字列のredactionをテストで固定し、`url.Error` 形式の `Post "https://discord.com/api/webhooks/..."` が診断ログへ生tokenとして残らないことを確認できるようにした。
 
 ## テスト結果
 
-- 未実行
+- `cd src && go test ./...` を実行し、成功した。
+- `node scripts/check-frontend-template-literals.mjs` を実行し、成功した。
+- `node scripts/check-wails-api-surface.mjs` を実行し、成功した。
+- `node scripts/check-closed-issue-index.mjs` を実行し、成功した。
+- `cmake -S tools/spout-capture -B /tmp/cfvrc-spout-logic-test && cmake --build /tmp/cfvrc-spout-logic-test --target spout-capture-logic-test -j2 && ctest --test-dir /tmp/cfvrc-spout-logic-test --output-on-failure` をHookeが実行し、成功した。
+- `x86_64-w64-mingw32-g++ -std=c++17 -Wall -Wextra -fsyntax-only -I/tmp/clipforvrchat-spout-mingw/_deps/spout2-src/SPOUTSDK/SpoutLibrary tools/spout-capture/main.cpp` をHookeが実行し、成功した。
+
+## コミット
+
+- `9161f8a fix(autoprocess): harden watcher config boundaries`: F01/F03/F08/F31/F32/F33/F34のために、config normalize、watcher tick上限、scan status dedup、Webhook解決、results mode draft解除を変更した。
+- `c9f41d8 fix(inputs): bound diagnostic qr and clipboard reads`: F04/F21/F22/F39/F41のために、CLI暗号化入力検証、QR upscale上限、clipboard PNG byte上限を追加した。
+- `a2ba76f fix(app): harden ipc explorer osc and diagnostics`: F06/F13/F14/F15/F18/F23/F24/F25/F26/F35/F36/F38のために、IPC検証、Explorer管理path制限、OSC self-loop/cache制限、update URL固定、診断ログredactionを変更した。
+- `0e1c7f0 fix(ui): enable discord output format controls`: F27/F28/F42のために、Discord-only時のformat/quality編集条件とdrop event cancellationを変更した。
+- `5af14b1 fix(spout): validate sender dimensions`: F10のために、Spout sender寸法検証とoverflow-safe buffer計算を追加した。
+- `docs(issues): record security remediation work`: 本レポート、監督issue、closed issue indexを更新し、完了/保留/後続再確認の状態を記録する。
 
 ## 残課題
 
-- 未分類
+- 重大な仕様変更・運用判断待ち: F02, F07, F11, F30, F37, F43, F44。今回の即時修正からは除外し、上記分類表の理由に沿って別途仕様判断する。
+- 追加情報・方針確認待ち: F05, F12。外部URL許可リストへ追加するhostを決める必要があるため、今回の即時修正からは除外した。
+- 後続再確認: F19。F33/F34/F38/F41の修正後に、metadata失敗時のDiscord upload経路が未検証投稿にならないか再確認する。
+- HEAD確認済み・重複・軽減済み: F09, F16, F20, F29, F40。追加コード修正は不要として扱った。

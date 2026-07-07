@@ -262,3 +262,13 @@
 | 293 | [インポート設定由来の自動処理監視フォルダを確認・制限する](unreleased/293-guard-imported-auto-processing-watch-directories.md) | 完了 | 未定 | 自動処理の監視フォルダと送信先Webhookを保存前確認に表示し、設定画面から監視フォルダを確認・変更できるようにした。 |
 | 294 | [Codex Security findings CSVを解説する](investigation-only/294-explain-codex-security-findings-csv.md) | 完了 | 調査のみ | Codex Security Findings CSVの24件のmedium指摘を分類し、優先対応候補を整理した。 |
 | 295 | [v0.1.8-rc2 release candidateを作成する](maintenance-only/295-create-v018-rc2.md) | 完了 | 整理のみ | `v0.1.8-rc2` を作成し、Release workflow、GitHub Release、公開Asset、zip内容を確認した。 |
+| 296 | [Codex Security findings全件対処に向けた軽量調査レポートを作成する](unreleased/296-create-security-findings-remediation-report.md) | 完了 | 未定 | 新CSV全44件を底本に、指定ディレクトリ配下へ全件対処の管理レポートを作成した。 |
+| 297 | [Codex Security findingsレポートを分類して追記する](unreleased/297-classify-security-findings-remediation-report.md) | 完了 | 未定 | 重大仕様変更、追加情報要否、即時修正対象を分類し、管理レポートへ追記した。 |
+| 298 | [追加情報不要のCodex Security findings修正をサブエージェントで監督する](unreleased/298-supervise-subagents-for-actionable-security-findings.md) | 完了 | 未定 | 仕様変更・追加情報待ちを除いたfindingを作業単位へ分け、サブエージェントに委任して統合した。 |
+| 299 | [Codex Security findings修正作業の報告をレポートへ追記する](unreleased/299-append-security-findings-remediation-work-report.md) | 完了 | 未定 | 即時修正対象の対応内容、テスト、保留理由、コミットを管理レポートへ追記した。 |
+| 300 | [CLI暗号化の入力サイズとファイル種別を上限付きで検証する](unreleased/300-bound-cli-encryption-input-size-and-type.md) | 完了 | 未定 | CLI暗号化で特殊ファイルと巨大ファイル/ディレクトリを事前拒否し、暗号化前のメモリ消費を制限した。 |
+| 301 | [F01/F03/F31/F32/F33/F34 の即時修正](unreleased/301-fix-immediate-security-findings-f01-f03-f31-f34.md) | 完了 | 未定 | AutoCapture Normalize、auto-photo の per-tick cap、scan status 重複抑制、screenshot auto-post の webhook 解決を修正した。 |
+| 302 | [F27/F28/F42 の即時修正](unreleased/302-fix-security-findings-f27-f28-f42.md) | 完了 | 未定 | Discordのみ出力でも画像形式を編集できるようにし、drop時のWebView navigationを抑止した。 |
+| 303 | [F39/F41を即時修正する](unreleased/303-f39-f41-qr-upscale-and-clipboard-png-size-guard.md) | 完了 | 未定 | QR upscaling の総ピクセル上限と Windows clipboard PNG の GlobalSize 上限を追加した。 |
+| 304 | [F15/F23/F25/F26/F35/F36 の即時修正を行う](unreleased/304-fix-security-findings-f15-f23-f25-f26-f35-f36.md) | 完了 | 未定 | localhost IPC、Explorer reveal、update URL、Windows COM shell呼び出しの境界を強化した。 |
+| 305 | [Spout diagnoseのsender寸法上限とoverflow対策を入れる](unreleased/305-fix-spout-diagnose-unbounded-sender-dimensions.md) | 完了 | 未定 | Spout senderの幅/高さを検証し、capture/diagnoseで巨大確保とoverflowを防いだ。 |
