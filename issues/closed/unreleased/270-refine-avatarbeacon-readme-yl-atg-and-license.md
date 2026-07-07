@@ -55,8 +55,17 @@ AvatarBeacon専用リポジトリのルートREADMEとUnity配布内READMEで、
 
 ## 受け入れ条件
 
-- [ ] ルートREADMEのYL-ATGとの関係を指定内容へ変更する。
-- [ ] Unity配布内READMEのYL-ATGとの関係を指定内容へ変更する。
-- [ ] ライセンス欄末尾に夜空くらげさんへの謝辞を追加する。
-- [ ] `配布物` セクションを削除する。
-- [ ] `詳細仕様` セクションを削除する。
+- [x] ルートREADMEのYL-ATGとの関係を指定内容へ変更する。
+- [x] Unity配布内READMEのYL-ATGとの関係を指定内容へ変更する。
+- [x] ライセンス欄末尾に夜空くらげさんへの謝辞を追加する。
+- [x] `配布物` セクションを削除する。
+- [x] `詳細仕様` セクションを削除する。
+
+## 完了メモ
+
+- AvatarBeacon専用リポジトリのルートREADMEとUnity配布内READMEで、YL-ATGとの関係を指定内容へ修正した。
+- ライセンス欄末尾に夜空くらげさんへの謝辞とClipForVRChatのアバター基準ローカル座標系機能に関する謝辞を追加した。
+- ルートREADMEから `配布物` と `詳細仕様` セクションを削除した。
+- 句点複数行チェック、指定削除対象検索、AvatarBeacon source zip相当の展開・必須ファイル・sha256検証を通した。
+- AvatarBeacon専用リポジトリの最新 `main` は `65af631`。
+- ClipForVRChat側のsubmodule pointerを `65af631` へ更新した。
