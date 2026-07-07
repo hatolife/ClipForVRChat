@@ -163,6 +163,7 @@ type OSSLicense struct {
 	Copyright string `json:"copyright"`
 	URL       string `json:"url"`
 	Text      string `json:"text,omitempty"`
+	Group     string `json:"group,omitempty"`
 }
 
 type FFmpegStatus struct {

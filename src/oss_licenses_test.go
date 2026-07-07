@@ -63,6 +63,7 @@ func TestOSSLicensesAreCompleteAndUnique(t *testing.T) {
 		"slicer",
 		"Spout2",
 		"u",
+		"AvatarBeacon / YL-ATG",
 	}
 	for _, name := range required {
 		if !seen[name] {
@@ -72,6 +73,28 @@ func TestOSSLicensesAreCompleteAndUnique(t *testing.T) {
 
 	if seen["go-qrcode"] {
 		t.Fatal("go-qrcode is test-only and should not be shown in app OSS licenses")
+	}
+}
+
+func TestAvatarBeaconLicenseIsGroupedSeparately(t *testing.T) {
+	var found bool
+	for _, license := range ossLicenses() {
+		if license.Group == "" {
+			continue
+		}
+		if license.Name != "AvatarBeacon / YL-ATG" {
+			t.Fatalf("%s has unexpected group %q", license.Name, license.Group)
+		}
+		if license.Group != "avatarBeacon" {
+			t.Fatalf("AvatarBeacon group = %q, want avatarBeacon", license.Group)
+		}
+		if !strings.Contains(license.Text, "YL-ATG_ForAvatar") {
+			t.Fatalf("AvatarBeacon license text does not include upstream notice")
+		}
+		found = true
+	}
+	if !found {
+		t.Fatal("AvatarBeacon license entry is missing")
 	}
 }
 

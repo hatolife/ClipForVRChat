@@ -1446,6 +1446,14 @@ small {
   gap: 12px;
 }
 
+.license-subsection {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #d6dee7;
+}
+
 .license-card {
   display: grid;
   gap: 8px;

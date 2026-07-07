@@ -100,6 +100,12 @@ const vueApp = createApp({
     hasResults() {
       return this.state.results && this.state.results.length > 0
     },
+    appLicenses() {
+      return (this.licenses || []).filter((license) => license.group !== 'avatarBeacon')
+    },
+    avatarBeaconLicenses() {
+      return (this.licenses || []).filter((license) => license.group === 'avatarBeacon')
+    },
     visibleHistory() {
       return (this.state.history || []).filter((item) => !item.cleared)
     },
@@ -2251,7 +2257,7 @@ const vueApp = createApp({
         <h2>OSSライセンス</h2>
         <p class="subtle">このアプリで使用しているOSSです。</p>
         <div class="license-list">
-          <article v-for="license in licenses" :key="license.name" class="license-card">
+          <article v-for="license in appLicenses" :key="license.name" class="license-card">
             <h3>{{ license.name }}</h3>
             <p>{{ license.license }}</p>
             <p>{{ license.copyright }}</p>
@@ -2262,6 +2268,21 @@ const vueApp = createApp({
             </details>
           </article>
         </div>
+        <section v-if="avatarBeaconLicenses.length" class="license-subsection">
+          <h3>AvatarBeacon</h3>
+          <div class="license-list">
+            <article v-for="license in avatarBeaconLicenses" :key="license.name" class="license-card">
+              <h3>{{ license.name }}</h3>
+              <p>{{ license.license }}</p>
+              <p>{{ license.copyright }}</p>
+              <button class="link-button" @click="openURL(license.url)" title="このOSSの配布元を開く">{{ license.url }}</button>
+              <details v-if="license.text" class="license-text">
+                <summary>ライセンス本文</summary>
+                <pre>{{ license.text }}</pre>
+              </details>
+            </article>
+          </div>
+        </section>
         <button class="secondary" @click="setView('about', 'licenses_back')" title="前の画面へ戻る">戻る</button>
       </section>
 
