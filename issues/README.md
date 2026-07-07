@@ -43,6 +43,7 @@
 | 208 | [自動撮影説明を改善し、カメラ自動起動/終了を既定OFFにする](208-improve-auto-capture-help-and-disable-camera-auto-open-close.md) | 要確認 | `v0.1.8` | 自動撮影説明とAvatarBeacon状態表示を整理し、Camera OSCの不安定さを避けるためカメラ自動起動/終了を設定化して既定OFFにする。 |
 | 228 | [全Markdownドキュメントを現状仕様に合わせて更新する](228-update-all-markdown-documents.md) | 要対応 | 未定 | リポジトリ内のMarkdownを横断確認し、古い説明や矛盾を現状仕様に合わせて整理する。 |
 | 241 | [AvatarBeacon_mainとAvatarBeacon_12を追加しparameter pathをavatar_beacon配下へ変更する](241-add-avatarbeacon-main-and-12-prefabs-with-prefixed-parameters.md) | 要確認 | 未定 | AvatarBeaconのmain方式Prefabを通常版として追加し、12方式Prefabと `avatar_beacon/...` parameter pathへ移行する。 |
+| 256 | [v0.1.8仕様に合わせて使い方画面の文面草案を作る](256-rewrite-help-screen-copy-for-v018.md) | 要対応 | 未定 | 使い方画面を基本、発展、補助機能の段階で読める文章へ変更するため、v0.1.8仕様に合わせた草案を整理する。 |
 
 ## 状態の意味
 
