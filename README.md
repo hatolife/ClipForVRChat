@@ -108,7 +108,7 @@ Stream方式で `Spout helperが見つかりません`、`Spout helperは見つ�
 
 自動撮影では、画像と同じ場所にsidecar JSONを保存できます。sidecar JSONには撮影時刻、構図、Stream sender情報、VRChat output logから取得できた同席ユーザー、world ID、instance ID、画像SHA256を記録します。PNG/JPEG画像内にも、設定に応じて自動撮影メタデータを埋め込めます。
 
-プレイヤー基準構図は、AvatarBeacon導入済みアバターから受け取る `avatar_osc` basis を基本にします。標準OSCだけでは動かず、positionはHips基準、yawはHead基準で、player root そのものではありません。専用ギミックなしの場合は `manual` basis で手動保存した基準Poseをフォールバックとして使えます。確認手順は `docs/v0.1.8-avatar-osc-basis-verification.md` と `docs/v0.1.8-player-local-verification.md`、AvatarBeaconの詳細は `docs/avatarbeacon-spec.md` を参照してください。
+プレイヤー基準構図は、AvatarBeacon導入済みアバターから受け取る `avatar_osc` basis を基本にします。標準OSCだけでは動かず、positionはHips基準、yawはHead基準で、player root そのものではありません。専用ギミックなしの場合は `manual` basis で手動保存した基準位置をフォールバックとして使えます。確認手順は `docs/v0.1.8-avatar-osc-basis-verification.md` と `docs/v0.1.8-player-local-verification.md`、AvatarBeaconの詳細は `docs/avatarbeacon-spec.md` を参照してください。
 
 AvatarBeacon は `avatar_osc` basis 確認用の汎用アバターギミックで、ClipForVRChat専用ではありません。CIは `AvatarBeacon-vX.Y.Z-source.zip` の元ファイルzipを作成します。source zipをUnity projectへ展開すると `Assets/PoppoWorks/AvatarBeacon/...` になる形を想定しています。
 

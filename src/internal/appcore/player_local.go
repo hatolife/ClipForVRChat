@@ -30,7 +30,7 @@ func ResolveCameraViewPose(cfg AutoCaptureConfig, view CameraViewConfig) (Camera
 		return view.Pose, nil
 	case "player_local":
 		if !cfg.PlayerLocal.Calibrated {
-			return CameraPoseConfig{}, fmt.Errorf("プレイヤー基準Poseが未設定のため、player_local構図を撮影できません。自動撮影タブで現在Poseをプレイヤー基準として保存してください")
+			return CameraPoseConfig{}, fmt.Errorf("プレイヤー基準位置が未設定のため、player_local構図を撮影できません。自動撮影タブで現在位置をプレイヤー基準として保存してください")
 		}
 		return TransformPlayerLocalPose(cfg.PlayerLocal.BasisPose, view.Pose), nil
 	default:
@@ -45,7 +45,7 @@ func ResolvePlayerLocalBasisPose(cfg AutoCaptureConfig, avatarOSCBasis AvatarOSC
 		return RestoreAvatarOSCBasisPose(avatarOSCBasis, cfg.PlayerLocal.AvatarOSC, now)
 	default:
 		if !cfg.PlayerLocal.Calibrated {
-			return CameraPoseConfig{}, fmt.Errorf("プレイヤー基準Poseが未設定のため、player_local構図を撮影できません。自動撮影タブで現在Poseをプレイヤー基準として保存してください")
+			return CameraPoseConfig{}, fmt.Errorf("プレイヤー基準位置が未設定のため、player_local構図を撮影できません。自動撮影タブで現在位置をプレイヤー基準として保存してください")
 		}
 		return cfg.PlayerLocal.BasisPose, nil
 	}

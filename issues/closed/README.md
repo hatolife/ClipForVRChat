@@ -208,3 +208,4 @@
 | 238 | [未保存変更のある設定項目を行としてハイライトする](unreleased/238-highlight-unsaved-setting-rows.md) | 完了 | 未定 | 未保存変更のある主要な設定行と構図カードを画面上でハイライトするようにした。 |
 | 239 | [AvatarBeaconにバージョン情報を埋め込みOSCで通知する](unreleased/239-embed-avatarbeacon-version-and-send-osc-version.md) | 完了 | 未定 | AvatarBeaconのPrefab/source内へ固定名でバージョン情報を埋め込み、OSC送信時に1回だけバージョン番号を送信し、CI/Releaseで自動更新する。 |
 | 240 | [b6でGUIが表示されないVue compiler errorを調査する](unreleased/240-investigate-b6-gui-vue-compiler-error.md) | 完了 | 未定 | `v0.1.8-b6` のVue runtime templateタグ不整合を修正し、compiler検査をCI/Releaseに追加した。 |
+| 242 | [設定内のカメラ姿勢Pose表記を日本語へ変更する](unreleased/242-localize-settings-camera-pose-labels.md) | 完了 | 未定 | 設定UI内のカメラ姿勢を表す `Pose` を日本語表記へ置き換えた。 |

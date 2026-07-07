@@ -516,16 +516,16 @@ const vueApp = createApp({
         'autoCapture.osc.vrcHost': 'OSCホスト',
         'autoCapture.osc.vrcInPort': 'OSC送信ポート',
         'autoCapture.osc.appOutPort': 'OSC受信ポート',
-        'autoCapture.osc.poseFreshnessSec': '現在Pose取得の有効秒数',
+        'autoCapture.osc.poseFreshnessSec': '現在位置取得の有効秒数',
         'autoCapture.osc.forward.enabled': 'OSC転送',
         'autoCapture.osc.forward.mode': '転送モード',
         'autoCapture.capture.autoEnablePreplacedLocalAnchor': 'フォールバックモードを自動ON',
         'autoCapture.capture.autoDisablePreplacedLocalAnchor': 'フォールバックモードを自動OFF',
         'autoCapture.capture.preplacedLocalAnchor': 'フォールバックモード',
         'autoCapture.playerLocal.basisSource': 'プレイヤー基準の取得元',
-        'autoCapture.playerLocal.calibrated': 'manual基準Pose',
-        'autoCapture.playerLocal.updatedAt': 'manual基準Pose',
-        'autoCapture.playerLocal.basisPose': 'manual基準Pose',
+        'autoCapture.playerLocal.calibrated': 'manual基準位置',
+        'autoCapture.playerLocal.updatedAt': 'manual基準位置',
+        'autoCapture.playerLocal.basisPose': 'manual基準位置',
         'autoCapture.playerLocal.avatarOsc.parameterPrefix': 'AvatarBeacon parameter prefix',
         'autoCapture.playerLocal.avatarOsc.positionScale': 'AvatarBeacon position scale',
         'autoCapture.playerLocal.avatarOsc.positiveFlagThreshold': 'AvatarBeacon sign threshold',
@@ -535,7 +535,7 @@ const vueApp = createApp({
       }
       if (exactLabels[path]) return exactLabels[path]
       if (path.startsWith('autoCapture.osc.forward.targets.')) return 'OSC転送先'
-      if (path.startsWith('autoCapture.playerLocal.basisPose.')) return 'manual基準Pose'
+      if (path.startsWith('autoCapture.playerLocal.basisPose.')) return 'manual基準位置'
       if (path.startsWith('image.')) return '画像変換'
       if (path.startsWith('output.uploadDiscord') || path.startsWith('discord.')) return 'Discord投稿'
       if (path.startsWith('output.saveLocal') || path.startsWith('output.local') || path.startsWith('output.detectQrCodeUrls')) return '処理結果'
@@ -784,7 +784,7 @@ const vueApp = createApp({
       return '自動撮影設定'
     },
     autoCaptureDetailDescription() {
-      if (this.autoCaptureDetailView === 'composition') return '撮影する構図、座標系、Pose、拡大率、並び順を設定します。'
+      if (this.autoCaptureDetailView === 'composition') return '撮影する構図、座標系、位置、拡大率、並び順を設定します。'
       if (this.autoCaptureDetailView === 'fallback') return 'フォールバックモードの自動ON/OFFを設定します。'
       if (this.autoCaptureDetailView === 'capture') return 'Stream方式のSpout受信、出力先、保存形式、ファイル名を設定します。'
       if (this.autoCaptureDetailView === 'metadata') return 'sidecar、画像メタデータ、同席ユーザー情報、Discord投稿、撮影後復元を設定します。'
@@ -1358,7 +1358,7 @@ const vueApp = createApp({
     async saveCurrentCameraPoseToView(view) {
       if (!view?.id) return
       if (!api?.SaveCurrentCameraPoseToView) {
-        this.error = '現在Pose保存APIが利用できません。'
+        this.error = '現在位置保存APIが利用できません。'
         return
       }
       this.error = ''
@@ -1368,7 +1368,7 @@ const vueApp = createApp({
         if (updated?.id) {
           Object.assign(view, updated)
         }
-        this.toast = '現在Poseを取得しました'
+        this.toast = '現在位置を取得しました'
         setTimeout(() => {
           this.toast = ''
         }, 1800)
@@ -1378,7 +1378,7 @@ const vueApp = createApp({
     },
     async addCurrentCameraPoseAsView(view) {
       if (!api?.AddCurrentCameraPoseAsView) {
-        this.error = '現在Pose追加APIが利用できません。'
+        this.error = '現在位置追加APIが利用できません。'
         return
       }
       this.error = ''
@@ -1388,7 +1388,7 @@ const vueApp = createApp({
         if (updated?.id) {
           this.autoCaptureSettings.views.push(this.newAutoCaptureView(updated))
         }
-        this.toast = '現在Poseから構図を追加しました'
+        this.toast = '現在位置から構図を追加しました'
         setTimeout(() => {
           this.toast = ''
         }, 1800)
@@ -1398,14 +1398,14 @@ const vueApp = createApp({
     },
     async saveCurrentCameraPoseAsPlayerBasis() {
       if (!api?.SaveCurrentCameraPoseAsPlayerBasis) {
-        this.error = 'プレイヤー基準Pose保存APIが利用できません。'
+        this.error = 'プレイヤー基準位置保存APIが利用できません。'
         return
       }
       this.error = ''
       try {
         const updated = await api.SaveCurrentCameraPoseAsPlayerBasis()
         this.syncAutoCaptureConfig(updated)
-        this.toast = 'プレイヤー基準Poseを保存しました'
+        this.toast = 'プレイヤー基準位置を保存しました'
         setTimeout(() => {
           this.toast = ''
         }, 1800)
@@ -1426,7 +1426,7 @@ const vueApp = createApp({
       this.error = ''
       try {
         await api.MoveCameraToView(view.id)
-        this.toast = 'カメラを構図のPoseへ移動しました'
+        this.toast = 'カメラを構図の位置へ移動しました'
         setTimeout(() => {
           this.toast = ''
         }, 1800)
@@ -1453,14 +1453,14 @@ const vueApp = createApp({
     async resetCameraPoseToDefault(view) {
       if (!view?.id) return
       if (!api?.ResetCameraPoseToDefault) {
-        this.error = '初期PoseリセットAPIが利用できません。'
+        this.error = '初期位置リセットAPIが利用できません。'
         return
       }
       this.error = ''
       try {
         const updated = await api.ResetCameraPoseToDefault(view.id)
         this.syncAutoCaptureConfig(updated)
-        this.toast = '初期Poseへ戻しました'
+        this.toast = '初期位置へ戻しました'
         setTimeout(() => {
           this.toast = ''
         }, 1800)
@@ -2297,12 +2297,12 @@ const vueApp = createApp({
                     <div>
                       <h4>構図設定</h4>
                       <p>「撮影する」がONの構図を上から順番に撮影します。</p>
-                      <p v-if="effectiveAutoCapturePreplacedLocalAnchor">フォールバックモード中は、各構図のPose、拡大率、表示対象はOSC送信されないため編集できません。</p>
+                      <p v-if="effectiveAutoCapturePreplacedLocalAnchor">フォールバックモード中は、各構図の位置、拡大率、表示対象はOSC送信されないため編集できません。</p>
                       <p v-if="avatarOscBasisStatus?.autoFallback && !effectiveAutoCapturePreplacedLocalAnchor">AvatarBeaconのbasis受信が30秒以上ないため、フォールバックモードOFFでは通常撮影に失敗する可能性があります。</p>
                       <p v-else-if="!effectiveAutoCapturePreplacedLocalAnchor">プレイヤー基準構図はAvatarBeaconの受信状態がreadyのときに自動追従します。</p>
                     </div>
                     <div class="button-row">
-                      <button type="button" class="secondary" @click="resetCameraViewsToDefaults" :disabled="effectiveAutoCapturePreplacedLocalAnchor" :title="effectiveAutoCapturePreplacedLocalAnchor ? 'フォールバックモード中は構図PoseやZoomを使いません' : '初期の3構図へ戻す'">初期3構図に戻す</button>
+                      <button type="button" class="secondary" @click="resetCameraViewsToDefaults" :disabled="effectiveAutoCapturePreplacedLocalAnchor" :title="effectiveAutoCapturePreplacedLocalAnchor ? 'フォールバックモード中は構図位置やZoomを使いません' : '初期の3構図へ戻す'">初期3構図に戻す</button>
                     </div>
                   </div>
                   <div v-if="autoCaptureViews.length" class="view-list">
@@ -2342,7 +2342,7 @@ const vueApp = createApp({
                       <div class="view-actions">
                         <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, -1)" :disabled="index === 0" :title="index === 0 ? '先頭なので上へ移動できません' : 'この構図を上へ移動'">↑</button>
                         <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, 1)" :disabled="index === autoCaptureViews.length - 1" :title="index === autoCaptureViews.length - 1 ? '末尾なので下へ移動できません' : 'この構図を下へ移動'">↓</button>
-                        <button type="button" class="secondary" @click="saveCurrentCameraPoseToView(cameraView)" :disabled="effectiveAutoCapturePreplacedLocalAnchor" :title="effectiveAutoCapturePreplacedLocalAnchor ? 'フォールバックモード中は構図Poseを使いません' : '現在のPoseをこの構図へ取得する'">現在Poseを取得</button>
+                        <button type="button" class="secondary" @click="saveCurrentCameraPoseToView(cameraView)" :disabled="effectiveAutoCapturePreplacedLocalAnchor" :title="effectiveAutoCapturePreplacedLocalAnchor ? 'フォールバックモード中は構図位置を使いません' : '現在の位置をこの構図へ取得する'">現在位置を取得</button>
                         <button type="button" class="secondary" @click="moveCameraToView(cameraView)" :disabled="effectiveAutoCapturePreplacedLocalAnchor" :title="effectiveAutoCapturePreplacedLocalAnchor ? 'フォールバックモード中はVRChat内で配置済みのローカルアンカーCameraを使います' : 'この構図の位置へカメラを移動する'">この位置に移動</button>
                         <button type="button" class="secondary" @click="testAutoCaptureView(cameraView)" title="この構図をテスト撮影する">テスト撮影</button>
                         <button type="button" class="secondary" @click="duplicateAutoCaptureView(cameraView)" title="この構図を複製する">複製</button>
@@ -2496,7 +2496,7 @@ const vueApp = createApp({
                   <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.restore.enabled" /><span></span></label>
                 </div>
                 <div class="setting-row" :class="{ disabled: !autoCaptureSettings.restore.enabled }">
-                  <div><strong>撮影前の受信値を優先</strong><p>Mode、Pose、Streaming、Smooth、拡大率、露出、マスクなどを撮影直前の受信値へ戻します。</p></div>
+                  <div><strong>撮影前の受信値を優先</strong><p>Mode、位置、Streaming、Smooth、拡大率、露出、マスクなどを撮影直前の受信値へ戻します。</p></div>
                   <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.restore.preferSnapshot" :disabled="!autoCaptureSettings.restore.enabled" /><span></span></label>
                 </div>
                 <div class="setting-row" :class="{ disabled: !autoCaptureSettings.restore.enabled || !autoCaptureSettings.restore.preferSnapshot }">
@@ -2532,7 +2532,7 @@ const vueApp = createApp({
                   <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.restore.fallback.lock" :disabled="!autoCaptureSettings.restore.enabled" /><span></span></label>
                 </div>
                 <div class="setting-row" :class="{ disabled: !autoCaptureSettings.restore.enabled }">
-                  <div><strong>戻し先 Poseを使う</strong><p>受信値がない場合でも指定Poseへ戻したい場合だけONにします。</p></div>
+                  <div><strong>戻し先位置を使う</strong><p>受信値がない場合でも指定位置へ戻したい場合だけONにします。</p></div>
                   <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.restore.fallback.restorePose" :disabled="!autoCaptureSettings.restore.enabled" /><span></span></label>
                 </div>
                 <div class="pose-grid" :class="{ disabled: !autoCaptureSettings.restore.enabled || !autoCaptureSettings.restore.fallback.restorePose }">
@@ -2598,7 +2598,7 @@ const vueApp = createApp({
             <div class="setting-row" :class="settingRowChangedClass('autoCapture.views')">
               <div>
                 <strong>構図設定</strong>
-                <p>撮影する構図、座標系、Pose、拡大率、並び順を設定します。</p>
+                <p>撮影する構図、座標系、位置、拡大率、並び順を設定します。</p>
                 <p>有効な構図: {{ enabledAutoCaptureViewCount }} / {{ autoCaptureViews.length }}</p>
               </div>
               <div class="settings-overview-controls">
@@ -2672,7 +2672,7 @@ const vueApp = createApp({
               </label>
             </div>
             <div class="setting-row" :class="settingRowChangedClass('autoCapture.osc.poseFreshnessSec')">
-              <div><strong>現在Pose取得の有効秒数</strong><p>「現在Poseを取得」を押した時に、何秒以内にVRChatから受信したPoseなら取得に使うかです。撮影間隔ではありません。</p></div>
+              <div><strong>現在位置取得の有効秒数</strong><p>「現在位置を取得」を押した時に、何秒以内にVRChatから受信した位置なら取得に使うかです。撮影間隔ではありません。</p></div>
               <label>
                 <input type="number" min="1" step="1" v-model.number="autoCaptureSettings.osc.poseFreshnessSec" />
               </label>
@@ -2684,15 +2684,15 @@ const vueApp = createApp({
               </div>
             </div>
             <div class="setting-row" :class="settingRowChangedClass('autoCapture.playerLocal.basisSource', 'autoCapture.playerLocal.basisPose', 'autoCapture.playerLocal.calibrated')">
-              <div><strong>プレイヤー基準の取得元</strong><p>AvatarBeaconを使う avatar_osc が通常の取得元です。manual は専用ギミックなしで手動保存した基準Poseを使うフォールバックです。</p></div>
+              <div><strong>プレイヤー基準の取得元</strong><p>AvatarBeaconを使う avatar_osc が通常の取得元です。manual は専用ギミックなしで手動保存した基準位置を使うフォールバックです。</p></div>
               <div class="settings-control-stack">
                 <select v-model="autoCaptureSettings.playerLocal.basisSource">
                   <option value="avatar_osc">AvatarBeacon / avatar_osc</option>
                   <option value="manual">manual fallback</option>
                 </select>
-                <button v-if="autoCaptureSettings.playerLocal.basisSource === 'manual'" type="button" class="secondary" @click="saveCurrentCameraPoseAsPlayerBasis" title="現在のPoseをmanual基準として保存する">現在Poseをmanual基準に保存</button>
+                <button v-if="autoCaptureSettings.playerLocal.basisSource === 'manual'" type="button" class="secondary" @click="saveCurrentCameraPoseAsPlayerBasis" title="現在の位置をmanual基準として保存する">現在位置をmanual基準に保存</button>
                 <p v-if="autoCaptureSettings.playerLocal.basisSource === 'manual'" class="setting-note" :class="autoCaptureSettings.playerLocal.calibrated ? 'ok' : 'warning'">
-                  manual基準Pose: {{ autoCaptureSettings.playerLocal.calibrated ? '保存済み' : '未設定' }}
+                  manual基準位置: {{ autoCaptureSettings.playerLocal.calibrated ? '保存済み' : '未設定' }}
                   <span v-if="autoCaptureSettings.playerLocal.updatedAt"> / {{ autoCaptureSettings.playerLocal.updatedAt }}</span>
                 </p>
               </div>

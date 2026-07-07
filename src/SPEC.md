@@ -192,9 +192,9 @@ Stream方式は主経路です。ffmpeg/gdigrabによるデスクトップやVRC
 構図は `world` または `player_local` の座標系を持ちます。
 
 - `world`: `/usercamera/Pose` へ設定値をそのまま送信します。
-- `player_local`: 手動保存したプレイヤー基準Pose、または専用アバターギミックから受信した `avatar_osc` basis に対して、構図のローカル位置/回転を加算してから `/usercamera/Pose` へ送信します。
+- `player_local`: 手動保存したプレイヤー基準位置、または専用アバターギミックから受信した `avatar_osc` basis に対して、構図のローカル位置/回転を加算してから `/usercamera/Pose` へ送信します。
 
-標準OSCだけではローカルプレイヤーroot位置/Yawを自動取得できないため、`manual` basis は「現在Poseをプレイヤー基準に保存」で保存した手動基準Poseを使います。`avatar_osc` basis は Hips/avatar 基準であり、player root 基準そのものではありません。基準Poseが未設定、または `avatar_osc` が未受信/鮮度切れの場合、`player_local` 構図は撮影失敗として扱います。
+標準OSCだけではローカルプレイヤーroot位置/Yawを自動取得できないため、`manual` basis は「現在位置をmanual基準に保存」で保存した手動基準位置を使います。`avatar_osc` basis は Hips/avatar 基準であり、player root 基準そのものではありません。基準位置が未設定、または `avatar_osc` が未受信/鮮度切れの場合、`player_local` 構図は撮影失敗として扱います。
 
 ### 同席ユーザーとメタデータ
 

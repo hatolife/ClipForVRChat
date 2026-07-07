@@ -840,7 +840,7 @@ func (a *App) ResetCameraPoseToDefault(viewID string) (appcore.Config, error) {
 	viewID = strings.TrimSpace(viewID)
 	defaultView, ok := appcore.DefaultCameraViewByID(viewID)
 	if !ok {
-		return cfg, fmt.Errorf("初期Poseが定義されていない構図です: %s", viewID)
+		return cfg, fmt.Errorf("初期位置が定義されていない構図です: %s", viewID)
 	}
 	found := false
 	for i := range cfg.AutoCapture.Views {
@@ -899,7 +899,7 @@ func (a *App) MoveCameraToView(viewID string) error {
 		return err
 	}
 	a.mu.Lock()
-	a.state.Message = "カメラを構図のPoseへ移動しました。"
+	a.state.Message = "カメラを構図の位置へ移動しました。"
 	a.mu.Unlock()
 	return nil
 }
@@ -2519,10 +2519,10 @@ func (a *App) latestUserCameraStateLocked(cfg appcore.Config, now time.Time) app
 func (a *App) freshCameraPoseLocked(cfg appcore.Config) (appcore.CameraPoseConfig, error) {
 	snapshot := a.latestCameraPoseLocked(cfg)
 	if snapshot.UpdatedAt == "" {
-		return appcore.CameraPoseConfig{}, fmt.Errorf("VRChatからUser Camera Poseをまだ受信していません。VRChatのOSCを有効にし、User Cameraを表示して少し動かしてください。")
+		return appcore.CameraPoseConfig{}, fmt.Errorf("VRChatからUser Cameraの位置をまだ受信していません。VRChatのOSCを有効にし、User Cameraを表示して少し動かしてください。")
 	}
 	if !snapshot.Fresh {
-		return appcore.CameraPoseConfig{}, fmt.Errorf("User Camera Poseが古いです。VRChat内でUser Cameraを少し動かしてから保存してください。")
+		return appcore.CameraPoseConfig{}, fmt.Errorf("User Cameraの位置が古いです。VRChat内でUser Cameraを少し動かしてから保存してください。")
 	}
 	return snapshot.Pose, nil
 }
@@ -2546,7 +2546,7 @@ func (a *App) latestPlayerLocalBasisLocked(cfg appcore.Config, now time.Time) Pl
 				Status:     "missing",
 				Configured: false,
 				Fresh:      false,
-				Error:      "プレイヤー基準Poseが未設定です。自動撮影タブで現在Poseをプレイヤー基準として保存してください",
+				Error:      "プレイヤー基準位置が未設定です。自動撮影タブで現在位置をプレイヤー基準として保存してください",
 			}
 		}
 		updatedAt := strings.TrimSpace(cfg.AutoCapture.PlayerLocal.UpdatedAt)
@@ -2574,7 +2574,7 @@ func (a *App) freshPlayerLocalBasisLocked(cfg appcore.Config) (appcore.CameraPos
 	snapshot := a.latestPlayerLocalBasisLocked(cfg, time.Now())
 	if snapshot.Source == "manual" {
 		if !snapshot.Configured {
-			return appcore.CameraPoseConfig{}, fmt.Errorf("プレイヤー基準Poseが未設定のため、player_local構図を撮影できません。自動撮影タブで現在Poseをプレイヤー基準として保存してください")
+			return appcore.CameraPoseConfig{}, fmt.Errorf("プレイヤー基準位置が未設定のため、player_local構図を撮影できません。自動撮影タブで現在位置をプレイヤー基準として保存してください")
 		}
 		return snapshot.Pose, nil
 	}

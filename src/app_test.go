@@ -485,7 +485,7 @@ func TestAppAvatarOSCBasisStatusIgnoresManualBasisMissing(t *testing.T) {
 	if got.Source != "avatar_osc" || got.Status != "missing" {
 		t.Fatalf("snapshot = %+v, want missing avatar_osc", got)
 	}
-	if strings.Contains(got.Error, "プレイヤー基準Pose") {
+	if strings.Contains(got.Error, "プレイヤー基準位置") {
 		t.Fatalf("error = %q, want avatar OSC diagnostic", got.Error)
 	}
 	if !strings.Contains(got.Error, "avatar OSC parameter") || !strings.Contains(got.Error, "avatar_beacon/coord/* / avatar_beacon/forward/*") {
@@ -519,7 +519,7 @@ func TestAppAvatarOSCBasisStatusResolvesEvenWhenManualBasisMissing(t *testing.T)
 	if got.Source != "avatar_osc" || got.Status != "ready" || !got.Fresh {
 		t.Fatalf("snapshot = %+v, want ready avatar_osc", got)
 	}
-	if strings.Contains(got.Error, "プレイヤー基準Pose") {
+	if strings.Contains(got.Error, "プレイヤー基準位置") {
 		t.Fatalf("error = %q, want no manual basis error", got.Error)
 	}
 }
