@@ -56,11 +56,20 @@ Release workflowはbuild/sign/package/releaseをjob分割し、署名secretはsi
 同一job内のPATH固定や絶対パスGPG指定だけでは最終対策にしない。
 keyless/KMS署名への移行は将来提案として `docs/security-future-recommendations.md` に分離する。
 
+## 対応
+
+2026-07-08: Release workflowを `build` / `sign` / `package` / `release` に分割した。
+`build` jobは署名secretを受け取らず、unsigned exeとpackage用payloadをartifactとして出力する。
+`sign` jobだけが `CI_RELEASE_GPG_PRIVATE_KEY` / passphrase / fingerprint を受け取り、unsigned exe artifactをdownloadして `/usr/bin/gpg` で detached signature を作成する。
+`sign` / `package` jobではartifact名とGitHub Actions artifact digestを確認し、exe本体はSHA256 manifestでも検証する。
+`package` jobはunsigned payloadとsignature artifactをdownloadして通常zip、単一exe署名asc、separated zip、AvatarBeacon unitypackageだけをRelease用artifactへ渡す。
+Release本文は引き続き `scripts/extract-release-notes.mjs` で `RELEASE_NOTES.md` から生成する。
+
 ## 受け入れ条件
 
-- [ ] ビルドjobに `CI_RELEASE_GPG_PRIVATE_KEY` / passphrase / fingerprint が渡らない。
-- [ ] 署名jobはビルド済みexe artifactだけを取得し、依存関係インストールやアプリビルドを行わない。
-- [ ] 署名対象exeのartifact名とdigestを検証し、別artifact差し替えを検出できる。
-- [ ] 署名jobでは絶対パスのGPG等を使い、runner状態の影響を最小化する。
-- [ ] Release workflowの公開Assetは通常zip、単一exe署名asc、separated zip、AvatarBeacon unitypackageの運用に合う。
-- [ ] Release本文が `RELEASE_NOTES.md` 由来であること、zip内ファイル一覧、不要な公開鍵/sha256個別公開がないことを確認する。
+- [x] ビルドjobに `CI_RELEASE_GPG_PRIVATE_KEY` / passphrase / fingerprint が渡らない。
+- [x] 署名jobはビルド済みexe artifactだけを取得し、依存関係インストールやアプリビルドを行わない。
+- [x] 署名対象exeのartifact名とdigestを検証し、別artifact差し替えを検出できる。
+- [x] 署名jobでは絶対パスのGPG等を使い、runner状態の影響を最小化する。
+- [x] Release workflowの公開Assetは通常zip、単一exe署名asc、separated zip、AvatarBeacon unitypackageの運用に合う。
+- [x] Release本文が `RELEASE_NOTES.md` 由来であること、zip内ファイル一覧、不要な公開鍵/sha256個別公開がないことを確認する。

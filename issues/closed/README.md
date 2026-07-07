@@ -279,3 +279,4 @@
 | 312 | [Auto-photo scan capによる旧画像漏えいを再検証する](unreleased/312-revalidate-autophoto-scan-cap-old-photo-leak.md) | 完了 | 未定 | 追加情報を再検証し、既存の全件baseline scan修正で旧画像投稿とstarvationが解消済みであることを確認した。 |
 | 313 | [Discord履歴のWebhook削除トークン保存を保護する](unreleased/313-protect-history-discord-token-storage.md) | 完了 | 未定 | 履歴JSONとUI stateへDiscord tokenを保存・露出せず、削除時は現在configのWebhook URLからtokenを解決するようにした。 |
 | 314 | [issue原文引用で秘密情報を永続化しない](unreleased/314-redact-secrets-in-verbatim-issue-quotes.md) | 完了 | 未定 | issueの原文引用ルールに、Webhook URLやtokenなどの秘密情報をredactする例外を追加した。 |
+| 316 | [Release署名鍵をビルドジョブから分離する](unreleased/316-isolate-release-signing-secrets-from-build-job.md) | 完了 | 未定 | Release workflowをbuild/sign/package/releaseへ分割し、署名secretを署名専用jobだけへ渡すようにした。 |

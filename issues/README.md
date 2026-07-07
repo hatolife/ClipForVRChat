@@ -46,7 +46,6 @@
 | 310 | [自動撮影Discord opt-outを自動撮影アップロードへ厳密に適用する](310-enforce-autocapture-discord-opt-out.md) | 要対応 | 未定 | 自動撮影専用Discord投稿OFFを実効ゲートにし、通常投稿ONだけで自動撮影画像が投稿されないようにする。 |
 | 311 | [非表示のカメラ自動起動/終了設定を無効化する](311-disable-hidden-camera-auto-start-settings.md) | 要対応 | 未定 | UIで非表示のカメラ自動起動/終了フラグが既存・インポートconfigのtrue値で実行されないようにする。 |
 | 315 | [非表示タブのWebhook/自動投稿設定を保存前確認する](315-confirm-hidden-webhook-autopost-settings-before-save.md) | 要対応 | 未定 | タブ外のWebhook、自動投稿、監視フォルダ差分を保存前に具体的に確認できるようにする。 |
-| 316 | [Release署名鍵をビルドジョブから分離する](316-isolate-release-signing-secrets-from-build-job.md) | 要対応 | 未定 | Release signing secretをビルドjobから分離し、署名専用jobでビルド済みartifactだけを署名する。 |
 
 ## 状態の意味
 

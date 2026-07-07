@@ -29,7 +29,7 @@ env:
 
 jobs:
   build:
-    name: Build exe and package release assets
+    name: Build unsigned executable and payload
     runs-on: windows-latest
     permissions:
       contents: read
@@ -38,6 +38,8 @@ jobs:
       asset_prefix: ${{ steps.version.outputs.asset_prefix }}
       draft: ${{ steps.version.outputs.draft }}
       prerelease: ${{ steps.version.outputs.prerelease }}
+      unsigned_exe_artifact_digest: ${{ steps.upload_unsigned_exe.outputs.artifact-digest }}
+      unsigned_payload_artifact_digest: ${{ steps.upload_unsigned_payload.outputs.artifact-digest }}
 
     steps:
       - name: Checkout
@@ -230,9 +232,11 @@ jobs:
           export GNUPGHOME="$(mktemp -d)"
           chmod 700 "$GNUPGHOME"
           curl --fail --location --silent --show-error "$RELEASE_SIGNING_KEY_URL" --output release-signing-public-key.asc
-          gpg --batch --import release-signing-public-key.asc
+          GPG=/usr/bin/gpg
+          test -x "$GPG"
+          "$GPG" --batch --import release-signing-public-key.asc
 
-          key_listing="$(gpg --batch --with-colons --fingerprint "$expected_fingerprint")"
+          key_listing="$("$GPG" --batch --with-colons --fingerprint "$expected_fingerprint")"
           actual_fingerprint="$(printf '%s\n' "$key_listing" | awk -F: '$1 == "fpr" { print toupper($10); exit }')"
           if [[ "$actual_fingerprint" != "$expected_fingerprint" ]]; then
             echo "release-signing key fingerprint mismatch: expected $expected_fingerprint but imported $actual_fingerprint" >&2
@@ -243,7 +247,7 @@ jobs:
             exit 1
           fi
 
-          if ! gpg --batch --status-fd 1 --verify "$signature_path" "$package_path" > gpg-verify-status.txt 2>&1; then
+          if ! "$GPG" --batch --status-fd 1 --verify "$signature_path" "$package_path" > gpg-verify-status.txt 2>&1; then
             cat gpg-verify-status.txt
             exit 1
           fi
@@ -294,30 +298,7 @@ jobs:
           Copy-Item $env:AVATARBEACON_PACKAGE_PATH "dist/ClipForVRChat-user-package/"
           Copy-Item "dist/ClipForVRChat/Release-signing-public-key.url" "dist/ClipForVRChat-user-package/"
 
-      - name: Sign executable
-        shell: bash
-        env:
-          ASSET_PREFIX: ${{ steps.version.outputs.asset_prefix }}
-          RELEASE_GPG_PRIVATE_KEY: ${{ secrets.CI_RELEASE_GPG_PRIVATE_KEY }}
-          RELEASE_GPG_PASSPHRASE: ${{ secrets.CI_RELEASE_GPG_PASSPHRASE }}
-          RELEASE_GPG_FINGERPRINT: ${{ secrets.CI_RELEASE_GPG_FINGERPRINT }}
-        run: |
-          test -n "$RELEASE_GPG_PRIVATE_KEY"
-          test -n "$RELEASE_GPG_PASSPHRASE"
-          test -n "$RELEASE_GPG_FINGERPRINT"
-          export GNUPGHOME="$(mktemp -d)"
-          chmod 700 "$GNUPGHOME"
-          printf '%s' "$RELEASE_GPG_PRIVATE_KEY" | gpg --batch --import
-          printf '%s' "$RELEASE_GPG_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
-            --local-user "$RELEASE_GPG_FINGERPRINT" \
-            --armor --detach-sign \
-            --output "dist/${ASSET_PREFIX}-windows-amd64.exe.asc" \
-            "dist/${ASSET_PREFIX}-windows-amd64.exe"
-          gpg --batch --verify \
-            "dist/${ASSET_PREFIX}-windows-amd64.exe.asc" \
-            "dist/${ASSET_PREFIX}-windows-amd64.exe"
-
-      - name: Package executable
+      - name: Write unsigned executable checksum
         shell: pwsh
         env:
           ASSET_PREFIX: ${{ steps.version.outputs.asset_prefix }}
@@ -325,15 +306,6 @@ jobs:
           Get-FileHash "dist/$env:ASSET_PREFIX-windows-amd64.exe" -Algorithm SHA256 |
             ForEach-Object { "$($_.Hash.ToLower())  $env:ASSET_PREFIX-windows-amd64.exe" } |
             Set-Content "dist/$env:ASSET_PREFIX-windows-amd64.exe.sha256"
-          Copy-Item "dist/$env:ASSET_PREFIX-windows-amd64.exe.asc" "dist/ClipForVRChat-user-package/" -Force
-          Compress-Archive -Path "dist/ClipForVRChat-user-package/*" -DestinationPath "dist/$env:ASSET_PREFIX-windows-amd64.zip" -Force
-          Get-FileHash "dist/$env:ASSET_PREFIX-windows-amd64.zip" -Algorithm SHA256 |
-            ForEach-Object { "$($_.Hash.ToLower())  $env:ASSET_PREFIX-windows-amd64.zip" } |
-            Set-Content "dist/$env:ASSET_PREFIX-windows-amd64.zip.sha256"
-          Compress-Archive -Path "dist/ClipForVRChat/*" -DestinationPath "dist/$env:ASSET_PREFIX-windows-amd64-separated.zip" -Force
-          Get-FileHash "dist/$env:ASSET_PREFIX-windows-amd64-separated.zip" -Algorithm SHA256 |
-            ForEach-Object { "$($_.Hash.ToLower())  $env:ASSET_PREFIX-windows-amd64-separated.zip" } |
-            Set-Content "dist/$env:ASSET_PREFIX-windows-amd64-separated.zip.sha256"
 
       - name: Write build metadata
         shell: pwsh
@@ -409,11 +381,221 @@ jobs:
           $metadata | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 "dist/$env:ASSET_PREFIX-build-metadata.json"
           Remove-Item "dist/$env:AVATARBEACON_PACKAGE_SIGNATURE_NAME" -Force
 
+      - name: Prepare release notes
+        if: steps.version.outputs.draft == 'false'
+        env:
+          TAG_NAME: ${{ steps.version.outputs.version }}
+        run: node scripts/extract-release-notes.mjs "$env:TAG_NAME" RELEASE_NOTES.md dist/release-body.md --fallback-rc-notes
+
+      - name: Prepare draft release notes
+        if: steps.version.outputs.draft == 'true'
+        env:
+          TAG_NAME: ${{ steps.version.outputs.version }}
+        run: node scripts/extract-release-notes.mjs "$env:TAG_NAME" RELEASE_NOTES.md dist/release-body.md --fallback-draft-notes
+
+      - name: Upload unsigned executable artifact
+        id: upload_unsigned_exe
+        uses: actions/upload-artifact@v6
+        with:
+          name: unsigned-exe-${{ steps.version.outputs.asset_prefix }}
+          path: |
+            dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64.exe
+            dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64.exe.sha256
+          if-no-files-found: error
+
+      - name: Upload unsigned release payload artifact
+        id: upload_unsigned_payload
+        uses: actions/upload-artifact@v6
+        with:
+          name: unsigned-release-payload-${{ steps.version.outputs.asset_prefix }}
+          path: |
+            dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64.exe
+            dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64.exe.sha256
+            dist/${{ steps.version.outputs.asset_prefix }}-build-metadata.json
+            dist/${{ env.AVATARBEACON_PACKAGE_NAME }}
+            dist/ClipForVRChat/**
+            dist/ClipForVRChat-user-package/**
+            dist/release-body.md
+          if-no-files-found: error
+
+  sign:
+    name: Sign executable
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      signature_artifact_digest: ${{ steps.upload_signature.outputs.artifact-digest }}
+
+    steps:
+      - name: Download unsigned executable artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: unsigned-exe-${{ needs.build.outputs.asset_prefix }}
+          path: unsigned
+
+      - name: Validate unsigned executable artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ASSET_PREFIX: ${{ needs.build.outputs.asset_prefix }}
+          EXPECTED_ARTIFACT_NAME: unsigned-exe-${{ needs.build.outputs.asset_prefix }}
+          EXPECTED_ARTIFACT_DIGEST: ${{ needs.build.outputs.unsigned_exe_artifact_digest }}
+        run: |
+          set -euo pipefail
+          test -n "$EXPECTED_ARTIFACT_NAME"
+          test -n "$EXPECTED_ARTIFACT_DIGEST"
+          artifacts_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts?per_page=100")"
+          actual_digest="$(printf '%s' "$artifacts_json" | jq -r --arg name "$EXPECTED_ARTIFACT_NAME" '.artifacts[] | select(.name == $name) | .digest' | sort -u)"
+          if [[ -z "$actual_digest" || "$actual_digest" == "null" ]]; then
+            echo "Artifact was not found in this workflow run: $EXPECTED_ARTIFACT_NAME" >&2
+            exit 1
+          fi
+          digest_count="$(printf '%s\n' "$actual_digest" | awk 'NF { count++ } END { print count + 0 }')"
+          if [[ "$digest_count" -ne 1 ]]; then
+            echo "Multiple artifact digests found for $EXPECTED_ARTIFACT_NAME:" >&2
+            printf '%s\n' "$actual_digest" >&2
+            exit 1
+          fi
+          if [[ "${actual_digest#sha256:}" != "${EXPECTED_ARTIFACT_DIGEST#sha256:}" ]]; then
+            echo "Artifact digest mismatch for $EXPECTED_ARTIFACT_NAME" >&2
+            echo "expected: $EXPECTED_ARTIFACT_DIGEST" >&2
+            echo "actual:   $actual_digest" >&2
+            exit 1
+          fi
+          test -s "unsigned/${ASSET_PREFIX}-windows-amd64.exe"
+          test -s "unsigned/${ASSET_PREFIX}-windows-amd64.exe.sha256"
+          (cd unsigned && sha256sum --check "${ASSET_PREFIX}-windows-amd64.exe.sha256")
+
+      - name: Sign executable
+        shell: bash
+        env:
+          ASSET_PREFIX: ${{ needs.build.outputs.asset_prefix }}
+          RELEASE_GPG_PRIVATE_KEY: ${{ secrets.CI_RELEASE_GPG_PRIVATE_KEY }}
+          RELEASE_GPG_PASSPHRASE: ${{ secrets.CI_RELEASE_GPG_PASSPHRASE }}
+          RELEASE_GPG_FINGERPRINT: ${{ secrets.CI_RELEASE_GPG_FINGERPRINT }}
+        run: |
+          set -euo pipefail
+          test -n "$RELEASE_GPG_PRIVATE_KEY"
+          test -n "$RELEASE_GPG_PASSPHRASE"
+          test -n "$RELEASE_GPG_FINGERPRINT"
+          GPG=/usr/bin/gpg
+          test -x "$GPG"
+          mkdir -p signature
+          export GNUPGHOME="$(mktemp -d)"
+          chmod 700 "$GNUPGHOME"
+          printf '%s' "$RELEASE_GPG_PRIVATE_KEY" | "$GPG" --batch --import
+          printf '%s' "$RELEASE_GPG_PASSPHRASE" | "$GPG" --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --local-user "$RELEASE_GPG_FINGERPRINT" \
+            --armor --detach-sign \
+            --output "signature/${ASSET_PREFIX}-windows-amd64.exe.asc" \
+            "unsigned/${ASSET_PREFIX}-windows-amd64.exe"
+          "$GPG" --batch --verify \
+            "signature/${ASSET_PREFIX}-windows-amd64.exe.asc" \
+            "unsigned/${ASSET_PREFIX}-windows-amd64.exe"
+
+      - name: Upload executable signature artifact
+        id: upload_signature
+        uses: actions/upload-artifact@v6
+        with:
+          name: executable-signature-${{ needs.build.outputs.asset_prefix }}
+          path: signature/${{ needs.build.outputs.asset_prefix }}-windows-amd64.exe.asc
+          if-no-files-found: error
+
+  package:
+    name: Package release assets
+    runs-on: windows-latest
+    needs: [build, sign]
+    permissions:
+      actions: read
+      contents: read
+
+    steps:
+      - name: Download unsigned release payload artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: unsigned-release-payload-${{ needs.build.outputs.asset_prefix }}
+          path: dist
+
+      - name: Download executable signature artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: executable-signature-${{ needs.build.outputs.asset_prefix }}
+          path: dist
+
+      - name: Validate downloaded artifacts
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ASSET_PREFIX: ${{ needs.build.outputs.asset_prefix }}
+          EXPECTED_UNSIGNED_PAYLOAD_ARTIFACT: unsigned-release-payload-${{ needs.build.outputs.asset_prefix }}
+          EXPECTED_UNSIGNED_PAYLOAD_ARTIFACT_DIGEST: ${{ needs.build.outputs.unsigned_payload_artifact_digest }}
+          EXPECTED_SIGNATURE_ARTIFACT: executable-signature-${{ needs.build.outputs.asset_prefix }}
+          EXPECTED_SIGNATURE_ARTIFACT_DIGEST: ${{ needs.sign.outputs.signature_artifact_digest }}
+          AVATARBEACON_PACKAGE_NAME: ${{ env.AVATARBEACON_PACKAGE_NAME }}
+        run: |
+          if (!$env:EXPECTED_UNSIGNED_PAYLOAD_ARTIFACT -or !$env:EXPECTED_UNSIGNED_PAYLOAD_ARTIFACT_DIGEST) {
+            throw "Unsigned payload artifact identity is missing"
+          }
+          if (!$env:EXPECTED_SIGNATURE_ARTIFACT -or !$env:EXPECTED_SIGNATURE_ARTIFACT_DIGEST) {
+            throw "Signature artifact identity is missing"
+          }
+          $artifacts = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID/artifacts?per_page=100" | ConvertFrom-Json
+          function Test-ArtifactDigest($name, $expectedDigest) {
+            $matches = @($artifacts.artifacts | Where-Object { $_.name -eq $name })
+            if ($matches.Count -ne 1) {
+              throw "Expected exactly one artifact named $name, found $($matches.Count)"
+            }
+            $actualDigest = [string]$matches[0].digest
+            $expectedNormalized = ([string]$expectedDigest) -replace '^sha256:', ''
+            $actualNormalized = $actualDigest -replace '^sha256:', ''
+            if ($actualNormalized -ne $expectedNormalized) {
+              throw "Artifact digest mismatch for $name. expected=$expectedDigest actual=$actualDigest"
+            }
+          }
+          Test-ArtifactDigest $env:EXPECTED_UNSIGNED_PAYLOAD_ARTIFACT $env:EXPECTED_UNSIGNED_PAYLOAD_ARTIFACT_DIGEST
+          Test-ArtifactDigest $env:EXPECTED_SIGNATURE_ARTIFACT $env:EXPECTED_SIGNATURE_ARTIFACT_DIGEST
+          $required = @(
+            "dist/$env:ASSET_PREFIX-windows-amd64.exe",
+            "dist/$env:ASSET_PREFIX-windows-amd64.exe.sha256",
+            "dist/$env:ASSET_PREFIX-windows-amd64.exe.asc",
+            "dist/$env:ASSET_PREFIX-build-metadata.json",
+            "dist/$env:AVATARBEACON_PACKAGE_NAME",
+            "dist/release-body.md",
+            "dist/ClipForVRChat/ClipForVRChat.exe",
+            "dist/ClipForVRChat-user-package/ClipForVRChat.exe"
+          )
+          foreach ($path in $required) {
+            if (!(Test-Path $path)) {
+              throw "Required downloaded artifact file was not found: $path"
+            }
+          }
+          $exeHashLine = Get-Content "dist/$env:ASSET_PREFIX-windows-amd64.exe.sha256"
+          $exeHash = (Get-FileHash "dist/$env:ASSET_PREFIX-windows-amd64.exe" -Algorithm SHA256).Hash.ToLower()
+          if ($exeHashLine -ne "$exeHash  $env:ASSET_PREFIX-windows-amd64.exe") {
+            throw "downloaded unsigned exe sha256 file does not match"
+          }
+
+      - name: Package executable
+        shell: pwsh
+        env:
+          ASSET_PREFIX: ${{ needs.build.outputs.asset_prefix }}
+        run: |
+          Copy-Item "dist/$env:ASSET_PREFIX-windows-amd64.exe.asc" "dist/ClipForVRChat-user-package/" -Force
+          Compress-Archive -Path "dist/ClipForVRChat-user-package/*" -DestinationPath "dist/$env:ASSET_PREFIX-windows-amd64.zip" -Force
+          Get-FileHash "dist/$env:ASSET_PREFIX-windows-amd64.zip" -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $env:ASSET_PREFIX-windows-amd64.zip" } |
+            Set-Content "dist/$env:ASSET_PREFIX-windows-amd64.zip.sha256"
+          Compress-Archive -Path "dist/ClipForVRChat/*" -DestinationPath "dist/$env:ASSET_PREFIX-windows-amd64-separated.zip" -Force
+          Get-FileHash "dist/$env:ASSET_PREFIX-windows-amd64-separated.zip" -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLower())  $env:ASSET_PREFIX-windows-amd64-separated.zip" } |
+            Set-Content "dist/$env:ASSET_PREFIX-windows-amd64-separated.zip.sha256"
+
       - name: Validate release assets
         shell: pwsh
         env:
-          ASSET_PREFIX: ${{ steps.version.outputs.asset_prefix }}
-          TAG_NAME: ${{ steps.version.outputs.version }}
+          ASSET_PREFIX: ${{ needs.build.outputs.asset_prefix }}
+          TAG_NAME: ${{ needs.build.outputs.tag_name }}
           AVATARBEACON_PACKAGE_NAME: ${{ env.AVATARBEACON_PACKAGE_NAME }}
         run: |
           $distRoot = (Resolve-Path "dist").Path
@@ -557,32 +739,22 @@ jobs:
             throw "Unexpected files were found in separated release zip"
           }
 
-      - name: Prepare release notes
-        if: steps.version.outputs.draft == 'false'
-        env:
-          TAG_NAME: ${{ steps.version.outputs.version }}
-        run: node scripts/extract-release-notes.mjs "$env:TAG_NAME" RELEASE_NOTES.md dist/release-body.md --fallback-rc-notes
-
-      - name: Prepare draft release notes
-        if: steps.version.outputs.draft == 'true'
-        env:
-          TAG_NAME: ${{ steps.version.outputs.version }}
-        run: node scripts/extract-release-notes.mjs "$env:TAG_NAME" RELEASE_NOTES.md dist/release-body.md --fallback-draft-notes
-
       - name: Upload release assets artifact
         uses: actions/upload-artifact@v6
         with:
-          name: release-assets-${{ steps.version.outputs.asset_prefix }}
+          name: release-assets-${{ needs.build.outputs.asset_prefix }}
           path: |
-            dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64.exe.asc
-            dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64.zip
-            dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64-separated.zip
+            dist/${{ needs.build.outputs.asset_prefix }}-windows-amd64.exe.asc
+            dist/${{ needs.build.outputs.asset_prefix }}-windows-amd64.zip
+            dist/${{ needs.build.outputs.asset_prefix }}-windows-amd64-separated.zip
+            dist/${{ env.AVATARBEACON_PACKAGE_NAME }}
             dist/release-body.md
+          if-no-files-found: error
 
   release:
     name: Create GitHub release
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build, package]
     permissions:
       contents: write
 
@@ -600,6 +772,7 @@ jobs:
           TAG_NAME: ${{ needs.build.outputs.tag_name }}
           DRAFT: ${{ needs.build.outputs.draft }}
           PRERELEASE: ${{ needs.build.outputs.prerelease }}
+          AVATARBEACON_PACKAGE_NAME: ${{ env.AVATARBEACON_PACKAGE_NAME }}
         run: |
           set -euo pipefail
           args=(
@@ -621,6 +794,7 @@ jobs:
             "ClipForVRChat-${TAG_NAME}-windows-amd64.zip"
             "ClipForVRChat-${TAG_NAME}-windows-amd64.exe.asc"
             "ClipForVRChat-${TAG_NAME}-windows-amd64-separated.zip"
+            "$AVATARBEACON_PACKAGE_NAME"
           )
           mapfile -t existing_assets < <(gh release view "$TAG_NAME" --json assets --jq '.assets[].name')
           for asset in "${existing_assets[@]}"; do
@@ -638,4 +812,5 @@ jobs:
           gh release upload "$TAG_NAME" --clobber \
             "dist/ClipForVRChat-${TAG_NAME}-windows-amd64.zip" \
             "dist/ClipForVRChat-${TAG_NAME}-windows-amd64.exe.asc" \
-            "dist/ClipForVRChat-${TAG_NAME}-windows-amd64-separated.zip"
+            "dist/ClipForVRChat-${TAG_NAME}-windows-amd64-separated.zip" \
+            "dist/${AVATARBEACON_PACKAGE_NAME}"
