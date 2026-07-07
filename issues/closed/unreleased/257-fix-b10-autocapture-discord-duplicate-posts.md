@@ -4,6 +4,8 @@
 
 > '/mnt/c/Users/user/Downloads/ClipForVRChat-v0.1.8-b10-windows-amd64/history.json''/mnt/c/Users/user/Downloads/ClipForVRChat-v0.1.8-b10-windows-amd64/logs' 3枚とる想定で6枚投稿される
 
+> 二重に投稿される不具合あって抑制処理入れたと思うんだけどフォールバックモードで自動撮影した場合ってちゃんと処理走る？
+
 ## 文脈
 
 `v0.1.8-b10` の実行結果で、3枚撮影される想定の自動撮影がDiscordへ6枚投稿された。ユーザーから実行環境の `history.json` と `logs/` が提示された。
@@ -40,3 +42,12 @@
 - `cd src && GOCACHE=/tmp/clipforvrchat-go-cache go test ./internal/appcore -run 'TestAutoPhotoWatcher|TestScanPhotoFiles'`
 - `cd src && GOCACHE=/tmp/clipforvrchat-go-cache go test ./...`
 - `git diff --check`
+
+## 追加確認
+
+- 2026-07-07: フォールバックモード時の自動撮影出力が、VRChat写真自動処理の重複取り込み抑制対象になるかコードで確認する。
+- `restartAutoPhotoWatcher()` はVRChat写真自動処理の `AutoPhotoWatcher` に `ExcludeDirectories: []string{cfg.AutoCapture.Output.Directory}` を渡している。
+- `AutoPhotoWatcher` は `scanPhotoFilesWithExcludesStatus()` で除外ディレクトリを `WalkDir` から `SkipDir` する。
+- Stream方式の自動撮影はフォールバックモードでも `autoCaptureOutputPath()` で `AutoCapture.Output.Directory` へ保存するため、VRChat写真自動処理側の二重取り込み抑制が効く。
+- Photo方式の自動撮影はVRChat写真フォルダに保存された写真を検出して処理するため、`AutoCapture.Output.Directory` 除外とは別経路になる。フォールバックモードとPhoto方式を組み合わせる場合、VRChat写真自動処理も同時ONなら別途重複確認が必要。
+- 確認: `go test ./internal/appcore -run 'TestAutoPhotoWatcherExcludesAutoCaptureOutputDirectory|TestPreplacedLocalAnchorSkipsPoseResolve'`
