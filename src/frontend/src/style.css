@@ -1358,25 +1358,44 @@ small {
   pointer-events: none;
 }
 
-.help-grid {
+.help-content {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+
+.help-section {
+  display: grid;
   gap: 12px;
 }
 
-.help-card {
-  display: grid;
-  align-content: start;
-  gap: 10px;
-  padding: 16px;
-  border: 1px solid #d6dee7;
-  border-radius: 8px;
-  background: #ffffff;
-}
-
-.help-card p {
+.help-section p,
+.help-section li {
   color: #455361;
   line-height: 1.65;
+}
+
+.help-section ol,
+.help-section ul {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.help-section li {
+  padding-left: 2px;
+}
+
+.help-section li p {
+  margin-top: 4px;
+}
+
+.help-callout {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border-left: 4px solid #8db8cc;
+  background: #f7fafc;
 }
 
 .about dl {
@@ -1718,7 +1737,6 @@ small {
 
   .setting-row,
   .license-list,
-  .help-grid,
   .auto-capture-views-header,
   .view-fields,
   .history-toolbar {
