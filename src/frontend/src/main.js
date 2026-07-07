@@ -2201,42 +2201,39 @@ const vueApp = createApp({
         </section>
         <section class="about-note">
           <h3>不具合報告について</h3>
-          <p>
-            不具合報告の際は、下記のボタンから生成できる不具合報告用データを添付していただける修正できる可能性が高まります。
-            下記の不具合報告用データ作成ボタンを押すと生成されます。
-            生成されるデータは2つあります。不具合報告の際は2.を添付してください。
-          </p>
-          <ol>
-            <li>2の元データとなるzipファイル 内容物確認用</li>
-            <li>暗号化された<button class="link-button inline" @click="openURL('https://www.google.com/search?q=gpg%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB')" title="gpgファイルを検索する">gpgファイル</button> 不具合報告用</li>
-          </ol>
-          <p>
-            1.のzipファイルは、不具合報告データには何が含まれているのだろうと不安になる場合に内容を確認してもらうためのデータになります。
-            もう少し詳しく説明します。
-            不具合報告用データの元となるデータには、設定ファイル、履歴、ログ、実行ファイル本体、画像保持フォルダの情報が含まれます。
-            これを処理して可能な範囲で個人情報が含まれないようにしたデータをzipにしています。
-            例えばログや設定などのテキストに含まれるユーザーフォルダのパスは、可能な範囲で <code>%USERPROFILE%</code> などの環境変数表記へ置換されます。
-            このzipにはそうした処理後のデータになります。
-          </p>
-          <p>
-            2.は1.のzipファイルを暗号化したものです。
-            1.のzipには基本的に個人情報は含まれないと考えていますが、
-            前述した処理が不十分で、秘匿性の高い情報が含まれてしまうかもしれません。
-            こうした場合でも問題にならないよう、GPGによる暗号化処理を行ったデータを生成するようにしました。
-            正式リリースされたプログラムで作成される2.の不具合報告用データは、<button class="link-button inline" @click="openURL(authorTwitterUrl)" title="作者のXを開く">作者</button>のみ復号できます。
-            とは言え、間違ってzipを添付してもzipにそれほど重要な情報が含まれる可能性は低いと思われるので、大した問題は発生しないと思います。
-          </p>
-          <p>
-            ただpgpで暗号化されたデータがこのzipのデータだと信じられない場合もあろうかと思います。
-            この場合、ClipForVRChatの暗号化処理が信用できないという状態なので、
-            <button class="link-button inline" @click="openURL('https://keys.openpgp.org/search?q=poppo@hato.life')" title="作者の公開鍵を開く">作者の公開鍵</button> を使用して暗号化する作業をご自身でして頂く必要があると思います。
-            作者としてはどちらでも構いません。
-            いずれにせよ不具合報告用データは、不具合の調査および原因解析の目的にのみ使用します。
-          </p>
-          <p>
-            不具合報告頂いても対応できるかは状況次第です。
-            少なくとも作者の環境で再現できない不具合は対処が難しいです。ご了承ください。
-          </p>
+          <div class="diagnostic-report-text">
+            <p>不具合報告の際は、下記のボタンから生成できる不具合報告用データを添付していただける修正できる可能性が高まります。</p>
+            <p>下記の不具合報告用データ作成ボタンを押すと生成されます。</p>
+            <p>生成されるデータは2つあります。不具合報告の際は2.を添付してください。</p>
+
+            <ol>
+              <li>2の元データとなるzipファイル 内容物確認用</li>
+              <li>暗号化された<button class="link-button inline" @click="openURL('https://www.google.com/search?q=gpg%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB')" title="gpgファイルを検索する">gpgファイル</button> 不具合報告用</li>
+            </ol>
+
+            <p class="diagnostic-report-break">1.のzipファイルは、不具合報告データには何が含まれているのだろうと不安になる場合に内容を確認してもらうためのデータになります。</p>
+            <p>もう少し詳しく説明します。</p>
+            <p>不具合報告用データの元となるデータには、設定ファイル、履歴、ログ、実行ファイル本体、画像保持フォルダの情報が含まれます。</p>
+            <p>これを処理して可能な範囲で個人情報が含まれないようにしたデータをzipにしています。</p>
+            <p>例えばログや設定などのテキストに含まれるユーザーフォルダのパスは、可能な範囲で <code>%USERPROFILE%</code> などの環境変数表記へ置換されます。</p>
+            <p>このzipにはそうした処理後のデータになります。</p>
+
+            <p class="diagnostic-report-break">2.は1.のzipファイルを暗号化したものです。</p>
+            <p>1.のzipには基本的に個人情報は含まれないと考えていますが、</p>
+            <p>前述した処理が不十分で、秘匿性の高い情報が含まれてしまうかもしれません。</p>
+            <p>こうした場合でも問題にならないよう、GPGによる暗号化処理を行ったデータを生成するようにしました。</p>
+            <p>正式リリースされたプログラムで作成される2.の不具合報告用データは、<button class="link-button inline" @click="openURL(authorTwitterUrl)" title="作者のXを開く">作者</button>のみ復号できます。</p>
+            <p>とは言え、間違ってzipを添付してもzipにそれほど重要な情報が含まれる可能性は低いと思われるので、大した問題は発生しないと思います。</p>
+
+            <p class="diagnostic-report-break">ただpgpで暗号化されたデータがこのzipのデータだと信じられない場合もあろうかと思います。</p>
+            <p>この場合、ClipForVRChatの暗号化処理が信用できないという状態なので、<button class="link-button inline" @click="openURL(info.github)" title="GitHubのソースコードを開く">GitHubのソースコード</button>を確認してもらうか、</p>
+            <p><button class="link-button inline" @click="openURL('https://keys.openpgp.org/search?q=poppo@hato.life')" title="作者の公開鍵を開く">作者の公開鍵</button> を使用して暗号化する作業をご自身でして頂く必要があると思います。</p>
+            <p>作者としてはどちらでも構いません。</p>
+            <p>いずれにせよ不具合報告用データは、不具合の調査および原因解析の目的にのみ使用します。</p>
+
+            <p class="diagnostic-report-break">不具合報告頂いても対応できるかは状況次第です。</p>
+            <p>少なくとも作者の環境で再現できない不具合は対処が難しいです。ご了承ください。</p>
+          </div>
           <div class="button-row">
             <button @click="createDiagnosticPackage" :disabled="diagnosticGenerating" title="不具合報告用データを作成する">不具合報告用データ生成</button>
           </div>

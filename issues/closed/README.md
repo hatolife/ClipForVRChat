@@ -223,3 +223,4 @@
 | 256 | [v0.1.8-b10 betaを作成する](maintenance-only/256-create-v018-b10-beta.md) | 完了 | 整理のみ | #243 と #255 を含む `v0.1.8-b10` betaタグを作成し、Release workflowとGitHub Releaseを確認した。 |
 | 257 | [b10で3枚撮影想定なのに6枚投稿される](unreleased/257-fix-b10-autocapture-discord-duplicate-posts.md) | 完了 | 未定 | VRChat写真自動投稿が自動撮影出力ディレクトリを拾って二重投稿する問題を修正した。 |
 | 258 | [保存ボタンで設定タブとスクロール位置を移動しない](unreleased/258-preserve-settings-tab-and-scroll-on-save.md) | 完了 | 未定 | 設定保存後も表示中の設定タブ、詳細画面、スクロール位置を維持するようにした。 |
+| 259 | [不具合報告についての説明文の改行を維持する](unreleased/259-preserve-diagnostic-report-description-line-breaks.md) | 完了 | 未定 | 情報タブの不具合報告説明を指定文面へ更新し、表示上の改行を維持するようにした。 |

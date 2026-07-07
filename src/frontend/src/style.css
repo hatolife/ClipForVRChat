@@ -1422,6 +1422,24 @@ small {
   padding-left: 24px;
 }
 
+.diagnostic-report-text {
+  display: grid;
+  gap: 0;
+}
+
+.diagnostic-report-text p {
+  margin: 0;
+}
+
+.diagnostic-report-text ol {
+  margin: 12px 0;
+}
+
+.diagnostic-report-text p + ol,
+.diagnostic-report-text .diagnostic-report-break {
+  margin-top: 12px;
+}
+
 .license-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
