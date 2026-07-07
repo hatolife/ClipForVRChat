@@ -46,6 +46,13 @@ Aを短期対応、Cを将来改善として扱う。
 「private permissionにしたうえでtokenをhistoryへ残す」案は不十分なため採用しない。
 現在configからtokenを解決できない古い履歴のDiscord削除は失敗を許容し、ローカル履歴削除だけ可能にする。
 
+## 方針決定
+
+2026-07-08: ユーザー判断によりAを採用する。
+history JSONとUI stateにはDiscord tokenを保存しない。
+履歴には `messageID`、`webhookID`、Webhook種別/参照だけを保存し、Discord削除時は現在configのWebhook URLからID一致でtokenを一時解決できる場合だけ削除APIを呼ぶ。
+tokenを解決できない古い履歴ではDiscord削除不可を明示し、ローカル履歴削除だけ可能にする。
+
 ## 追加解説
 
 このissueで守りたい対象は、Discord webhook URLそのものではなく、履歴機能が追加で保持する削除用tokenの複製である。
@@ -65,7 +72,8 @@ historyにはopaque IDだけを置き、tokenはWindows Credential Managerなど
 一方で、OS別実装、portable運用、バックアップ/移行、credential削除、テスト環境での扱いが増えるため、今回の即時修正としては大きい。
 
 判断の基準は、再起動後のDiscord削除機能を維持したいかである。
-維持したいならA、削除機能を落としてよいならB、OS別の秘密情報ストア実装まで投資するならCを選ぶ。
+今回はA採用のため、再起動後の削除機能は「現在configから同じWebhookのtokenを解決できる範囲で維持する」扱いにする。
+OS別の秘密情報ストア実装は将来提案として扱う。
 
 ## 受け入れ条件
 
