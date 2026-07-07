@@ -53,7 +53,7 @@ const (
 	singleInstanceChoiceReplace
 )
 
-func initializeSingleInstance(stderr io.Writer) (*singleInstance, error) {
+func initializeSingleInstance(stderr io.Writer, args []string) (*singleInstance, error) {
 	if err := rejectElevatedProcess(); err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func initializeSingleInstance(stderr io.Writer) (*singleInstance, error) {
 		return nil, err
 	}
 
-	instance, handled, err := handleExistingSingleInstance(stderr)
+	instance, handled, err := handleExistingSingleInstance(stderr, args)
 	if err != nil {
 		showNativeMessage("ClipForVRChat", err.Error())
 		return nil, err
@@ -117,7 +117,7 @@ func tryStartPrimarySingleInstance() (*singleInstance, error) {
 	}, nil
 }
 
-func handleExistingSingleInstance(stderr io.Writer) (*singleInstance, bool, error) {
+func handleExistingSingleInstance(stderr io.Writer, args []string) (*singleInstance, bool, error) {
 	state, err := readExistingSingleInstanceState()
 	if err != nil {
 		return nil, false, err
@@ -129,7 +129,11 @@ func handleExistingSingleInstance(stderr io.Writer) (*singleInstance, bool, erro
 	choice := chooseExistingSingleInstanceAction(state, stderr)
 	switch choice {
 	case singleInstanceChoiceActivate:
-		if err := sendSingleInstanceCommand(state, "activate", 3*time.Second); err != nil {
+		command := "activate"
+		if len(args) > 0 {
+			command = "open-paths"
+		}
+		if err := sendSingleInstanceCommandWithPaths(state, command, args, 3*time.Second); err != nil {
 			return nil, false, fmt.Errorf("既存のClipForVRChatをアクティブ化できませんでした: %w", err)
 		}
 		return nil, true, nil
@@ -253,7 +257,7 @@ func (s *singleInstance) BindApp(app *App) {
 	if s == nil || s.server == nil || app == nil {
 		return
 	}
-	s.server.SetHandlers(app.activateFromSingleInstance, app.shutdownFromSingleInstance)
+	s.server.SetHandlers(app.activateFromSingleInstance, app.shutdownFromSingleInstance, app.openPathsFromSingleInstance)
 }
 
 func (s *singleInstance) Close() {
@@ -277,14 +281,16 @@ type singleInstanceServer struct {
 	done     chan struct{}
 	once     sync.Once
 
-	mu       sync.RWMutex
-	activate func() error
-	shutdown func() error
+	mu        sync.RWMutex
+	activate  func() error
+	shutdown  func() error
+	openPaths func([]string) error
 }
 
 type singleInstanceRequest struct {
-	Token   string `json:"token"`
-	Command string `json:"command"`
+	Token   string   `json:"token"`
+	Command string   `json:"command"`
+	Paths   []string `json:"paths,omitempty"`
 }
 
 type singleInstanceResponse struct {
@@ -315,6 +321,9 @@ func startSingleInstanceServer() (*singleInstanceServer, error) {
 			}()
 			return nil
 		},
+		openPaths: func([]string) error {
+			return errors.New("既存ウィンドウはまだ起動準備中です")
+		},
 	}
 	go server.serve()
 	return server, nil
@@ -342,7 +351,7 @@ func (s *singleInstanceServer) Token() string {
 	return s.token
 }
 
-func (s *singleInstanceServer) SetHandlers(activate func() error, shutdown func() error) {
+func (s *singleInstanceServer) SetHandlers(activate func() error, shutdown func() error, openPaths func([]string) error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if activate != nil {
@@ -350,6 +359,9 @@ func (s *singleInstanceServer) SetHandlers(activate func() error, shutdown func(
 	}
 	if shutdown != nil {
 		s.shutdown = shutdown
+	}
+	if openPaths != nil {
+		s.openPaths = openPaths
 	}
 }
 
@@ -401,6 +413,12 @@ func (s *singleInstanceServer) handle(conn net.Conn) {
 			return
 		}
 		writeSingleInstanceResponse(conn, true, "")
+	case "open-paths":
+		if err := s.callOpenPaths(req.Paths); err != nil {
+			writeSingleInstanceResponse(conn, false, err.Error())
+			return
+		}
+		writeSingleInstanceResponse(conn, true, "")
 	case "shutdown":
 		if err := s.callShutdown(); err != nil {
 			writeSingleInstanceResponse(conn, false, err.Error())
@@ -426,11 +444,22 @@ func (s *singleInstanceServer) callShutdown() error {
 	return fn()
 }
 
+func (s *singleInstanceServer) callOpenPaths(paths []string) error {
+	s.mu.RLock()
+	fn := s.openPaths
+	s.mu.RUnlock()
+	return fn(paths)
+}
+
 func writeSingleInstanceResponse(w io.Writer, ok bool, message string) {
 	_ = json.NewEncoder(w).Encode(singleInstanceResponse{OK: ok, Message: message})
 }
 
 func sendSingleInstanceCommand(state singleInstanceState, command string, timeout time.Duration) error {
+	return sendSingleInstanceCommandWithPaths(state, command, nil, timeout)
+}
+
+func sendSingleInstanceCommandWithPaths(state singleInstanceState, command string, paths []string, timeout time.Duration) error {
 	conn, err := net.DialTimeout("tcp", state.Endpoint, timeout)
 	if err != nil {
 		return err
@@ -438,7 +467,7 @@ func sendSingleInstanceCommand(state singleInstanceState, command string, timeou
 	defer conn.Close()
 	_ = conn.SetDeadline(time.Now().Add(timeout))
 
-	if err := json.NewEncoder(conn).Encode(singleInstanceRequest{Token: state.Token, Command: command}); err != nil {
+	if err := json.NewEncoder(conn).Encode(singleInstanceRequest{Token: state.Token, Command: command, Paths: paths}); err != nil {
 		return err
 	}
 	var res singleInstanceResponse

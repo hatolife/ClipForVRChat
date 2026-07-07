@@ -49,7 +49,7 @@ func main() {
 		return
 	}
 
-	instance, err := initializeSingleInstance(stderr)
+	instance, err := initializeSingleInstance(stderr, args)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		os.Exit(1)

@@ -85,11 +85,15 @@ func TestSingleInstanceServerCommands(t *testing.T) {
 
 	var activated bool
 	var shutdown bool
+	var openedPaths []string
 	server.SetHandlers(func() error {
 		activated = true
 		return nil
 	}, func() error {
 		shutdown = true
+		return nil
+	}, func(paths []string) error {
+		openedPaths = append([]string(nil), paths...)
 		return nil
 	})
 	state := singleInstanceState{Endpoint: server.Endpoint(), Token: server.Token()}
@@ -102,8 +106,14 @@ func TestSingleInstanceServerCommands(t *testing.T) {
 	if err := sendSingleInstanceCommand(state, "shutdown", time.Second); err != nil {
 		t.Fatal(err)
 	}
+	if err := sendSingleInstanceCommandWithPaths(state, "open-paths", []string{"first.png", "second.png"}, time.Second); err != nil {
+		t.Fatal(err)
+	}
 	if !activated || !shutdown {
 		t.Fatalf("activated=%t shutdown=%t", activated, shutdown)
+	}
+	if len(openedPaths) != 2 || openedPaths[0] != "first.png" || openedPaths[1] != "second.png" {
+		t.Fatalf("openedPaths = %#v, want first.png and second.png", openedPaths)
 	}
 }
 

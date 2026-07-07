@@ -231,6 +231,21 @@ func (a *App) activateFromSingleInstance() error {
 	return nil
 }
 
+func (a *App) openPathsFromSingleInstance(paths []string) error {
+	a.mu.Lock()
+	ctx := a.ctx
+	a.logLifecycleLocked("single_instance open_paths request: ctx_ready=%t count=%d", ctx != nil, len(paths))
+	a.mu.Unlock()
+	if ctx == nil {
+		return errors.New("既存ウィンドウはまだ起動準備中です")
+	}
+	runtime.WindowShow(ctx)
+	runtime.WindowUnminimise(ctx)
+	runtime.Show(ctx)
+	emitWailsEvent(ctx, "single-instance:open-paths", paths)
+	return nil
+}
+
 func (a *App) shutdownFromSingleInstance() error {
 	a.mu.Lock()
 	ctx := a.ctx

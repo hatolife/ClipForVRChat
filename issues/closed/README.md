@@ -215,3 +215,4 @@
 | 249 | [AvatarBeaconバージョンOSC受信をログに記録する](unreleased/249-log-avatarbeacon-version-osc-receive.md) | 完了 | 未定 | AvatarBeacon version OSCを受信したら診断ログへ記録し、導入済みギミックのバージョンを切り分けやすくした。 |
 | 250 | [初回起動直後に未保存変更が表示される](unreleased/250-fix-initial-unsaved-settings-after-first-launch.md) | 完了 | 未定 | configなし初回起動で既定値のOSC転送先が差分扱いになる問題を修正し、未保存変更の具体項目と行ハイライトを改善した。 |
 | 251 | [AvatarBeaconフォールバック判定とOSCデバッグUIを調整する](unreleased/251-adjust-avatarbeacon-fallback-and-osc-debug-ui.md) | 完了 | 未定 | OSCデバッグ既定入力、AvatarBeaconのみログフィルター、フォールバック自動ON待機時間、構図値丸め、保存ボタン挙動を調整した。 |
+| 252 | [起動中にexeへドラッグしたファイルを既存インスタンスへ渡す](unreleased/252-forward-exe-drop-paths-to-running-instance.md) | 完了 | 未定 | 単一起動中に2つ目のexeへ渡されたファイル引数を既存インスタンスへ転送し、通常のドロップ処理で扱うようにした。 |

@@ -431,6 +431,9 @@ const vueApp = createApp({
             api.QuitAfterSettingsDecision()
           }
         })
+        window.runtime.EventsOn('single-instance:open-paths', async (paths) => {
+          await this.handleDrop(paths || [])
+        })
       }
       window.runtime?.OnFileDrop?.(async (_x, _y, paths) => {
         this.dragging = false
