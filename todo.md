@@ -1,10 +1,8 @@
-# issue 265 AvatarBeacon専用リポジトリ初期配置
+# issue 266 AvatarBeacon README刷新とsubmodule化
 
 - [x] 原文付きチケットを作成する
-- [x] 既存AvatarBeacon元ファイルとCI手順を確認する
-- [x] `~/work/AvatarBeacon` を新規作成して既存コードを配置する
-- [x] `v0.0.1` メタデータと専用CIを整備する
-- [x] ローカル検証を実行する
-- [x] 初回コミットとpushを行う
-- [x] README見出しを調整する
-- [x] GitHub Actions CI結果を確認する
+- [ ] AvatarBeacon READMEを利用者向けに全面改稿する
+- [ ] AvatarBeacon専用リポジトリで検証・コミット・pushする
+- [ ] ClipForVRChat側のAvatarBeaconをsubmoduleへ置き換える
+- [ ] ClipForVRChat側の検証を行う
+- [ ] 完了チケットへ移動してコミットする
