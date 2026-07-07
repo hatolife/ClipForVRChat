@@ -1073,8 +1073,21 @@ func (r AutoCaptureRunner) recoverEmptySpoutSenderList(ctx context.Context, clie
 			diagAutoCapture(logPath, "spout sender recovery cancelled: phase=%q view_id=%q err=%v", "off_wait", viewID, ctx.Err())
 			return ctx.Err()
 		}
-	} else {
-		diagAutoCapture(logPath, "spout sender recovery off skipped: open_before_batch=false view_id=%q", viewID)
+		if err := sendCameraBoolCompat(client, logPath, "/usercamera/Streaming", true, "spout_sender_recovery_on_after_off:"+viewID); err != nil {
+			diagAutoCapture(logPath, "spout sender recovery error: phase=%q view_id=%q err=%v", "on_after_off", viewID, err)
+			return err
+		}
+		if !sleepContext(ctx, 1200*time.Millisecond) {
+			diagAutoCapture(logPath, "spout sender recovery cancelled: phase=%q view_id=%q err=%v", "on_after_off_wait", viewID, ctx.Err())
+			return ctx.Err()
+		}
+		after, err := autoCaptureListSpoutSenders(ctx, r.Config.AutoCapture.Stream, logPath)
+		if err != nil {
+			diagAutoCapture(logPath, "spout sender recovery recheck error: view_id=%q err=%v", viewID, err)
+			return nil
+		}
+		diagAutoCapture(logPath, "spout sender recovery complete: view_id=%q before_senders=%d after_senders=%d toggled=%t", viewID, len(list.Senders), len(after.Senders), true)
+		return nil
 	}
 	if err := sendCameraBoolCompat(client, logPath, "/usercamera/Streaming", true, "spout_sender_recovery_on:"+viewID); err != nil {
 		diagAutoCapture(logPath, "spout sender recovery error: phase=%q view_id=%q err=%v", "on", viewID, err)
@@ -1089,7 +1102,33 @@ func (r AutoCaptureRunner) recoverEmptySpoutSenderList(ctx context.Context, clie
 		diagAutoCapture(logPath, "spout sender recovery recheck error: view_id=%q err=%v", viewID, err)
 		return nil
 	}
-	diagAutoCapture(logPath, "spout sender recovery complete: view_id=%q before_senders=%d after_senders=%d", viewID, len(list.Senders), len(after.Senders))
+	if len(after.Senders) > 0 {
+		diagAutoCapture(logPath, "spout sender recovery complete: view_id=%q before_senders=%d after_senders=%d toggled=%t", viewID, len(list.Senders), len(after.Senders), false)
+		return nil
+	}
+	diagAutoCapture(logPath, "spout sender recovery escalate: reason=%q view_id=%q after_on_senders=%d", "on_only_no_sender", viewID, len(after.Senders))
+	if err := sendCameraBoolCompat(client, logPath, "/usercamera/Streaming", false, "spout_sender_recovery_off:"+viewID); err != nil {
+		diagAutoCapture(logPath, "spout sender recovery error: phase=%q view_id=%q err=%v", "off", viewID, err)
+		return err
+	}
+	if !sleepContext(ctx, 300*time.Millisecond) {
+		diagAutoCapture(logPath, "spout sender recovery cancelled: phase=%q view_id=%q err=%v", "off_wait", viewID, ctx.Err())
+		return ctx.Err()
+	}
+	if err := sendCameraBoolCompat(client, logPath, "/usercamera/Streaming", true, "spout_sender_recovery_on_after_off:"+viewID); err != nil {
+		diagAutoCapture(logPath, "spout sender recovery error: phase=%q view_id=%q err=%v", "on_after_off", viewID, err)
+		return err
+	}
+	if !sleepContext(ctx, 1200*time.Millisecond) {
+		diagAutoCapture(logPath, "spout sender recovery cancelled: phase=%q view_id=%q err=%v", "on_after_off_wait", viewID, ctx.Err())
+		return ctx.Err()
+	}
+	toggledAfter, err := autoCaptureListSpoutSenders(ctx, r.Config.AutoCapture.Stream, logPath)
+	if err != nil {
+		diagAutoCapture(logPath, "spout sender recovery toggled recheck error: view_id=%q err=%v", viewID, err)
+		return nil
+	}
+	diagAutoCapture(logPath, "spout sender recovery complete: view_id=%q before_senders=%d after_senders=%d toggled=%t", viewID, len(list.Senders), len(toggledAfter.Senders), true)
 	return nil
 }
 

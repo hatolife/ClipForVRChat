@@ -641,7 +641,7 @@ func TestRecoverEmptySpoutSenderListTogglesStreaming(t *testing.T) {
 	}
 }
 
-func TestRecoverEmptySpoutSenderListDoesNotStopStreamingWhenAutoOpenDisabled(t *testing.T) {
+func TestRecoverEmptySpoutSenderListUsesOnOnlyWhenAutoOpenDisabledAndSenderReturns(t *testing.T) {
 	conn, port := listenOSCUserCameraPackets(t)
 	defer conn.Close()
 
@@ -650,6 +650,9 @@ func TestRecoverEmptySpoutSenderListDoesNotStopStreamingWhenAutoOpenDisabled(t *
 	calls := 0
 	autoCaptureListSpoutSenders = func(ctx context.Context, cfg AutoCaptureStreamConfig, logPath string) (SpoutListResult, error) {
 		calls++
+		if calls == 2 {
+			return SpoutListResult{OK: true, Senders: []SpoutSenderInfo{{Name: "VRCSender1", Width: 1920, Height: 1080}}}, nil
+		}
 		return SpoutListResult{OK: true, Senders: nil}, nil
 	}
 
@@ -692,6 +695,68 @@ func TestRecoverEmptySpoutSenderListDoesNotStopStreamingWhenAutoOpenDisabled(t *
 		}
 		if sample.HasInt && sample.Int == 0 {
 			t.Fatalf("packet[%d] stopped streaming by int compat: %+v all=%+v", i, sample, samples)
+		}
+		if want[i].boolVal != nil {
+			if !sample.HasBool || sample.Bool != *want[i].boolVal {
+				t.Fatalf("packet[%d] bool = %+v, want %t", i, sample, *want[i].boolVal)
+			}
+			continue
+		}
+		if !sample.HasInt || sample.Int != *want[i].intVal {
+			t.Fatalf("packet[%d] int = %+v, want %d", i, sample, *want[i].intVal)
+		}
+	}
+}
+
+func TestRecoverEmptySpoutSenderListEscalatesToToggleWhenAutoOpenDisabled(t *testing.T) {
+	conn, port := listenOSCUserCameraPackets(t)
+	defer conn.Close()
+
+	originalList := autoCaptureListSpoutSenders
+	defer func() { autoCaptureListSpoutSenders = originalList }()
+	calls := 0
+	autoCaptureListSpoutSenders = func(ctx context.Context, cfg AutoCaptureStreamConfig, logPath string) (SpoutListResult, error) {
+		calls++
+		return SpoutListResult{OK: true, Senders: nil}, nil
+	}
+
+	cfg := DefaultConfig()
+	cfg.AutoCapture.OSC.Host = "127.0.0.1"
+	cfg.AutoCapture.OSC.SendPort = port
+	cfg.AutoCapture.Capture.PreplacedLocalAnchor = boolPtr(false)
+	cfg.AutoCapture.Capture.OpenCameraBeforeBatch = false
+	runner := AutoCaptureRunner{Config: cfg}
+	client := oscClient{host: "127.0.0.1", port: port}
+	if err := client.open(); err != nil {
+		t.Fatal(err)
+	}
+	defer client.close()
+
+	if err := runner.recoverEmptySpoutSenderList(context.Background(), client, "front"); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 3 {
+		t.Fatalf("sender list calls = %d, want 3", calls)
+	}
+
+	samples := withoutVersionNoticePackets(readOSCPacketSamples(t, conn))
+	want := []struct {
+		boolVal *bool
+		intVal  *int
+	}{
+		{boolVal: boolPtr(true)},
+		{intVal: intPtr(1)},
+		{boolVal: boolPtr(false)},
+		{intVal: intPtr(0)},
+		{boolVal: boolPtr(true)},
+		{intVal: intPtr(1)},
+	}
+	if len(samples) != len(want) {
+		t.Fatalf("packet count = %d, want %d: %+v", len(samples), len(want), samples)
+	}
+	for i, sample := range samples {
+		if sample.Address != "/usercamera/Streaming" {
+			t.Fatalf("packet[%d].address = %q, want /usercamera/Streaming", i, sample.Address)
 		}
 		if want[i].boolVal != nil {
 			if !sample.HasBool || sample.Bool != *want[i].boolVal {
