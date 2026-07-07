@@ -17,6 +17,8 @@ ClipForVRChat は、VRChat で外部画像URLを使いやすくするための W
 - 履歴画面からDiscord上の投稿画像を削除
 - VRChatで撮影された写真を自動で検知してDiscordへ投稿
 - Win+Shift+Sで保存されたスクリーンショットを自動で検知してDiscordへ投稿
+- VRChat User CameraをOSCで操作し、Stream Camera(Spout)方式で自動撮影
+- VRChatから受信したOSCを他アプリ向けの別UDPポートへ転送
 
 ## 使い方
 
@@ -94,6 +96,8 @@ Win+Shift+Sなどで画像が保存されると、設定に応じてDiscord投�
 
 設定画面の「自動撮影」タブでは、VRChat User CameraをOSCで操作し、指定した構図を順番に撮影できます。
 
+自動撮影は初期状態では無効です。使う場合は自動撮影スケジュールをONにします。スケジュール詳細では、撮影間隔、初回待機時間、開始時撮影、最大実行回数を設定できます。開始時撮影は既定ONですが、AvatarBeacon basisが使える状態、またはフォールバックモードが使える状態になるまで待ってから実行します。
+
 Stream方式はVRChat Stream CameraのSpout映像を内蔵の `spout-capture.exe` で直接受信して保存します。通常利用者向けzip内の `ClipForVRChat.exe` には、`spout-capture.exe` と実行に必要な `SpoutLibrary.dll` が埋め込まれており、初回使用時にClipForVRChatが管理フォルダへ展開して呼び出します。通常はユーザーが直接起動せず、ClipForVRChatが自動撮影時に呼び出します。Photo方式はVRChat標準写真を使うフォールバックで、VRChat側のシャッター音が発生します。
 
 `spout-capture.exe` と `SpoutLibrary.dll` は、VRChat Stream Cameraの実体であるSpout senderから映像フレームを受け取るために必要です。Spout/DirectX/OpenGL/DLLロードなどのWindowsネイティブ処理を本体プロセスに混ぜると、GPUやDLLまわりの失敗がアプリ全体のクラッシュにつながりやすくなります。そのためv0.1.8では、Spout受信だけを小さい別プロセスへ分離し、本体exeにはそのhelper一式を埋め込みます。本体はOSC制御、設定、保存後処理、履歴、Discord投稿を担当します。
@@ -109,6 +113,8 @@ Stream方式で `Spout helperが見つかりません`、`Spout helperは見つ�
 自動撮影では、画像と同じ場所にsidecar JSONを保存できます。sidecar JSONには撮影時刻、構図、Stream sender情報、VRChat output logから取得できた同席ユーザー、world ID、instance ID、画像SHA256を記録します。PNG/JPEG画像内にも、設定に応じて自動撮影メタデータを埋め込めます。
 
 プレイヤー基準構図は、AvatarBeacon導入済みアバターから受け取る `avatar_osc` basis を基本にします。標準OSCだけでは動かず、positionはHips基準、yawはHead基準で、player root そのものではありません。専用ギミックなしの場合は `manual` basis で手動保存した基準位置をフォールバックとして使えます。確認手順は `docs/v0.1.8-avatar-osc-basis-verification.md` と `docs/v0.1.8-player-local-verification.md`、AvatarBeaconの詳細は `docs/avatarbeacon-spec.md` を参照してください。
+
+AvatarBeaconが使えない環境では、フォールバックモードを使えます。フォールバックモードでは、VRChat内であらかじめ配置したローカルアンカーCameraを使うため、ClipForVRChatはCamera Poseを送信しません。AvatarBeacon未受信時の自動ON、受信復帰時の自動OFFも設定できますが、どちらも既定OFFです。
 
 AvatarBeacon は `avatar_osc` basis 確認用の汎用アバターギミックで、ClipForVRChat専用ではありません。CIは `AvatarBeacon-vX.Y.Z-source.zip` の元ファイルzipを作成します。source zipをUnity projectへ展開すると `Assets/PoppoWorks/AvatarBeacon/...` になる形を想定しています。
 
@@ -154,9 +160,27 @@ Discord投稿では、本文に含まれる `@everyone`、`@here`、ユーザー
 
 - VRChat写真自動処理: VRChat上で撮影されたときに処理します。
 - スクリーンショット自動処理: Win + Shift + Sでスクリーンショットが撮られたときに処理します。
-- Discord投稿: 処理した画像をDiscord Webhookへ投稿します。
-- 投稿URLの自動コピー: Discordに投稿したURLをクリップボードに保存します。
 - QRコードURL検出: 画像内のQRコードからURLを取得します。
+
+### 自動撮影
+
+- AvatarBeacon受信状態: `avatar_osc` basisの状態、最終受信、position、yaw、エラーを確認できます。
+- フォールバックモード: AvatarBeaconなしで、VRChat内に配置済みのローカルアンカーCameraを使います。
+- 自動撮影スケジュール: 撮影間隔、初回待機時間、開始時撮影、最大実行回数を設定できます。
+- 撮影と出力: Stream/Photo方式、Spout helper、sender、自動選択、録画デバッグ、保存先、保存形式、ファイル名、sidecar JSON、画像埋め込みメタデータを設定できます。
+- Camera状態復元: 撮影後にUser CameraのMode、Pose、Streaming、Zoom、Exposure、表示対象mask類などをできるだけ戻します。
+- 構図: 正面、背後、斜めなどの `player_local` 構図を管理できます。
+
+### OSC
+
+- OSCホスト: 通常は `127.0.0.1` です。
+- OSC送信ポート: ClipForVRChatからVRChatへ送るUDPポートです。初期値は `9000` です。
+- OSC受信ポート: VRChatから外部アプリへ届くUDPポートです。初期値は `9001` です。
+- カメラOSCリセット: VRChat User CameraのOSC操作状態を戻したいときに使います。
+- プレイヤー基準の取得元: 通常は `avatar_osc`、専用ギミックなしの場合は `manual` を使います。
+- OSC転送: VRChatから受信したOSC packetを、他アプリ用の別ポートへ転送できます。
+- OSC受信ログ/送信ログ: 一時ログを確認し、フィルタやコピーができます。診断用には `logs/osc_recieve.jsonl` と `logs/osc_send.jsonl` に保存されます。
+- OSCデバッグ送信: 現在のVRChat OSC送信先へ任意のOSCを送れます。
 
 ### 処理
 
@@ -166,19 +190,23 @@ Discord投稿では、本文に含まれる `@everyone`、`@here`、ユーザー
 - 出力形式: PNGまたはJPGを選べます。
 - JPEG品質: JPG出力時だけ使います。
 
-### Webhook
+### その他
 
-- 通常投稿用Webhook URL: Discordで作成したWebhook URLを貼り付けます。
-- VRChat写真用Webhook URL: VRChat写真だけ別のDiscordチャンネルに投稿したい場合に入力します。空なら通常投稿用Webhook URLを使います。
-- スクリーンショット用Webhook URL: スクリーンショットだけ別のDiscordチャンネルに投稿したい場合に入力します。空なら通常投稿用Webhook URLを使います。
-
-### 更新
-
+- PC起動時に自動起動: Windows Startupフォルダに現在のexeへのショートカットを作成または削除します。
 - 更新確認: 起動時にGitHub Releasesを確認し、新しいバージョンがあるか調べます。初期値はONです。
 - 更新通知: 新しいバージョンが見つかったとき、画面上部に通知を表示します。初期値はONです。
 
+### Discord投稿
+
+- Discord投稿: 処理した画像をDiscord Webhookへ投稿します。
+- 投稿URLの自動コピー: Discordに投稿したURLをクリップボードに保存します。
+- 通常投稿用Webhook URL: Discordで作成したWebhook URLを貼り付けます。
+- VRChat写真用Webhook URL: VRChat写真だけ別のDiscordチャンネルに投稿したい場合に入力します。空なら通常投稿用Webhook URLを使います。
+- スクリーンショット用Webhook URL: スクリーンショットだけ別のDiscordチャンネルに投稿したい場合に入力します。空なら通常投稿用Webhook URLを使います。
+- 自動撮影用Webhook URL: 自動撮影だけ別のDiscordチャンネルに投稿したい場合に入力します。空なら通常投稿用Webhook URLを使います。
+
 Discord投稿がOFFの場合、投稿URLの自動コピーとWebhook設定はグレーアウトします。VRChat写真自動処理とスクリーンショット自動処理は、縮小、QRコードURL検出、ローカル保存を行えるためグレーアウトしません。ローカル保存がOFFの場合、出力形式を含むローカル保存に関係する設定はグレーアウトします。
-自動撮影の `player_local` は AvatarBeacon の `avatar_osc` basis を既定にし、専用アバターギミックがない場合だけ `manual` basis に切り替えて使います。受信状態や最終受信時刻、position/yaw は設定画面の自動撮影タブで確認できます。
+自動撮影の `player_local` は AvatarBeacon の `avatar_osc` basis を既定にし、専用アバターギミックがない場合だけ `manual` basis またはフォールバックモードに切り替えて使います。受信状態や最終受信時刻、position/yaw は設定画面の自動撮影タブとOSCタブで確認できます。
 
 ## 画面
 
@@ -203,6 +231,8 @@ QRコードURL検出がONの場合、画像から読み取れたURLもサムネ�
 保存先、出力形式、Discord投稿などを変更できます。設定項目は上部タブでカテゴリごとに切り替えて表示します。
 
 出力先フォルダは、入力欄へ貼り付けても、「選択」ボタンからフォルダを選んでも設定できます。
+
+未保存変更がある場合は、変更されたタブや項目が強調されます。設定画面を閉じる、別画面へ移動する、またはウィンドウを閉じる前に、保存、破棄、キャンセルを選べます。
 
 ### 使い方画面
 
@@ -245,3 +275,8 @@ https://github.com/hatolife/ClipForVRChat/issues
 - `config.json`: アプリ設定
 - `history.json`: 取得した画像URLの履歴
 - `output` フォルダ: ローカル保存した縮小画像
+- `logs/YYYY-MM-DD.log`: 診断ログ
+- `logs/osc_send.jsonl`: ClipForVRChatから送信したOSCログ
+- `logs/osc_recieve.jsonl`: VRChatから受信したOSCとforwardのログ
+- `diagnostics/`: 不具合報告用データの確認用zipと暗号化済み `.zip.gpg`
+- `%LOCALAPPDATA%` 配下の単一起動管理フォルダ: 未保存設定の下書きと、単一exe版から展開したSpout helperの一時キャッシュ

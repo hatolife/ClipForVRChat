@@ -176,6 +176,8 @@ v0.1.8では、設定画面の「自動撮影」タブからVRChat User Camera�
 
 AvatarBeacon は `avatar_osc` basis の確認に使う汎用アバターギミックであり、ClipForVRChat専用ではありません。CIでは `AvatarBeacon-vX.Y.Z-source.zip` の元ファイルzipを作成します。source zipをUnity projectへ展開すると `Assets/PoppoWorks/AvatarBeacon/...` になる形を想定します。Prefab構造とparameter仕様は `docs/avatarbeacon-spec.md` に記録します。
 
+自動撮影スケジュール自体は既定OFFです。開始時撮影は既定ONですが、スケジュール有効時に `avatar_osc` basisが新鮮な状態、またはフォールバックモードが有効な状態になるまで待機してから実行します。VRChat output logからworld/instance情報を読む設定がONの場合は、world metadataが安定するまで待ってから開始します。
+
 ### 撮影方式
 
 - Stream方式: VRChat Stream CameraのSpout senderを内蔵の `spout-capture.exe` で受信し、静止画として保存します。通常利用者向けzip内の `ClipForVRChat.exe` では `spout-capture.exe` と `SpoutLibrary.dll` を本体に埋め込み、実行時に管理フォルダへ展開してからClipForVRChat本体が起動します。分離版zipでは両ファイルを `ClipForVRChat.exe` と同じフォルダに置きます。
@@ -195,6 +197,8 @@ Stream方式は主経路です。ffmpeg/gdigrabによるデスクトップやVRC
 - `player_local`: 手動保存したプレイヤー基準位置、または専用アバターギミックから受信した `avatar_osc` basis に対して、構図のローカル位置/回転を加算してから `/usercamera/Pose` へ送信します。
 
 標準OSCだけではローカルプレイヤーroot位置/Yawを自動取得できないため、`manual` basis は「現在位置をmanual基準に保存」で保存した手動基準位置を使います。`avatar_osc` basis は Hips/avatar 基準であり、player root 基準そのものではありません。基準位置が未設定、または `avatar_osc` が未受信/鮮度切れの場合、`player_local` 構図は撮影失敗として扱います。
+
+フォールバックモードでは、VRChat内にあらかじめ配置したローカルアンカーCameraを使うため、ClipForVRChatは `/usercamera/Pose` や個別Camera optionを送信しません。AvatarBeacon未受信時にフォールバックモードを自動ONにする設定と、AvatarBeacon受信復帰時に自動OFFにする設定を持ちます。どちらも既定OFFです。
 
 ### 同席ユーザーとメタデータ
 
@@ -452,9 +456,9 @@ URL一覧は以下の場合に表示します。
 
 設定画面の詳細仕様は [`SETTINGS_SPEC.md`](SETTINGS_SPEC.md) で管理します。
 
-この全体仕様では、設定画面が通常ユーザー向けの設定編集UIであり、`config.json` を直接編集しなくても主要な機能、処理、Webhook、更新確認を切り替えられることだけを規定します。
+この全体仕様では、設定画面が通常ユーザー向けの設定編集UIであり、`config.json` を直接編集しなくても主要な機能、自動撮影、OSC、処理、Discord投稿、更新確認、自動起動を切り替えられることだけを規定します。
 
-保存が成功した場合、設定画面を閉じて通常画面へ戻ります。閉じるを押した場合、設定は保存せず通常画面へ戻ります。
+通常の保存が成功した場合、設定画面に残り、選択中のタブ、詳細設定画面、スクロール位置を維持します。設定画面から別画面へ移動するときやウィンドウを閉じるときに未保存変更がある場合は、保存、破棄、キャンセルを選べる確認を表示します。
 
 ### 更新通知
 
@@ -617,16 +621,19 @@ config.json
   "image": {
     "maxWidth": 2048,
     "maxHeight": 2048,
+    "maxInputMb": 32,
     "suffix": "_2048",
+    "outputFormat": "png",
     "overwrite": false,
     "jpegQuality": 92,
-    "outputDirectory": ""
+    "outputDirectory": "./output"
   },
   "output": {
     "saveLocal": true,
     "uploadDiscord": false,
     "showUi": "auto",
     "copySingleUrlToClipboard": false,
+    "deleteOutputOnHistoryPurge": true,
     "detectQrCodeUrls": false
   },
   "discord": {
@@ -643,6 +650,101 @@ config.json
     "screenshotDirectory": "%USERPROFILE%\\Pictures\\Screenshots",
     "webhookUrl": "",
     "scanIntervalSeconds": 2
+  },
+  "update": {
+    "checkEnabled": true,
+    "notificationEnabled": true
+  },
+  "autoCapture": {
+    "osc": {
+      "vrcHost": "127.0.0.1",
+      "vrcInPort": 9000,
+      "appOutPort": 9001,
+      "poseFreshnessSec": 3,
+      "forward": {
+        "enabled": false,
+        "mode": "all",
+        "targets": []
+      }
+    },
+    "playerLocal": {
+      "basisSource": "avatar_osc",
+      "avatarOsc": {
+        "parameterPrefix": "avatar_beacon",
+        "positionScale": 1000,
+        "invertMagnitude": true,
+        "positiveFlagThreshold": 0,
+        "maxAbsPosition": 10000,
+        "maxAbsForward": 2000,
+        "freshnessSec": 3
+      },
+      "calibrated": false
+    },
+    "schedule": {
+      "enabled": false,
+      "captureIntervalSec": 300,
+      "initialDelaySec": 0,
+      "skipIfPreviousBatchRunning": true,
+      "captureOnStart": true,
+      "maxBatches": 0
+    },
+    "capture": {
+      "mode": "stream",
+      "preplacedLocalAnchor": false,
+      "autoEnablePreplacedLocalAnchor": false,
+      "autoEnablePreplacedLocalAnchorAfterMinutes": 5,
+      "autoDisablePreplacedLocalAnchor": false,
+      "openCameraBeforeBatch": false,
+      "closeCameraAfterBatch": false,
+      "autoLevelRollBeforeShot": true,
+      "settleDelayMs": 1500,
+      "buttonReleaseDelayMs": 200
+    },
+    "stream": {
+      "spoutHelperPath": "spout-capture.exe",
+      "spoutSenderName": "",
+      "spoutAutoSelect": true,
+      "captureTimeoutMs": 10000,
+      "startDelayMs": 1000,
+      "debugRecordingEnabled": false,
+      "debugFrameCount": 8
+    },
+    "restore": {
+      "enabled": true,
+      "preferSnapshot": true,
+      "snapshotFreshnessSec": 10
+    },
+    "output": {
+      "directory": "%USERPROFILE%\\Pictures\\VRChat\\VRC-AutoCapture",
+      "imageFormat": "png",
+      "filenameTemplate": "{timestamp_local}_{batch_id}_{shot_index}_{view_name}_{mode}.{ext}",
+      "writeSidecarJson": true,
+      "writeExif": true,
+      "writeUserListToExif": true,
+      "writeUserIdsToExif": false
+    },
+    "presence": {
+      "watchOutputLog": true,
+      "outputLogDirectory": "%USERPROFILE%\\AppData\\LocalLow\\VRChat\\VRChat",
+      "includeUserIdsInSidecar": true,
+      "includeUserIdsInDiscord": false,
+      "includeDisplayNamesInDiscord": false
+    },
+    "discord": {
+      "enabled": false,
+      "webhookUrl": "",
+      "postMode": "shot",
+      "includeImages": true
+    },
+    "views": [
+      {
+        "id": "front",
+        "name": "正面",
+        "enabled": true,
+        "sortOrder": 0,
+        "coordinateSpace": "player_local"
+      }
+    ]
   }
 }
 ```
@@ -713,7 +815,7 @@ GitHub Release には、検証・切り分け用の分離版zipも添付しま�
 
 分離版zipで `spout-capture.exe` または `SpoutLibrary.dll` が欠けている場合は、v0.1.8のStream方式として不完全です。
 
-CIで生成するAvatarBeacon source zipは、リリース担当者がUnityで `.unitypackage` を作るための元ファイルとして添付します。
+CIで生成するAvatarBeacon source zipは、GitHub Releaseへ公開添付する標準Assetです。リリース担当者がUnityで `.unitypackage` を手動作成する場合も、このsource zipを元ファイルとして使います。
 
 - `AvatarBeacon-vX.Y.Z-source.zip`
 
@@ -736,8 +838,8 @@ PGP署名を検証する利用者向け説明では、Release assetに同梱ま�
 例:
 
 ```txt
-ClipForVRChat-v0.4.0-windows-amd64.exe
-ClipForVRChat-v0.4.0-windows-amd64.zip
-ClipForVRChat-v0.4.0-windows-amd64-separated.zip
-AvatarBeacon-v0.4.0-source.zip
+ClipForVRChat-vX.Y.Z-windows-amd64.zip
+ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc
+ClipForVRChat-vX.Y.Z-windows-amd64-separated.zip
+AvatarBeacon-vX.Y.Z-source.zip
 ```
