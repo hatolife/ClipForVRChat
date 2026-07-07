@@ -1374,7 +1374,8 @@ func captureStreamFrameWithFFmpeg(ctx context.Context, cfg AutoCaptureStreamConf
 	if timeout <= 0 {
 		timeout = 10 * time.Second
 	}
-	if _, err := ResolveFFmpegPath(cfg.LegacyFFmpegPath); err != nil {
+	resolvedFFmpegPath, err := resolveFFmpegPath(cfg.LegacyFFmpegPath)
+	if err != nil {
 		diagAutoCapture(logPath, "stream ffmpeg missing: path=%q err=%v", cfg.LegacyFFmpegPath, err)
 		return err
 	}
@@ -1399,8 +1400,8 @@ func captureStreamFrameWithFFmpeg(ctx context.Context, cfg AutoCaptureStreamConf
 		args = append([]string{"-y"}, args...)
 		args = append(args, "-frames:v", "1", outputPath)
 	}
-	diagAutoCapture(logPath, "stream ffmpeg begin: path=%q args=%q output=%q timeout_ms=%d", cfg.LegacyFFmpegPath, strings.Join(args, " "), outputPath, timeout.Milliseconds())
-	cmd := exec.CommandContext(commandCtx, cfg.LegacyFFmpegPath, args...) // #nosec G204 -- user-configured local ffmpeg command for capture source.
+	diagAutoCapture(logPath, "stream ffmpeg begin: path=%q resolved_path=%q args=%q output=%q timeout_ms=%d", cfg.LegacyFFmpegPath, resolvedFFmpegPath, strings.Join(args, " "), outputPath, timeout.Milliseconds())
+	cmd := exec.CommandContext(commandCtx, resolvedFFmpegPath, args...) // #nosec G204 -- validated PATH ffmpeg command for legacy capture source.
 	output, err := cmd.CombinedOutput()
 	if commandCtx.Err() == context.DeadlineExceeded {
 		return fmt.Errorf("ffmpegによるStream切り出しがタイムアウトしました。ffmpegパス、入力引数、Stream Cameraの表示状態を確認してください。")
@@ -1496,20 +1497,18 @@ public static class Win32Rect {
 	return rect, nil
 }
 
+var resolveFFmpegPath = ResolveFFmpegPath
+
 func ResolveFFmpegPath(ffmpegPath string) (string, error) {
 	ffmpegPath = strings.Trim(strings.TrimSpace(ffmpegPath), `"`)
 	if ffmpegPath == "" {
 		ffmpegPath = "ffmpeg"
 	}
 	if strings.ContainsAny(ffmpegPath, `\/`) || filepath.IsAbs(ffmpegPath) {
-		info, err := os.Stat(ffmpegPath)
-		if err != nil {
-			return "", fmt.Errorf("ffmpegがインストールされていないかPATHにありません。ffmpegパスを確認するか、設定画面からffmpegをインストールしてください。")
-		}
-		if info.IsDir() {
-			return "", fmt.Errorf("ffmpegパスがフォルダを指しています。ffmpeg.exeのパスを指定してください。")
-		}
-		return ffmpegPath, nil
+		return "", fmt.Errorf("ffmpegパスにはファイル名だけを指定してください。安全のため、設定ファイルから絶対パスや相対パスの実行ファイルは起動しません。")
+	}
+	if !strings.EqualFold(ffmpegPath, "ffmpeg") && !strings.EqualFold(ffmpegPath, "ffmpeg.exe") {
+		return "", fmt.Errorf("ffmpegパスにはffmpegまたはffmpeg.exeだけを指定してください。安全のため、設定ファイルから別名の実行ファイルは起動しません。")
 	}
 	resolved, err := exec.LookPath(ffmpegPath)
 	if err != nil {

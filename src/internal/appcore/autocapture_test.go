@@ -298,9 +298,76 @@ func TestSplitCommandLine(t *testing.T) {
 
 func TestResolveFFmpegPathRejectsMissingPath(t *testing.T) {
 	_, err := ResolveFFmpegPath(filepath.Join(t.TempDir(), "missing-ffmpeg.exe"))
-	if err == nil || !strings.Contains(err.Error(), "ffmpegがインストールされていないかPATHにありません") {
-		t.Fatalf("err = %v, want missing ffmpeg message", err)
+	if err == nil || !strings.Contains(err.Error(), "絶対パスや相対パス") {
+		t.Fatalf("err = %v, want unsafe path rejection", err)
 	}
+}
+
+func TestResolveFFmpegPathRejectsConfigControlledExecutablePath(t *testing.T) {
+	dir := t.TempDir()
+	malicious := filepath.Join(dir, "attacker-ffmpeg")
+	if err := os.WriteFile(malicious, []byte("test helper"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	for _, input := range []string{
+		malicious,
+		".\\ffmpeg.exe",
+		"./ffmpeg",
+		"powershell",
+		"cmd.exe",
+		"attacker-ffmpeg",
+	} {
+		t.Run(input, func(t *testing.T) {
+			_, err := ResolveFFmpegPath(input)
+			if err == nil {
+				t.Fatalf("ResolveFFmpegPath(%q) returned nil error, want rejection", input)
+			}
+		})
+	}
+}
+
+func TestCaptureStreamFrameWithFFmpegUsesResolvedPath(t *testing.T) {
+	original := resolveFFmpegPath
+	t.Cleanup(func() {
+		resolveFFmpegPath = original
+	})
+	resolveFFmpegPath = func(string) (string, error) {
+		return os.Args[0], nil
+	}
+	t.Setenv("GO_WANT_FFMPEG_HELPER_PROCESS", "1")
+	outputPath := filepath.Join(t.TempDir(), "capture.png")
+	cfg := AutoCaptureStreamConfig{
+		LegacyFFmpegPath: "ffmpeg",
+		LegacyInputArgs:  "-test.run=TestFFmpegHelperProcess -- {output}",
+		CaptureTimeoutMS: 5000,
+	}
+	if err := captureStreamFrameWithFFmpeg(context.Background(), cfg, outputPath, ""); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "resolved ffmpeg output" {
+		t.Fatalf("output = %q, want helper output", string(data))
+	}
+}
+
+func TestFFmpegHelperProcess(t *testing.T) {
+	if os.Getenv("GO_WANT_FFMPEG_HELPER_PROCESS") != "1" {
+		return
+	}
+	for i, arg := range os.Args {
+		if arg == "--" && i+1 < len(os.Args) {
+			if err := os.WriteFile(os.Args[len(os.Args)-1], []byte("resolved ffmpeg output"), 0600); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(2)
+			}
+			os.Exit(0)
+		}
+	}
+	fmt.Fprintln(os.Stderr, "missing output path")
+	os.Exit(2)
 }
 
 func TestResolveSpoutHelperPathRejectsMissingPath(t *testing.T) {

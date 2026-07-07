@@ -257,3 +257,4 @@
 | 288 | [Spout2 FetchContent未固定セキュリティレポートを解説する](investigation-only/288-explain-security-report-unpinned-spout2-fetchcontent.md) | 完了 | 調査のみ | ReleaseビルドでSpout2を不変commit/hashではなく可変タグで取得するfindingの内容を整理した。 |
 | 289 | [Spout2取得をhash検証付きarchiveへ固定し更新運用を明文化する](unreleased/289-pin-spout2-archive-and-release-update-policy.md) | 完了 | 未定 | Spout2 revision更新運用をAGENTS.mdへ記載し、FetchContent取得を不変commit archiveとSHA256検証へ変更した。 |
 | 290 | [設定由来ffmpeg実行セキュリティレポートを解説する](investigation-only/290-explain-security-report-config-controlled-ffmpeg.md) | 完了 | 調査のみ | 外部JSON設定から任意ローカル実行ファイルをffmpegとして起動できるfindingの内容を整理した。 |
+| 291 | [設定由来のffmpeg実行パスを制限する](unreleased/291-restrict-config-controlled-ffmpeg-execution.md) | 完了 | 未定 | 外部JSON設定から任意実行ファイルをffmpegとして起動できないよう、ffmpeg実行名を既定名に限定し解決済みパスだけを実行するようにした。 |
