@@ -299,7 +299,7 @@ func TestLoadConfigPreservesExplicitCaptureOnStartFalse(t *testing.T) {
 
 func TestLoadConfigDefaultsAutoLevelRollBeforeShotWhenMissing(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(path, []byte(`{"autoCapture":{"capture":{"mode":"stream","closeCameraAfterBatch":true}}}`), 0600); err != nil {
+	if err := os.WriteFile(path, []byte(`{"autoCapture":{"capture":{"mode":"stream","openCameraBeforeBatch":true,"closeCameraAfterBatch":true}}}`), 0600); err != nil {
 		t.Fatal(err)
 	}
 	got, err := LoadConfig(path)
@@ -308,6 +308,9 @@ func TestLoadConfigDefaultsAutoLevelRollBeforeShotWhenMissing(t *testing.T) {
 	}
 	if got.AutoCapture.Capture.AutoLevelRollBeforeShot == nil || !*got.AutoCapture.Capture.AutoLevelRollBeforeShot {
 		t.Fatalf("AutoLevelRollBeforeShot = %v, want true when field is missing", got.AutoCapture.Capture.AutoLevelRollBeforeShot)
+	}
+	if got.AutoCapture.Capture.OpenCameraBeforeBatch {
+		t.Fatalf("OpenCameraBeforeBatch = %t, want false after normalize", got.AutoCapture.Capture.OpenCameraBeforeBatch)
 	}
 	if got.AutoCapture.Capture.CloseCameraAfterBatch {
 		t.Fatalf("CloseCameraAfterBatch = %t, want false after normalize", got.AutoCapture.Capture.CloseCameraAfterBatch)

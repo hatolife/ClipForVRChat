@@ -57,3 +57,8 @@ UIで操作できない `openCameraBeforeBatch` / `closeCameraAfterBatch` は、
 - [ ] フロントエンドだけでなくバックエンド正規化または実行前正規化で強制される。
 - [ ] 自動撮影の通常動作、Stream取得、復元処理を壊さない。
 - [ ] 該当挙動を検証するGoテストを追加する。
+
+## 作業メモ
+
+2026-07-08: ユーザー指示によりbackend-sideのみで実装する。`src/frontend/src/main.js` は変更しない。
+`OpenCameraBeforeBatch` と `CloseCameraAfterBatch` はbackend正規化で常にfalseへ丸め、実行経路でも正規化済み設定を使う。

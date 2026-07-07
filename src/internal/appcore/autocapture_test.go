@@ -77,9 +77,15 @@ func TestAutoCaptureConfigNormalize(t *testing.T) {
 	cfg := Config{AutoCapture: AutoCaptureConfig{
 		OSC:      AutoCaptureOSCConfig{SendPort: -1, ReceivePort: 70000},
 		Schedule: AutoCaptureScheduleConfig{CaptureIntervalSec: 1, InitialDelaySec: -1, MaxBatches: -1},
-		Capture:  AutoCaptureCaptureConfig{Mode: "bad", ConcurrentMode: "bad", RequestedCameraCount: 10},
-		Output:   AutoCaptureOutputConfig{ImageFormat: "gif"},
-		Discord:  AutoCaptureDiscordConfig{PostMode: "bad"},
+		Capture: AutoCaptureCaptureConfig{
+			Mode:                  "bad",
+			ConcurrentMode:        "bad",
+			RequestedCameraCount:  10,
+			OpenCameraBeforeBatch: true,
+			CloseCameraAfterBatch: true,
+		},
+		Output:  AutoCaptureOutputConfig{ImageFormat: "gif"},
+		Discord: AutoCaptureDiscordConfig{PostMode: "bad"},
 	}}
 	cfg.Normalize()
 	if cfg.AutoCapture.Schedule.CaptureIntervalSec != 10 {
@@ -610,7 +616,7 @@ func TestParseDebugOSCLine(t *testing.T) {
 	}
 }
 
-func TestAutoCaptureRunnerRunOnceReleasesStreamingOnCancellation(t *testing.T) {
+func TestAutoCaptureRunnerRunOnceIgnoresLegacyCameraAutoOpenOnCancellation(t *testing.T) {
 	conn, port := listenOSCUserCameraPackets(t)
 	defer conn.Close()
 
@@ -621,7 +627,7 @@ func TestAutoCaptureRunnerRunOnceReleasesStreamingOnCancellation(t *testing.T) {
 	cfg.AutoCapture.Capture.Mode = "stream"
 	cfg.AutoCapture.Capture.PreplacedLocalAnchor = boolPtr(false)
 	cfg.AutoCapture.Capture.OpenCameraBeforeBatch = true
-	cfg.AutoCapture.Capture.CloseCameraAfterBatch = false
+	cfg.AutoCapture.Capture.CloseCameraAfterBatch = true
 	cfg.AutoCapture.Capture.SettleDelayMS = 1500
 	cfg.AutoCapture.Stream.StartDelayMS = 0
 	cfg.AutoCapture.Stream.SpoutHelperPath = filepath.Join(t.TempDir(), "missing-spout-capture.exe")
@@ -643,7 +649,7 @@ func TestAutoCaptureRunnerRunOnceReleasesStreamingOnCancellation(t *testing.T) {
 	}}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	time.AfterFunc(2700*time.Millisecond, cancel)
+	time.AfterFunc(250*time.Millisecond, cancel)
 
 	results, err := (AutoCaptureRunner{Config: cfg}).RunOnce(ctx)
 	if err == nil {
@@ -654,41 +660,11 @@ func TestAutoCaptureRunnerRunOnceReleasesStreamingOnCancellation(t *testing.T) {
 	}
 
 	samples := withoutVersionNoticePackets(readOSCPacketSamples(t, conn))
-	hasStreamStart := false
-	hasStreamStop := false
-	hasStreamStartInt := false
-	hasStreamStopInt := false
 	for _, sample := range samples {
-		if sample.Address != "/usercamera/Streaming" {
-			continue
+		switch sample.Address {
+		case "/usercamera/Mode", "/usercamera/SmoothMovement", "/usercamera/Streaming":
+			t.Fatalf("legacy camera auto-open packet should not be sent after normalization: %+v all=%+v", sample, samples)
 		}
-		if sample.HasBool {
-			if sample.Bool {
-				hasStreamStart = true
-			} else {
-				hasStreamStop = true
-			}
-		}
-		if sample.HasInt {
-			switch sample.Int {
-			case 1:
-				hasStreamStartInt = true
-			case 0:
-				hasStreamStopInt = true
-			}
-		}
-	}
-	if !hasStreamStart {
-		t.Fatalf("stream start packet not found: %+v", samples)
-	}
-	if !hasStreamStop {
-		t.Fatalf("stream stop packet not found: %+v", samples)
-	}
-	if !hasStreamStartInt {
-		t.Fatalf("stream start compat int packet not found: %+v", samples)
-	}
-	if !hasStreamStopInt {
-		t.Fatalf("stream stop compat int packet not found: %+v", samples)
 	}
 }
 
@@ -783,7 +759,7 @@ func TestAutoCaptureRunnerRunOnceCanDisableAutoLevelRollBeforeShot(t *testing.T)
 	}
 }
 
-func TestRecoverEmptySpoutSenderListTogglesStreaming(t *testing.T) {
+func TestRecoverEmptySpoutSenderListIgnoresLegacyAutoOpen(t *testing.T) {
 	conn, port := listenOSCUserCameraPackets(t)
 	defer conn.Close()
 
@@ -810,8 +786,8 @@ func TestRecoverEmptySpoutSenderListTogglesStreaming(t *testing.T) {
 	if err := runner.recoverEmptySpoutSenderList(context.Background(), client, "front"); err != nil {
 		t.Fatal(err)
 	}
-	if calls != 2 {
-		t.Fatalf("sender list calls = %d, want 2", calls)
+	if calls != 3 {
+		t.Fatalf("sender list calls = %d, want 3", calls)
 	}
 
 	samples := withoutVersionNoticePackets(readOSCPacketSamples(t, conn))
@@ -819,6 +795,8 @@ func TestRecoverEmptySpoutSenderListTogglesStreaming(t *testing.T) {
 		boolVal *bool
 		intVal  *int
 	}{
+		{boolVal: boolPtr(true)},
+		{intVal: intPtr(1)},
 		{boolVal: boolPtr(false)},
 		{intVal: intPtr(0)},
 		{boolVal: boolPtr(true)},
@@ -1384,17 +1362,37 @@ func TestFinalizeAutoCaptureImageCreatesThumbnail(t *testing.T) {
 	}
 }
 
-func TestAutoCaptureDiscordUploadEnabledFollowsPrimaryUploadSetting(t *testing.T) {
+func TestAutoCaptureDiscordUploadEnabledFollowsAutoCaptureSettingOnly(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.AutoCapture.Discord.Enabled = false
 	cfg.Output.UploadDiscord = true
-	if !autoCaptureDiscordUploadEnabled(cfg) {
-		t.Fatal("auto-capture Discord upload should be enabled by primary upload setting")
+	if autoCaptureDiscordUploadEnabled(cfg) {
+		t.Fatal("auto-capture Discord upload should ignore primary upload setting")
 	}
 	cfg.Output.UploadDiscord = false
 	cfg.AutoCapture.Discord.Enabled = true
 	if !autoCaptureDiscordUploadEnabled(cfg) {
 		t.Fatal("auto-capture Discord upload should be enabled by auto-capture setting")
+	}
+}
+
+func TestFinalizeAutoCaptureImageIgnoresDisabledAutoCaptureDiscordWebhook(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "capture.png")
+	writeTestPNG(t, path, 20, 10)
+	cfg := DefaultConfig()
+	cfg.Output.UploadDiscord = true
+	cfg.AutoCapture.Output.WriteEXIF = false
+	cfg.AutoCapture.Output.WriteSidecarJSON = false
+	cfg.AutoCapture.Discord.Enabled = false
+	cfg.AutoCapture.Discord.WebhookURL = "https://discord.com/api/webhooks/disabled/stale"
+	cfg.Discord.WebhookURL = "https://discord.com/api/webhooks/primary/stale"
+
+	result := (AutoCaptureRunner{Config: cfg}).finalizeAutoCaptureImage(path, "batch-test", "shot-test", cfg.AutoCapture.Views[0], nil, nil, "unknown", AutoCaptureVRChatMetadata{}, SpoutCaptureResult{})
+	if result.Error != "" {
+		t.Fatalf("result error = %q, want no Discord attempt", result.Error)
+	}
+	if result.URL != "" || result.DiscordMessageID != "" || result.DiscordWebhookID != "" || result.DiscordToken != "" {
+		t.Fatalf("discord fields = url:%q message:%q webhook:%q token:%q, want empty", result.URL, result.DiscordMessageID, result.DiscordWebhookID, result.DiscordToken)
 	}
 }
 

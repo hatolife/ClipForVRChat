@@ -60,3 +60,8 @@ Aを採用する。
 - [ ] UI文言と無効化条件が新しい仕様に一致する。
 - [ ] 既存の通常Discord投稿機能は手動処理で維持される。
 - [ ] Goテストとフロントエンドテンプレート検査が通る。
+
+## 作業メモ
+
+2026-07-08: ユーザー指示によりbackend-sideのみで実装する。`src/frontend/src/main.js` は変更しない。
+`autoCapture.discord.enabled` を自動撮影Discord投稿の唯一の実行条件とし、`output.uploadDiscord=true` 単独では投稿しない回帰テストを追加する。

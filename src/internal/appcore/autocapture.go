@@ -235,6 +235,7 @@ func ResetUserCameraOSC(ctx context.Context, cfg Config) error {
 func (r AutoCaptureRunner) RunOnce(ctx context.Context) (results []Result, err error) {
 	cfg := r.Config
 	cfg.Normalize()
+	r.Config = cfg
 	ac := cfg.AutoCapture
 	logPath := cfg.DiagnosticLogPath
 	diagAutoCapture(logPath, "run_once begin: mode=%q schedule_enabled=%t capture_on_start=%t interval_sec=%d preplaced_local_anchor=%t open_before_batch=%t button_release_ms=%d settle_ms=%d",
@@ -399,7 +400,9 @@ func (r AutoCaptureRunner) finishUserCameraState(client oscClient) {
 }
 
 func (r AutoCaptureRunner) restoreUserCameraState(client oscClient) {
-	cfg := r.Config.AutoCapture
+	normalized := r.Config
+	normalized.Normalize()
+	cfg := normalized.AutoCapture
 	restore := cfg.Restore
 	logPath := r.Config.DiagnosticLogPath
 	if !restore.Enabled {
@@ -1037,11 +1040,14 @@ func (r AutoCaptureRunner) captureStreamShot(ctx context.Context, client oscClie
 
 func (r AutoCaptureRunner) ensureStreamCameraForSpoutCapture(ctx context.Context, client oscClient, viewID string) error {
 	logPath := r.Config.DiagnosticLogPath
-	if r.Config.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
+	cfg := r.Config
+	cfg.Normalize()
+	ac := cfg.AutoCapture
+	if ac.Capture.PreplacedLocalAnchorEnabled() {
 		diagAutoCapture(logPath, "stream camera refresh skipped: preplaced_local_anchor=true view_id=%q", viewID)
 		return nil
 	}
-	if !r.Config.AutoCapture.Capture.OpenCameraBeforeBatch {
+	if !ac.Capture.OpenCameraBeforeBatch {
 		diagAutoCapture(logPath, "stream camera refresh skipped: open_before_batch=false view_id=%q", viewID)
 		return nil
 	}
@@ -1068,11 +1074,14 @@ func (r AutoCaptureRunner) ensureStreamCameraForSpoutCapture(ctx context.Context
 
 func (r AutoCaptureRunner) recoverEmptySpoutSenderList(ctx context.Context, client oscClient, viewID string) error {
 	logPath := r.Config.DiagnosticLogPath
-	if r.Config.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
+	cfg := r.Config
+	cfg.Normalize()
+	ac := cfg.AutoCapture
+	if ac.Capture.PreplacedLocalAnchorEnabled() {
 		diagAutoCapture(logPath, "spout sender recovery skipped: preplaced_local_anchor=true view_id=%q", viewID)
 		return nil
 	}
-	list, err := autoCaptureListSpoutSenders(ctx, r.Config.AutoCapture.Stream, logPath)
+	list, err := autoCaptureListSpoutSenders(ctx, ac.Stream, logPath)
 	if err != nil {
 		diagAutoCapture(logPath, "spout sender recovery skipped: list_error=%q view_id=%q", err.Error(), viewID)
 		return nil
@@ -1082,7 +1091,7 @@ func (r AutoCaptureRunner) recoverEmptySpoutSenderList(ctx context.Context, clie
 		return nil
 	}
 	diagAutoCapture(logPath, "spout sender recovery begin: reason=%q view_id=%q", "empty_sender_list", viewID)
-	if r.Config.AutoCapture.Capture.OpenCameraBeforeBatch {
+	if ac.Capture.OpenCameraBeforeBatch {
 		if err := sendCameraBoolCompat(client, logPath, "/usercamera/Streaming", false, "spout_sender_recovery_off:"+viewID); err != nil {
 			diagAutoCapture(logPath, "spout sender recovery error: phase=%q view_id=%q err=%v", "off", viewID, err)
 			return err
@@ -1099,7 +1108,7 @@ func (r AutoCaptureRunner) recoverEmptySpoutSenderList(ctx context.Context, clie
 			diagAutoCapture(logPath, "spout sender recovery cancelled: phase=%q view_id=%q err=%v", "on_after_off_wait", viewID, ctx.Err())
 			return ctx.Err()
 		}
-		after, err := autoCaptureListSpoutSenders(ctx, r.Config.AutoCapture.Stream, logPath)
+		after, err := autoCaptureListSpoutSenders(ctx, ac.Stream, logPath)
 		if err != nil {
 			diagAutoCapture(logPath, "spout sender recovery recheck error: view_id=%q err=%v", viewID, err)
 			return nil
@@ -1115,7 +1124,7 @@ func (r AutoCaptureRunner) recoverEmptySpoutSenderList(ctx context.Context, clie
 		diagAutoCapture(logPath, "spout sender recovery cancelled: phase=%q view_id=%q err=%v", "on_wait", viewID, ctx.Err())
 		return ctx.Err()
 	}
-	after, err := autoCaptureListSpoutSenders(ctx, r.Config.AutoCapture.Stream, logPath)
+	after, err := autoCaptureListSpoutSenders(ctx, ac.Stream, logPath)
 	if err != nil {
 		diagAutoCapture(logPath, "spout sender recovery recheck error: view_id=%q err=%v", viewID, err)
 		return nil
@@ -1141,7 +1150,7 @@ func (r AutoCaptureRunner) recoverEmptySpoutSenderList(ctx context.Context, clie
 		diagAutoCapture(logPath, "spout sender recovery cancelled: phase=%q view_id=%q err=%v", "on_after_off_wait", viewID, ctx.Err())
 		return ctx.Err()
 	}
-	toggledAfter, err := autoCaptureListSpoutSenders(ctx, r.Config.AutoCapture.Stream, logPath)
+	toggledAfter, err := autoCaptureListSpoutSenders(ctx, ac.Stream, logPath)
 	if err != nil {
 		diagAutoCapture(logPath, "spout sender recovery toggled recheck error: view_id=%q err=%v", viewID, err)
 		return nil
@@ -1261,7 +1270,7 @@ func thumbnailDataURLForImageFile(path string) (string, error) {
 }
 
 func autoCaptureDiscordUploadEnabled(cfg Config) bool {
-	return cfg.AutoCapture.Discord.Enabled || cfg.Output.UploadDiscord
+	return cfg.AutoCapture.Discord.Enabled
 }
 
 func (r AutoCaptureRunner) emit(event AutoCaptureEvent) {
