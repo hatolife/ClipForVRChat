@@ -35,6 +35,117 @@ func TestScanPhotoFilesReportsMissingDirectory(t *testing.T) {
 	}
 }
 
+func TestScanPhotoFilesAllWithExcludesStatusIgnoresScanCap(t *testing.T) {
+	dir := t.TempDir()
+	for i := 0; i < 6; i++ {
+		path := filepath.Join(dir, fmt.Sprintf("%05d.png", i))
+		if err := os.WriteFile(path, []byte("x"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	limited, limitedStatus := scanPhotoFilesLimitedWithExcludesStatus(dir, 3, nil)
+	if len(limited) != 3 {
+		t.Fatalf("len(limited) = %d, want 3", len(limited))
+	}
+	if !limitedStatus.LimitReached {
+		t.Fatal("expected limited scan to report limit reached")
+	}
+	all, status := scanPhotoFilesAllWithExcludesStatus(dir, nil)
+	if status.Error != "" {
+		t.Fatalf("unexpected scan status error: %s", status.Error)
+	}
+	if status.LimitReached {
+		t.Fatal("expected full scan to avoid limit reached status")
+	}
+	if len(all) != 6 {
+		t.Fatalf("len(all) = %d, want 6", len(all))
+	}
+}
+
+func TestAutoPhotoWatcherFullScanBaselineDoesNotResurfaceDeletedOldFiles(t *testing.T) {
+	dir := t.TempDir()
+	for i := 0; i < 8; i++ {
+		path := filepath.Join(dir, fmt.Sprintf("%05d.png", i))
+		if err := os.WriteFile(path, []byte("x"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	watcher := AutoPhotoWatcher{
+		Config: Config{AutoPhoto: AutoPhotoConfig{PhotoDirectory: dir}},
+		Process: func(path string) Result {
+			return Result{Name: filepath.Base(path), SourcePath: path}
+		},
+	}
+	seen, status := scanPhotoFilesAllWithExcludesStatus(dir, nil)
+	if status.Error != "" {
+		t.Fatalf("unexpected scan status error: %s", status.Error)
+	}
+	if len(seen) != 8 {
+		t.Fatalf("len(seen) = %d, want 8", len(seen))
+	}
+	watcher.seen = seen
+
+	if err := os.Remove(filepath.Join(dir, "00000.png")); err != nil {
+		t.Fatal(err)
+	}
+
+	newPath := filepath.Join(dir, "99999.png")
+	if err := os.WriteFile(newPath, []byte("x"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	var processed []string
+	watcher.Process = func(path string) Result {
+		processed = append(processed, path)
+		return Result{Name: filepath.Base(path), SourcePath: path}
+	}
+	watcher.tick()
+
+	if len(processed) != 1 || processed[0] != newPath {
+		t.Fatalf("processed = %v, want only %q", processed, newPath)
+	}
+}
+
+func TestAutoPhotoWatcherFullScanBaselineProcessesLateArrivingFile(t *testing.T) {
+	dir := t.TempDir()
+	for i := 0; i < 8; i++ {
+		path := filepath.Join(dir, fmt.Sprintf("%05d.png", i))
+		if err := os.WriteFile(path, []byte("x"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	watcher := AutoPhotoWatcher{
+		Config: Config{AutoPhoto: AutoPhotoConfig{PhotoDirectory: dir}},
+		Process: func(path string) Result {
+			return Result{Name: filepath.Base(path), SourcePath: path}
+		},
+	}
+	seen, status := scanPhotoFilesAllWithExcludesStatus(dir, nil)
+	if status.Error != "" {
+		t.Fatalf("unexpected scan status error: %s", status.Error)
+	}
+	watcher.seen = seen
+
+	newPath := filepath.Join(dir, "99999.png")
+	if err := os.WriteFile(newPath, []byte("x"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	var processed []string
+	watcher.Process = func(path string) Result {
+		processed = append(processed, path)
+		return Result{Name: filepath.Base(path), SourcePath: path}
+	}
+	watcher.tick()
+
+	if len(processed) != 1 || processed[0] != newPath {
+		t.Fatalf("processed = %v, want only %q", processed, newPath)
+	}
+}
+
 func TestAutoPhotoWatcherEmitsScanStatus(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "missing")
 	var events []AutoPhotoEvent

@@ -44,7 +44,7 @@ func (w *AutoPhotoWatcher) Run(ctx context.Context) {
 		w.Interval = 2 * time.Second
 	}
 	var status autoPhotoScanStatus
-	w.seen, status = scanPhotoFilesWithExcludesStatus(w.directory(), w.ExcludeDirectories)
+	w.seen, status = scanPhotoFilesAllWithExcludesStatus(w.directory(), w.ExcludeDirectories)
 	w.emitScanStatus(status)
 	ticker := time.NewTicker(w.Interval)
 	defer ticker.Stop()
@@ -59,7 +59,7 @@ func (w *AutoPhotoWatcher) Run(ctx context.Context) {
 }
 
 func (w *AutoPhotoWatcher) tick() {
-	current, status := scanPhotoFilesWithExcludesStatus(w.directory(), w.ExcludeDirectories)
+	current, status := scanPhotoFilesAllWithExcludesStatus(w.directory(), w.ExcludeDirectories)
 	w.emitScanStatus(status)
 	processed := 0
 	for _, path := range sortedPhotoPaths(current) {
@@ -175,6 +175,47 @@ func scanPhotoFilesLimitedWithStatus(dir string, maxFiles int) (map[string]time.
 
 func scanPhotoFilesWithExcludesStatus(dir string, excludes []string) (map[string]time.Time, autoPhotoScanStatus) {
 	return scanPhotoFilesLimitedWithExcludesStatus(dir, MaxAutoPhotoScanFiles, excludes)
+}
+
+func scanPhotoFilesAllWithExcludesStatus(dir string, excludes []string) (map[string]time.Time, autoPhotoScanStatus) {
+	files := make(map[string]time.Time)
+	if strings.TrimSpace(dir) == "" {
+		return files, autoPhotoScanStatus{Error: "自動投稿の監視フォルダが未設定です。"}
+	}
+	info, err := os.Stat(dir)
+	if err != nil {
+		return files, autoPhotoScanStatus{Error: fmt.Sprintf("自動投稿の監視フォルダを確認できません: %v", err)}
+	}
+	if !info.IsDir() {
+		return files, autoPhotoScanStatus{Error: "自動投稿の監視フォルダにファイルが指定されています。"}
+	}
+	status := autoPhotoScanStatus{}
+	root := cleanAbsPath(dir)
+	excludeDirs := cleanAbsPaths(excludes)
+	_ = filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			if status.Error == "" {
+				status.Error = fmt.Sprintf("自動投稿の監視フォルダを走査できません: %v", err)
+			}
+			return nil
+		}
+		if entry.IsDir() {
+			if shouldSkipAutoPhotoScanDir(root, path, excludeDirs) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !isSupportedPhotoPath(path) {
+			return nil
+		}
+		info, err := os.Stat(path)
+		if err != nil {
+			return nil
+		}
+		files[path] = info.ModTime()
+		return nil
+	})
+	return files, status
 }
 
 func scanPhotoFilesLimitedWithExcludesStatus(dir string, maxFiles int, excludes []string) (map[string]time.Time, autoPhotoScanStatus) {
