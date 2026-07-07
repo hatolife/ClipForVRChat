@@ -280,6 +280,13 @@ func prepareDiagnosticDataDirectory(configPath string, cfg appcore.Config, dataD
 			return manifest, err
 		}
 	}
+	for _, fileName := range []string{oscSendLogFileName, oscReceiveLogFileName} {
+		logPath := filepath.Join(appcore.DiagnosticLogDir(configPath), fileName)
+		name := filepath.Join("logs", fileName)
+		if err := add(name, logPath); err != nil {
+			return manifest, err
+		}
+	}
 	manifestData, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
 		return manifest, err

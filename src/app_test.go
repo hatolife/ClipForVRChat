@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
@@ -637,14 +638,14 @@ func TestOSCForwarderSkipsSelfTarget(t *testing.T) {
 
 func TestAppOSCLogEntriesAreBounded(t *testing.T) {
 	app := NewApp(filepath.Join(t.TempDir(), "config.json"), appcore.UIState{Mode: appcore.ModeResults})
-	for i := 0; i < 550; i++ {
+	for i := 0; i < maxOSCLogEntries+50; i++ {
 		app.recordOSCLogEvent(OSCLogEntry{Direction: "receive", Address: fmt.Sprintf("/test/%d", i)})
 	}
 	got := app.GetOSCLogEntries()
-	if len(got) != 500 {
-		t.Fatalf("entries = %d, want 500", len(got))
+	if len(got) != maxOSCLogEntries {
+		t.Fatalf("entries = %d, want %d", len(got), maxOSCLogEntries)
 	}
-	if got[0].Address != "/test/50" || got[len(got)-1].Address != "/test/549" {
+	if got[0].Address != "/test/50" || got[len(got)-1].Address != "/test/1049" {
 		t.Fatalf("unexpected ring contents: first=%q last=%q", got[0].Address, got[len(got)-1].Address)
 	}
 }
@@ -652,13 +653,13 @@ func TestAppOSCLogEntriesAreBounded(t *testing.T) {
 func TestAppOSCSendLogEntriesAreSeparateFromReceiveLog(t *testing.T) {
 	app := NewApp(filepath.Join(t.TempDir(), "config.json"), appcore.UIState{Mode: appcore.ModeSettings})
 	app.recordOSCLogEvent(OSCLogEntry{Direction: "send", Address: "/avatar/parameters/debug", Target: "127.0.0.1:9000"})
-	for i := 0; i < 550; i++ {
+	for i := 0; i < maxOSCLogEntries+50; i++ {
 		app.recordOSCLogEvent(OSCLogEntry{Direction: "receive", Address: fmt.Sprintf("/test/%d", i)})
 	}
 
 	receiveLog := app.GetOSCLogEntries()
-	if len(receiveLog) != 500 {
-		t.Fatalf("receive entries = %d, want 500", len(receiveLog))
+	if len(receiveLog) != maxOSCLogEntries {
+		t.Fatalf("receive entries = %d, want %d", len(receiveLog), maxOSCLogEntries)
 	}
 	for _, entry := range receiveLog {
 		if entry.Direction == "send" {
@@ -1585,6 +1586,69 @@ func TestCreateEncryptedDiagnosticPackageEncryptsZip(t *testing.T) {
 	}
 }
 
+func TestAppPersistsOSCLogsAsSeparateLatestThousandJSON(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+
+	for i := 0; i < maxOSCLogEntries+5; i++ {
+		app.recordOSCLogEvent(OSCLogEntry{
+			Direction: "receive",
+			Address:   fmt.Sprintf("/receive/%d", i),
+			TypeTags:  ",i",
+			Values:    fmt.Sprintf("%d", i),
+			Remote:    "127.0.0.1:9001",
+			Status:    "ok",
+		})
+		app.recordOSCLogEvent(OSCLogEntry{
+			Direction: "send",
+			Address:   fmt.Sprintf("/send/%d", i),
+			TypeTags:  ",i",
+			Values:    fmt.Sprintf("%d", i),
+			Target:    "127.0.0.1:9000",
+			Status:    "ok",
+		})
+	}
+
+	app.mu.Lock()
+	app.flushOSCLogFilesLocked()
+	app.mu.Unlock()
+
+	receiveEntries := readOSCLogEntriesFile(t, filepath.Join(appcore.DiagnosticLogDir(configPath), oscReceiveLogFileName))
+	if len(receiveEntries) != maxOSCLogEntries {
+		t.Fatalf("receive entries = %d, want %d", len(receiveEntries), maxOSCLogEntries)
+	}
+	if receiveEntries[0].Address != "/receive/5" || receiveEntries[len(receiveEntries)-1].Address != "/receive/1004" {
+		t.Fatalf("receive addresses = first %q last %q, want latest 1000", receiveEntries[0].Address, receiveEntries[len(receiveEntries)-1].Address)
+	}
+	if receiveEntries[0].Direction != "receive" || receiveEntries[0].Remote == "" {
+		t.Fatalf("receive entry = %+v, want receive direction and remote", receiveEntries[0])
+	}
+
+	sendEntries := readOSCLogEntriesFile(t, filepath.Join(appcore.DiagnosticLogDir(configPath), oscSendLogFileName))
+	if len(sendEntries) != maxOSCLogEntries {
+		t.Fatalf("send entries = %d, want %d", len(sendEntries), maxOSCLogEntries)
+	}
+	if sendEntries[0].Address != "/send/5" || sendEntries[len(sendEntries)-1].Address != "/send/1004" {
+		t.Fatalf("send addresses = first %q last %q, want latest 1000", sendEntries[0].Address, sendEntries[len(sendEntries)-1].Address)
+	}
+	if sendEntries[0].Direction != "send" || sendEntries[0].Target == "" {
+		t.Fatalf("send entry = %+v, want send direction and target", sendEntries[0])
+	}
+}
+
+func readOSCLogEntriesFile(t *testing.T, path string) []OSCLogEntry {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var entries []OSCLogEntry
+	if err := json.Unmarshal(data, &entries); err != nil {
+		t.Fatal(err)
+	}
+	return entries
+}
+
 func TestEncryptZipFileWithPublicKey(t *testing.T) {
 	dir := t.TempDir()
 	zipPath := filepath.Join(dir, "sample.zip")
@@ -1644,6 +1708,16 @@ func TestDiagnosticZipDoesNotIncludeOutputImages(t *testing.T) {
 		t.Fatal(err)
 	}
 	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(configPath), "test log")
+	logDir := appcore.DiagnosticLogDir(configPath)
+	if err := os.MkdirAll(logDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := appcore.WritePrivateFile(filepath.Join(logDir, oscSendLogFileName), []byte(`[{"direction":"send","address":"/send"}]`+"\n")); err != nil {
+		t.Fatal(err)
+	}
+	if err := appcore.WritePrivateFile(filepath.Join(logDir, oscReceiveLogFileName), []byte(`[{"direction":"receive","address":"/receive"}]`+"\n")); err != nil {
+		t.Fatal(err)
+	}
 	zipData, _, err := buildDiagnosticZip(configPath, cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -1653,7 +1727,11 @@ func TestDiagnosticZipDoesNotIncludeOutputImages(t *testing.T) {
 		t.Fatalf("plain diagnostic zip is invalid: %v", err)
 	}
 	entries := zipEntryNames(plainZip.File)
-	for _, want := range []string{"logs/" + filepath.Base(appcore.DiagnosticLogPath(configPath))} {
+	for _, want := range []string{
+		"logs/" + filepath.Base(appcore.DiagnosticLogPath(configPath)),
+		"logs/" + oscSendLogFileName,
+		"logs/" + oscReceiveLogFileName,
+	} {
 		if !entries[want] {
 			t.Fatalf("zip entries = %+v, missing %s", entries, want)
 		}

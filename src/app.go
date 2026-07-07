@@ -29,6 +29,13 @@ var (
 	runningGoTest         = isGoTestBinary(os.Args[0])
 )
 
+const (
+	maxOSCLogEntries      = 1000
+	oscLogPersistInterval = time.Second
+	oscSendLogFileName    = "osc_send.json"
+	oscReceiveLogFileName = "osc_recieve.json"
+)
+
 func appBoolConfigPtr(value bool) *bool {
 	return &value
 }
@@ -71,6 +78,10 @@ type App struct {
 	oscSendLogSeq         uint64
 	oscLogLastEmit        time.Time
 	oscSendLogLastEmit    time.Time
+	oscLogDirty           bool
+	oscSendLogDirty       bool
+	oscLogLastWrite       time.Time
+	oscSendLogLastWrite   time.Time
 	oscTraceCleanup       func()
 	settingsDraftDirty    bool
 	allowClose            bool
@@ -209,6 +220,7 @@ func (a *App) shutdown(ctx context.Context) {
 	a.logLifecycleLocked("shutdown begin: auto_capture_osc=%t auto_photo=%t", a.oscCancel != nil, a.autoCancel != nil)
 	a.stopBackgroundTasksLocked()
 	a.stopOSCTraceLocked()
+	a.flushOSCLogFilesLocked()
 	if err := appcore.CleanupEmbeddedSpoutHelperCache(); err != nil {
 		a.logLifecycleLocked("spout helper cache cleanup failed: %v", err)
 	} else {
@@ -436,6 +448,7 @@ func trustedExternalURL(rawURL string) (string, error) {
 func (a *App) CreateEncryptedDiagnosticPackage() (string, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	a.flushOSCLogFilesLocked()
 	path, err := createEncryptedDiagnosticPackage(a.configPath, a.state.Config)
 	if err != nil {
 		a.logUserActionLocked("diagnostic_package_failed", err.Error())
@@ -2312,10 +2325,11 @@ func (a *App) recordOSCLogEventLocked(entry OSCLogEntry) {
 		entry.Status = "ok"
 	}
 	a.oscLogEntries = append(a.oscLogEntries, entry)
-	const maxOSCLogEntries = 500
 	if len(a.oscLogEntries) > maxOSCLogEntries {
 		a.oscLogEntries = append([]OSCLogEntry(nil), a.oscLogEntries[len(a.oscLogEntries)-maxOSCLogEntries:]...)
 	}
+	a.oscLogDirty = true
+	a.writeOSCLogFileLocked(false)
 	if a.ctx == nil || runningGoTest {
 		return
 	}
@@ -2337,10 +2351,11 @@ func (a *App) recordOSCSendLogEventLocked(entry OSCLogEntry) {
 		entry.Status = "ok"
 	}
 	a.oscSendLogEntries = append(a.oscSendLogEntries, entry)
-	const maxOSCSendLogEntries = 500
-	if len(a.oscSendLogEntries) > maxOSCSendLogEntries {
-		a.oscSendLogEntries = append([]OSCLogEntry(nil), a.oscSendLogEntries[len(a.oscSendLogEntries)-maxOSCSendLogEntries:]...)
+	if len(a.oscSendLogEntries) > maxOSCLogEntries {
+		a.oscSendLogEntries = append([]OSCLogEntry(nil), a.oscSendLogEntries[len(a.oscSendLogEntries)-maxOSCLogEntries:]...)
 	}
+	a.oscSendLogDirty = true
+	a.writeOSCSendLogFileLocked(false)
 	if a.ctx == nil || runningGoTest {
 		return
 	}
@@ -2350,6 +2365,57 @@ func (a *App) recordOSCSendLogEventLocked(entry OSCLogEntry) {
 	}
 	a.oscSendLogLastEmit = now
 	emitWailsEvent(a.ctx, "osc-send-log:entries", append([]OSCLogEntry(nil), a.oscSendLogEntries...))
+}
+
+func (a *App) flushOSCLogFilesLocked() {
+	a.writeOSCLogFileLocked(true)
+	a.writeOSCSendLogFileLocked(true)
+}
+
+func (a *App) writeOSCLogFileLocked(force bool) {
+	a.writeOSCLogEntriesFileLocked(force, false, oscReceiveLogFileName, a.oscLogEntries, &a.oscLogDirty, &a.oscLogLastWrite)
+}
+
+func (a *App) writeOSCSendLogFileLocked(force bool) {
+	a.writeOSCLogEntriesFileLocked(force, true, oscSendLogFileName, a.oscSendLogEntries, &a.oscSendLogDirty, &a.oscSendLogLastWrite)
+}
+
+func (a *App) writeOSCLogEntriesFileLocked(force bool, send bool, fileName string, entries []OSCLogEntry, dirty *bool, lastWrite *time.Time) {
+	if dirty == nil || lastWrite == nil {
+		return
+	}
+	if !*dirty && !(force && len(entries) > 0) {
+		return
+	}
+	now := time.Now()
+	if !force && !lastWrite.IsZero() && now.Sub(*lastWrite) < oscLogPersistInterval {
+		return
+	}
+	*lastWrite = now
+	path := filepath.Join(appcore.DiagnosticLogDir(a.configPath), fileName)
+	if err := writeOSCLogEntriesFile(path, entries); err != nil {
+		kind := "receive"
+		if send {
+			kind = "send"
+		}
+		appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "osc %s log write error: path=%q err=%v", kind, path, err)
+		return
+	}
+	*dirty = false
+}
+
+func writeOSCLogEntriesFile(path string, entries []OSCLogEntry) error {
+	if strings.TrimSpace(path) == "" {
+		return nil
+	}
+	data, err := json.MarshalIndent(entries, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return err
+	}
+	return appcore.WritePrivateFile(path, append(data, '\n'))
 }
 
 func (a *App) recordDebugOSCLogResult(beforeSeq uint64, result appcore.DebugOSCSendResult, err error) {

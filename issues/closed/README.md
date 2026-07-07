@@ -219,3 +219,4 @@
 | 252 | [起動中にexeへドラッグしたファイルを既存インスタンスへ渡す](unreleased/252-forward-exe-drop-paths-to-running-instance.md) | 完了 | 未定 | 単一起動中に2つ目のexeへ渡されたファイル引数を既存インスタンスへ転送し、通常のドロップ処理で扱うようにした。 |
 | 253 | [不具合報告zipとgpgのファイル名に添付可否を付ける](unreleased/253-prefix-diagnostic-package-filenames.md) | 完了 | 未定 | 不具合報告用の暗号化前zipと添付用gpgのファイル名先頭に、添付可否が分かる文言を付けるようにした。 |
 | 254 | [不具合報告についての説明文を更新する](unreleased/254-rewrite-diagnostic-report-description.md) | 完了 | 未定 | 情報タブの不具合報告説明を、zip/gpgの役割、添付対象、公開鍵による手動暗号化案内が分かる文面へ更新した。 |
+| 255 | [OSC送受信ログを分けて保持し不具合報告zipに含める](unreleased/255-persist-osc-send-receive-logs-in-diagnostic-zip.md) | 完了 | 未定 | `logs/osc_send.json` と `logs/osc_recieve.json` に最新1000件のOSC送受信ログを保存し、診断zipへ含めるようにした。 |
