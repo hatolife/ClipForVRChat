@@ -48,6 +48,8 @@ const vueApp = createApp({
       latestReleaseUrl: 'https://github.com/hatolife/ClipForVRChat/releases/latest',
       boothUrl: 'https://hatolife.booth.pm/items/8531663',
       updateInfo: { available: false, currentVersion: '', currentReleaseTime: '', latestVersion: '', latestReleasePublished: '', url: '' },
+      startupShortcutStatus: { supported: false, enabled: false, shortcutName: 'ClipForVRChat.lnk', shortcutPath: '', currentTarget: '', currentExe: '', targetMatchesCurrentExe: false, error: '' },
+      startupShortcutUpdating: false,
       updateBannerDismissed: false,
       view: 'main',
       processing: false,
@@ -81,6 +83,7 @@ const vueApp = createApp({
       oscLogEntries: [],
       oscSendLogEntries: [],
       oscLogFilter: '',
+      avatarBeaconOSCExcludeRegex: '',
       oscLogUnsubscribe: null,
       oscSendLogUnsubscribe: null,
       debugOSCInput: '/avatar/parameters/debug true',
@@ -293,7 +296,7 @@ const vueApp = createApp({
         { id: 'osc', label: 'OSC' },
         { id: 'process', label: '処理' },
         { id: 'webhook', label: 'Discord投稿' },
-        { id: 'update', label: '更新' }
+        { id: 'other', label: 'その他' }
       ]
     },
     shouldShowUpdateBanner() {
@@ -405,6 +408,8 @@ const vueApp = createApp({
       this.info = await api.GetAppInfo()
       this.setStartupStatus('初期状態を取得しています。')
       this.state = await api.GetInitialState()
+      await this.refreshAvatarBeaconOSCExcludeRegex()
+      await this.refreshStartupShortcutStatus()
       if (this.isSettings) {
         this.rememberSettingsBaseline()
       }
@@ -541,7 +546,7 @@ const vueApp = createApp({
       if (path.startsWith('output.saveLocal') || path.startsWith('output.local') || path.startsWith('output.detectQrCodeUrls')) return '処理結果'
       if (path.startsWith('autoPhoto.')) return 'VRChat写真自動処理'
       if (path.startsWith('screenshotAutoPost.')) return 'スクリーンショット自動処理'
-      if (path.startsWith('update.')) return '更新確認'
+      if (path.startsWith('update.')) return 'その他 更新確認'
       if (path.startsWith('autoCapture.osc.')) return '自動撮影 OSC'
       if (path.startsWith('autoCapture.capture.preplacedLocalAnchor')) return 'フォールバックモード'
       if (path.startsWith('autoCapture.capture.')) return '自動撮影 撮影方式'
@@ -570,6 +575,21 @@ const vueApp = createApp({
     },
     settingRowChangedClass(...prefixes) {
       return { 'unsaved-setting-row': this.settingChanged(...prefixes) }
+    },
+    settingTabChanged(tabId) {
+      if (tabId === 'autoCapture') {
+        return this.changedSettingPathList().some((path) => path.startsWith('autoCapture.') && !path.startsWith('autoCapture.osc.') && !path.startsWith('autoCapture.playerLocal.'))
+      }
+      const prefixesByTab = {
+        feature: ['autoPhoto.', 'screenshotAutoPost.', 'output.saveLocal', 'output.detectQrCodeUrls'],
+        osc: ['autoCapture.osc.', 'autoCapture.playerLocal.'],
+        process: ['image.', 'output.local', 'output.saveLocal', 'output.detectQrCodeUrls'],
+        webhook: ['discord.', 'output.uploadDiscord', 'output.copySingleUrlToClipboard', 'autoPhoto.webhookUrl', 'screenshotAutoPost.webhookUrl', 'autoCapture.discord.'],
+        other: ['update.']
+      }
+      const prefixes = prefixesByTab[tabId] || []
+      const paths = this.changedSettingPathList()
+      return paths.some((path) => prefixes.some((prefix) => path === prefix.replace(/\.$/, '') || path.startsWith(prefix)))
     },
     rememberSettingsBaseline() {
       this.settingsBaseline = this.serializeSettings(this.state.settingsBaselineConfig || this.state.config)
@@ -1751,6 +1771,51 @@ const vueApp = createApp({
         }
       }
     },
+    async refreshAvatarBeaconOSCExcludeRegex() {
+      if (!api?.GetAvatarBeaconOSCExcludeRegex) {
+        this.avatarBeaconOSCExcludeRegex = '^(?!.*(?:/avatar/parameters/)?avatar_beacon/(?:coord|forward)/(?:x|y|z)(?:Sign)?(?:\\s|\\||$)).*$'
+        return
+      }
+      try {
+        this.avatarBeaconOSCExcludeRegex = await api.GetAvatarBeaconOSCExcludeRegex()
+      } catch {
+        this.avatarBeaconOSCExcludeRegex = '^(?!.*(?:/avatar/parameters/)?avatar_beacon/(?:coord|forward)/(?:x|y|z)(?:Sign)?(?:\\s|\\||$)).*$'
+      }
+    },
+    async applyAvatarBeaconExcludeOSCFilter() {
+      await this.refreshAvatarBeaconOSCExcludeRegex()
+      this.oscLogFilter = this.avatarBeaconOSCExcludeRegex
+    },
+    async refreshStartupShortcutStatus() {
+      if (!api?.GetStartupShortcutStatus) return
+      try {
+        this.startupShortcutStatus = await api.GetStartupShortcutStatus()
+      } catch (err) {
+        this.startupShortcutStatus = {
+          ...this.startupShortcutStatus,
+          supported: false,
+          enabled: false,
+          error: startupErrorMessage(err)
+        }
+      }
+    },
+    async setStartupShortcutEnabled(event) {
+      const enabled = Boolean(event?.target?.checked)
+      if (!api?.SetStartupShortcutEnabled || this.startupShortcutUpdating) {
+        await this.refreshStartupShortcutStatus()
+        return
+      }
+      this.startupShortcutUpdating = true
+      this.error = ''
+      try {
+        this.startupShortcutStatus = await api.SetStartupShortcutEnabled(enabled)
+      } catch (err) {
+        this.error = startupErrorMessage(err)
+        await this.refreshStartupShortcutStatus()
+      } finally {
+        this.startupShortcutUpdating = false
+      }
+    },
     startOSCLogEventSubscription() {
       if (!window.runtime?.EventsOn) return
       if (!this.oscLogUnsubscribe) {
@@ -2213,7 +2278,7 @@ const vueApp = createApp({
                 type="button"
                 role="tab"
                 :aria-selected="settingsTab === tab.id"
-                :class="{ active: settingsTab === tab.id }"
+                :class="{ active: settingsTab === tab.id, 'unsaved-setting-tab': settingTabChanged(tab.id) }"
                 :title="tab.label + '設定を開く'"
                 @click="selectSettingsTab(tab.id)"
               >{{ tab.label }}</button>
@@ -2227,15 +2292,15 @@ const vueApp = createApp({
 
           <section v-if="settingsTab === 'feature'" class="settings-group" role="tabpanel">
             <h3>機能</h3>
-            <div class="setting-row">
+            <div class="setting-row" :class="settingRowChangedClass('autoPhoto.enabled')">
               <div><strong>VRChat写真自動処理</strong><p>VRChat上で撮影されたときに処理します。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.autoPhoto.enabled" /><span></span></label>
             </div>
-            <div class="setting-row">
+            <div class="setting-row" :class="settingRowChangedClass('screenshotAutoPost.enabled')">
               <div><strong>スクリーンショット自動処理</strong><p>Win + Shift + Sでスクリーンショットが撮られたときに処理します。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.screenshotAutoPost.enabled" /><span></span></label>
             </div>
-            <div class="setting-row">
+            <div class="setting-row" :class="settingRowChangedClass('output.detectQrCodeUrls')">
               <div><strong>QRコードURL検出</strong><p>画像内のQRコードからURLを取得します。取得したURLはDiscord本文と結果画面に表示します。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.output.detectQrCodeUrls" /><span></span></label>
             </div>
@@ -2605,7 +2670,7 @@ const vueApp = createApp({
                 <button type="button" class="secondary" title="構図設定の詳細画面を開きます。" aria-label="構図設定の詳細設定" @click="openAutoCaptureDetail('composition')">詳細設定</button>
               </div>
             </div>
-            <div class="setting-row">
+            <div class="setting-row" :class="settingRowChangedClass('autoCapture.schedule')">
               <div>
                 <strong>自動撮影スケジュール</strong>
                 <p>一定間隔でVRChatカメラ撮影を実行します。</p>
@@ -2615,7 +2680,7 @@ const vueApp = createApp({
                 <button type="button" class="secondary" :title="autoCaptureSettings.schedule.enabled ? '撮影間隔、初回待機時間、開始時撮影を設定します。' : '自動撮影スケジュールをONにすると詳細設定を開けます。'" aria-label="自動撮影スケジュールの詳細設定" :disabled="!autoCaptureSettings.schedule.enabled" @click="openAutoCaptureDetail('schedule')">詳細設定</button>
               </div>
             </div>
-            <div class="setting-row">
+            <div class="setting-row" :class="settingRowChangedClass('autoCapture.capture.mode')">
               <div><strong>撮影方式</strong><p>Stream方式ではVRChatのStream Cameraで動画を撮り、画像として保存します。<br />Photo方式はVRChatの標準カメラを使います。撮影時にシャッター音が鳴ります。</p></div>
               <label>
                 <select v-model="autoCaptureSettings.capture.mode">
@@ -2624,7 +2689,7 @@ const vueApp = createApp({
                 </select>
               </label>
             </div>
-            <div class="setting-row">
+            <div class="setting-row" :class="settingRowChangedClass('autoCapture.stream', 'autoCapture.output', 'autoCapture.capture.concurrentMode', 'autoCapture.capture.requestedCameraCount')">
               <div>
                 <strong>撮影・出力</strong>
                 <p>Spout helper、sender、Stream取得、録画デバッグ、保存先、ファイル名を設定します。</p>
@@ -2633,7 +2698,7 @@ const vueApp = createApp({
                 <button type="button" class="secondary" title="撮影と出力の詳細設定を開きます。" aria-label="撮影と出力の詳細設定" @click="openAutoCaptureDetail('capture')">詳細設定</button>
               </div>
             </div>
-            <div class="setting-row">
+            <div class="setting-row" :class="settingRowChangedClass('autoCapture.output', 'autoCapture.presence', 'autoCapture.discord', 'autoCapture.restore')">
               <div>
                 <strong>保存・投稿・復元</strong>
                 <p>sidecar、画像メタデータ、同席ユーザー情報、Discord投稿、撮影後復元を設定します。</p>
@@ -2697,7 +2762,7 @@ const vueApp = createApp({
                 </p>
               </div>
             </div>
-            <div class="setting-row" :class="{ disabled: autoCaptureSettings.playerLocal.basisSource !== 'avatar_osc' }">
+            <div class="setting-row" :class="[{ disabled: autoCaptureSettings.playerLocal.basisSource !== 'avatar_osc' }, settingRowChangedClass('autoCapture.playerLocal.avatarOsc')]">
               <div><strong>AvatarBeacon受信状態</strong><p>Hips基準position、Head基準yaw、最終受信、エラーを表示します。</p></div>
               <div class="settings-control-stack">
                 <div class="inline-actions">
@@ -2750,7 +2815,10 @@ const vueApp = createApp({
                   <h4>OSC受信ログ</h4>
                   <p>受信とforwardの一時ログです。通常の診断ログファイルには保存されません。</p>
                 </div>
-                <button type="button" class="secondary" @click="copyVisibleOSCLog" :disabled="filteredOSCLogEntries.length === 0" :title="filteredOSCLogEntries.length === 0 ? 'コピーできるOSCログがありません' : '表示中のOSCログをコピーする'">表示中ログをコピー</button>
+                <div class="inline-actions">
+                  <button type="button" class="secondary" @click="applyAvatarBeaconExcludeOSCFilter" title="AvatarBeacon basis parameter以外だけを表示する正規表現フィルタを適用する">AvatarBeacon以外</button>
+                  <button type="button" class="secondary" @click="copyVisibleOSCLog" :disabled="filteredOSCLogEntries.length === 0" :title="filteredOSCLogEntries.length === 0 ? 'コピーできるOSCログがありません' : '表示中のOSCログをコピーする'">表示中ログをコピー</button>
+                </div>
               </div>
               <label>
                 <small>正規表現フィルタ</small>
@@ -2787,7 +2855,7 @@ const vueApp = createApp({
               <div class="osc-log-header">
                 <div>
                   <h4>OSCデバッグ送信</h4>
-                  <p>現在のVRChat OSC送信先へ任意のOSCを送信します。例: /avatar/parameters/debug true、/usercamera/Zoom f:60、/avatar/parameters/count i:3</p>
+                  <p>現在のVRChat OSC送信先へ任意のOSCを送信します。<br />例: /chatbox/input test</p>
                 </div>
               </div>
               <div class="osc-debug-send">
@@ -2804,18 +2872,18 @@ const vueApp = createApp({
 
           <section v-if="settingsTab === 'process'" class="settings-group" role="tabpanel">
             <h3>処理</h3>
-            <div class="setting-row">
+            <div class="setting-row" :class="settingRowChangedClass('output.uploadDiscord')">
               <div><strong>ローカル保存</strong><p>処理した画像をローカルに保存します。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.output.saveLocal" /><span></span></label>
             </div>
-            <div class="setting-row" :class="{ disabled: !state.config.output.saveLocal }">
+            <div class="setting-row" :class="[{ disabled: !state.config.output.saveLocal }, settingRowChangedClass('image.outputDirectory')]">
               <div><strong>出力先フォルダ</strong><p>ローカル保存時の保存先です。初期値はアプリと同じ場所にある output フォルダです。</p></div>
               <div class="input-with-button">
                 <input v-model="state.config.image.outputDirectory" @blur="sanitizeOutputDirectory" placeholder="./output" :disabled="!state.config.output.saveLocal" />
                 <button class="secondary" @click="chooseOutputDirectory" :disabled="!state.config.output.saveLocal" :title="state.config.output.saveLocal ? '出力先フォルダを選ぶ' : 'ローカル保存をONにすると選べます'">選択</button>
               </div>
             </div>
-            <div class="setting-row" :class="{ disabled: !state.config.output.saveLocal }">
+            <div class="setting-row" :class="[{ disabled: !state.config.output.saveLocal }, settingRowChangedClass('image.suffix')]">
               <div>
                 <strong>ファイル名サフィックス</strong>
                 <p>ローカル保存時のファイル名末尾に付ける文字です。</p>
@@ -2825,7 +2893,7 @@ const vueApp = createApp({
                 <input v-model="state.config.image.suffix" :disabled="!state.config.output.saveLocal" />
               </label>
             </div>
-            <div class="setting-row" :class="{ disabled: !state.config.output.saveLocal }">
+            <div class="setting-row" :class="[{ disabled: !state.config.output.saveLocal }, settingRowChangedClass('image.outputFormat')]">
               <div><strong>出力形式</strong><p>保存または投稿に使う画像形式です。PNGは画質を保ちやすく、JPGは写真向きです。</p></div>
               <label>
                 <select v-model="state.config.image.outputFormat" :disabled="!state.config.output.saveLocal">
@@ -2834,7 +2902,7 @@ const vueApp = createApp({
                 </select>
               </label>
             </div>
-            <div class="setting-row" :class="{ disabled: !state.config.output.saveLocal || !isJpegOutput }">
+            <div class="setting-row" :class="[{ disabled: !state.config.output.saveLocal || !isJpegOutput }, settingRowChangedClass('image.jpegQuality')]">
               <div><strong>JPEG品質</strong><p>{{ state.config.output.saveLocal && isJpegOutput ? 'JPG出力時の画質です。数字が大きいほど高画質です。' : 'ローカル保存OFFまたはPNG出力では使用しません。' }}</p></div>
               <label>
                 <input type="number" min="1" max="100" v-model.number="state.config.image.jpegQuality" :disabled="!state.config.output.saveLocal || !isJpegOutput" />
@@ -2842,13 +2910,26 @@ const vueApp = createApp({
             </div>
           </section>
 
-          <section v-if="settingsTab === 'update'" class="settings-group" role="tabpanel">
-            <h3>更新</h3>
+          <section v-if="settingsTab === 'other'" class="settings-group" role="tabpanel">
+            <h3>その他</h3>
             <div class="setting-row">
+              <div>
+                <strong>PC起動時に自動起動</strong>
+                <p>WindowsのStartupフォルダへ固定名のショートカットを作成します。ON/OFF切り替え時は既存の {{ startupShortcutStatus.shortcutName || 'ClipForVRChat.lnk' }} を削除してから反映します。</p>
+                <p v-if="startupShortcutStatus.shortcutPath" class="setting-note">ショートカット: {{ startupShortcutStatus.shortcutPath }}</p>
+                <p v-if="startupShortcutStatus.enabled && !startupShortcutStatus.targetMatchesCurrentExe && startupShortcutStatus.currentTarget" class="setting-note warning">現在のショートカットは別のexeを指しています。ONに切り替えるとこのexeへ張り直します。</p>
+                <p v-if="startupShortcutStatus.error" class="setting-note warning">{{ startupShortcutStatus.error }}</p>
+              </div>
+              <label class="switch">
+                <input type="checkbox" :checked="startupShortcutStatus.enabled" :disabled="startupShortcutUpdating || startupShortcutStatus.supported === false" @change="setStartupShortcutEnabled" />
+                <span></span>
+              </label>
+            </div>
+            <div class="setting-row" :class="settingRowChangedClass('update.checkEnabled')">
               <div><strong>更新確認</strong><p>起動時にGitHub Releasesを確認し、新しいバージョンがあるか調べます。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.update.checkEnabled" /><span></span></label>
             </div>
-            <div class="setting-row" :class="{ disabled: !state.config.update.checkEnabled }">
+            <div class="setting-row" :class="[{ disabled: !state.config.update.checkEnabled }, settingRowChangedClass('update.notificationEnabled')]">
               <div><strong>更新通知</strong><p>新しいバージョンが見つかったとき、画面上部に通知を表示します。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.update.notificationEnabled" :disabled="!state.config.update.checkEnabled" /><span></span></label>
             </div>
@@ -2860,11 +2941,11 @@ const vueApp = createApp({
               <div><strong>Discord投稿</strong><p>縮小した画像をDiscord Webhookへ投稿し、VRChatで使うURLを取得します。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.output.uploadDiscord" /><span></span></label>
             </div>
-            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord }">
+            <div class="setting-row" :class="[{ disabled: !state.config.output.uploadDiscord }, settingRowChangedClass('output.copySingleUrlToClipboard')]">
               <div><strong>投稿URLの自動コピー</strong><p>Discordに投稿したURLをクリップボードに保存します。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.output.copySingleUrlToClipboard" :disabled="!state.config.output.uploadDiscord" /><span></span></label>
             </div>
-            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord }">
+            <div class="setting-row" :class="[{ disabled: !state.config.output.uploadDiscord }, settingRowChangedClass('discord.webhookUrl')]">
               <div>
                 <strong>通常投稿用Webhook URL</strong>
                 <p>Discordの投稿先チャンネルでWebhookを作成し、そのURLを貼り付けます。空の時は投稿できません。</p>
@@ -2874,21 +2955,21 @@ const vueApp = createApp({
               <input type="password" v-model="state.config.discord.webhookUrl" placeholder="https://discord.com/api/webhooks/..." :disabled="!state.config.output.uploadDiscord" :class="{ 'attention-input': shouldWarnMissingPrimaryWebhook() }" />
               </label>
             </div>
-            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord || !state.config.autoPhoto.enabled }">
+            <div class="setting-row" :class="[{ disabled: !state.config.output.uploadDiscord || !state.config.autoPhoto.enabled }, settingRowChangedClass('autoPhoto.webhookUrl')]">
               <div><strong>VRChat写真用Webhook URL</strong><p>通常投稿とは別の投稿先にしたい場合だけ入力します。空の場合は通常投稿用Webhook URLへ投稿します。</p></div>
               <label>
                 <input type="password" v-model="state.config.autoPhoto.webhookUrl" placeholder="空なら通常投稿用Webhook URLを使用" :disabled="!state.config.output.uploadDiscord || !state.config.autoPhoto.enabled" />
                 <p v-if="state.config.output.uploadDiscord && state.config.autoPhoto.enabled" :class="['setting-note', webhookFallbackNoteClass(state.config.autoPhoto.webhookUrl, state.config.autoPhoto.enabled)]">{{ webhookFallbackNote(state.config.autoPhoto.webhookUrl, state.config.autoPhoto.enabled) }}</p>
               </label>
             </div>
-            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord || !state.config.screenshotAutoPost.enabled }">
+            <div class="setting-row" :class="[{ disabled: !state.config.output.uploadDiscord || !state.config.screenshotAutoPost.enabled }, settingRowChangedClass('screenshotAutoPost.webhookUrl')]">
               <div><strong>スクリーンショット用Webhook URL</strong><p>通常投稿とは別の投稿先にしたい場合だけ入力します。空の場合は通常投稿用Webhook URLへ投稿します。</p></div>
               <label>
                 <input type="password" v-model="state.config.screenshotAutoPost.webhookUrl" placeholder="空なら通常投稿用Webhook URLを使用" :disabled="!state.config.output.uploadDiscord || !state.config.screenshotAutoPost.enabled" />
                 <p v-if="state.config.output.uploadDiscord && state.config.screenshotAutoPost.enabled" :class="['setting-note', webhookFallbackNoteClass(state.config.screenshotAutoPost.webhookUrl, state.config.screenshotAutoPost.enabled)]">{{ webhookFallbackNote(state.config.screenshotAutoPost.webhookUrl, state.config.screenshotAutoPost.enabled) }}</p>
               </label>
             </div>
-            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord || !state.config.autoCapture.discord.enabled }">
+            <div class="setting-row" :class="[{ disabled: !state.config.output.uploadDiscord || !state.config.autoCapture.discord.enabled }, settingRowChangedClass('autoCapture.discord.webhookUrl')]">
               <div><strong>自動撮影用Webhook URL</strong><p>通常投稿とは別の投稿先にしたい場合だけ入力します。空の場合は通常投稿用Webhook URLへ投稿します。</p></div>
               <label>
                 <input type="password" v-model="state.config.autoCapture.discord.webhookUrl" placeholder="空なら通常投稿用Webhook URLを使用" :disabled="!state.config.output.uploadDiscord || !state.config.autoCapture.discord.enabled" />

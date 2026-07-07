@@ -918,6 +918,31 @@ func TestAppAvatarOSCBasisAddressAffectsBasisOnlyForConfiguredAxes(t *testing.T)
 	}
 }
 
+func TestAppAvatarBeaconOSCExcludeRegexTracksBasisAddresses(t *testing.T) {
+	app := NewApp(filepath.Join(t.TempDir(), "config.json"), appcore.UIState{Mode: appcore.ModeResults, Config: appcore.DefaultConfig()})
+	pattern := app.GetAvatarBeaconOSCExcludeRegex()
+
+	for _, want := range []string{
+		"avatar_beacon/coord/x",
+		"/avatar/parameters/avatar_beacon/coord/x",
+		"avatar_beacon/forward/zSign",
+		"/avatar/parameters/avatar_beacon/forward/zSign",
+	} {
+		if !strings.Contains(pattern, want) {
+			t.Fatalf("AvatarBeacon exclude regex = %q, want %q", pattern, want)
+		}
+	}
+	for _, unwanted := range []string{
+		"GestureLeft",
+		"/usercamera/Pose",
+		"avatar_beacon/debug",
+	} {
+		if strings.Contains(pattern, unwanted) {
+			t.Fatalf("AvatarBeacon exclude regex = %q, should not include %q", pattern, unwanted)
+		}
+	}
+}
+
 func TestAppFormatAvatarOSCBasisValuesOmitsDebugPing(t *testing.T) {
 	app := NewApp(filepath.Join(t.TempDir(), "config.json"), appcore.UIState{Mode: appcore.ModeResults})
 	cfg := appcore.DefaultConfig()
@@ -968,11 +993,25 @@ func TestAppAvatarOSCBasisStatusSupportsMainWithoutSignParameters(t *testing.T) 
 	}
 }
 
-func TestAvatarOSCBasisAddressSchemeDoesNotFallbackToLegacyCoordForward(t *testing.T) {
-	scheme, positionRoot, forwardRoot, signSuffix := avatarOSCBasisAddressScheme("coord")
+func TestAppAvatarOSCBasisStatusMigratesLegacyCoordPrefixToAvatarBeacon(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+	now := time.Date(2026, 7, 7, 12, 0, 0, 0, time.UTC)
+	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
+	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC = appcore.DefaultConfig().AutoCapture.PlayerLocal.AvatarOSC
+	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix = "coord"
+	app.avatarOSCBasisSamples = map[string]avatarOSCBasisSample{
+		"avatar_beacon/coord/x":   {Float: 0.75, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/coord/y":   {Float: 0.25, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/coord/z":   {Float: 0.5, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/forward/x": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/forward/y": {Float: 0.5, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/forward/z": {Float: 0.5, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+	}
 
-	if scheme != "custom" || positionRoot != "coord/p" || forwardRoot != "coord/f" || signSuffix != "Sign" {
-		t.Fatalf("scheme = %q %q %q %q, want custom coord/p coord/f Sign", scheme, positionRoot, forwardRoot, signSuffix)
+	got := app.latestAvatarOSCBasisSnapshotLocked(app.state.Config, now)
+	if got.Status != "ready" || got.ParameterPrefix != "avatar_beacon" {
+		t.Fatalf("snapshot = %+v, want ready with migrated avatar_beacon prefix", got)
 	}
 }
 
@@ -1004,6 +1043,33 @@ func TestFormatOSCLogValuesIncludesUnsupportedAndRemainingPayload(t *testing.T) 
 			t.Fatalf("formatOSCLogValues = %q, want %q", got, want)
 		}
 	}
+}
+
+func TestAppLogsAvatarBeaconVersionOSCOncePerVersion(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	logPath := appcore.DiagnosticLogPath(configPath)
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+	payload := oscStringPayloadForTest("v0.1.8-b8")
+
+	app.logAvatarBeaconVersionOSC(logPath, "/avatar/parameters/AvatarBeacon/version", ",s", payload)
+	app.logAvatarBeaconVersionOSC(logPath, "/avatar/parameters/AvatarBeacon/version", ",s", payload)
+
+	text, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(text)
+	if strings.Count(got, "avatarbeacon version osc received") != 1 || !strings.Contains(got, `version="v0.1.8-b8"`) {
+		t.Fatalf("log = %q, want one AvatarBeacon version entry", got)
+	}
+}
+
+func oscStringPayloadForTest(value string) []byte {
+	payload := append([]byte(value), 0)
+	for len(payload)%4 != 0 {
+		payload = append(payload, 0)
+	}
+	return payload
 }
 
 func TestHexPreviewTruncatesLongPayload(t *testing.T) {

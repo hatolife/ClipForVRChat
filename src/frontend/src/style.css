@@ -384,6 +384,12 @@ button:disabled {
   color: #1b638f;
 }
 
+.settings-tabs button.unsaved-setting-tab {
+  border-color: #d99f22;
+  color: #74530b;
+  box-shadow: inset 0 3px 0 #d99f22;
+}
+
 .settings-error {
   margin-top: 14px;
 }
@@ -421,6 +427,15 @@ button:disabled {
   border-color: #d99f22;
   background: #fff9e8;
   box-shadow: inset 3px 0 0 #d99f22;
+}
+
+.setting-row.unsaved-setting-row strong,
+.view-card.unsaved-setting-row strong {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #ffe7a3;
+  color: #5f4709;
 }
 
 .settings-group {

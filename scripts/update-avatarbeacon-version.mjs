@@ -92,7 +92,7 @@ function versionPrefabBlock(rootTransformID) {
     `  - component: {fileID: ${transformID}}`,
     '  m_Layer: 0',
     `  m_Name: ${displayName}`,
-    '  m_TagString: Untagged',
+    '  m_TagString: EditorOnly',
     '  m_Icon: {fileID: 0}',
     '  m_NavMeshLayer: 0',
     '  m_StaticEditorFlags: 0',

@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -62,6 +63,7 @@ type App struct {
 	poseAt                time.Time
 	userCameraSamples     map[string]userCameraOSCSample
 	latestAvatarOSCBasis  avatarOSCBasisState
+	avatarBeaconVersion   string
 	avatarOSCBasisSamples map[string]avatarOSCBasisSample
 	oscLogEntries         []OSCLogEntry
 	oscSendLogEntries     []OSCLogEntry
@@ -131,6 +133,17 @@ type AppInfo struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
 	GitHub  string `json:"github"`
+}
+
+type StartupShortcutStatus struct {
+	Supported               bool   `json:"supported"`
+	Enabled                 bool   `json:"enabled"`
+	ShortcutName            string `json:"shortcutName"`
+	ShortcutPath            string `json:"shortcutPath,omitempty"`
+	CurrentTarget           string `json:"currentTarget,omitempty"`
+	CurrentExe              string `json:"currentExe,omitempty"`
+	TargetMatchesCurrentExe bool   `json:"targetMatchesCurrentExe"`
+	Error                   string `json:"error,omitempty"`
 }
 
 type OSSLicense struct {
@@ -302,6 +315,22 @@ func (a *App) GetAppInfo() AppInfo {
 	}
 }
 
+func (a *App) GetStartupShortcutStatus() StartupShortcutStatus {
+	return startupShortcutStatus()
+}
+
+func (a *App) SetStartupShortcutEnabled(enabled bool) (StartupShortcutStatus, error) {
+	status, err := setStartupShortcut(enabled)
+	a.mu.Lock()
+	if err != nil {
+		a.logUserActionLocked("startup_shortcut_error", fmt.Sprintf("enabled=%t err=%v", enabled, err))
+	} else {
+		a.logUserActionLocked("startup_shortcut_set", fmt.Sprintf("enabled=%t shortcut=%q target=%q", enabled, status.ShortcutPath, status.CurrentTarget))
+	}
+	a.mu.Unlock()
+	return status, err
+}
+
 func (a *App) GetOSCLogEntries() []OSCLogEntry {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -312,6 +341,15 @@ func (a *App) GetOSCSendLogEntries() []OSCLogEntry {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return append([]OSCLogEntry(nil), a.oscSendLogEntries...)
+}
+
+func (a *App) GetAvatarBeaconOSCExcludeRegex() string {
+	a.mu.Lock()
+	cfg := a.state.Config
+	cfg.Normalize()
+	pattern := avatarOSCBasisAddressFilterPattern(cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix)
+	a.mu.Unlock()
+	return "^(?!.*(?:" + pattern + ")(?:\\s|\\||$)).*$"
 }
 
 func (a *App) SendDebugOSC(line string) (appcore.DebugOSCSendResult, error) {
@@ -1960,6 +1998,7 @@ func (a *App) runCameraPoseReceiver(ctx context.Context, seq uint64, host string
 	}()
 	buf := make([]byte, 2048)
 	var nextAvatarOSCSummaryAt time.Time
+	var nextPoseLogAt time.Time
 	for {
 		n, remoteAddr, err := conn.ReadFromUDP(buf)
 		if err != nil {
@@ -2008,11 +2047,15 @@ func (a *App) runCameraPoseReceiver(ctx context.Context, seq uint64, host string
 			a.mu.Unlock()
 			if sample.HasPose {
 				pose := sample.Pose
-				appcore.AppendDiagnosticLog(logPath, "auto-capture pose received: x=%.3f y=%.3f z=%.3f rx=%.3f ry=%.3f rz=%.3f", pose.Position.X, pose.Position.Y, pose.Position.Z, pose.Rotation.X, pose.Rotation.Y, pose.Rotation.Z)
+				if nextPoseLogAt.IsZero() || !now.Before(nextPoseLogAt) {
+					appcore.AppendDiagnosticLog(logPath, "auto-capture pose received: x=%.3f y=%.3f z=%.3f rx=%.3f ry=%.3f rz=%.3f", pose.Position.X, pose.Position.Y, pose.Position.Z, pose.Rotation.X, pose.Rotation.Y, pose.Rotation.Z)
+					nextPoseLogAt = now.Add(10 * time.Second)
+				}
 			}
 		}
 		if strings.HasPrefix(address, "/avatar/parameters/") {
 			handledByClipForVRChat = true
+			a.logAvatarBeaconVersionOSC(logPath, address, typeTags, payload)
 			sample, ok := decodeAvatarOSCBasisSample(typeTags, payload)
 			if !ok {
 				forwarder.Forward(packet, address, handledByClipForVRChat)
@@ -2041,6 +2084,25 @@ func (a *App) runCameraPoseReceiver(ctx context.Context, seq uint64, host string
 		}
 		forwarder.Forward(packet, address, handledByClipForVRChat)
 	}
+}
+
+func (a *App) logAvatarBeaconVersionOSC(logPath string, address string, typeTags string, payload []byte) {
+	if !strings.EqualFold(address, "/avatar/parameters/AvatarBeacon/version") {
+		return
+	}
+	version, ok := decodeOSCFirstString(typeTags, payload)
+	if !ok {
+		appcore.AppendDiagnosticLog(logPath, "avatarbeacon version osc received invalid: address=%q types=%q values=%s", address, typeTags, formatOSCLogValues(typeTags, payload))
+		return
+	}
+	a.mu.Lock()
+	if a.avatarBeaconVersion == version {
+		a.mu.Unlock()
+		return
+	}
+	a.avatarBeaconVersion = version
+	a.mu.Unlock()
+	appcore.AppendDiagnosticLog(logPath, "avatarbeacon version osc received: address=%q version=%q", address, version)
 }
 
 type oscForwarder struct {
@@ -2419,6 +2481,15 @@ func readOSCLogString(data []byte, offset int) (string, int, bool) {
 		return "", offset, false
 	}
 	return string(data[offset:end]), next, true
+}
+
+func decodeOSCFirstString(typeTags string, payload []byte) (string, bool) {
+	tags := strings.TrimPrefix(typeTags, ",")
+	if tags == "" || tags[0] != 's' {
+		return "", false
+	}
+	value, _, ok := readOSCLogString(payload, 0)
+	return value, ok
 }
 
 func hexPreview(data []byte, maxBytes int) string {
@@ -2806,15 +2877,37 @@ func (a *App) avatarOSCBasisAddressAffectsBasisLocked(address string, cfg appcor
 	if canonicalAddress == "" {
 		return false
 	}
-	_, positionRoot, forwardRoot, signSuffix := avatarOSCBasisAddressScheme(cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix)
-	for _, root := range []string{positionRoot, forwardRoot} {
-		for _, axis := range []string{"x", "y", "z"} {
-			if canonicalAddress == root+"/"+axis || canonicalAddress == root+"/"+axis+signSuffix {
-				return true
-			}
+	for _, key := range avatarOSCBasisAddressKeys(cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix, true) {
+		if canonicalAddress == key {
+			return true
 		}
 	}
 	return false
+}
+
+func avatarOSCBasisAddressKeys(prefix string, includeSigns bool) []string {
+	_, positionRoot, forwardRoot, signSuffix := avatarOSCBasisAddressScheme(prefix)
+	keys := make([]string, 0, 12)
+	for _, root := range []string{positionRoot, forwardRoot} {
+		for _, axis := range []string{"x", "y", "z"} {
+			keys = append(keys, root+"/"+axis)
+			if includeSigns {
+				keys = append(keys, root+"/"+axis+signSuffix)
+			}
+		}
+	}
+	return keys
+}
+
+func avatarOSCBasisAddressFilterPattern(prefix string) string {
+	keys := avatarOSCBasisAddressKeys(prefix, true)
+	parts := make([]string, 0, len(keys)*2)
+	for _, key := range keys {
+		quoted := regexp.QuoteMeta(key)
+		parts = append(parts, quoted)
+		parts = append(parts, regexp.QuoteMeta("/avatar/parameters/"+key))
+	}
+	return strings.Join(parts, "|")
 }
 
 func avatarOSCBasisAddressScheme(prefix string) (scheme string, positionRoot string, forwardRoot string, signSuffix string) {
@@ -2958,15 +3051,7 @@ func (a *App) formatAvatarOSCBasisValuesLocked(cfg appcore.Config) string {
 	cfg.AutoCapture.PlayerLocal.AvatarOSC.Normalize()
 	_, positionRoot, forwardRoot, signSuffix := avatarOSCBasisAddressScheme(cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix)
 	includeSigns := a.avatarOSCBasisHasAnySignSampleLocked(positionRoot, forwardRoot, signSuffix)
-	keys := make([]string, 0, 12)
-	for _, root := range []string{positionRoot, forwardRoot} {
-		for _, axis := range []string{"x", "y", "z"} {
-			keys = append(keys, root+"/"+axis)
-			if includeSigns {
-				keys = append(keys, root+"/"+axis+signSuffix)
-			}
-		}
-	}
+	keys := avatarOSCBasisAddressKeys(cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix, includeSigns)
 
 	parts := make([]string, 0, len(keys))
 	for _, key := range keys {

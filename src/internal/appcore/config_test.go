@@ -176,6 +176,13 @@ func TestAutoCapturePlayerLocalNormalizeDefaultsAndSourceFallback(t *testing.T) 
 	if cfg.AvatarOSC.ParameterPrefix != "avatar_beacon" {
 		t.Fatalf("ParameterPrefix = %q", cfg.AvatarOSC.ParameterPrefix)
 	}
+	for _, legacyPrefix := range []string{"coord", "/coord/", "forward", "avatar_beacon/coord", "avatar_beacon/forward"} {
+		cfg.AvatarOSC.ParameterPrefix = legacyPrefix
+		cfg.Normalize()
+		if cfg.AvatarOSC.ParameterPrefix != "avatar_beacon" {
+			t.Fatalf("legacy ParameterPrefix %q normalized to %q, want avatar_beacon", legacyPrefix, cfg.AvatarOSC.ParameterPrefix)
+		}
+	}
 	if cfg.AvatarOSC.PositionScale != 1000 {
 		t.Fatalf("PositionScale = %v, want 1000", cfg.AvatarOSC.PositionScale)
 	}

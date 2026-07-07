@@ -852,7 +852,8 @@ func normalizePlayerLocalBasisSource(source string) string {
 
 func (c *AutoCapturePlayerLocalAvatarOSCConfig) Normalize() {
 	c.ParameterPrefix = strings.TrimSpace(strings.Trim(strings.TrimSpace(c.ParameterPrefix), `"`))
-	if c.ParameterPrefix == "" || c.ParameterPrefix == "CFVRC/basis" {
+	switch strings.Trim(strings.TrimSpace(c.ParameterPrefix), "/") {
+	case "", "CFVRC/basis", "coord", "forward", "avatar_beacon/coord", "avatar_beacon/forward":
 		c.ParameterPrefix = "avatar_beacon"
 	}
 	if c.PositionScale <= 0 {

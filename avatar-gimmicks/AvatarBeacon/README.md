@@ -1,25 +1,25 @@
-# AvatarBeacon source package
+# AvatarBeacon 元ファイル package
 
-AvatarBeacon is a VRChat avatar gimmick source package for sending avatar-based
-position and forward-vector values through OSC Avatar Parameters.
+AvatarBeacon は、VRChat アバターから OSC Avatar Parameters へ、アバター基準の位置と向きの値を送るためのアバターギミック元ファイルです。
 
-This source zip is intended for release verification and manual Unity packaging.
-CI does not create a `.unitypackage`. To make one, copy or extract this package
-into a Unity avatar project, confirm the assets under:
+この source zip は、Release確認と手動での Unity package 作成に使います。
+CI は `.unitypackage` を作成しません。
+
+Unity package を作る場合は、この package を Unity のアバタープロジェクトへコピーまたは展開し、次の場所に asset があることを確認してください。
 
 ```text
 Assets/PoppoWorks/AvatarBeacon/
 ```
 
-Then export `Assets/PoppoWorks/AvatarBeacon` from Unity as a `.unitypackage`.
-Use this release file name pattern:
+その後、Unity から `Assets/PoppoWorks/AvatarBeacon` を `.unitypackage` として export します。
+Release用のファイル名は次の形式にします。
 
 ```text
 AvatarBeacon-vX.Y.Z.unitypackage
 ```
 
-For release verification, create a SHA-256 file next to the `.unitypackage`.
-On Windows PowerShell:
+Release確認では、`.unitypackage` の隣に SHA-256 ファイルを作成します。
+Windows PowerShell では次のコマンドを使います。
 
 ```powershell
 Get-FileHash "AvatarBeacon-vX.Y.Z.unitypackage" -Algorithm SHA256 |
@@ -27,13 +27,13 @@ Get-FileHash "AvatarBeacon-vX.Y.Z.unitypackage" -Algorithm SHA256 |
   Set-Content -Encoding ASCII "AvatarBeacon-vX.Y.Z.unitypackage.sha256"
 ```
 
-The Unity-facing setup guide is included at:
+Unity利用者向けの導入手順は次のファイルに含めています。
 
 ```text
 Assets/PoppoWorks/AvatarBeacon/README.md
 ```
 
-YL-ATG derived parts are covered by the MIT license and notice included in:
+YL-ATG 由来部分の MIT License と notice は次のファイルに含めています。
 
 ```text
 Assets/PoppoWorks/AvatarBeacon/LICENSES/YL-ATG-MIT.txt
