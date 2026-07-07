@@ -1,4 +1,4 @@
-# 専用アバターギミックOSCでHips/avatar基準Poseを自動取得する
+# 専用アバターギミックOSCでHead/avatar基準Poseを自動取得する
 
 ## 問題
 
@@ -7,7 +7,7 @@
 
 ## 期待する挙動
 
-専用アバターギミックを導入したユーザーは、ClipForVRChatがVRChatから送られるOSC Avatar Parametersを受信し、Hipsまたは任意avatar transform由来のworld position/forwardを `player_local` のbasisとして自動更新できる。
+専用アバターギミックを導入したユーザーは、ClipForVRChatがVRChatから送られるOSC Avatar Parametersを受信し、Headまたは任意avatar transform由来のworld position/forwardを `player_local` のbasisとして自動更新できる。
 通常の標準OSC利用者には影響せず、専用ギミック未導入時は従来の手動基準Poseまたはworld構図へ安全にフォールバックできる。
 
 ## 受け入れ条件
@@ -38,9 +38,9 @@
 ### 用語
 
 - `manual basis`: 現在の「現在Poseをプレイヤー基準に保存」で保持する手動基準Pose。
-- `avatar OSC basis`: 専用アバターギミックからOSC Avatar Parametersとして受けるHips/avatar transform基準Pose。
-- `hips basis`: Hips付近を原点にするbasis。player rootそのものではないが、Headよりプレイヤー位置に近い。
-- `avatar basis`: Hips以外の任意avatar transformを原点にするbasis。
+- `avatar OSC basis`: 専用アバターギミックからOSC Avatar Parametersとして受けるHead/avatar transform基準Pose。
+- `head basis`: Head付近を原点にするbasis。player rootそのものではないが、顔や視点中心の撮影構図に合わせやすい。
+- `avatar basis`: Head以外の任意avatar transformを原点にするbasis。
 
 ### OSC受信parameter案
 
@@ -128,7 +128,7 @@ forward/yawは、受信したforward vector相当の水平成分から算出す�
 ### 専用アバターギミック側の必要条件
 
 - Modular Avatarで導入できるprefabにする。
-- 既定の追跡対象はHips相当とし、必要に応じて対象Bone/Transformを変更可能にする。
+- 既定の追跡対象はHead相当とし、必要に応じて対象Bone/Transformを変更可能にする。
 - Avatar Dynamics Contact/Constraintでpositionとforward vectorをFloat parametersへエンコードする。
 - Parameterは `coord/*` と `forward/*` を既定にし、ClipForVRChat固有名を含めない。
 - YL-ATG互換 `ATG/*` はアプリ側の検証用受信経路として残す。
@@ -139,7 +139,7 @@ forward/yawは、受信したforward vector相当の水平成分から算出す�
 
 - 標準OSCだけでは使えない。
 - 専用アバターギミックを導入したアバター使用中だけ有効。
-- デフォルトはHips基準であり、player root基準そのものではない。
+- デフォルトはHead基準であり、player root基準そのものではない。
 - アバター切り替え、OSC無効化、parameter出力停止、値の鮮度切れで自動追従は停止する。
 - 座標精度、遅延、更新頻度はVRChat/Avatar Dynamics/OSCの挙動に依存する。
 
@@ -158,6 +158,7 @@ forward/yawは、受信したforward vector相当の水平成分から算出す�
 - 2026-07-02: Go runtime/app 層で avatar OSC basis 受信と snapshot API、player_local 撮影時の basis 解決までを先行実装する。frontend UI と appcore の復元ロジックは別作業者と分担する。
 - 2026-07-02: frontend の自動撮影タブに `manual` / `avatar_osc` の basis source 表示と、`GetAvatarOSCBasisStatus` 想定の受信状態UIを追加する。
 - 2026-07-02: README / SPEC / docs に、専用アバターギミック必須、標準OSC単独では動かない、Hips基準で player root そのものではないことを明記する。
+- 2026-07-07: AvatarBeaconの既定位置基準をHeadへ変更する方針に合わせ、仕様文言をHead/avatar基準へ更新する。
 - 2026-07-02: 実機確認では、AvatarBeacon既定の `coord/*` / `forward/*` を主経路にし、必要に応じてYL-ATG互換 `ATG/*` を切り分け用に使う。
 - 2026-07-02: 監督レビューで、`/avatar/parameters/` 付きOSC addressをcanonical化する修正、Wails JS wrapper追加、構図保存時の `avatar_osc` basis適用、未使用の旧復元経路削除、sidecar/埋め込みmetadataへの basis source/pose 記録を追加した。
 

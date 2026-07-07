@@ -15,7 +15,7 @@
 - [x] `GetAvatarOSCBasisStatus` がmanual basis未設定エラーを返さない。
 - [x] `raw: 0` の場合、VRChat OSC、専用アバターギミック、`/avatar/parameters` 送信の確認を促す。
 - [x] AvatarBeaconのbasis確認先が `coord/*` / `forward/*` だと分かる。
-- [x] 自動撮影タブの説明がHips/avatar基準に統一される。
+- [x] 自動撮影タブの説明がHead/avatar基準に統一される。
 
 ## メモ
 

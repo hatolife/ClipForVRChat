@@ -234,3 +234,4 @@
 | 267 | [AvatarBeacon READMEを汎用OSCギミックとして修正する](unreleased/267-rewrite-avatarbeacon-readme-as-generic-osc-gimmick.md) | 完了 | 未定 | READMEからClipForVRChat固有説明を外し、汎用OSCギミックとしての説明、ライセンス表記、句点改行を整理した。 |
 | 267 | [exeへD&Dされた画像以外のパスをGPG暗号化する](unreleased/267-encrypt-non-image-exe-drop-paths.md) | 完了 | 未定 | exeへ渡されたパスを画像なら入力画像、画像以外のファイルやフォルダならGPG暗号化対象として扱うようにした。 |
 | 268 | [自動撮影用Webhook URLが想定外にグレーアウトする](unreleased/268-fix-auto-capture-webhook-url-unexpected-disabled.md) | 完了 | 未定 | 自動撮影用Webhook URL欄を自動撮影Discord投稿OFF時でも編集できるようにした。 |
+| 269 | [AvatarBeaconの位置取得をHips基準からHead基準へ変更する](unreleased/269-use-head-position-for-avatarbeacon.md) | 完了 | 未定 | AvatarBeaconの位置用 `point` をHeadへ追従させ、説明文をHead基準position/yawに統一した。 |

@@ -21,10 +21,10 @@ Unity側で `.unitypackage` を手作業作成するときも、外部依存本�
 ## 追跡対象
 
 Prefab root直下の `point` が位置用の追跡対象、`HeadForwardAnchor` が向き用の追跡対象です。
-READMEの手順では Modular Avatar の Bone Proxy target を `AvatarBeacon_12/point` または `AvatarBeacon_main/point` にHips、`AvatarBeacon_12/HeadForwardAnchor` または `AvatarBeacon_main/HeadForwardAnchor` にHeadを設定します。
+READMEの手順では Modular Avatar の Bone Proxy target を `AvatarBeacon_12/point` または `AvatarBeacon_main/point` にHead、`AvatarBeacon_12/HeadForwardAnchor` または `AvatarBeacon_main/HeadForwardAnchor` にHeadを設定します。
 
-これは player root そのものではありませんが、HipsはHeadよりプレイヤー位置に近いbasisとして扱います。
-ClipForVRChat 側では `avatar_beacon/coord/*` から復元したHips基準位置を `player_local` basis の位置、`avatar_beacon/forward/*` から復元したHead基準の水平forward vectorを basis yaw として使います。
+これは player root そのものではありません。
+ClipForVRChat 側では `avatar_beacon/coord/*` から復元したHead基準位置を `player_local` basis の位置、`avatar_beacon/forward/*` から復元したHead基準の水平forward vectorを basis yaw として使います。
 
 `point` は単なる見た目用オブジェクトではありません。
 MA Bone Proxyの付いた追跡アンカーであり、`WorldOriginAnchor`、`const_x`、`const_z` などのConstraintがこのTransformを参照して座標エンコードの基準にします。
@@ -32,7 +32,7 @@ MA Bone Proxyの付いた追跡アンカーであり、`WorldOriginAnchor`、`co
 
 `HeadForwardAnchor` もMA Bone Proxyの付いた追跡アンカーです。
 `offset_rot` のRotationConstraintがこのTransformを参照し、`avatar_beacon/forward/*` の生成元になります。
-そのため、位置はHips、yawはHeadという分離を保つには必須です。
+位置用の `point` と同じHeadへ追従しますが、既存Prefabではforward/yaw用のConstraint参照先として残します。
 
 ## OSC Parameter
 
@@ -89,7 +89,7 @@ ClipForVRChat 側の `_12` 復元は次の通りです。
 
 - `value = (1 - magnitude) * 1000`
 - `sign > 0` なら正、それ以外なら負
-- positionはHips基準の `avatar_beacon/coord/x,y,z` を使う
+- positionはHead基準の `avatar_beacon/coord/x,y,z` を使う
 - yawはHead基準の `avatar_beacon/forward/x,z` から `atan2(forward.x, forward.z)` で求める
 - `avatar_beacon/forward/y` は受信完全性の確認には使うが、`player_local` のyaw計算には直接使わない
 
@@ -98,7 +98,7 @@ ClipForVRChat は `xSign` などの `*Sign` parameterが1つも届いていな�
 
 - `signed = raw * 2 - 1`
 - `value = signed * 1000`
-- positionはHips基準の `avatar_beacon/coord/x,y,z` を使う
+- positionはHead基準の `avatar_beacon/coord/x,y,z` を使う
 - yawはHead基準の `avatar_beacon/forward/x,z` から `atan2(forward.x, forward.z)` で求める
 
 `AvatarBeacon_main.prefab` のContact構成は静的YAML編集で入れているため、Unity/VRChat実機で `0.5` 付近がゼロ、`0.0` 付近が負、`1.0` 付近が正としてOSC出力されることを確認してください。
@@ -187,7 +187,7 @@ Modular Avatar Parameters相当のComponentで、`avatar_beacon/coord/*` と `av
 ### `point`
 
 位置追跡対象の基準Transformです。
-Modular Avatar Bone Proxy相当のComponentを持ち、既定ではHipsへ追従します。
+Modular Avatar Bone Proxy相当のComponentを持ち、既定ではHeadへ追従します。
 必要に応じて任意のBone/Transformへ差し替えられます。
 
 このオブジェクトがないと、どのアバターTransformを座標出力対象にするかを指定できないため必須です。
@@ -198,7 +198,7 @@ yaw/forward追跡対象の基準Transformです。
 Modular Avatar Bone Proxy相当のComponentを持ち、既定ではHeadへ追従します。
 
 `offset_rot` のRotationConstraintがこのTransformを参照し、`avatar_beacon/forward/*` のContact経路へHead基準の向きを渡します。
-このオブジェクトがないと、位置をHips基準にしたまま向きだけHead基準に分離できないため必須です。
+`point` もHead基準になったため概念上は統合余地がありますが、既存Prefabではforward/yaw用Constraintの参照先として必要です。
 
 ### `WorldOriginAnchor`
 
@@ -285,7 +285,7 @@ v0.1.8では、不要機能を追加しないことよりも、YL-ATGで成立�
 
 - Unity import後、`Assets/PoppoWorks/AvatarBeacon/...` として配置される。
 - `AvatarBeacon_main.prefab` と `AvatarBeacon_12.prefab` をアバターroot配下へ置ける。
-- `point` をHips基準、`HeadForwardAnchor` をHead基準に設定できる。
+- `point` をHead基準、`HeadForwardAnchor` をHead基準に設定できる。
 - ClipForVRChatの `avatar_osc` 受信状態または10秒summaryに `avatar_beacon/coord/*` / `avatar_beacon/forward/*` が表示される。
 - VRChat OSCで `/avatar/parameters/avatar_beacon/coord/*` と `/avatar/parameters/avatar_beacon/forward/*` が更新される。
 - 前後左右移動で `avatar_beacon/coord/*` が変化する。

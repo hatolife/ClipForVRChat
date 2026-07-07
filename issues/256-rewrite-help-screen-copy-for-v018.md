@@ -146,7 +146,7 @@ ClipForVRChatは端に自動で定期的に撮影だけします。
 
 	ClipForVRChatではこの問題を解決するため、
 	ワールド内のプレイヤーの位置情報をOSCで送信するアバターギミック AvatarBeacon を作成しました。
-	AvatarBeaconは、プレーヤーのHipsの座標とHeadの向きをOSCで送信するアバターギミックです。
+	AvatarBeaconは、プレーヤーのHeadの座標と向きをOSCで送信するアバターギミックです。
 
 	AvatarBeaconから送信されたプレーヤーの位置と向き情報を使って、
 	ClipForVRChatで配置先カメラ位置を計算し、アバター基準の自動撮影を実現しています。

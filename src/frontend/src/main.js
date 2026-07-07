@@ -2410,7 +2410,7 @@ const vueApp = createApp({
                 <h4>1. アバターギミックについて</h4>
                 <p>自動撮影では、アバターの正面、背面、斜めなど、アバター基準でカメラ位置を自動配置する機能を用意しています。</p>
                 <p>ワールド座標系でアバターの正面位置を計算するにはアバターの位置情報が必要ですが、公式の方法ではワールド内のアバター位置を取得できません。そのため、公式機能だけではアバター基準の自動配置を実現できません。</p>
-                <p>ClipForVRChatでは、ワールド内のプレイヤー位置をOSCで送信するアバターギミック AvatarBeacon を用意しています。AvatarBeaconをアバターに導入すると、Hipsの座標とHeadの向きをOSCで送信できます。</p>
+                <p>ClipForVRChatでは、ワールド内のプレイヤー位置をOSCで送信するアバターギミック AvatarBeacon を用意しています。AvatarBeaconをアバターに導入すると、Headの座標と向きをOSCで送信できます。</p>
                 <p>ClipForVRChatはAvatarBeaconから受信した位置と向きを使ってカメラ位置を計算し、アバター基準の自動撮影を実現します。</p>
                 <h4>2. ゲーム内カメラについて</h4>
                 <p>本来は公式機能によりOSCでカメラの表示/非表示を切り替えられますが、現在はCamera UIを閉じるとCamera OSCが効かない不具合が報告されています。</p>
@@ -2854,7 +2854,7 @@ const vueApp = createApp({
               </div>
             </div>
             <div class="setting-row" :class="[{ disabled: autoCaptureSettings.playerLocal.basisSource !== 'avatar_osc' }, settingRowChangedClass('autoCapture.playerLocal.avatarOsc')]">
-              <div><strong>AvatarBeacon受信状態</strong><p>Hips基準position、Head基準yaw、最終受信、エラーを表示します。</p></div>
+              <div><strong>AvatarBeacon受信状態</strong><p>Head基準position、Head基準yaw、最終受信、エラーを表示します。</p></div>
               <div class="settings-control-stack">
                 <div class="inline-actions">
                   <span class="status-pill" :class="avatarOSCBasisStatusClass()">{{ avatarOSCBasisStatusLabel() }}</span>

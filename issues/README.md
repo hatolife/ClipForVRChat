@@ -16,7 +16,7 @@
 | 141 | [自動撮影構図UIへ `player_local` を統合する](141-integrate-player-local-coordinate-ui.md) | 要確認 | `v0.1.8` | 構図設定、現在Pose保存/追加、リセット、移動、テスト撮影を座標系に対応させる。 |
 | 166 | [v0.1.8-a13作成可能状態まで未完了項目を解消する](166-prepare-v018-a13-readiness.md) | 要確認 | `v0.1.8` | a13作成前に未完了issueを実装・検証し、残課題を再チケット化する。 |
 | 171 | [Spout helperを本体exeへ埋め込み単一exe配布にする](171-embed-spout-helper-single-exe-release.md) | 要確認 | `v0.1.8` | C案採用に基づき、通常利用者向けReleaseを単一exe主導線へ戻し、分離版zipも検証用に残す。 |
-| 173 | [専用アバターギミックOSCでHips/avatar基準Poseを自動取得する](173-implement-avatar-osc-basis-bridge.md) | 要確認 | `v0.1.8` | YL-ATG方式を参考に、専用アバターギミックからOSCでHips/avatar基準Poseを受け取り `player_local` basisへ使う機能を実装する。 |
+| 173 | [専用アバターギミックOSCでHead/avatar基準Poseを自動取得する](173-implement-avatar-osc-basis-bridge.md) | 要確認 | `v0.1.8` | YL-ATG方式を参考に、専用アバターギミックからOSCでHead/avatar基準Poseを受け取り `player_local` basisへ使う機能を実装する。 |
 | 175 | [CIでアバターギミック元ファイルzipを配布する](175-package-avatar-gimmick-source-zip.md) | 要確認 | `v0.1.8-a17` | `Assets/PoppoWorks/AvatarBeacon/...` に配置したPrefab等をCIで元ファイルzip化し、`.unitypackage` は手作業で作成してGitHub Releaseへ添付する。 |
 | 176 | [YL-ATGを参考にAvatarBeaconアバターギミックを作成する](176-create-clipforvrchat-avatar-gimmick-from-yl-atg-reference.md) | 要確認 | `v0.1.8-a24` | ユーザー配置済みのATG_ForAvatar packageを参考に汎用アバターギミックAvatarBeaconを作成し、`coord/*` と `forward/*` の汎用OSC parameter、YL-ATG由来部分のMITライセンス表記、stale診断、10秒ごとのOSC summaryログ、`avatar_osc` 初期値化、受信器維持、受信状態の自動更新とyaw表示を整備する。 |
 | 177 | [自動処理Webhookの通常投稿フォールバックを明確にする](177-clarify-discord-webhook-fallback-for-auto-processing.md) | 要確認 | `v0.1.8-a18` | 自動処理専用Webhookが空欄の場合に通常投稿用Webhookへフォールバックする表示と保存前確認条件を整理する。 |

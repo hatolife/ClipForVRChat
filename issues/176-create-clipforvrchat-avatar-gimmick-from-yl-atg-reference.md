@@ -131,8 +131,8 @@ AvatarBeaconでは、ClipForVRChat専用名を避け、次の汎用parameterを�
 - [x] リポジトリ内に、AvatarBeaconのUnity asset sourceを追加する。
 - [x] 配布packageのimport先が `Assets/PoppoWorks/AvatarBeacon/...` になる。
 - [x] アバターへ導入できるPrefabを用意し、追跡対象TransformまたはBoneを設定できる。
-- [x] 既定の追跡対象をHips相当にし、player rootそのものではないがHeadよりプレイヤー位置に近いbasisであることをREADMEに明記する。
-- [x] positionはHips基準、yaw/forwardはHead基準としてAvatarBeaconから送信できるようにする。
+- [x] 既定の追跡対象をHead相当にし、player rootそのものではないが顔や視点中心の撮影構図に合わせやすいbasisであることをREADMEに明記する。
+- [x] positionはHead基準、yaw/forwardもHead基準としてAvatarBeaconから送信できるようにする。
 - [x] VRChat Expressions Menuから手動でOSC疎通確認できるデバッグ用parameter/menuを追加しない。AvatarBeaconはbasis送信用の `coord/*` / `forward/*` のみに絞る。
 - [x] Prefabが `coord/*` と `forward/*` のposition/forward情報をOSC Avatar Parametersへ出せる。
 - [x] AvatarBeacon Prefab内GameObjectの役割、必要性、削除判断を仕様書に記録する。
@@ -181,4 +181,5 @@ AvatarBeaconでは、ClipForVRChat専用名を避け、次の汎用parameterを�
 - 2026-07-04: `avatar_osc 受信状態` は自動更新されるため、手動の「更新」ボタンを削除する。
 - 2026-07-04: `avatar_osc 受信状態` の最終受信表示は時刻だけにし、raw/lastの詳細確認は10秒summaryログへ寄せる。
 - 2026-07-04: positionはHips追従の `point` から維持し、yaw/forwardはHead追従の専用アンカーから取得する。アプリ側OSC parameterは `coord/*` / `forward/*` のまま変えない。
+- 2026-07-07: 顔や視点中心の撮影構図へ合わせるため、`point` の既定MA Bone ProxyをHeadへ戻す。`HeadForwardAnchor` は既存forward/yaw用Constraintの参照先として残す。
 - 2026-07-04: 自動撮影UIはAvatarBeacon導入を基本導線にし、manual basisは専用ギミックなしのフォールバック/高度設定として扱う。

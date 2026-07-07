@@ -114,7 +114,7 @@ Stream方式で `Spout helperが見つかりません`、`Spout helperは見つ�
 
 自動撮影では、画像と同じ場所にsidecar JSONを保存できます。sidecar JSONには撮影時刻、構図、Stream sender情報、VRChat output logから取得できた同席ユーザー、world ID、instance ID、画像SHA256を記録します。PNG/JPEG画像内にも、設定に応じて自動撮影メタデータを埋め込めます。
 
-プレイヤー基準構図は、AvatarBeacon導入済みアバターから受け取る `avatar_osc` basis を基本にします。標準OSCだけでは動かず、positionはHips基準、yawはHead基準で、player root そのものではありません。専用ギミックなしの場合は `manual` basis で手動保存した基準位置をフォールバックとして使えます。確認手順は `docs/v0.1.8-avatar-osc-basis-verification.md` と `docs/v0.1.8-player-local-verification.md`、AvatarBeaconの詳細は `docs/avatarbeacon-spec.md` を参照してください。
+プレイヤー基準構図は、AvatarBeacon導入済みアバターから受け取る `avatar_osc` basis を基本にします。標準OSCだけでは動かず、positionとyawはHead基準で、player root そのものではありません。専用ギミックなしの場合は `manual` basis で手動保存した基準位置をフォールバックとして使えます。確認手順は `docs/v0.1.8-avatar-osc-basis-verification.md` と `docs/v0.1.8-player-local-verification.md`、AvatarBeaconの詳細は `docs/avatarbeacon-spec.md` を参照してください。
 
 AvatarBeaconが使えない環境では、フォールバックモードを使えます。フォールバックモードでは、VRChat内であらかじめ配置したローカルアンカーCameraを使うため、ClipForVRChatはCamera Poseを送信しません。AvatarBeacon未受信時の自動ON、受信復帰時の自動OFFも設定できますが、どちらも既定OFFです。
 
