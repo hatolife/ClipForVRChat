@@ -86,6 +86,7 @@ type AutoCaptureConfig struct {
 	Capture     AutoCaptureCaptureConfig     `json:"capture"`
 	Stream      AutoCaptureStreamConfig      `json:"stream"`
 	Restore     AutoCaptureRestoreConfig     `json:"restore"`
+	Idle        AutoCaptureIdleConfig        `json:"idle"`
 	Output      AutoCaptureOutputConfig      `json:"output"`
 	Presence    AutoCapturePresenceConfig    `json:"presence"`
 	Discord     AutoCaptureDiscordConfig     `json:"discord"`
@@ -178,6 +179,11 @@ type AutoCaptureRestoreConfig struct {
 	SnapshotFreshnessSec int                                 `json:"snapshotFreshnessSec"`
 	Fallback             AutoCaptureUserCameraFallbackConfig `json:"fallback"`
 	Snapshot             AutoCaptureUserCameraState          `json:"-"`
+}
+
+type AutoCaptureIdleConfig struct {
+	Enabled bool             `json:"enabled"`
+	View    CameraViewConfig `json:"view"`
 }
 
 type AutoCaptureUserCameraFallbackConfig struct {
@@ -402,6 +408,7 @@ func DefaultAutoCaptureConfig() AutoCaptureConfig {
 			DebugFrameCount:  8,
 		},
 		Restore: defaultAutoCaptureRestoreConfig(),
+		Idle:    defaultAutoCaptureIdleConfig(),
 		Output: AutoCaptureOutputConfig{
 			Directory:           DefaultAutoCaptureDirectory(),
 			ImageFormat:         "png",
@@ -634,6 +641,7 @@ func (c *AutoCaptureConfig) Normalize() {
 	}
 	c.Stream.DebugRecordingDirectory = strings.Trim(strings.TrimSpace(c.Stream.DebugRecordingDirectory), `"`)
 	c.Restore.Normalize()
+	c.Idle.Normalize()
 	c.Output.Directory = strings.Trim(strings.TrimSpace(c.Output.Directory), `"`)
 	if c.Output.Directory == "" {
 		c.Output.Directory = DefaultAutoCaptureDirectory()
@@ -709,6 +717,40 @@ func defaultAutoCaptureRestoreConfig() AutoCaptureRestoreConfig {
 		SnapshotFreshnessSec: 10,
 		Fallback:             defaultAutoCaptureUserCameraFallbackConfig(),
 	}
+}
+
+func defaultAutoCaptureIdleConfig() AutoCaptureIdleConfig {
+	return AutoCaptureIdleConfig{
+		Enabled: false,
+		View: CameraViewConfig{
+			ID:              "idle",
+			Name:            "待機位置",
+			Enabled:         true,
+			CoordinateSpace: "player_local",
+			Pose: CameraPoseConfig{
+				Position: CameraVector3Config{Y: -5},
+			},
+			Zoom: float64ConfigPtr(userCameraZoomDefault),
+		},
+	}
+}
+
+func (c *AutoCaptureIdleConfig) Normalize() {
+	if c.View.ID == "" && c.View.Name == "" && c.View.CoordinateSpace == "" && c.View.Pose.isZero() && c.View.Zoom == nil {
+		defaults := defaultAutoCaptureIdleConfig()
+		defaults.Enabled = c.Enabled
+		*c = defaults
+		return
+	}
+	c.View.ID = "idle"
+	if strings.TrimSpace(c.View.Name) == "" {
+		c.View.Name = "待機位置"
+	}
+	if c.View.CoordinateSpace == "" {
+		c.View.CoordinateSpace = "player_local"
+	}
+	c.View.Enabled = true
+	c.View.Normalize(-1)
 }
 
 func defaultAutoCaptureUserCameraFallbackConfig() AutoCaptureUserCameraFallbackConfig {

@@ -68,6 +68,7 @@ type autoCaptureConfigLogSummary struct {
 	Schedule        appcore.AutoCaptureScheduleConfig `json:"schedule"`
 	Capture         appcore.AutoCaptureCaptureConfig  `json:"capture"`
 	OSC             appcore.AutoCaptureOSCConfig      `json:"osc"`
+	Idle            appcore.AutoCaptureIdleConfig     `json:"idle"`
 	PlayerLocal     autoCapturePlayerLocalLogSummary  `json:"playerLocal"`
 	Output          autoCaptureOutputLogSummary       `json:"output"`
 	Presence        appcore.AutoCapturePresenceConfig `json:"presence"`
@@ -200,6 +201,7 @@ func autoCaptureSummaryForLog(cfg appcore.AutoCaptureConfig, primaryWebhookConfi
 		Schedule: cfg.Schedule,
 		Capture:  cfg.Capture,
 		OSC:      cfg.OSC,
+		Idle:     cfg.Idle,
 		PlayerLocal: autoCapturePlayerLocalLogSummary{
 			BasisSource: cfg.PlayerLocal.BasisSource,
 			Calibrated:  cfg.PlayerLocal.Calibrated,

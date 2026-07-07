@@ -250,6 +250,23 @@ const vueApp = createApp({
       autoCapture.output ||= {}
       autoCapture.presence ||= {}
       autoCapture.discord ||= {}
+      autoCapture.idle ||= {}
+      if (autoCapture.idle.enabled === undefined) autoCapture.idle.enabled = false
+      autoCapture.idle.view ||= {}
+      const idleView = autoCapture.idle.view
+      idleView.id ||= 'idle'
+      idleView.name ||= '待機位置'
+      idleView.coordinateSpace ||= 'player_local'
+      idleView.pose ||= {}
+      idleView.pose.position ||= {}
+      idleView.pose.rotation ||= {}
+      if (idleView.pose.position.x === undefined) idleView.pose.position.x = 0
+      if (idleView.pose.position.y === undefined) idleView.pose.position.y = -5
+      if (idleView.pose.position.z === undefined) idleView.pose.position.z = 0
+      if (idleView.pose.rotation.x === undefined) idleView.pose.rotation.x = 0
+      if (idleView.pose.rotation.y === undefined) idleView.pose.rotation.y = 0
+      if (idleView.pose.rotation.z === undefined) idleView.pose.rotation.z = 0
+      if (idleView.zoom === undefined) idleView.zoom = 45
       autoCapture.restore ||= {}
       autoCapture.restore.fallback ||= {}
       if (autoCapture.restore.enabled === undefined) autoCapture.restore.enabled = true
@@ -538,6 +555,8 @@ const vueApp = createApp({
         'autoCapture.capture.autoEnablePreplacedLocalAnchorAfterMinutes': 'フォールバック自動ON待機時間',
         'autoCapture.capture.autoDisablePreplacedLocalAnchor': 'フォールバックモードを自動OFF',
         'autoCapture.capture.preplacedLocalAnchor': 'フォールバックモード',
+        'autoCapture.idle.enabled': '待機カメラ位置',
+        'autoCapture.idle.view': '待機カメラ位置',
         'autoCapture.playerLocal.basisSource': 'プレイヤー基準の取得元',
         'autoCapture.playerLocal.calibrated': 'manual基準位置',
         'autoCapture.playerLocal.updatedAt': 'manual基準位置',
@@ -561,6 +580,7 @@ const vueApp = createApp({
       if (path.startsWith('update.')) return 'その他 更新確認'
       if (path.startsWith('autoCapture.osc.')) return '自動撮影 OSC'
       if (path.startsWith('autoCapture.capture.preplacedLocalAnchor')) return 'フォールバックモード'
+      if (path.startsWith('autoCapture.idle.')) return '待機カメラ位置'
       if (path.startsWith('autoCapture.capture.')) return '自動撮影 撮影方式'
       if (path.startsWith('autoCapture.views.')) return '構図設定'
       if (path.startsWith('autoCapture.schedule.')) return '自動撮影スケジュール'
@@ -838,6 +858,7 @@ const vueApp = createApp({
     autoCaptureDetailTitle() {
       if (this.autoCaptureDetailView === 'composition') return '構図設定'
       if (this.autoCaptureDetailView === 'fallback') return 'フォールバックモード'
+      if (this.autoCaptureDetailView === 'idle') return '待機カメラ位置'
       if (this.autoCaptureDetailView === 'capture') return '撮影・出力'
       if (this.autoCaptureDetailView === 'metadata') return '保存・投稿・復元'
       if (this.autoCaptureDetailView === 'schedule') return '自動撮影スケジュール'
@@ -847,6 +868,7 @@ const vueApp = createApp({
     autoCaptureDetailDescription() {
       if (this.autoCaptureDetailView === 'composition') return '撮影する構図、座標系、位置、拡大率、並び順を設定します。'
       if (this.autoCaptureDetailView === 'fallback') return 'フォールバックモードの自動ON/OFFを設定します。'
+      if (this.autoCaptureDetailView === 'idle') return '自動撮影バッチ終了後に送るカメラ位置を設定します。'
       if (this.autoCaptureDetailView === 'capture') return 'Stream方式のSpout受信、出力先、保存形式、ファイル名を設定します。'
       if (this.autoCaptureDetailView === 'metadata') return 'sidecar、画像メタデータ、同席ユーザー情報、Discord投稿、撮影後復元を設定します。'
       if (this.autoCaptureDetailView === 'schedule') return '自動撮影の開始条件と繰り返し間隔を設定します。'
@@ -2792,6 +2814,30 @@ const vueApp = createApp({
                   <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.capture.autoDisablePreplacedLocalAnchor" /><span></span></label>
                 </div>
               </template>
+              <template v-else-if="autoCaptureDetailView === 'idle'">
+                <div class="setting-row" :class="[{ disabled: effectiveAutoCapturePreplacedLocalAnchor }, settingRowChangedClass('autoCapture.idle.enabled')]">
+                  <div><strong>待機カメラ位置を使う</strong><p>通常モードの自動撮影バッチ終了後、下の位置へUser Cameraを移動します。</p></div>
+                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.idle.enabled" :disabled="effectiveAutoCapturePreplacedLocalAnchor" /><span></span></label>
+                </div>
+                <div class="setting-row" :class="[{ disabled: effectiveAutoCapturePreplacedLocalAnchor || !autoCaptureSettings.idle.enabled }, settingRowChangedClass('autoCapture.idle.view.coordinateSpace')]">
+                  <div><strong>待機位置の座標系</strong><p>初期値はプレイヤー基準です。AvatarBeaconまたはmanual基準からworld位置へ変換して送ります。</p></div>
+                  <label>
+                    <select v-model="autoCaptureSettings.idle.view.coordinateSpace" :disabled="effectiveAutoCapturePreplacedLocalAnchor || !autoCaptureSettings.idle.enabled">
+                      <option value="player_local">プレイヤー基準</option>
+                      <option value="world">ワールド固定</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="pose-grid" :class="{ disabled: effectiveAutoCapturePreplacedLocalAnchor || !autoCaptureSettings.idle.enabled }">
+                  <label><small>待機 位置 X</small><input type="number" step="0.001" v-model.number="autoCaptureSettings.idle.view.pose.position.x" :disabled="effectiveAutoCapturePreplacedLocalAnchor || !autoCaptureSettings.idle.enabled" /></label>
+                  <label><small>待機 位置 Y</small><input type="number" step="0.001" v-model.number="autoCaptureSettings.idle.view.pose.position.y" :disabled="effectiveAutoCapturePreplacedLocalAnchor || !autoCaptureSettings.idle.enabled" /></label>
+                  <label><small>待機 位置 Z</small><input type="number" step="0.001" v-model.number="autoCaptureSettings.idle.view.pose.position.z" :disabled="effectiveAutoCapturePreplacedLocalAnchor || !autoCaptureSettings.idle.enabled" /></label>
+                  <label><small>待機 回転 X</small><input type="number" step="0.001" v-model.number="autoCaptureSettings.idle.view.pose.rotation.x" :disabled="effectiveAutoCapturePreplacedLocalAnchor || !autoCaptureSettings.idle.enabled" /></label>
+                  <label><small>待機 回転 Y</small><input type="number" step="0.001" v-model.number="autoCaptureSettings.idle.view.pose.rotation.y" :disabled="effectiveAutoCapturePreplacedLocalAnchor || !autoCaptureSettings.idle.enabled" /></label>
+                  <label><small>待機 回転 Z</small><input type="number" step="0.001" v-model.number="autoCaptureSettings.idle.view.pose.rotation.z" :disabled="effectiveAutoCapturePreplacedLocalAnchor || !autoCaptureSettings.idle.enabled" /></label>
+                  <label><small>待機 拡大率</small><input type="number" min="20" max="150" step="0.1" v-model.number="autoCaptureSettings.idle.view.zoom" :disabled="effectiveAutoCapturePreplacedLocalAnchor || !autoCaptureSettings.idle.enabled" /></label>
+                </div>
+              </template>
             </div>
             <template v-else>
             <div class="setting-row" :class="settingRowChangedClass('autoCapture.capture.preplacedLocalAnchor')">
@@ -2815,6 +2861,17 @@ const vueApp = createApp({
               </div>
               <div class="settings-overview-controls">
                 <button type="button" class="secondary" title="構図設定の詳細画面を開きます。" aria-label="構図設定の詳細設定" @click="openAutoCaptureDetail('composition')">詳細設定</button>
+              </div>
+            </div>
+            <div class="setting-row" :class="[{ disabled: effectiveAutoCapturePreplacedLocalAnchor }, settingRowChangedClass('autoCapture.idle')]">
+              <div>
+                <strong>待機カメラ位置</strong>
+                <p>自動撮影バッチ終了後、通常モードのカメラを指定位置へ退避します。</p>
+                <p>初期値はプレイヤー基準で足元方向 Y=-5m です。</p>
+              </div>
+              <div class="settings-overview-controls">
+                <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.idle.enabled" :disabled="effectiveAutoCapturePreplacedLocalAnchor" /><span></span></label>
+                <button type="button" class="secondary" :disabled="effectiveAutoCapturePreplacedLocalAnchor" title="待機カメラ位置の詳細設定を開きます。" aria-label="待機カメラ位置の詳細設定" @click="openAutoCaptureDetail('idle')">詳細設定</button>
               </div>
             </div>
             <div class="setting-row" :class="settingRowChangedClass('autoCapture.schedule')">

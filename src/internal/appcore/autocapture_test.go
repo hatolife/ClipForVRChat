@@ -43,6 +43,12 @@ func TestDefaultAutoCaptureConfig(t *testing.T) {
 	if cfg.AutoCapture.Capture.OpenCameraBeforeBatch || cfg.AutoCapture.Capture.CloseCameraAfterBatch {
 		t.Fatalf("camera auto open/close should default off: %+v", cfg.AutoCapture.Capture)
 	}
+	if cfg.AutoCapture.Idle.Enabled {
+		t.Fatalf("idle camera should default off: %+v", cfg.AutoCapture.Idle)
+	}
+	if cfg.AutoCapture.Idle.View.CoordinateSpace != "player_local" || cfg.AutoCapture.Idle.View.Pose.Position.Y != -5 {
+		t.Fatalf("unexpected idle camera default: %+v", cfg.AutoCapture.Idle)
+	}
 	if cfg.AutoCapture.Capture.PreplacedLocalAnchorEnabled() || cfg.AutoCapture.Capture.AutoEnablePreplaced || cfg.AutoCapture.Capture.AutoDisablePreplaced {
 		t.Fatalf("fallback mode and auto fallback should default off: %+v", cfg.AutoCapture.Capture)
 	}
@@ -87,6 +93,9 @@ func TestAutoCaptureConfigNormalize(t *testing.T) {
 	if cfg.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
 		t.Fatalf("PreplacedLocalAnchor should default off: %+v", cfg.AutoCapture.Capture)
 	}
+	if cfg.AutoCapture.Idle.Enabled || cfg.AutoCapture.Idle.View.CoordinateSpace != "player_local" || cfg.AutoCapture.Idle.View.Pose.Position.Y != -5 {
+		t.Fatalf("idle camera normalize failed: %+v", cfg.AutoCapture.Idle)
+	}
 	if cfg.AutoCapture.Capture.AutoEnablePreplaced || cfg.AutoCapture.Capture.AutoDisablePreplaced {
 		t.Fatalf("auto fallback controls should default off: %+v", cfg.AutoCapture.Capture)
 	}
@@ -130,6 +139,49 @@ func TestPreplacedLocalAnchorSkipsPoseResolve(t *testing.T) {
 	runner := AutoCaptureRunner{Config: cfg}
 	if err := runner.applyCameraViewAndOptions(oscClient{}, view); err != nil {
 		t.Fatalf("applyCameraViewAndOptions with preplaced local anchor returned error: %v", err)
+	}
+}
+
+func TestApplyIdleCameraStateSendsPlayerLocalDefaultPose(t *testing.T) {
+	conn, port := listenOSCUserCameraPackets(t)
+	defer conn.Close()
+
+	cfg := DefaultConfig()
+	cfg.AutoCapture.OSC.Host = "127.0.0.1"
+	cfg.AutoCapture.OSC.SendPort = port
+	cfg.AutoCapture.Idle.Enabled = true
+	cfg.AutoCapture.PlayerLocal.BasisSource = PlayerLocalBasisSourceManual
+	cfg.AutoCapture.PlayerLocal.Calibrated = true
+	cfg.AutoCapture.PlayerLocal.BasisPose = CameraPoseConfig{}
+	client := oscClient{host: "127.0.0.1", port: port}
+	if err := client.open(); err != nil {
+		t.Fatal(err)
+	}
+	defer client.close()
+
+	if err := (AutoCaptureRunner{Config: cfg}).applyIdleCameraState(client); err != nil {
+		t.Fatal(err)
+	}
+
+	samples := withoutVersionNoticePackets(readOSCPacketSamples(t, conn))
+	if len(samples) < 3 {
+		t.Fatalf("packet count = %d, want at least 3: %+v", len(samples), samples)
+	}
+	if samples[0].Address != "/usercamera/Mode" || !samples[0].HasInt || samples[0].Int != 2 {
+		t.Fatalf("mode sample = %+v, want stream mode", samples[0])
+	}
+	var poseSample *oscPacketSample
+	for i := range samples {
+		if samples[i].Address == "/usercamera/Pose" {
+			poseSample = &samples[i]
+			break
+		}
+	}
+	if poseSample == nil || !poseSample.HasPose {
+		t.Fatalf("pose sample missing: %+v", samples)
+	}
+	if poseSample.Pose.Position.X != 0 || poseSample.Pose.Position.Y != -5 || poseSample.Pose.Position.Z != 0 {
+		t.Fatalf("idle pose = %+v, want player-local default resolved to Y=-5", poseSample.Pose)
 	}
 }
 
@@ -698,6 +750,10 @@ type oscPacketSample struct {
 	HasBool  bool
 	Int      int
 	HasInt   bool
+	Float    float64
+	HasFloat bool
+	Pose     CameraPoseConfig
+	HasPose  bool
 	String   string
 	HasStr   bool
 }
@@ -737,6 +793,12 @@ func readOSCPacketSamples(t *testing.T, conn net.PacketConn) []oscPacketSample {
 					t.Fatalf("OSC int packet too short: %v", buf[:n])
 				}
 				sample.Int = int(int32(binary.BigEndian.Uint32(payload[:4])))
+			case 'f':
+				sample.HasFloat = true
+				if len(payload) < 4 {
+					t.Fatalf("OSC float packet too short: %v", buf[:n])
+				}
+				sample.Float = float64(math.Float32frombits(binary.BigEndian.Uint32(payload[:4])))
 			case 's':
 				sample.HasStr = true
 				str, _, ok := readOSCString(payload, 0)
@@ -745,6 +807,10 @@ func readOSCPacketSamples(t *testing.T, conn net.PacketConn) []oscPacketSample {
 				}
 				sample.String = str
 			}
+		}
+		if pose, ok := ParseOSCPose(append([]byte(nil), buf[:n]...)); ok {
+			sample.Pose = pose
+			sample.HasPose = true
 		}
 		samples = append(samples, sample)
 	}

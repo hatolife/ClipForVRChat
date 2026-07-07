@@ -290,10 +290,13 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) (results []Result, err e
 	}
 	defer client.close()
 	streamStarted := false
-	if ac.Restore.Enabled && !ac.Capture.PreplacedLocalAnchorEnabled() {
-		defer r.restoreUserCameraState(client)
+	if !ac.Capture.PreplacedLocalAnchorEnabled() {
+		defer r.finishUserCameraState(client)
 	} else if ac.Capture.PreplacedLocalAnchorEnabled() {
 		diagAutoCapture(logPath, "camera restore skipped: preplaced_local_anchor=true")
+		if ac.Idle.Enabled {
+			diagAutoCapture(logPath, "idle camera skipped: preplaced_local_anchor=true")
+		}
 	}
 	defer func() {
 		if err == nil || !streamStarted {
@@ -382,6 +385,17 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) (results []Result, err e
 	diagAutoCapture(logPath, "camera close skipped: usercamera_close_disabled=true successful_shots=%d", successCount)
 	diagAutoCapture(logPath, "run_once complete: batch_id=%q results=%d", batchID, len(results))
 	return results, nil
+}
+
+func (r AutoCaptureRunner) finishUserCameraState(client oscClient) {
+	if r.Config.AutoCapture.Restore.Enabled {
+		r.restoreUserCameraState(client)
+	} else {
+		diagAutoCapture(r.Config.DiagnosticLogPath, "camera restore skipped: enabled=false")
+	}
+	if err := r.applyIdleCameraState(client); err != nil {
+		diagAutoCapture(r.Config.DiagnosticLogPath, "idle camera apply error: err=%v", err)
+	}
 }
 
 func (r AutoCaptureRunner) restoreUserCameraState(client oscClient) {
@@ -492,6 +506,44 @@ func (r AutoCaptureRunner) restoreUserCameraState(client oscClient) {
 		sendRestoreBoolCompat(client, logPath, "/usercamera/Streaming", *target.Streaming)
 	}
 	diagAutoCapture(logPath, "camera restore complete")
+}
+
+func (r AutoCaptureRunner) applyIdleCameraState(client oscClient) error {
+	cfg := r.Config.AutoCapture
+	idle := cfg.Idle
+	logPath := r.Config.DiagnosticLogPath
+	if !idle.Enabled {
+		diagAutoCapture(logPath, "idle camera skipped: enabled=false")
+		return nil
+	}
+	if cfg.Capture.PreplacedLocalAnchorEnabled() {
+		diagAutoCapture(logPath, "idle camera skipped: preplaced_local_anchor=true")
+		return nil
+	}
+	cameraMode := int32(1)
+	if cfg.Capture.Mode == "stream" {
+		cameraMode = 2
+	}
+	diagAutoCapture(logPath, "idle camera apply begin: mode=%d coordinate_space=%q view_id=%q", cameraMode, idle.View.CoordinateSpace, idle.View.ID)
+	if err := client.sendInt("/usercamera/Mode", cameraMode); err != nil {
+		diagAutoCapture(logPath, "idle camera mode error: mode=%d err=%v", cameraMode, err)
+		return err
+	}
+	if err := r.applyCameraView(client, idle.View); err != nil {
+		diagAutoCapture(logPath, "idle camera pose error: err=%v", err)
+		return err
+	}
+	sentOptions := sendOptionalFloat(client, "/usercamera/Zoom", idle.View.Zoom) +
+		sendOptionalFloat(client, "/usercamera/Exposure", idle.View.Exposure) +
+		sendOptionalFloat(client, "/usercamera/FocalDistance", idle.View.FocalDistance) +
+		sendOptionalFloat(client, "/usercamera/Aperture", idle.View.Aperture) +
+		sendOptionalBool(client, "/usercamera/LookAtMe", idle.View.LookAtMe) +
+		sendOptionalBool(client, "/usercamera/ShowUIInCamera", idle.View.ShowUIInCamera) +
+		sendOptionalBool(client, "/usercamera/LocalPlayer", idle.View.LocalPlayer) +
+		sendOptionalBool(client, "/usercamera/RemotePlayer", idle.View.RemotePlayer) +
+		sendOptionalBool(client, "/usercamera/Environment", idle.View.Environment)
+	diagAutoCapture(logPath, "idle camera apply complete: mode=%d optional_params=%d", cameraMode, sentOptions)
+	return nil
 }
 
 func shouldRestoreCameraParameters(mode *int) bool {
