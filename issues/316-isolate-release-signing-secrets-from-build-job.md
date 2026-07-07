@@ -49,6 +49,13 @@ Release workflow変更のため、配布AssetとRelease本文の検証も受け�
 Aを短期対応として採用し、Cは将来の理想形として別途検討する。
 BはAより強い運用分離を狙えるが、承認フローとRelease手順の設計が必要なため次段階の候補にする。
 
+## 方針決定
+
+2026-07-08: ユーザー判断によりAを採用する。
+Release workflowはbuild/sign/package/releaseをjob分割し、署名secretはsign jobだけへ渡す。
+同一job内のPATH固定や絶対パスGPG指定だけでは最終対策にしない。
+keyless/KMS署名への移行は将来提案として `docs/security-future-recommendations.md` に分離する。
+
 ## 受け入れ条件
 
 - [ ] ビルドjobに `CI_RELEASE_GPG_PRIVATE_KEY` / passphrase / fingerprint が渡らない。

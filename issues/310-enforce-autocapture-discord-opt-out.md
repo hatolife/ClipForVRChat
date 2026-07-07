@@ -45,6 +45,12 @@ Aを採用する。
 通常処理の投稿ONと自動撮影の投稿ONは、利用者の同意範囲が異なるため分離する。
 自動撮影専用Webhook URLは、投稿ONの場合だけ送信先候補として扱う。
 
+## 方針決定
+
+2026-07-08: ユーザー判断によりAを採用する。
+自動撮影Discord投稿は `autoCapture.discord.enabled` の明示ONだけで有効化し、通常投稿用 `output.uploadDiscord` は自動撮影投稿の許可条件として使わない。
+実装時は、自動撮影投稿OFFのために `output.uploadDiscord=true` でも自動撮影画像・本文をDiscordへ送らないように変更する。
+
 ## 受け入れ条件
 
 - [ ] 自動撮影投稿の実行条件が `autoCapture.discord.enabled` の明示ONだけになる。

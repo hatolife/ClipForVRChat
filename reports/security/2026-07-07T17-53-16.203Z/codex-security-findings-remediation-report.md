@@ -308,7 +308,9 @@
 
 ### 19:48版 残課題
 
-- 重大な仕様変更・運用判断待ち: 19:48-F01/F02/F05/F06/F08/F10/F16/F33。Release workflowのAction pinning/write token分離、署名鍵隔離、auto-capture Discord同意境界、設定タブ確認、原文引用redaction、隠しcamera設定、metadata失敗時upload、history token保存モデルは別途仕様判断が必要。
+- 方針決定済み・実装待ち: `issues/310` は自動撮影Discord投稿を専用ONだけで有効化する。`issues/311` は非表示camera自動起動/終了をバックエンド側で無効化する。`issues/314` はissue原文引用よりsecret redactionを優先する。`issues/315` は非表示タブのWebhook/自動投稿差分を保存前に具体表示する。`issues/316` はRelease署名secretをbuild jobからsign jobへ分離する。
+- 方針未決・追加解説済み: `issues/313` はhistory JSON/UI stateにDiscord tokenを保存しない短期案、Discord削除機能を落とす案、OS秘密情報ストアへ分離する案の影響を追加解説した。ユーザー判断待ち。
+- 将来提案: `docs/security-future-recommendations.md` に、313のOS秘密情報ストア分離、314のredaction検査、316のkeyless/KMS release signingを記録した。
 - 旧F43/19:48-F30相当のauto-photo scan cap policyは、追加情報再検証によりW9修正で対応済みへ移した。
 - 追加情報・方針確認待ちは、旧F05/旧F12の方針決定により今回分では解消した。
 - HEAD確認済み・重複・軽減済み: 19:48-F13/F14/F27/F29/F38/F47相当は前回修正または確認済みとして扱う。
