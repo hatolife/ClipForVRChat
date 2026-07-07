@@ -187,9 +187,10 @@
 ## 依存関係と無効化
 
 - Discord投稿がOFFの場合
-  - 投稿URLの自動コピーをグレーアウトし、編集不可にする。
-  - Discord投稿カテゴリの入力項目をグレーアウトし、編集不可にする。
+  - 投稿URLの自動コピーと通常投稿用Webhook URLをグレーアウトし、編集不可にする。
   - VRChat写真自動処理とスクリーンショット自動処理はグレーアウトしない。縮小、QRコードURL検出、ローカル保存はDiscord投稿なしでも実行できる。
+  - VRChat写真用Webhook URLとスクリーンショット用Webhook URLは、それぞれの自動処理がONでも通常Discord投稿がOFFならグレーアウトし、編集不可にする。
+  - 自動撮影用Webhook URLは通常Discord投稿のON/OFFではなく、自動撮影のDiscord投稿がOFFの場合にグレーアウトする。
 - VRChat写真自動処理がOFFの場合
   - VRChat写真用Webhook URLをグレーアウトし、編集不可にする。
 - スクリーンショット自動処理がOFFの場合

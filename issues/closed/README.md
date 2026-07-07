@@ -196,6 +196,7 @@
 | 225 | [自動撮影用Webhook URLをDiscord投稿タブへ移動する](unreleased/225-move-autocapture-webhook-to-discord-tab.md) | 完了 | 未定 | 自動撮影用Webhook URLをDiscord投稿タブへ移し、投稿先設定を同じ場所にまとめた。 |
 | 226 | [フォールバックモードを構図設定の上へ移動する](unreleased/226-move-fallback-mode-above-composition.md) | 完了 | 未定 | 自動撮影タブ概要で構図設定の上にフォールバックモードを表示し、詳細画面に入らず切り替えられるようにした。 |
 | 227 | [OSC送信ログを分離し任意OSC送信欄を追加する](unreleased/227-split-osc-send-log-and-debug-send.md) | 完了 | 未定 | OSCタブで受信ログと送信ログを分離し、デバッグ用に任意OSCを送信できる入力欄を追加した。 |
+| 228 | [全Markdownドキュメントを現状仕様に合わせて更新する](unreleased/228-update-all-markdown-documents.md) | 完了 | 未定 | リポジトリ内のMarkdownを横断確認し、現行ドキュメントのリンク切れ確認とRelease公開Asset運用の説明更新を完了した。 |
 | 229 | [ウィンドウ終了時にも未保存設定の保存確認を出す](unreleased/229-confirm-unsaved-settings-on-window-close.md) | 完了 | 未定 | 設定画面で未保存変更がある状態の×ボタンや複数起動による既存終了で、保存確認ダイアログを出すようにした。 |
 | 230 | [保存せず終了した設定変更を一時変更として復元する](unreleased/230-restore-unsaved-settings-draft-from-single-instance.md) | 完了 | 未定 | 未保存変更をsingle-instance配下へ一時保存し、次回起動時に保存せず一時状態として復元するようにした。 |
 | 231 | [未保存変更がある設定項目名をハイライトする](unreleased/231-highlight-unsaved-settings-fields.md) | 完了 | 未定 | 保存前に変更された設定項目名を設定画面上部へハイライト表示するようにした。 |

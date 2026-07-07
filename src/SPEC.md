@@ -673,6 +673,18 @@ config.json
       }
     },
     "playerLocal": {
+      "basisPose": {
+        "position": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "rotation": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        }
+      },
       "basisSource": "avatar_osc",
       "avatarOsc": {
         "parameterPrefix": "avatar_beacon",
@@ -695,6 +707,10 @@ config.json
     },
     "capture": {
       "mode": "stream",
+      "concurrentMode": "sequential",
+      "requestedCameraCount": 1,
+      "multiBackend": "dolly_multi",
+      "fallbackToSequential": true,
       "preplacedLocalAnchor": false,
       "autoEnablePreplacedLocalAnchor": false,
       "autoEnablePreplacedLocalAnchorAfterMinutes": 5,
@@ -712,12 +728,88 @@ config.json
       "captureTimeoutMs": 10000,
       "startDelayMs": 1000,
       "debugRecordingEnabled": false,
-      "debugFrameCount": 8
+      "debugFrameCount": 8,
+      "legacyFfmpegPath": "ffmpeg"
     },
     "restore": {
       "enabled": true,
       "preferSnapshot": true,
-      "snapshotFreshnessSec": 10
+      "snapshotFreshnessSec": 10,
+      "fallback": {
+        "mode": 0,
+        "streaming": false,
+        "smoothMovement": true,
+        "restorePose": false,
+        "pose": {
+          "position": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "zoom": 45,
+        "exposure": 0,
+        "focalDistance": 1.5,
+        "aperture": 15,
+        "hue": 120,
+        "saturation": 100,
+        "lightness": 50,
+        "lookAtMeXOffset": 0,
+        "lookAtMeYOffset": 0,
+        "flySpeed": 3,
+        "turnSpeed": 1,
+        "smoothingStrength": 5,
+        "photoRate": 1,
+        "duration": 2,
+        "showUiInCamera": false,
+        "lock": false,
+        "localPlayer": true,
+        "remotePlayer": true,
+        "environment": true,
+        "greenScreen": false,
+        "lookAtMe": false,
+        "autoLevelRoll": true,
+        "autoLevelPitch": false,
+        "flying": false,
+        "triggerTakesPhotos": false,
+        "dollyPathsStayVisible": false,
+        "cameraEars": false,
+        "showFocus": false,
+        "rollWhileFlying": false,
+        "orientationIsLandscape": true
+      }
+    },
+    "idle": {
+      "enabled": false,
+      "view": {
+        "id": "idle",
+        "name": "待機位置",
+        "enabled": true,
+        "sortOrder": 0,
+        "coordinateSpace": "player_local",
+        "pose": {
+          "position": {
+            "x": 0,
+            "y": -5,
+            "z": 0
+          },
+          "rotation": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        },
+        "zoom": 45,
+        "exposure": 0,
+        "settleDelayMs": 1500,
+        "captureDelayMs": 0,
+        "calibrated": false
+      }
     },
     "output": {
       "directory": "%USERPROFILE%\\Pictures\\VRChat\\VRC-AutoCapture",
@@ -747,7 +839,28 @@ config.json
         "name": "正面",
         "enabled": true,
         "sortOrder": 0,
-        "coordinateSpace": "player_local"
+        "coordinateSpace": "player_local",
+        "pose": {
+          "position": {
+            "x": 0,
+            "y": 0,
+            "z": 1
+          },
+          "rotation": {
+            "x": 0,
+            "y": 180,
+            "z": 0
+          }
+        },
+        "zoom": 45,
+        "exposure": 0,
+        "lookAtMe": true,
+        "localPlayer": true,
+        "remotePlayer": true,
+        "environment": true,
+        "settleDelayMs": 1500,
+        "captureDelayMs": 0,
+        "calibrated": false
       }
     ]
   }

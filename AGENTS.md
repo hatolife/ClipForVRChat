@@ -48,7 +48,7 @@
   - 先頭は `## ダウンロード` を置き、`- [プログラムのダウンロード](https://github.com/hatolife/ClipForVRChat/releases/download/vX.Y.Z/ClipForVRChat-vX.Y.Z-windows-amd64.zip)` の1行を置く。
   - 続けて `### 更新内容` を置き、直前の正式バージョンから見て結果的に何が変わったかを端的に列挙する。RCごとの細かい修正差分や内部作業の羅列にしない。
   - 最後に `### 比較` を置き、`https://github.com/hatolife/ClipForVRChat/compare/vA.B.C...vX.Y.Z` を置く。
-- GitHub Releaseへ公開添付するCI生成Assetは、通常利用者向けzip、単一exe署名asc、検証・切り分け用separated zip、AvatarBeacon source zipの4種類に絞る。sha256、個別exe、build metadataは公開Assetとして添付しない。
+- GitHub Releaseへ公開添付するCI生成Assetは、通常利用者向けzip、単一exe署名asc、検証・切り分け用separated zipの3種類に絞る。AvatarBeacon `.unitypackage` は外部AvatarBeacon Releaseから取得して署名検証後にzip内へ同梱し、ClipForVRChat側の公開Assetとしては添付しない。sha256、個別exe、build metadata、AvatarBeacon source zipは公開Assetとして添付しない。
 
 ## Spout2 revision更新運用
 
