@@ -253,4 +253,5 @@
 | 284 | [外部AvatarBeacon package同梱セキュリティレポートを解説する](investigation-only/284-explain-security-report-avatarbeacon-unverified-package.md) | 完了 | 調査のみ | 外部AvatarBeacon `.unitypackage` を検証せずRelease zipへ同梱するfindingの内容を整理した。 |
 | 285 | [外部AvatarBeacon unitypackageのPGP署名をRelease workflowで検証する](unreleased/285-verify-avatarbeacon-unitypackage-signature.md) | 完了 | 未定 | Release workflowでAvatarBeacon `.unitypackage.asc` を取得し、release-signing鍵のfingerprint/UID/署名を検証してから配布zipへ同梱するようにした。 |
 | 286 | [Spout helper隣接exe優先セキュリティレポートを解説する](investigation-only/286-explain-security-report-spout-helper-binary-planting.md) | 完了 | 調査のみ | 署名済み単一exeでも同じフォルダの未署名 `spout-capture.exe` が優先実行され得るfindingの内容を整理した。 |
+| 287 | [既定Spout helperは隣接exeより埋め込みhelperを優先する](unreleased/287-prefer-embedded-spout-helper-over-adjacent-default.md) | 完了 | 未定 | 署名済み単一exeの既定動作で、同じフォルダの未署名 `spout-capture.exe` ではなく埋め込みhelperを優先するようにした。 |
 | 288 | [Spout2 FetchContent未固定セキュリティレポートを解説する](investigation-only/288-explain-security-report-unpinned-spout2-fetchcontent.md) | 完了 | 調査のみ | ReleaseビルドでSpout2を不変commit/hashではなく可変タグで取得するfindingの内容を整理した。 |

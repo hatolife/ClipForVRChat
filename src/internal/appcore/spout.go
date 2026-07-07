@@ -26,7 +26,12 @@ const (
 	spoutLibraryDLLName = "SpoutLibrary.dll"
 )
 
-var spoutHelperCacheDirForTest string
+var (
+	spoutHelperCacheDirForTest       string
+	embeddedSpoutHelperAvailableFunc = embeddedSpoutHelperAvailable
+	resolveEmbeddedSpoutHelperFunc   = resolveEmbeddedSpoutHelper
+	spoutHelperNextToExecutableFunc  = spoutHelperNextToExecutable
+)
 
 type SpoutSenderInfo struct {
 	Name     string `json:"name"`
@@ -117,15 +122,15 @@ func ResolveSpoutHelperPath(helperPath string) (string, error) {
 		}
 		return helperPath, nil
 	}
-	if candidate, ok := spoutHelperNextToExecutable(helperPath); ok {
-		return candidate, nil
-	}
-	if useEmbeddedFallback && embeddedSpoutHelperAvailable() {
-		embedded, err := resolveEmbeddedSpoutHelper()
+	if useEmbeddedFallback && embeddedSpoutHelperAvailableFunc() {
+		embedded, err := resolveEmbeddedSpoutHelperFunc()
 		if err != nil {
 			return "", err
 		}
 		return embedded, nil
+	}
+	if candidate, ok := spoutHelperNextToExecutableFunc(helperPath); ok {
+		return candidate, nil
 	}
 	resolved, err := exec.LookPath(helperPath)
 	if err != nil {

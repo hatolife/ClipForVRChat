@@ -325,6 +325,67 @@ func TestResolveSpoutHelperPathUsesExplicitExistingPath(t *testing.T) {
 	}
 }
 
+func TestResolveSpoutHelperPathPrefersEmbeddedForDefaultName(t *testing.T) {
+	oldAvailable := embeddedSpoutHelperAvailableFunc
+	oldResolveEmbedded := resolveEmbeddedSpoutHelperFunc
+	oldNextToExecutable := spoutHelperNextToExecutableFunc
+	t.Cleanup(func() {
+		embeddedSpoutHelperAvailableFunc = oldAvailable
+		resolveEmbeddedSpoutHelperFunc = oldResolveEmbedded
+		spoutHelperNextToExecutableFunc = oldNextToExecutable
+	})
+
+	embedded := filepath.Join(t.TempDir(), spoutHelperFileName)
+	planted := filepath.Join(t.TempDir(), spoutHelperFileName)
+	embeddedSpoutHelperAvailableFunc = func() bool { return true }
+	resolveEmbeddedSpoutHelperFunc = func() (string, error) { return embedded, nil }
+	nextToCalls := 0
+	spoutHelperNextToExecutableFunc = func(helperPath string) (string, bool) {
+		nextToCalls++
+		return planted, true
+	}
+
+	for _, helperPath := range []string{"", spoutHelperFileName} {
+		nextToCalls = 0
+		got, err := ResolveSpoutHelperPath(helperPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != embedded {
+			t.Fatalf("path = %q, want embedded %q for helperPath %q", got, embedded, helperPath)
+		}
+		if nextToCalls != 0 {
+			t.Fatalf("next-to-executable lookup was called %d times for helperPath %q", nextToCalls, helperPath)
+		}
+	}
+}
+
+func TestResolveSpoutHelperPathUsesAdjacentWhenEmbeddedUnavailable(t *testing.T) {
+	oldAvailable := embeddedSpoutHelperAvailableFunc
+	oldNextToExecutable := spoutHelperNextToExecutableFunc
+	t.Cleanup(func() {
+		embeddedSpoutHelperAvailableFunc = oldAvailable
+		spoutHelperNextToExecutableFunc = oldNextToExecutable
+	})
+
+	adjacent := filepath.Join(t.TempDir(), spoutHelperFileName)
+	embeddedSpoutHelperAvailableFunc = func() bool { return false }
+	spoutHelperNextToExecutableFunc = func(helperPath string) (string, bool) {
+		if helperPath != spoutHelperFileName {
+			t.Fatalf("helperPath = %q, want %q", helperPath, spoutHelperFileName)
+		}
+		return adjacent, true
+	}
+
+	got, err := ResolveSpoutHelperPath("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != adjacent {
+		t.Fatalf("path = %q, want adjacent %q", got, adjacent)
+	}
+}
+
 func TestExpandFFmpegInputPlaceholdersNoWindow(t *testing.T) {
 	args := []string{"-f", "gdigrab", "-i", "desktop"}
 	got, err := expandFFmpegInputPlaceholders(nil, args, "")
