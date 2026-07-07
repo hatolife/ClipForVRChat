@@ -24,9 +24,13 @@
 - ローカルアンカー配置済みカメラを使うフォールバックモードを追加し、自動ON/OFFを個別に設定できるようにしました。自動ON/OFFはどちらも既定OFFです。
 - 自動撮影の詳細設定画面でも「保存」「閉じる」ボタンを表示するようにしました。
 - Release workflowで同梱するAvatarBeacon packageのPGP署名を検証し、Spout2取得元をSHA256検証付きの固定archiveにしました。
+- Release workflowの署名処理をbuild jobから分離し、署名secretを署名専用jobだけで扱うようにしました。
 - 単一exe配布では既定で埋め込みSpout helperを使い、同じフォルダに置かれた未署名helperを優先しないようにしました。
 - 設定由来のlegacy ffmpeg実行パスを制限し、外部設定から任意実行ファイルを起動しにくくしました。
 - 自動処理の監視フォルダとDiscord送信先を保存前に確認できるようにし、広すぎる監視フォルダには警告を表示するようにしました。
+- Webhook、自動投稿、監視フォルダ、自動撮影スケジュールなどの重要な設定差分を保存前に具体的に確認できるようにしました。
+- 自動撮影のDiscord投稿を専用設定がONの場合だけ実行するようにし、通常Discord投稿ONだけでは自動撮影結果を投稿しないようにしました。
+- Discord履歴にWebhook tokenを保存せず、Discord側の削除時だけ現在設定から一時的にtokenを解決するようにしました。
 - 別フォルダや別バージョンのClipForVRChatでも同じWindowsユーザーでは単一起動になるようにし、OSC port競合を避けました。
 - 起動中の進捗表示、frontend template検査、Wails API surface検査を追加し、GUI起動不具合を切り分けやすくしました。
 
