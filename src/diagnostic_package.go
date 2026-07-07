@@ -33,6 +33,11 @@ mwM/zreTlthl15c9e1qSIEcR5OdubzCuJgI=
 =OlRJ
 -----END PGP PUBLIC KEY BLOCK-----`
 
+const (
+	diagnosticPlainZipPrefix = "※これは添付しないでください "
+	diagnosticGPGPrefix      = "※これを添付してください "
+)
+
 type diagnosticPackageManifest struct {
 	CreatedAt    string                  `json:"createdAt"`
 	AppVersion   string                  `json:"appVersion"`
@@ -81,8 +86,10 @@ func createEncryptedDiagnosticPackage(configPath string, cfg appcore.Config) (st
 	stamp := time.Now().Format("20060102-150405")
 	workDir := filepath.Join(outputDir, "diagnostics", stamp)
 	dataDir := filepath.Join(workDir, "data")
-	zipPath := filepath.Join(workDir, fmt.Sprintf("ClipForVRChat-diagnostics-%s.zip", stamp))
-	outputPath := zipPath + ".gpg"
+	zipFileName := fmt.Sprintf("ClipForVRChat-diagnostics-%s.zip", stamp)
+	zipPath := filepath.Join(workDir, zipFileName)
+	reviewZipPath := filepath.Join(workDir, diagnosticPlainZipPrefix+zipFileName)
+	outputPath := filepath.Join(workDir, diagnosticGPGPrefix+zipFileName+".gpg")
 	redactor := newDiagnosticPathRedactor(configPath)
 
 	appendDiagnosticOutputDirectoryLog(configPath, cfg, redactor)
@@ -108,7 +115,10 @@ func createEncryptedDiagnosticPackage(configPath string, cfg appcore.Config) (st
 	if err := appcore.WritePrivateFile(outputPath, encrypted); err != nil {
 		return "", fmt.Errorf("診断パッケージを保存できません: %w", err)
 	}
-	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(configPath), "diagnostic package=%q zip=%q staged_data_dir=%q files=%d missing=%d", outputPath, zipPath, dataDir, len(manifest.Files), len(manifest.MissingFiles))
+	if err := os.Rename(zipPath, reviewZipPath); err != nil {
+		return "", fmt.Errorf("確認用診断zipのファイル名を変更できません: %w", err)
+	}
+	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(configPath), "diagnostic package=%q zip=%q staged_data_dir=%q files=%d missing=%d", outputPath, reviewZipPath, dataDir, len(manifest.Files), len(manifest.MissingFiles))
 	return outputPath, nil
 }
 

@@ -1530,7 +1530,14 @@ func TestCreateEncryptedDiagnosticPackageEncryptsZip(t *testing.T) {
 	if filepath.Base(filepath.Dir(workDir)) != "diagnostics" || filepath.Ext(path) != ".gpg" {
 		t.Fatalf("path = %q, want encrypted package under diagnostics timestamp dir", path)
 	}
-	zipPath := strings.TrimSuffix(path, ".gpg")
+	if !strings.HasPrefix(filepath.Base(path), diagnosticGPGPrefix) {
+		t.Fatalf("path = %q, want gpg filename prefix %q", path, diagnosticGPGPrefix)
+	}
+	baseZipName := strings.TrimPrefix(strings.TrimSuffix(filepath.Base(path), ".gpg"), diagnosticGPGPrefix)
+	zipPath := filepath.Join(workDir, diagnosticPlainZipPrefix+baseZipName)
+	if !strings.HasPrefix(filepath.Base(zipPath), diagnosticPlainZipPrefix) {
+		t.Fatalf("zipPath = %q, want zip filename prefix %q", zipPath, diagnosticPlainZipPrefix)
+	}
 	if _, err := os.Stat(zipPath); err != nil {
 		t.Fatalf("plain zip should remain for user review: %v", err)
 	}
