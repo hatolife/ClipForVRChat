@@ -90,6 +90,75 @@ func TestAppSaveConfigAndOpenSettings(t *testing.T) {
 	}
 }
 
+func TestAppOpenSettingsImportedConfigIsPreviewUntilSaved(t *testing.T) {
+	dir := t.TempDir()
+	activeConfigPath := filepath.Join(dir, "config.json")
+	importedConfigPath := filepath.Join(dir, "imported.json")
+
+	activeCfg := appcore.DefaultConfig()
+	activeCfg.Image.Suffix = "_active"
+	if err := appcore.SaveConfig(activeConfigPath, activeCfg); err != nil {
+		t.Fatal(err)
+	}
+	importedCfg := appcore.DefaultConfig()
+	importedCfg.Image.Suffix = "_imported"
+	if err := appcore.SaveConfig(importedConfigPath, importedCfg); err != nil {
+		t.Fatal(err)
+	}
+
+	app := NewApp(activeConfigPath, appcore.UIState{Mode: appcore.ModeResults, Config: activeCfg, ConfigPath: activeConfigPath})
+	state, err := app.OpenSettings(importedConfigPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if app.configPath != activeConfigPath {
+		t.Fatalf("configPath = %q, want %q", app.configPath, activeConfigPath)
+	}
+	if state.ConfigPath != activeConfigPath {
+		t.Fatalf("state.ConfigPath = %q, want %q", state.ConfigPath, activeConfigPath)
+	}
+	if state.Config.Image.Suffix != "_imported" {
+		t.Fatalf("preview suffix = %q, want _imported", state.Config.Image.Suffix)
+	}
+	if !state.UnsavedSettingsDraft {
+		t.Fatal("imported config should be treated as an unsaved preview")
+	}
+	if state.SettingsBaselineConfig == nil || state.SettingsBaselineConfig.Image.Suffix != "_active" {
+		t.Fatalf("baseline = %+v, want active config", state.SettingsBaselineConfig)
+	}
+
+	discarded := app.CloseSettings()
+	if discarded.Mode != appcore.ModeResults {
+		t.Fatalf("discarded mode = %s, want results", discarded.Mode)
+	}
+	if discarded.Config.Image.Suffix != "_active" {
+		t.Fatalf("discarded config suffix = %q, want _active", discarded.Config.Image.Suffix)
+	}
+
+	state, err = app.OpenSettings(importedConfigPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := app.SaveConfig(state.Config); err != nil {
+		t.Fatal(err)
+	}
+	saved, err := appcore.LoadConfig(activeConfigPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.Image.Suffix != "_imported" {
+		t.Fatalf("saved active config suffix = %q, want _imported", saved.Image.Suffix)
+	}
+
+	closed := app.CloseSettings()
+	if closed.Mode != appcore.ModeResults {
+		t.Fatalf("closed mode = %s, want results", closed.Mode)
+	}
+	if closed.Config.Image.Suffix != "_imported" {
+		t.Fatalf("closed config suffix = %q, want _imported", closed.Config.Image.Suffix)
+	}
+}
+
 func TestAppSaveConfigWritesDiagnosticConfigSummary(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.json")
@@ -146,6 +215,18 @@ func TestAppSaveConfigLogsFailure(t *testing.T) {
 	}
 	if text := string(data); !strings.Contains(text, "settings save error: err=") {
 		t.Fatalf("diagnostic log = %q, want settings save error", text)
+	}
+}
+
+func TestPickerDefaultDirectoryRejectsUnsafeNetworkPaths(t *testing.T) {
+	for _, current := range []string{
+		`\\server\share\output`,
+		`\\?\UNC\server\share\output`,
+		`\\.\pipe\picker`,
+	} {
+		if got := pickerDefaultDirectory(current); got != "" {
+			t.Fatalf("pickerDefaultDirectory(%q) = %q, want empty", current, got)
+		}
 	}
 }
 
@@ -477,8 +558,12 @@ func TestTrustedExternalURL(t *testing.T) {
 		{name: "booth", raw: "https://hatolife.booth.pm/items/8531663", ok: true},
 		{name: "discord help", raw: "https://support.discord.com/hc/ja/articles/228383668", ok: true},
 		{name: "twitter", raw: "https://x.com/hato_poppo_life", ok: true},
+		{name: "gnupg", raw: "https://gnupg.org/", ok: true},
+		{name: "openpgp keys", raw: "https://keys.openpgp.org/search?q=poppo@hato.life", ok: true},
+		{name: "vrchat feedback", raw: "https://feedback.vrchat.com/bug-reports/p/camera-osc-does-not-work-unless-camera-ui-is-open", ok: true},
 		{name: "http", raw: "http://github.com/hatolife/ClipForVRChat", ok: false},
 		{name: "file", raw: "file:///C:/Windows/win.ini", ok: false},
+		{name: "google search remains blocked", raw: "https://www.google.com/search?q=gpg", ok: false},
 		{name: "unknown host", raw: "https://example.com", ok: false},
 	}
 	for _, tt := range tests {

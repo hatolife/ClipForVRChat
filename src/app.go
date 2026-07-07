@@ -509,7 +509,7 @@ func trustedExternalURL(rawURL string) (string, error) {
 		return "", fmt.Errorf("開けないURLです")
 	}
 	switch strings.ToLower(parsed.Hostname()) {
-	case "github.com", "hatolife.booth.pm", "support.discord.com", "x.com":
+	case "github.com", "hatolife.booth.pm", "support.discord.com", "x.com", "gnupg.org", "keys.openpgp.org", "feedback.vrchat.com":
 	default:
 		return "", fmt.Errorf("許可されていないURLです")
 	}
@@ -587,20 +587,50 @@ func (a *App) SelectScreenshotDirectory(current string) (string, error) {
 }
 
 func (a *App) selectDirectory(title string, current string) (string, error) {
-	dir := strings.Trim(strings.TrimSpace(current), `"`)
+	dir := pickerDefaultDirectory(current)
 	if dir != "" && !filepath.IsAbs(dir) {
 		exe, err := os.Executable()
 		if err == nil {
 			dir = filepath.Join(filepath.Dir(exe), dir)
 		}
 	}
-	if stat, err := os.Stat(dir); err != nil || !stat.IsDir() {
+	if dir == "" || isUnsafePickerDefaultDirectory(dir) {
+		dir = ""
+	} else if stat, err := os.Stat(dir); err != nil || !stat.IsDir() {
 		dir = ""
 	}
 	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
 		Title:            title,
 		DefaultDirectory: dir,
 	})
+}
+
+func pickerDefaultDirectory(current string) string {
+	dir := strings.Trim(strings.TrimSpace(current), `"`)
+	if dir == "" {
+		return ""
+	}
+	if isUnsafePickerDefaultDirectory(dir) {
+		return ""
+	}
+	return dir
+}
+
+func isUnsafePickerDefaultDirectory(dir string) bool {
+	dir = strings.TrimSpace(strings.Trim(dir, `"`))
+	if dir == "" {
+		return false
+	}
+	lower := strings.ToLower(dir)
+	switch {
+	case strings.HasPrefix(lower, `\\?\`),
+		strings.HasPrefix(lower, `\\.\`),
+		strings.HasPrefix(lower, `\\`),
+		strings.HasPrefix(lower, `//`):
+		return true
+	default:
+		return false
+	}
 }
 
 func (a *App) ClearResults() appcore.UIState {
@@ -1282,12 +1312,16 @@ func (a *App) saveAutoCaptureConfigFromSettingsLocked(cfg appcore.Config) error 
 func (a *App) CloseSettings() appcore.UIState {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if a.state.SettingsBaselineConfig != nil {
+		a.state.Config = *a.state.SettingsBaselineConfig
+	}
 	if err := removeSettingsDraft(); err != nil {
 		a.logLifecycleLocked("settings draft remove on close settings failed: %v", err)
 	}
 	a.settingsDraftDirty = false
 	a.state.Mode = appcore.ModeResults
 	a.state.Message = ""
+	a.state.ConfigPath = a.configPath
 	a.state.SettingsBaselineConfig = nil
 	a.state.UnsavedSettingsDraft = false
 	a.state.Results = nil
@@ -1299,15 +1333,31 @@ func (a *App) CloseSettings() appcore.UIState {
 func (a *App) OpenSettings(path string) (appcore.UIState, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	configPath := a.configPath
-	if strings.TrimSpace(path) != "" {
-		configPath = path
-	}
-	cfg, err := appcore.LoadConfig(configPath)
+	cfg, err := appcore.LoadConfig(a.configPath)
 	if err != nil {
 		return a.state, err
 	}
-	a.configPath = configPath
+	if strings.TrimSpace(path) != "" {
+		importedCfg, err := appcore.LoadConfig(path)
+		if err != nil {
+			return a.state, err
+		}
+		baseline := cfg
+		a.state.Mode = appcore.ModeSettings
+		a.state.Message = ""
+		a.state.ConfigPath = a.configPath
+		a.state.Config = importedCfg
+		a.state.SettingsBaselineConfig = &baseline
+		a.state.UnsavedSettingsDraft = true
+		a.state.Results = nil
+		a.state.PendingPaths = nil
+		a.state.ProcessOnSave = false
+		a.settingsDraftDirty = true
+		if err := saveSettingsDraftForConfig(a.configPath, importedCfg, &baseline); err != nil {
+			a.logLifecycleLocked("settings draft save failed: %v", err)
+		}
+		return a.state, nil
+	}
 	a.state.Mode = appcore.ModeSettings
 	a.state.Message = ""
 	a.state.ConfigPath = a.configPath
@@ -1317,7 +1367,6 @@ func (a *App) OpenSettings(path string) (appcore.UIState, error) {
 	a.state.Results = nil
 	a.state.PendingPaths = nil
 	a.state.ProcessOnSave = false
-	a.restartCameraPoseReceiverLocked(cfg)
 	return a.state, nil
 }
 
