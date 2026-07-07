@@ -32,8 +32,36 @@
 
 ## 受け入れ条件
 
-- [ ] `RELEASE_NOTES.md` の `v0.1.8` 更新内容が今回のbeta内容を含む。
-- [ ] `develop` と `v0.1.8-b16` タグをGitHubへpushする。
-- [ ] Release workflowが成功する。
-- [ ] GitHub Release `v0.1.8-b16` が prerelease として作成される。
-- [ ] Release添付ファイル一覧とzip内ファイル一覧を確認する。
+- [x] `RELEASE_NOTES.md` の `v0.1.8` 更新内容が今回のbeta内容を含む。
+- [x] `develop` と `v0.1.8-b16` タグをGitHubへpushする。
+- [x] Release workflowが成功する。
+- [x] GitHub Release `v0.1.8-b16` が prerelease として作成される。
+- [x] Release添付ファイル一覧とzip内ファイル一覧を確認する。
+
+## 作業結果
+
+- `v0.1.8-b16` タグを `21d2533f` に作成し、GitHubへpushした。
+- Release workflow: https://github.com/hatolife/ClipForVRChat/actions/runs/28880812263
+- develop CI: https://github.com/hatolife/ClipForVRChat/actions/runs/28880811952
+- GitHub Release: https://github.com/hatolife/ClipForVRChat/releases/tag/v0.1.8-b16
+- GitHub Releaseは prerelease、draftなし。
+- 公開Assetは次の3件。
+  - `ClipForVRChat-v0.1.8-b16-windows-amd64.zip`
+  - `ClipForVRChat-v0.1.8-b16-windows-amd64.exe.asc`
+  - `ClipForVRChat-v0.1.8-b16-windows-amd64-separated.zip`
+- 通常zip内ファイル一覧を確認した。
+  - `AvatarBeacon_v0.0.1.unitypackage`
+  - `ClipForVRChat-v0.1.8-b16-windows-amd64.exe.asc`
+  - `ClipForVRChat.exe`
+  - `LICENSE`
+  - `README.md`
+  - `Release-signing-public-key.url`
+- separated zip内ファイル一覧を確認した。
+  - `AvatarBeacon_v0.0.1.unitypackage`
+  - `ClipForVRChat.exe`
+  - `LICENSE`
+  - `README.md`
+  - `Release-signing-public-key.url`
+  - `spout-capture.exe`
+  - `Spout2-LICENSE.txt`
+  - `SpoutLibrary.dll`

@@ -52,7 +52,7 @@
 - [x] 既定構図と新規構図で `RemotePlayer` がONになる。
 - [x] 構図設定に自分、他ユーザー、ワールドのマスク入力がある。
 - [x] frontend template検査とbuildが成功する。
-- [ ] 修正を含む beta を発行し、Release workflowと配布物を確認する。
+- [x] 修正を含む beta を発行し、Release workflowと配布物を確認する。
 
 ## 対応メモ
 
@@ -60,3 +60,4 @@
 - 2026-07-08: 構図ごとの明るさ入力を追加し、`/usercamera/Exposure` の既定値を中立の `0` にした。現在位置取得では新しい露出サンプルがあれば構図へ保存する。
 - 2026-07-08: 既定構図と新規構図で他ユーザーの表示対象マスクをONにし、構図UIで自分、他ユーザー、ワールドを切り替えられるようにした。
 - 2026-07-08: 検証: `node scripts/check-frontend-template-literals.mjs`、`node scripts/check-vue-runtime-template.mjs`、`node scripts/check-wails-api-surface.mjs`、`npm run build`、`go test ./internal/appcore`、`go test . -run 'TestAppSaveCurrentCameraPoseToView'`、`go test ./...`。
+- 2026-07-08: `v0.1.8-b16` betaを発行し、Release workflow、develop CI、GitHub Release、公開Asset、zip内ファイル一覧を確認した。
