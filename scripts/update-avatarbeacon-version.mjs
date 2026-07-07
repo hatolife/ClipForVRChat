@@ -14,7 +14,7 @@ if (!version || !/^v?\d+\.\d+\.\d+(-(a|b|rc)\d+)?$|^ci$|^dev$/.test(version)) {
 const avatarRoot = path.join(root, 'avatar-gimmicks', 'AvatarBeacon', 'Assets', 'PoppoWorks', 'AvatarBeacon')
 const versionTxtPath = path.join(avatarRoot, 'Version.txt')
 const versionMetaPath = `${versionTxtPath}.meta`
-const prefabPath = path.join(avatarRoot, 'Prefabs', 'AvatarBeacon.prefab')
+const prefabDir = path.join(avatarRoot, 'Prefabs')
 
 const gameObjectID = '910239000000000001'
 const transformID = '910239000000000002'
@@ -54,7 +54,32 @@ function assertOrWrite(file, expected) {
   fs.writeFileSync(file, expected, 'utf8')
 }
 
-function versionPrefabBlock() {
+function avatarBeaconPrefabPaths() {
+  if (!fs.existsSync(prefabDir)) {
+    console.error(`AvatarBeacon prefab directory was not found: ${prefabDir}`)
+    process.exit(1)
+  }
+  const prefabs = fs.readdirSync(prefabDir)
+    .filter((name) => /^AvatarBeacon.*\.prefab$/.test(name))
+    .sort()
+    .map((name) => path.join(prefabDir, name))
+  if (prefabs.length === 0) {
+    console.error(`AvatarBeacon prefab files were not found in: ${prefabDir}`)
+    process.exit(1)
+  }
+  return prefabs
+}
+
+function prefabRootTransformID(prefab, file) {
+  const rootMatch = prefab.match(/--- !u!1 &(\d+)\nGameObject:\n[\s\S]*?\n  m_Name: AvatarBeacon[^\n]*\n[\s\S]*?--- !u!4 &(\d+)\nTransform:\n[\s\S]*?\n  m_GameObject: \{fileID: \1\}\n[\s\S]*?\n  m_Father: \{fileID: 0\}/)
+  if (!rootMatch) {
+    console.error(`AvatarBeacon root GameObject was not found in: ${file}`)
+    process.exit(1)
+  }
+  return rootMatch[2]
+}
+
+function versionPrefabBlock(rootTransformID) {
   return [
     `--- !u!1 &${gameObjectID}`,
     'GameObject:',
@@ -91,7 +116,8 @@ function versionPrefabBlock() {
   ].join('\n')
 }
 
-function updatePrefab(prefab) {
+function updatePrefab(prefab, file) {
+  const rootTransformID = prefabRootTransformID(prefab, file)
   const blockPattern = new RegExp(`--- !u!1 &${gameObjectID}\\n[\\s\\S]*?--- !u!4 &${transformID}\\n[\\s\\S]*?(?=\\n--- !u!|\\s*$)`)
   let next = prefab.replace(blockPattern, '')
   const childLine = `  - {fileID: ${transformID}}`
@@ -100,14 +126,16 @@ function updatePrefab(prefab) {
     next = next.replace(rootPattern, (_match, head, children) => `${head}${children}${childLine}\n`)
   }
   next = next.replace(/\n*$/, '\n')
-  return `${next}${versionPrefabBlock()}`
+  return `${next}${versionPrefabBlock(rootTransformID)}`
 }
 
 assertOrWrite(versionTxtPath, versionTxt)
 assertOrWrite(versionMetaPath, versionMeta)
 
-const expectedPrefab = updatePrefab(readText(prefabPath))
-assertOrWrite(prefabPath, expectedPrefab)
+for (const prefabPath of avatarBeaconPrefabPaths()) {
+  const expectedPrefab = updatePrefab(readText(prefabPath), prefabPath)
+  assertOrWrite(prefabPath, expectedPrefab)
+}
 
 if (process.exitCode) {
   process.exit(process.exitCode)
