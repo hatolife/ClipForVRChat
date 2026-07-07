@@ -582,6 +582,7 @@ func (c *AutoCaptureConfig) Normalize() {
 	if c.Capture.ButtonReleaseDelayMS < 200 {
 		c.Capture.ButtonReleaseDelayMS = 200
 	}
+	c.Capture.CloseCameraAfterBatch = false
 	if c.Capture.AutoEnablePreplacedAfterMinutes <= 0 {
 		c.Capture.AutoEnablePreplacedAfterMinutes = 5
 	}

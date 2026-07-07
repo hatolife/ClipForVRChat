@@ -212,15 +212,13 @@ func ResetUserCameraOSC(ctx context.Context, cfg Config) error {
 		return err
 	}
 	defer client.close()
-	for _, address := range []string{"/usercamera/Capture", "/usercamera/Close"} {
-		if err := client.sendBool(address, false); err != nil {
-			diagAutoCapture(logPath, "osc recovery bool error: address=%q err=%v", address, err)
-			return err
-		}
-		diagAutoCapture(logPath, "osc recovery bool success: address=%q value=false", address)
-		if !sleepContext(ctx, 100*time.Millisecond) {
-			return ctx.Err()
-		}
+	if err := client.sendBool("/usercamera/Capture", false); err != nil {
+		diagAutoCapture(logPath, "osc recovery bool error: address=%q err=%v", "/usercamera/Capture", err)
+		return err
+	}
+	diagAutoCapture(logPath, "osc recovery bool success: address=%q value=false", "/usercamera/Capture")
+	if !sleepContext(ctx, 100*time.Millisecond) {
+		return ctx.Err()
 	}
 	if err := sendCameraBoolCompat(client, logPath, "/usercamera/Streaming", false, "osc_recovery"); err != nil {
 		return err
@@ -238,14 +236,13 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) (results []Result, err e
 	cfg.Normalize()
 	ac := cfg.AutoCapture
 	logPath := cfg.DiagnosticLogPath
-	diagAutoCapture(logPath, "run_once begin: mode=%q schedule_enabled=%t capture_on_start=%t interval_sec=%d preplaced_local_anchor=%t open_before_batch=%t close_after_batch=%t button_release_ms=%d settle_ms=%d",
+	diagAutoCapture(logPath, "run_once begin: mode=%q schedule_enabled=%t capture_on_start=%t interval_sec=%d preplaced_local_anchor=%t open_before_batch=%t button_release_ms=%d settle_ms=%d",
 		ac.Capture.Mode,
 		ac.Schedule.Enabled,
 		ac.Schedule.CaptureOnStart,
 		ac.Schedule.CaptureIntervalSec,
 		ac.Capture.PreplacedLocalAnchorEnabled(),
 		ac.Capture.OpenCameraBeforeBatch,
-		ac.Capture.CloseCameraAfterBatch,
 		ac.Capture.ButtonReleaseDelayMS,
 		ac.Capture.SettleDelayMS,
 	)
@@ -381,25 +378,7 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) (results []Result, err e
 			successCount++
 		}
 	}
-	if ac.Capture.CloseCameraAfterBatch && ac.Capture.PreplacedLocalAnchorEnabled() {
-		diagAutoCapture(logPath, "camera close skipped: preplaced_local_anchor=true")
-	} else if ac.Capture.CloseCameraAfterBatch && (successCount > 0 || ac.Capture.Mode == "stream") {
-		if ac.Capture.Mode == "stream" {
-			diagAutoCapture(logPath, "osc button release begin: address=%q detail=%q", "/usercamera/Streaming", "stream_stop")
-			if err := sendCameraBoolCompat(client, logPath, "/usercamera/Streaming", false, "stream_stop"); err != nil {
-				diagAutoCapture(logPath, "stream stop failed: err=%v", err)
-			} else {
-				diagAutoCapture(logPath, "osc button release success: address=%q detail=%q", "/usercamera/Streaming", "stream_stop")
-			}
-		}
-		if err := sendCameraButton(ctx, client, "/usercamera/Close", ac.Capture.ButtonReleaseDelayMS, logPath, "batch_close"); err != nil {
-			diagAutoCapture(logPath, "camera close failed: err=%v", err)
-		}
-	} else if ac.Capture.CloseCameraAfterBatch {
-		diagAutoCapture(logPath, "camera close skipped: reason=%q successful_shots=%d", "no_successful_shots", successCount)
-	} else {
-		diagAutoCapture(logPath, "camera close skipped: close_after_batch=false")
-	}
+	diagAutoCapture(logPath, "camera close skipped: usercamera_close_disabled=true successful_shots=%d", successCount)
 	diagAutoCapture(logPath, "run_once complete: batch_id=%q results=%d", batchID, len(results))
 	return results, nil
 }

@@ -240,8 +240,8 @@ func TestResetUserCameraOSCUsesStreamingCompatAndKeepsOtherSettingsUntouched(t *
 	}
 
 	samples := withoutVersionNoticePackets(readOSCPacketSamples(t, conn))
-	if len(samples) != 5 {
-		t.Fatalf("packet count = %d, want 5: %+v", len(samples), samples)
+	if len(samples) != 4 {
+		t.Fatalf("packet count = %d, want 4: %+v", len(samples), samples)
 	}
 
 	want := []struct {
@@ -250,7 +250,6 @@ func TestResetUserCameraOSCUsesStreamingCompatAndKeepsOtherSettingsUntouched(t *
 		intVal  *int
 	}{
 		{address: "/usercamera/Capture", boolVal: boolPtr(false)},
-		{address: "/usercamera/Close", boolVal: boolPtr(false)},
 		{address: "/usercamera/Streaming", boolVal: boolPtr(false)},
 		{address: "/usercamera/Streaming", intVal: intPtr(0)},
 		{address: "/usercamera/Mode", intVal: intPtr(0)},
@@ -450,7 +449,7 @@ func TestAutoCaptureRunnerRunOnceSkipsCameraAutoOpenWhenDisabled(t *testing.T) {
 	cfg.AutoCapture.Capture.Mode = "stream"
 	cfg.AutoCapture.Capture.PreplacedLocalAnchor = boolPtr(false)
 	cfg.AutoCapture.Capture.OpenCameraBeforeBatch = false
-	cfg.AutoCapture.Capture.CloseCameraAfterBatch = false
+	cfg.AutoCapture.Capture.CloseCameraAfterBatch = true
 	cfg.AutoCapture.Stream.SpoutHelperPath = filepath.Join(t.TempDir(), "missing-spout-capture.exe")
 	cfg.AutoCapture.Output.Directory = t.TempDir()
 	cfg.AutoCapture.Presence.WatchOutputLog = false
@@ -477,6 +476,8 @@ func TestAutoCaptureRunnerRunOnceSkipsCameraAutoOpenWhenDisabled(t *testing.T) {
 		switch sample.Address {
 		case "/usercamera/Mode", "/usercamera/SmoothMovement", "/usercamera/Streaming":
 			t.Fatalf("camera auto-open packet should not be sent when disabled: %+v all=%+v", sample, samples)
+		case "/usercamera/Close":
+			t.Fatalf("camera close packet should not be sent even when legacy closeCameraAfterBatch is true: %+v all=%+v", sample, samples)
 		}
 		if sample.Address == "/usercamera/AutoLevelRoll" && sample.HasBool && sample.Bool {
 			hasAutoLevelRoll = true
