@@ -1,0 +1,539 @@
+Imported config can execute arbitrary ffmpeg command
+Link: https://chatgpt.com/codex/cloud/security/findings/9b49f259a284819193c25862c885e028?sev=critical%2Chigh
+Criticality: high (attack path: high)
+Status: new
+
+# Metadata
+Repo: hatolife/ClipForVRChat
+Commit: 08dbae4
+Author: poppo@hato.life
+Created: 2026/7/8 3:18:57
+Assignee: Unassigned
+Signals: Security, Validated, Attack-path
+
+# Summary
+Introduced: untrusted/config-controlled Stream ffmpeg settings are used as an executable path and command arguments without restricting them to a trusted ffmpeg binary or requiring an explicit trust/confirmation boundary for imported configs.
+This commit introduces Stream auto-capture by adding AutoCaptureStreamConfig fields and passing them directly to exec.CommandContext. LoadConfig accepts JSON configuration files, and the app exposes both scheduled auto-capture and the new TestAutoCaptureView path that call AutoCaptureRunner.RunOnce. Because Normalize only trims ffmpegPath and inputArgs, an attacker who convinces a user to open/save or test a crafted config can set autoCapture.stream.ffmpegPath to an arbitrary local executable and autoCapture.stream.inputArgs to attacker-chosen arguments. exec.CommandContext avoids shell metacharacter injection, but it still intentionally executes the attacker-selected binary. This turns an untrusted configuration file from data into code execution under the current user's privileges. The issue is introduced by this commit because the external ffmpeg execution path did not previously exist.
+
+# Validation
+## Rubric
+- [x] External JSON configs can be opened/loaded into app state via LoadConfig.
+- [x] autoCapture.stream.ffmpegPath and inputArgs are JSON-backed, attacker-controlled fields.
+- [x] Normalize only trims/defaults these fields and does not require a trusted ffmpeg binary or user trust boundary.
+- [x] TestAutoCaptureView/AutoCaptureRunner.RunOnce reaches the stream capture path for enabled stream views.
+- [x] A crafted config dynamically caused execution of an arbitrary helper script with attacker-chosen arguments.
+## Report
+Validated the finding with targeted code review plus a dynamic PoC against the real appcore auto-capture runner. Relevant code path: src/main.go:80-92 accepts an external .json and calls appcore.LoadConfig; src/internal/appcore/config.go:108-112 stores stream.ffmpegPath and stream.inputArgs in JSON-backed config; src/internal/appcore/config.go:274-286 unmarshals JSON over defaults; src/internal/appcore/config.go:420-427 only trims/defaults these fields without restricting the executable; src/internal/appcore/autocapture.go:52-70 starts AutoCaptureRunner.RunOnce; src/internal/appcore/autocapture.go:286 reaches captureStreamFrameWithFFmpeg for stream mode; src/internal/appcore/autocapture.go:423-447 parses config-controlled inputArgs and calls exec.CommandContext(commandCtx, cfg.FFmpegPath, args...). The UI test trigger in src/app.go:495-517 calls AutoCaptureRunner.RunOnce from TestAutoCaptureView. I created a PoC Go test that writes a crafted config with autoCapture.stream.ffmpegPath pointing to /tmp/cfvrc-config-rce-validation/attacker-ffmpeg.sh and inputArgs containing attacker-controlled tokens including a quoted argument. The test loads that config via LoadConfig and runs AutoCaptureRunner.RunOnce. Output proved the helper script executed and received the attacker-supplied args: marker showed EXECUTED, arg=[controlled], arg=[two words], and the diagnostic log showed stream ffmpeg begin: path="/tmp/cfvrc-config-rce-validation/attacker-ffmpeg.sh" args="--attacker controlled --quoted two words --output /tmp/cfvrc-config-rce-validation/out/validation_01.png". Direct crash reproduction is not applicable because this is intended arbitrary process execution rather than memory corruption; the direct PoC completed successfully. Valgrind was unavailable in the container. I built a debug Go test binary with -gcflags=all='-N -l' and attempted LLDB, but LLDB timed out in this environment, so final validation rests on code-path confirmation plus the successful dynamic execution PoC.
+
+# Evidence
+src/app.go (L371 to 380)
+  Note: Saving a loaded config restarts automatic watchers using the saved configuration, allowing malicious scheduled auto-capture settings to become active.
+```
+func (a *App) saveConfigLocked(cfg appcore.Config) error {
+	if err := appcore.SaveConfig(a.configPath, cfg); err != nil {
+		return err
+	}
+	a.state.Config = cfg
+	a.state.Mode = appcore.ModeResults
+	a.state.Message = ""
+	a.state.Results = nil
+	a.restartCameraPoseReceiverLocked(cfg)
+	a.restartAutoPhotoWatcher(cfg)
+```
+
+src/app.go (L495 to 517)
+  Note: The new TestAutoCaptureView API runs AutoCaptureRunner.RunOnce from the UI, providing an interactive trigger for the config-controlled command execution path.
+```
+func (a *App) TestAutoCaptureView(viewID string) ([]appcore.Result, error) {
+	a.mu.Lock()
+	cfg := a.state.Config
+	cfg.Normalize()
+	viewID = strings.TrimSpace(viewID)
+	found := false
+	for i := range cfg.AutoCapture.Views {
+		if cfg.AutoCapture.Views[i].ID == viewID {
+			cfg.AutoCapture.Views[i].Enabled = true
+			found = true
+			continue
+		}
+		cfg.AutoCapture.Views[i].Enabled = false
+	}
+	if !found {
+		a.mu.Unlock()
+		return nil, fmt.Errorf("構図が見つかりません: %s", viewID)
+	}
+	cfg.AutoCapture.Schedule.Enabled = false
+	cfg.DiagnosticLogPath = appcore.DiagnosticLogPath(a.configPath)
+	a.mu.Unlock()
+
+	results, err := appcore.AutoCaptureRunner{Config: cfg}.RunOnce(context.Background())
+```
+
+src/app.go (L946 to 974)
+  Note: If the crafted config enables auto-capture scheduling and CaptureOnStart, the scheduler triggers a capture batch that reaches the ffmpeg execution path.
+```
+	if cfg.AutoCapture.Schedule.Enabled {
+		appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler launch")
+		go a.runAutoCaptureScheduler(ctx, cfg)
+	}
+}
+
+func (a *App) runAutoCaptureScheduler(ctx context.Context, cfg appcore.Config) {
+	cfg.Normalize()
+	logPath := appcore.DiagnosticLogPath(a.configPath)
+	ac := cfg.AutoCapture
+	appcore.AppendDiagnosticLog(
+		logPath,
+		"auto-capture scheduler start: capture_on_start=%t initial_delay_sec=%d interval_sec=%d max_batches=%d",
+		ac.Schedule.CaptureOnStart,
+		ac.Schedule.InitialDelaySec,
+		ac.Schedule.CaptureIntervalSec,
+		ac.Schedule.MaxBatches,
+	)
+	if ac.Schedule.InitialDelaySec > 0 {
+		appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler initial_delay begin: seconds=%d", ac.Schedule.InitialDelaySec)
+		if !sleepWithContext(ctx, time.Duration(ac.Schedule.InitialDelaySec)*time.Second) {
+			appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler initial_delay cancelled: err=%v", ctx.Err())
+			return
+		}
+		appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler initial_delay complete")
+	}
+	if ac.Schedule.CaptureOnStart {
+		appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler trigger: reason=%q", "capture_on_start")
+		a.runAutoCaptureBatch(ctx, cfg)
+```
+
+src/internal/appcore/autocapture.go (L423 to 447)
+  Note: The config-controlled ffmpegPath and parsed inputArgs are passed directly to exec.CommandContext, enabling arbitrary executable invocation with attacker-chosen arguments.
+```
+func captureStreamFrameWithFFmpeg(ctx context.Context, cfg AutoCaptureStreamConfig, outputPath string, logPath string) error {
+	timeout := time.Duration(cfg.CaptureTimeoutMS) * time.Millisecond
+	if timeout <= 0 {
+		timeout = 10 * time.Second
+	}
+	commandCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	args, err := splitCommandLine(cfg.InputArgs)
+	if err != nil {
+		return fmt.Errorf("ffmpeg入力引数を解釈できません: %w", err)
+	}
+	outputInserted := false
+	for i := range args {
+		if strings.Contains(args[i], "{output}") {
+			args[i] = strings.ReplaceAll(args[i], "{output}", outputPath)
+			outputInserted = true
+		}
+	}
+	if !outputInserted {
+		args = append([]string{"-y"}, args...)
+		args = append(args, "-frames:v", "1", outputPath)
+	}
+	diagAutoCapture(logPath, "stream ffmpeg begin: path=%q args=%q output=%q timeout_ms=%d", cfg.FFmpegPath, strings.Join(args, " "), outputPath, timeout.Milliseconds())
+	cmd := exec.CommandContext(commandCtx, cfg.FFmpegPath, args...) // #nosec G204 -- user-configured local ffmpeg command for capture source.
+	output, err := cmd.CombinedOutput()
+```
+
+src/internal/appcore/config.go (L108 to 112)
+  Note: The new stream config stores the executable path and command-line arguments in user/imported configuration.
+```
+type AutoCaptureStreamConfig struct {
+	FFmpegPath       string `json:"ffmpegPath"`
+	InputArgs        string `json:"inputArgs"`
+	CaptureTimeoutMS int    `json:"captureTimeoutMs"`
+	StartDelayMS     int    `json:"startDelayMs"`
+```
+
+src/internal/appcore/config.go (L420 to 427)
+  Note: Normalization only trims ffmpegPath and inputArgs, defaulting empty values, but performs no trust check, path restriction, or validation that the executable is actually ffmpeg.
+```
+	c.Stream.FFmpegPath = strings.Trim(strings.TrimSpace(c.Stream.FFmpegPath), `"`)
+	if c.Stream.FFmpegPath == "" {
+		c.Stream.FFmpegPath = "ffmpeg"
+	}
+	c.Stream.InputArgs = strings.TrimSpace(c.Stream.InputArgs)
+	if c.Stream.InputArgs == "" {
+		c.Stream.InputArgs = "-f gdigrab -framerate 30 -i desktop"
+	}
+```
+
+src/main.go (L80 to 92)
+  Note: The app accepts an external .json file as a configuration file, making config fields attacker-controlled when a user opens a crafted config.
+```
+	if len(args) == 1 && strings.EqualFold(filepath.Ext(args[0]), ".json") {
+		requestedConfigPath := args[0]
+		cfg, err := appcore.LoadConfig(requestedConfigPath)
+		if err != nil {
+			state.Mode = appcore.ModeError
+			state.Message = fmt.Sprintf("設定を読み込めませんでした: %v", err)
+		} else {
+			configPath = requestedConfigPath
+			state.Mode = appcore.ModeSettings
+			state.Config = cfg
+			state.ConfigPath = configPath
+		}
+		runUI(configPath, state)
+```
+
+Proposed patch:
+diff --git a/issues/closed/README.md b/issues/closed/README.md
+index 9ca56585c694a879e6cefdec028e06ec5ba4de01..249f96051e2082ac7debb94874e1176b9803e9b2 100644
+--- a/issues/closed/README.md
++++ b/issues/closed/README.md
+@@ -228,25 +228,26 @@
+ | 260 | [OSSライセンス表記を監査し本文を表示する](unreleased/260-audit-oss-license-notices-and-show-full-text.md) | 完了 | 未定 | OSS表示を実依存に合わせて監査し、不足・誤表記・テスト専用項目を整理して全項目のライセンス本文を表示できるようにした。 |
+ | 261 | [AvatarBeaconライセンスをOSS画面の最下部に分けて表示する](unreleased/261-show-avatarbeacon-license-separately.md) | 完了 | 未定 | AvatarBeacon関連ライセンスを通常OSS一覧とは別セクションとしてOSSライセンス画面の最下部に表示するようにした。 |
+ | 262 | [処理タブを機能と自動撮影の間に移動する](unreleased/262-move-process-settings-tab-before-autocapture.md) | 完了 | 未定 | 設定画面のタブ順を、機能、処理、自動撮影、OSC、Discord投稿、その他に変更した。 |
+ | 263 | [Discord投稿タブを処理と自動撮影の間に移動する](unreleased/263-move-discord-settings-tab-between-process-and-autocapture.md) | 完了 | 未定 | 設定画面のタブ順を、機能、処理、Discord投稿、自動撮影、OSC、その他に変更した。 |
+ | 264 | [v0.1.8-b11 betaを作成する](maintenance-only/264-create-v018-b11-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b11` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |
+ | 265 | [AvatarBeaconを専用リポジトリへ配置する](avatarbeacon-v0.0.1/265-extract-avatarbeacon-to-dedicated-repository.md) | 完了 | `AvatarBeacon v0.0.1` | 既存AvatarBeacon元ファイルを専用リポジトリへ初期配置し、CI設定、push、最新main CI確認を行った。 |
+ | 266 | [AvatarBeacon READMEを作り直し、ClipForVRChat側をsubmodule化する](unreleased/266-rewrite-avatarbeacon-readme-and-use-submodule.md) | 完了 | 未定 | AvatarBeacon READMEを利用者向けに全面改稿し、ClipForVRChat側のAvatarBeaconをsubmodule参照へ置き換えた。 |
+ | 267 | [AvatarBeacon READMEを汎用OSCギミックとして修正する](unreleased/267-rewrite-avatarbeacon-readme-as-generic-osc-gimmick.md) | 完了 | 未定 | READMEからClipForVRChat固有説明を外し、汎用OSCギミックとしての説明、ライセンス表記、句点改行を整理した。 |
+ | 267 | [exeへD&Dされた画像以外のパスをGPG暗号化する](unreleased/267-encrypt-non-image-exe-drop-paths.md) | 完了 | 未定 | exeへ渡されたパスを画像なら入力画像、画像以外のファイルやフォルダならGPG暗号化対象として扱うようにした。 |
+ | 268 | [自動撮影用Webhook URLが想定外にグレーアウトする](unreleased/268-fix-auto-capture-webhook-url-unexpected-disabled.md) | 完了 | 未定 | 自動撮影用Webhook URL欄を自動撮影Discord投稿OFF時でも編集できるようにした。 |
+ | 269 | [AvatarBeaconの位置取得をHips基準からHead基準へ変更する](unreleased/269-use-head-position-for-avatarbeacon.md) | 完了 | 未定 | AvatarBeaconの位置用 `point` をHeadへ追従させ、説明文をHead基準position/yawに統一した。 |
+ | 270 | [AvatarBeacon READMEのYL-ATG関係と謝辞を修正する](unreleased/270-refine-avatarbeacon-readme-yl-atg-and-license.md) | 完了 | 未定 | YL-ATGとの関係を指定文へ修正し、謝辞追加、配布物・詳細仕様セクション削除を行った。 |
+ | 271 | [AvatarBeaconからHeadForwardAnchorを削除する](unreleased/271-remove-avatarbeacon-head-forward-anchor.md) | 完了 | 未定 | 位置と向きの追跡対象をHead基準の `point` へ統合し、不要になった `HeadForwardAnchor` を削除した。 |
+ | 272 | [AvatarBeacon mainと_12のfloat精度を調査する](investigation-only/272-investigate-avatarbeacon-main-12-float-precision.md) | 完了 | 調査のみ | mainと_12のfloat表現、復元範囲、理論分解能、実機未確認要因を整理した。 |
+ | 273 | [v0.1.8-b12 betaを作成する](maintenance-only/273-create-v018-b12-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b12` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |
+ | 274 | [外部AvatarBeacon unitypackageを配布zipへ同梱する](unreleased/274-package-external-avatarbeacon-unitypackage.md) | 完了 | 未定 | AvatarBeacon source zipの公開添付をやめ、外部Releaseのunitypackageを通常zipと分離zipへ同梱するようにした。 |
+ | 275 | [v0.1.8-b13 betaを作成する](maintenance-only/275-create-v018-b13-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b13` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |
+ | 276 | [b13でStream自動撮影後にカメラ終了・サムネイル未表示・Discord未投稿になる](unreleased/276-investigate-b13-stream-camera-close-thumbnail-discord.md) | 完了 | 未定 | 指定フォルダのログと設定から原因を切り分け、復元/Spout復旧の終了方向OSC送信、サムネイル生成、自動撮影Discord投稿条件を修正した。 |
+ | 277 | [自動撮影の通常モードに待機カメラ位置を追加する](unreleased/277-add-autocapture-idle-camera-position.md) | 完了 | 未定 | 通常モードで撮影後に送る待機カメラ位置を追加し、既定OFFかつ初期Poseをプレイヤー基準の足元方向にした。 |
+ | 278 | [v0.1.8-b14 betaを作成する](maintenance-only/278-create-v018-b14-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b14` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |
+ | 279 | [b14で1枚目成功後に2枚目以降のSpout取得が失敗する](v0.1.8-b15/279-fix-b14-spout-sender-missing-after-first-shot.md) | 完了 | `v0.1.8-b15` | 1枚目成功後にSpout senderが空になる場合、ON再送で戻らなければOFF/ONトグルして連続撮影を成功させる。 |
+ | 280 | [待機カメラ位置の詳細設定ボタンを押せるようにする](v0.1.8-b16/280-fix-idle-camera-detail-button-disabled.md) | 完了 | `v0.1.8-b16` | 待機カメラ位置の詳細設定を開けるようにし、構図ごとの明るさと表示対象マスクも設定できるようにした。 |
+ | 281 | [v0.1.8-b16 betaを作成する](maintenance-only/281-create-v018-b16-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b16` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |
+ | 282 | [v0.1.8-b16確認後にmasterをdevelopで上書きする](maintenance-only/282-overwrite-master-with-develop-after-b16.md) | 完了 | 整理のみ | `master` を `develop` と同じ履歴へ上書きしてpushし、不要な作業ブランチを削除した。 |
+ | 283 | [カメラ移動時の飛行モードON時間を短くする](v0.1.8-rc1/283-shorten-usercamera-flying-during-pose-move.md) | 完了 | `v0.1.8-rc1` | カメラPose送信直前だけ飛行モードをONにし、移動後すぐOFFへ戻してRC1を作成した。 |
++| 284 | [設定由来のffmpeg実行パスを制限する](unreleased/284-restrict-config-controlled-ffmpeg-execution.md) | 完了 | 未定 | 外部JSON設定から任意実行ファイルをffmpegとして起動できないよう制限。 |
+
+
+diff --git a/issues/closed/unreleased/284-restrict-config-controlled-ffmpeg-execution.md b/issues/closed/unreleased/284-restrict-config-controlled-ffmpeg-execution.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..313dd19da06700f7f0d3ad81b17c1e0acb71e30f
+--- /dev/null
++++ b/issues/closed/unreleased/284-restrict-config-controlled-ffmpeg-execution.md
+@@ -0,0 +1,41 @@
++# 設定由来のffmpeg実行パスを制限する
++
++## 指示
++
++> Aardvark detected a vulnerability in the repository https://github.com/hatolife/ClipForVRChat.
++>
++>             Follow these steps:
++>             1. Check whether the issue is still present in the HEAD of the current branch. Try
++>             to match the relevant lines in case the files get moved or renamed.
++>             2. If the issue doesn't exist anymore in HEAD, then **DO NOT**
++>             attempt to propose a code fix, **DO NOT** try to reintroduce the code functionality,
++>             **DO NOT** produce any code, **ONLY** explain your reasoning.
++>             3. If the issue still exists in HEAD, then propose a fix.
++>             4. Please produce a minimal code fix that remediates the issue while preserving existing
++>             functionality and tests.
++
++## 文脈
++
++Aardvarkは、外部JSON設定から読み込まれる自動撮影Stream設定がffmpeg実行パスと引数を保持し、そのまま `exec.CommandContext` に渡されることで、細工された設定ファイルを開いた利用者の権限で任意ローカル実行ファイルを起動できると報告している。
++
++HEADではStream方式はSpoutヘルパー中心へ移行済みだが、互換用の `legacyFfmpegPath` / `legacyInputArgs` と `captureStreamFrameWithFFmpeg` が残っているため、同種の設定制御実行パスが残存している可能性がある。
++
++## 解釈
++
++現在のHEADで該当経路が残っているか確認し、残っている場合は、設定ファイル由来の値で任意実行ファイルを選択できないよう最小修正する。既存の通常用途であるPATH上のffmpeg実行は維持する。
++
++## 問題
++
++`legacyFfmpegPath` が設定ファイルから読み込まれ、絶対パスや区切り文字を含む任意パスでも存在すれば許可され、さらに実行時は解決済みパスではなく設定値が `exec.CommandContext` に渡される。
++
++## 期待する挙動
++
++- 設定由来のffmpeg実行名は安全な既定の `ffmpeg` / `ffmpeg.exe` のみに限定される。
++- 絶対パス、相対パス、パス区切り文字を含む値、ffmpeg以外のコマンド名は拒否される。
++- 実行時は検証・解決済みのPATH上ffmpegを使う。
++
++## 受け入れ条件
++
++- `ResolveFFmpegPath` が任意パスや任意コマンド名を拒否するテストがある。
++- `captureStreamFrameWithFFmpeg` が解決済みパスを実行に使う。
++- 既存のappcoreテストが成功する。
+
+
+diff --git a/src/internal/appcore/autocapture.go b/src/internal/appcore/autocapture.go
+index 745b732a142c97997d911fc72597f46b0ff8de61..174838bd098e68c5d4e3c895f49988b3fe101e8a 100644
+--- a/src/internal/appcore/autocapture.go
++++ b/src/internal/appcore/autocapture.go
+@@ -1352,77 +1352,78 @@ func autoCaptureOutputPath(cfg AutoCaptureConfig, batchID string, shotID string,
+ 	replacements := map[string]string{
+ 		"{timestamp_local}": time.Now().Format("20060102_150405"),
+ 		"{batch_id}":        batchID,
+ 		"{shot_id}":         shotID,
+ 		"{shot_index}":      fmt.Sprintf("%02d", index),
+ 		"{view_id}":         safeFilenamePart(view.ID),
+ 		"{view_name}":       safeFilenamePart(view.Name),
+ 		"{mode}":            safeFilenamePart(cfg.Capture.Mode),
+ 		"{ext}":             ext,
+ 	}
+ 	for old, value := range replacements {
+ 		name = strings.ReplaceAll(name, old, value)
+ 	}
+ 	name = safeFilenamePart(name)
+ 	if filepath.Ext(name) == "" {
+ 		name += "." + ext
+ 	}
+ 	return filepath.Join(dir, name), nil
+ }
+ 
+ func captureStreamFrameWithFFmpeg(ctx context.Context, cfg AutoCaptureStreamConfig, outputPath string, logPath string) error {
+ 	timeout := time.Duration(cfg.CaptureTimeoutMS) * time.Millisecond
+ 	if timeout <= 0 {
+ 		timeout = 10 * time.Second
+ 	}
+-	if _, err := ResolveFFmpegPath(cfg.LegacyFFmpegPath); err != nil {
++	resolvedFFmpegPath, err := ResolveFFmpegPath(cfg.LegacyFFmpegPath)
++	if err != nil {
+ 		diagAutoCapture(logPath, "stream ffmpeg missing: path=%q err=%v", cfg.LegacyFFmpegPath, err)
+ 		return err
+ 	}
+ 	commandCtx, cancel := context.WithTimeout(ctx, timeout)
+ 	defer cancel()
+ 	args, err := splitCommandLine(cfg.LegacyInputArgs)
+ 	if err != nil {
+ 		return fmt.Errorf("ffmpeg入力引数を解釈できません: %w", err)
+ 	}
+ 	args, err = expandFFmpegInputPlaceholders(ctx, args, logPath)
+ 	if err != nil {
+ 		return err
+ 	}
+ 	outputInserted := false
+ 	for i := range args {
+ 		if strings.Contains(args[i], "{output}") {
+ 			args[i] = strings.ReplaceAll(args[i], "{output}", outputPath)
+ 			outputInserted = true
+ 		}
+ 	}
+ 	if !outputInserted {
+ 		args = append([]string{"-y"}, args...)
+ 		args = append(args, "-frames:v", "1", outputPath)
+ 	}
+-	diagAutoCapture(logPath, "stream ffmpeg begin: path=%q args=%q output=%q timeout_ms=%d", cfg.LegacyFFmpegPath, strings.Join(args, " "), outputPath, timeout.Milliseconds())
+-	cmd := exec.CommandContext(commandCtx, cfg.LegacyFFmpegPath, args...) // #nosec G204 -- user-configured local ffmpeg command for capture source.
++	diagAutoCapture(logPath, "stream ffmpeg begin: path=%q resolved_path=%q args=%q output=%q timeout_ms=%d", cfg.LegacyFFmpegPath, resolvedFFmpegPath, strings.Join(args, " "), outputPath, timeout.Milliseconds())
++	cmd := exec.CommandContext(commandCtx, resolvedFFmpegPath, args...) // #nosec G204 -- validated PATH ffmpeg command for legacy capture source.
+ 	output, err := cmd.CombinedOutput()
+ 	if commandCtx.Err() == context.DeadlineExceeded {
+ 		return fmt.Errorf("ffmpegによるStream切り出しがタイムアウトしました。ffmpegパス、入力引数、Stream Cameraの表示状態を確認してください。")
+ 	}
+ 	if err != nil {
+ 		trimmed := strings.TrimSpace(string(output))
+ 		if len(trimmed) > 600 {
+ 			trimmed = trimmed[len(trimmed)-600:]
+ 		}
+ 		return fmt.Errorf("ffmpegによるStream切り出しに失敗しました: %v %s", err, trimmed)
+ 	}
+ 	if !fileHasContent(outputPath) {
+ 		return fmt.Errorf("ffmpegは終了しましたが画像が作成されませんでした。入力引数と出力先を確認してください。")
+ 	}
+ 	diagAutoCapture(logPath, "stream ffmpeg success: output=%q", outputPath)
+ 	return nil
+ }
+ 
+ type windowRect struct {
+ 	X      int `json:"x"`
+ 	Y      int `json:"y"`
+ 	Width  int `json:"width"`
+ 	Height int `json:"height"`
+ }
+ 
+@@ -1480,58 +1481,54 @@ public static class Win32Rect {
+ 	}
+ 	if err != nil {
+ 		trimmed := strings.TrimSpace(string(output))
+ 		diagAutoCapture(logPath, "stream window rect error: err=%v output=%q", err, trimmed)
+ 		if trimmed != "" {
+ 			return rect, fmt.Errorf("VRChatウィンドウ位置を取得できません: %s", trimmed)
+ 		}
+ 		return rect, fmt.Errorf("VRChatウィンドウ位置を取得できません: %v", err)
+ 	}
+ 	if err := json.Unmarshal(output, &rect); err != nil {
+ 		diagAutoCapture(logPath, "stream window rect parse error: err=%v output=%q", err, strings.TrimSpace(string(output)))
+ 		return rect, fmt.Errorf("VRChatウィンドウ位置の取得結果を解釈できません: %w", err)
+ 	}
+ 	if rect.Width <= 0 || rect.Height <= 0 {
+ 		return rect, fmt.Errorf("VRChatウィンドウサイズが不正です: %dx%d", rect.Width, rect.Height)
+ 	}
+ 	return rect, nil
+ }
+ 
+ func ResolveFFmpegPath(ffmpegPath string) (string, error) {
+ 	ffmpegPath = strings.Trim(strings.TrimSpace(ffmpegPath), `"`)
+ 	if ffmpegPath == "" {
+ 		ffmpegPath = "ffmpeg"
+ 	}
+ 	if strings.ContainsAny(ffmpegPath, `\/`) || filepath.IsAbs(ffmpegPath) {
+-		info, err := os.Stat(ffmpegPath)
+-		if err != nil {
+-			return "", fmt.Errorf("ffmpegがインストールされていないかPATHにありません。ffmpegパスを確認するか、設定画面からffmpegをインストールしてください。")
+-		}
+-		if info.IsDir() {
+-			return "", fmt.Errorf("ffmpegパスがフォルダを指しています。ffmpeg.exeのパスを指定してください。")
+-		}
+-		return ffmpegPath, nil
++		return "", fmt.Errorf("ffmpegパスにはファイル名だけを指定してください。安全のため、設定ファイルから絶対パスや相対パスの実行ファイルは起動しません。")
++	}
++	if !strings.EqualFold(ffmpegPath, "ffmpeg") && !strings.EqualFold(ffmpegPath, "ffmpeg.exe") {
++		return "", fmt.Errorf("ffmpegパスにはffmpegまたはffmpeg.exeだけを指定してください。安全のため、設定ファイルから別名の実行ファイルは起動しません。")
+ 	}
+ 	resolved, err := exec.LookPath(ffmpegPath)
+ 	if err != nil {
+ 		return "", fmt.Errorf("ffmpegがインストールされていないかPATHにありません。ffmpegパスを確認するか、設定画面からffmpegをインストールしてください。")
+ 	}
+ 	return resolved, nil
+ }
+ 
+ func splitCommandLine(input string) ([]string, error) {
+ 	args := make([]string, 0)
+ 	var current strings.Builder
+ 	var quote rune
+ 	escaped := false
+ 	for _, r := range input {
+ 		switch {
+ 		case escaped:
+ 			current.WriteRune(r)
+ 			escaped = false
+ 		case r == '\\':
+ 			escaped = true
+ 		case quote != 0:
+ 			if r == quote {
+ 				quote = 0
+ 			} else {
+ 				current.WriteRune(r)
+
+
+diff --git a/src/internal/appcore/autocapture_test.go b/src/internal/appcore/autocapture_test.go
+index d47677550da71073df5f277a0f464249ed52cf48..4aef26cabbe9d8fadb38837c58e1bcda2cb05ed5 100644
+--- a/src/internal/appcore/autocapture_test.go
++++ b/src/internal/appcore/autocapture_test.go
+@@ -276,52 +276,74 @@ func TestAutoCaptureConfigNormalizeMigratesOldDesktopFFmpegInputToLegacy(t *test
+ 		cfg.Normalize()
+ 		if cfg.AutoCapture.Stream.LegacyInputArgs != DefaultAutoCaptureFFmpegInputArgs() {
+ 			t.Fatalf("legacy stream input args = %q, want %q", cfg.AutoCapture.Stream.LegacyInputArgs, DefaultAutoCaptureFFmpegInputArgs())
+ 		}
+ 	}
+ }
+ 
+ func TestSplitCommandLine(t *testing.T) {
+ 	got, err := splitCommandLine(`-f gdigrab -i "title=VRChat Window" -frames:v 1`)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	want := []string{"-f", "gdigrab", "-i", "title=VRChat Window", "-frames:v", "1"}
+ 	if len(got) != len(want) {
+ 		t.Fatalf("args = %#v, want %#v", got, want)
+ 	}
+ 	for i := range want {
+ 		if got[i] != want[i] {
+ 			t.Fatalf("args = %#v, want %#v", got, want)
+ 		}
+ 	}
+ }
+ 
+ func TestResolveFFmpegPathRejectsMissingPath(t *testing.T) {
+ 	_, err := ResolveFFmpegPath(filepath.Join(t.TempDir(), "missing-ffmpeg.exe"))
+-	if err == nil || !strings.Contains(err.Error(), "ffmpegがインストールされていないかPATHにありません") {
+-		t.Fatalf("err = %v, want missing ffmpeg message", err)
++	if err == nil || !strings.Contains(err.Error(), "絶対パスや相対パス") {
++		t.Fatalf("err = %v, want unsafe path rejection", err)
++	}
++}
++
++func TestResolveFFmpegPathRejectsConfigControlledExecutablePath(t *testing.T) {
++	dir := t.TempDir()
++	malicious := filepath.Join(dir, "attacker-ffmpeg")
++	if err := os.WriteFile(malicious, []byte("#!/bin/sh\nexit 0\n"), 0700); err != nil {
++		t.Fatal(err)
++	}
++	for _, input := range []string{
++		malicious,
++		".\\ffmpeg.exe",
++		"./ffmpeg",
++		"powershell",
++		"cmd.exe",
++	} {
++		t.Run(input, func(t *testing.T) {
++			_, err := ResolveFFmpegPath(input)
++			if err == nil {
++				t.Fatalf("ResolveFFmpegPath(%q) returned nil error, want rejection", input)
++			}
++		})
+ 	}
+ }
+ 
+ func TestResolveSpoutHelperPathRejectsMissingPath(t *testing.T) {
+ 	_, err := ResolveSpoutHelperPath(filepath.Join(t.TempDir(), "missing-spout-capture.exe"))
+ 	if err == nil || !strings.Contains(err.Error(), "Spout helperが見つかりません") {
+ 		t.Fatalf("err = %v, want missing spout helper message", err)
+ 	}
+ }
+ 
+ func TestResolveSpoutHelperPathUsesExplicitExistingPath(t *testing.T) {
+ 	dir := t.TempDir()
+ 	helper := filepath.Join(dir, "custom-spout-capture.exe")
+ 	if err := os.WriteFile(helper, []byte("helper"), 0600); err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	got, err := ResolveSpoutHelperPath(helper)
+ 	if err != nil {
+ 		t.Fatal(err)
+ 	}
+ 	if got != helper {
+ 		t.Fatalf("path = %q, want %q", got, helper)
+ 	}
+ }
+
+# Attack-path analysis
+Final: high | Decider: model_decided | Matrix severity: medium | Policy adjusted: medium
+## Rationale
+Retained high severity. The finding is in the main runtime product and the attack path is evidenced: external JSON config loading in src/main.go reaches JSON-backed stream ffmpeg fields in config.go, normalization lacks executable validation, and autocapture.go passes those fields to exec.CommandContext. The provided validation PoC executed an attacker-controlled helper via AutoCaptureRunner.RunOnce, confirming the sink is reachable. Impact is arbitrary command execution as the current user. It is not raised to critical because the app has no public ingress, exploitation requires victim interaction with a crafted config and a trigger action or scheduled capture, and compromise is per-user/per-desktop rather than service-wide or wormable.
+## Likelihood
+medium - The vulnerable code is reachable through normal app behavior and a dynamic PoC reportedly executed a helper binary through the real appcore runner. Exploitation still requires social engineering/user interaction and a suitable local executable, so likelihood is medium rather than high.
+## Impact
+high - Successful exploitation executes an attacker-selected local executable with attacker-controlled arguments as the current desktop user, enabling file access, credential theft available to that user, malware launch, or destructive commands.
+## Assumptions
+- The victim runs the main ClipForVRChat Wails desktop application as intended.
+- An attacker can persuade the victim to open or use a crafted .json configuration file.
+- The attacker-selected executable is available on the victim system by absolute path or PATH lookup, such as powershell.exe or cmd.exe on Windows.
+- The victim triggers auto-capture through the test UI path or saves a configuration that enables scheduled capture.
+- Victim opens an attacker-supplied .json config or otherwise loads attacker-controlled config content
+- Config reaches autoCapture.stream.ffmpegPath and autoCapture.stream.inputArgs
+- Auto-capture stream mode is triggered via TestAutoCaptureView or scheduled capture
+- Chosen executable exists on the victim machine
+## Path
+Attacker config.json
+  -> victim opens/saves/tests config
+  -> LoadConfig json.Unmarshal
+  -> Normalize trims only
+  -> TestAutoCaptureView or scheduler
+  -> AutoCaptureRunner stream mode
+  -> exec.CommandContext(ffmpegPath, inputArgs...)
+  -> arbitrary local command as victim user
+## Path evidence
+- `src/wails.json:2-4` - Identifies the product as the ClipForVRChat Wails desktop application, not a server or IaC deployment.
+- `src/main.go:80-92` - The main application accepts an external .json path and loads it as application configuration.
+- `src/internal/appcore/config.go:108-112` - The stream auto-capture config exposes ffmpegPath and inputArgs as JSON-backed fields.
+- `src/internal/appcore/config.go:274-288` - LoadConfig reads the local config file and unmarshals JSON directly into Config before normalization.
+- `src/internal/appcore/config.go:420-427` - Normalization only trims/defaults the executable path and argument string; it does not validate or restrict them.
+- `src/internal/appcore/autocapture.go:52-70` - AutoCaptureRunner.RunOnce accepts stream mode and proceeds when enabled camera views exist.
+- `src/internal/appcore/autocapture.go:286` - The stream capture path calls captureStreamFrameWithFFmpeg with the config-controlled stream settings.
+- `src/internal/appcore/autocapture.go:423-447` - The sink parses config-controlled inputArgs and executes cfg.FFmpegPath using exec.CommandContext.
+- `src/app.go:495-517` - The Wails backend exposes a normal UI test path that triggers AutoCaptureRunner.RunOnce.
+- `src/app.go:946-974` - Saved configuration with auto-capture scheduling enabled can trigger capture automatically via the scheduler.
+## Narrative
+This is a real, in-scope vulnerability. ClipForVRChat is a Wails desktop app, and the main startup path accepts an external .json file and loads it as configuration. The new stream auto-capture config stores ffmpegPath and inputArgs in JSON-backed fields. LoadConfig unmarshals those fields and Normalize only trims/defaults them; it does not restrict the executable to a trusted ffmpeg binary. The auto-capture UI test path and scheduled capture path call AutoCaptureRunner.RunOnce, which reaches captureStreamFrameWithFFmpeg and executes exec.CommandContext with cfg.FFmpegPath and parsed cfg.InputArgs. exec.CommandContext avoids shell metacharacter expansion, but it still spawns the attacker-selected executable with attacker-selected arguments. A crafted config can therefore choose a local interpreter such as PowerShell or cmd.exe and execute commands as the current user after plausible user interaction. The impact is high because it is arbitrary code execution in the victim user's account, but not critical because there is no network-facing service, exploitation requires user interaction, and impact is limited to a single desktop user context.
+## Controls
+- No public network ingress or listening service was identified for this attack path.
+- exec.CommandContext avoids shell metacharacter injection but does not prevent attacker-selected executable invocation.
+- A capture timeout limits the direct child process duration but does not prevent command execution or child process launch.
+- Configuration normalization exists but does not provide a trust boundary for ffmpegPath or inputArgs.
+## Blindspots
+- This static pass did not run the full Windows Wails GUI, so exact Windows shell/interpreter argument behavior was not re-tested here.
+- Repository artifacts show no cloud/IaC deployment for this feature; if a separate distribution mechanism auto-imports configs, likelihood could change.
+- Local OS policy, endpoint protection, or missing interpreters could reduce practical exploitability on some victim systems.

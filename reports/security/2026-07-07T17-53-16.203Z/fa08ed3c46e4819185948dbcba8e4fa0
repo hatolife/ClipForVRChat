@@ -1,0 +1,311 @@
+Unverified external Unity package bundled in releases
+Link: https://chatgpt.com/codex/cloud/security/findings/fa08ed3c46e4819185948dbcba8e4fa0?sev=critical%2Chigh
+Criticality: high (attack path: high)
+Status: new
+
+# Metadata
+Repo: hatolife/ClipForVRChat
+Commit: 16bfb40
+Author: poppo@hato.life
+Created: 2026/7/8 1:45:41
+Assignee: Unassigned
+Signals: Security, Validated, Patch generated, Attack-path
+
+# Summary
+Introduced: the release workflow accepts mutable external release content as a trusted release component without pinning or verifying its expected digest/signature before redistribution.
+This commit changes the release process from packaging repository-controlled AvatarBeacon source to downloading a prebuilt .unitypackage at release time. The workflow only checks that the downloaded file exists and is non-empty, then calculates and records the hash after download. It never compares the package to a committed expected SHA256 or verifies an upstream signature/attestation. The package is then copied into both user-facing release zips. Because the PGP signature step signs only the standalone ClipForVRChat.exe, not the zip contents or the Unity package, users who verify the exe signature could still receive an attacker-controlled AvatarBeacon package inside an official release zip if the external AvatarBeacon release asset, tag, repository account, or GitHub-hosted asset is compromised/replaced before a ClipForVRChat release build. Unity packages may contain scripts that execute in the Unity editor when imported, so this can become arbitrary code execution in the user's Unity environment after expected user interaction.
+
+# Validation
+## Rubric
+- [x] Confirm the affected commit changed the release process to use an external AvatarBeacon `.unitypackage` instead of repository-controlled source packaging.
+- [x] Confirm the workflow pins only URL/name and does not define or compare a committed expected SHA256, signature, or attestation for the AvatarBeacon package.
+- [x] Confirm the download step validates only existence/non-empty size and computes SHA256 after download rather than enforcing a trusted expected value.
+- [x] Confirm the downloaded package is copied into both user-facing release package directories/zips.
+- [x] Confirm the signing/release process authenticates only the standalone executable and not the zips or bundled Unity package.
+## Report
+Validated the finding as a CI/release supply-chain trust flaw, not a runtime memory-safety crash. Crash/Valgrind/debugger validation is not applicable because the affected component is `.github/workflows/release.yml`; valgrind and gdb were also not installed in the container. Evidence: `.github/workflows/release.yml:22-23` defines `AVATARBEACON_PACKAGE_URL` and `AVATARBEACON_PACKAGE_NAME` but no expected digest/signature variable. `.github/workflows/release.yml:167-188` downloads the external asset with `Invoke-WebRequest`, checks only `Test-Path` and `$item.Length -le 0`, then computes `package_sha256` after download. A targeted grep for AvatarBeacon expected digest/signature controls returned only post-download hash metadata: line 277 `AVATARBEACON_PACKAGE_SHA256: ${{ steps.avatarbeacon.outputs.package_sha256 }}` and line 298 `packageSha256 = $env:AVATARBEACON_PACKAGE_SHA256`; no pinned expected SHA/signature/attestation check was found. `.github/workflows/release.yml:210` and `:219` copy the downloaded package into both `dist/ClipForVRChat/` and `dist/ClipForVRChat-user-package/`. `.github/workflows/release.yml:222-243` signs and verifies only `dist/${ASSET_PREFIX}-windows-amd64.exe`, while `.github/workflows/release.yml:254` and `:258` zip directories that contain the Unity package. `.github/workflows/release.yml:529-532` uploads the two zips and the exe `.asc`, but no zip/package signature. The commit diff confirms this was introduced by adding the external download and removing repository-generated `AvatarBeacon-*-source.zip` packaging. I also ran a bounded local PoC that mirrors the relevant workflow behavior: it created an attacker-controlled non-empty `AvatarBeacon_v0.0.1.unitypackage`, accepted it with only a post-download SHA256, copied it into both release zip trees, signed only the executable, and verified that the exe signature remains valid while the unsigned package is present in the zip. PoC output included: `download-step accepted AvatarBeacon_v0.0.1.unitypackage with post-download sha256=d42cfe6c9dedcd9f8a7a84a2ec8179e86c99c14133be43980eb1342f5e30e307`, both zips listing `AvatarBeacon_v0.0.1.unitypackage`, embedded payload `ATTACKER-CONTROLLED UNITYPACKAGE: would contain Unity Editor scripts/assets`, and GPG `Good signature from "CFVRC PoC <poc@example.invalid>"` for the exe only. This demonstrates that mutable upstream release content can become part of official release zips without an authenticated expected value.
+
+# Evidence
+github/workflows/release.yml (L167 to 188)
+  Note: Downloads the external package and only checks existence/non-empty size. The SHA256 is calculated after download and exported, not compared against a trusted expected value.
+
+github/workflows/release.yml (L210 to 219)
+  Note: Copies the unverified downloaded package into both release package directories that become user-facing release zips.
+
+github/workflows/release.yml (L22 to 23)
+  Note: Defines the external GitHub release asset URL and package name, but no expected hash or signature is pinned in the workflow.
+
+github/workflows/release.yml (L222 to 243)
+  Note: The release signature covers only the standalone executable, so it does not authenticate the bundled Unity package inside the zips.
+
+github/workflows/release.yml (L296 to 300)
+  Note: Build metadata records the package hash after the fact, which is useful for reporting but does not prevent a compromised or replaced external package from being bundled.
+
+Proposed patch:
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index 51d48508e46bffbe713ed0a22268b66e4eed7033..29ea48a1f0d48b8d51b3213ba3e8e551551a0296 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -1,48 +1,51 @@
+ name: Release
+ 
+ on:
+   push:
+     tags:
+       - "v*"
+   workflow_dispatch:
+     inputs:
+       tag_name:
+         description: "Release tag to build, for example v0.1.8-a1, v0.1.8-b1, v0.1.8-rc1, or v0.1.8"
+         required: true
+         type: string
+ 
+ permissions:
+   contents: read
+ 
+ env:
+   GO_VERSION: "1.26.4"
+   NODE_VERSION: "22"
+   WAILS_VERSION: "v2.12.0"
+   GOVULNCHECK_VERSION: "v1.1.4"
+   AVATARBEACON_PACKAGE_URL: "https://github.com/hatolife/AvatarBeacon/releases/download/v0.0.1/AvatarBeacon_v0.0.1.unitypackage"
+   AVATARBEACON_PACKAGE_NAME: "AvatarBeacon_v0.0.1.unitypackage"
++  # Pinned expected digest for AVATARBEACON_PACKAGE_URL. Update this only after
++  # manually verifying the upstream package out-of-band.
++  AVATARBEACON_PACKAGE_SHA256: "0000000000000000000000000000000000000000000000000000000000000000"
+ 
+ jobs:
+   build:
+     name: Build exe and package release assets
+     runs-on: windows-latest
+     permissions:
+       contents: read
+     outputs:
+       tag_name: ${{ steps.version.outputs.version }}
+       asset_prefix: ${{ steps.version.outputs.asset_prefix }}
+       draft: ${{ steps.version.outputs.draft }}
+       prerelease: ${{ steps.version.outputs.prerelease }}
+ 
+     steps:
+       - name: Checkout
+         uses: actions/checkout@v7
+         with:
+           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref }}
+           fetch-depth: 0
+           submodules: recursive
+ 
+       - name: Prepare version
+         id: version
+         shell: pwsh
+         env:
+@@ -148,62 +151,70 @@ jobs:
+       - name: Prepare Windows version info
+         shell: pwsh
+         env:
+           APP_VERSION: ${{ steps.version.outputs.version }}
+           APP_REVISION: ${{ steps.version.outputs.revision }}
+         run: |
+           node scripts/write-wails-info.mjs "$env:APP_VERSION" src/wails.json
+           node scripts/write-wails-windows-info.mjs "$env:APP_VERSION" "$env:APP_REVISION" src/build/windows/info.json
+ 
+       - name: Build application
+         working-directory: src
+         shell: pwsh
+         timeout-minutes: 20
+         env:
+           APP_VERSION: ${{ steps.version.outputs.version }}
+           APP_REVISION: ${{ steps.version.outputs.revision }}
+           APP_RELEASE_TIME: ${{ steps.version.outputs.release_time }}
+         run: wails build -v 2 -m -nosyncgomod -skipbindings -webview2 browser -tags embeddedspout -ldflags "-X main.version=$env:APP_VERSION -X main.revision=$env:APP_REVISION -X main.releaseTime=$env:APP_RELEASE_TIME -X main.buildChannel=release"
+ 
+       - name: Download AvatarBeacon package
+         id: avatarbeacon
+         shell: pwsh
+         env:
+           AVATARBEACON_PACKAGE_URL: ${{ env.AVATARBEACON_PACKAGE_URL }}
+           AVATARBEACON_PACKAGE_NAME: ${{ env.AVATARBEACON_PACKAGE_NAME }}
++          AVATARBEACON_PACKAGE_SHA256: ${{ env.AVATARBEACON_PACKAGE_SHA256 }}
+         run: |
+           New-Item -ItemType Directory -Force dist | Out-Null
+           $packagePath = Join-Path "dist" $env:AVATARBEACON_PACKAGE_NAME
+           Invoke-WebRequest -Uri $env:AVATARBEACON_PACKAGE_URL -OutFile $packagePath
+           if (!(Test-Path $packagePath)) {
+             throw "AvatarBeacon package was not downloaded: $packagePath"
+           }
+           $item = Get-Item $packagePath
+           if ($item.Length -le 0) {
+             throw "AvatarBeacon package is empty: $packagePath"
+           }
+           $hash = (Get-FileHash $packagePath -Algorithm SHA256).Hash.ToLower()
++          $expectedHash = $env:AVATARBEACON_PACKAGE_SHA256.ToLowerInvariant()
++          if ($expectedHash -notmatch '^[0-9a-f]{64}$') {
++            throw "AVATARBEACON_PACKAGE_SHA256 must be a pinned 64-character SHA256 digest"
++          }
++          if ($hash -ne $expectedHash) {
++            throw "AvatarBeacon package SHA256 mismatch: expected $expectedHash but downloaded $hash"
++          }
+           "package_path=$packagePath" >> $env:GITHUB_OUTPUT
+           "package_name=$env:AVATARBEACON_PACKAGE_NAME" >> $env:GITHUB_OUTPUT
+           "package_url=$env:AVATARBEACON_PACKAGE_URL" >> $env:GITHUB_OUTPUT
+           "package_sha256=$hash" >> $env:GITHUB_OUTPUT
+ 
+       - name: Prepare package directory
+         shell: pwsh
+         env:
+           ASSET_PREFIX: ${{ steps.version.outputs.asset_prefix }}
+           SPOUT_HELPER_PATH: ${{ steps.spout.outputs.helper_path }}
+           SPOUT_DLL_PATH: ${{ steps.spout.outputs.dll_path }}
+           AVATARBEACON_PACKAGE_PATH: ${{ steps.avatarbeacon.outputs.package_path }}
+         run: |
+           if (!(Test-Path "src/build/bin/ClipForVRChat.exe")) {
+             throw "src/build/bin/ClipForVRChat.exe was not created"
+           }
+           New-Item -ItemType Directory -Force dist | Out-Null
+           Copy-Item "src/build/bin/ClipForVRChat.exe" "dist/$env:ASSET_PREFIX-windows-amd64.exe" -Force
+           New-Item -ItemType Directory -Force "dist/ClipForVRChat" | Out-Null
+           Copy-Item "src/build/bin/ClipForVRChat.exe" "dist/ClipForVRChat/"
+           Copy-Item $env:SPOUT_HELPER_PATH "dist/ClipForVRChat/"
+           Copy-Item $env:SPOUT_DLL_PATH "dist/ClipForVRChat/"
+           Copy-Item "README.md" "dist/ClipForVRChat/"
+           Copy-Item "LICENSE" "dist/ClipForVRChat/"
+           Copy-Item "third_party/Spout2-LICENSE.txt" "dist/ClipForVRChat/"
+
+
+diff --git a/issues/closed/README.md b/issues/closed/README.md
+index ae2824e69adf0ed65aa3124c9cd27508c162c7d9..e3ea105cf188a97efcec0a5811340ac16bc209a1 100644
+--- a/issues/closed/README.md
++++ b/issues/closed/README.md
+@@ -227,25 +227,26 @@
+ | 259 | [不具合報告についての説明文の改行を維持する](unreleased/259-preserve-diagnostic-report-description-line-breaks.md) | 完了 | 未定 | 情報タブの不具合報告説明を指定文面へ更新し、表示上の改行を維持するようにした。 |
+ | 260 | [OSSライセンス表記を監査し本文を表示する](unreleased/260-audit-oss-license-notices-and-show-full-text.md) | 完了 | 未定 | OSS表示を実依存に合わせて監査し、不足・誤表記・テスト専用項目を整理して全項目のライセンス本文を表示できるようにした。 |
+ | 261 | [AvatarBeaconライセンスをOSS画面の最下部に分けて表示する](unreleased/261-show-avatarbeacon-license-separately.md) | 完了 | 未定 | AvatarBeacon関連ライセンスを通常OSS一覧とは別セクションとしてOSSライセンス画面の最下部に表示するようにした。 |
+ | 262 | [処理タブを機能と自動撮影の間に移動する](unreleased/262-move-process-settings-tab-before-autocapture.md) | 完了 | 未定 | 設定画面のタブ順を、機能、処理、自動撮影、OSC、Discord投稿、その他に変更した。 |
+ | 263 | [Discord投稿タブを処理と自動撮影の間に移動する](unreleased/263-move-discord-settings-tab-between-process-and-autocapture.md) | 完了 | 未定 | 設定画面のタブ順を、機能、処理、Discord投稿、自動撮影、OSC、その他に変更した。 |
+ | 264 | [v0.1.8-b11 betaを作成する](maintenance-only/264-create-v018-b11-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b11` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |
+ | 265 | [AvatarBeaconを専用リポジトリへ配置する](avatarbeacon-v0.0.1/265-extract-avatarbeacon-to-dedicated-repository.md) | 完了 | `AvatarBeacon v0.0.1` | 既存AvatarBeacon元ファイルを専用リポジトリへ初期配置し、CI設定、push、最新main CI確認を行った。 |
+ | 266 | [AvatarBeacon READMEを作り直し、ClipForVRChat側をsubmodule化する](unreleased/266-rewrite-avatarbeacon-readme-and-use-submodule.md) | 完了 | 未定 | AvatarBeacon READMEを利用者向けに全面改稿し、ClipForVRChat側のAvatarBeaconをsubmodule参照へ置き換えた。 |
+ | 267 | [AvatarBeacon READMEを汎用OSCギミックとして修正する](unreleased/267-rewrite-avatarbeacon-readme-as-generic-osc-gimmick.md) | 完了 | 未定 | READMEからClipForVRChat固有説明を外し、汎用OSCギミックとしての説明、ライセンス表記、句点改行を整理した。 |
+ | 267 | [exeへD&Dされた画像以外のパスをGPG暗号化する](unreleased/267-encrypt-non-image-exe-drop-paths.md) | 完了 | 未定 | exeへ渡されたパスを画像なら入力画像、画像以外のファイルやフォルダならGPG暗号化対象として扱うようにした。 |
+ | 268 | [自動撮影用Webhook URLが想定外にグレーアウトする](unreleased/268-fix-auto-capture-webhook-url-unexpected-disabled.md) | 完了 | 未定 | 自動撮影用Webhook URL欄を自動撮影Discord投稿OFF時でも編集できるようにした。 |
+ | 269 | [AvatarBeaconの位置取得をHips基準からHead基準へ変更する](unreleased/269-use-head-position-for-avatarbeacon.md) | 完了 | 未定 | AvatarBeaconの位置用 `point` をHeadへ追従させ、説明文をHead基準position/yawに統一した。 |
+ | 270 | [AvatarBeacon READMEのYL-ATG関係と謝辞を修正する](unreleased/270-refine-avatarbeacon-readme-yl-atg-and-license.md) | 完了 | 未定 | YL-ATGとの関係を指定文へ修正し、謝辞追加、配布物・詳細仕様セクション削除を行った。 |
+ | 271 | [AvatarBeaconからHeadForwardAnchorを削除する](unreleased/271-remove-avatarbeacon-head-forward-anchor.md) | 完了 | 未定 | 位置と向きの追跡対象をHead基準の `point` へ統合し、不要になった `HeadForwardAnchor` を削除した。 |
+ | 272 | [AvatarBeacon mainと_12のfloat精度を調査する](investigation-only/272-investigate-avatarbeacon-main-12-float-precision.md) | 完了 | 調査のみ | mainと_12のfloat表現、復元範囲、理論分解能、実機未確認要因を整理した。 |
+ | 273 | [v0.1.8-b12 betaを作成する](maintenance-only/273-create-v018-b12-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b12` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |
+ | 274 | [外部AvatarBeacon unitypackageを配布zipへ同梱する](unreleased/274-package-external-avatarbeacon-unitypackage.md) | 完了 | 未定 | AvatarBeacon source zipの公開添付をやめ、外部Releaseのunitypackageを通常zipと分離zipへ同梱するようにした。 |
+ | 275 | [v0.1.8-b13 betaを作成する](maintenance-only/275-create-v018-b13-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b13` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |
+ | 276 | [b13でStream自動撮影後にカメラ終了・サムネイル未表示・Discord未投稿になる](unreleased/276-investigate-b13-stream-camera-close-thumbnail-discord.md) | 完了 | 未定 | 指定フォルダのログと設定から原因を切り分け、復元/Spout復旧の終了方向OSC送信、サムネイル生成、自動撮影Discord投稿条件を修正した。 |
+ | 277 | [自動撮影の通常モードに待機カメラ位置を追加する](unreleased/277-add-autocapture-idle-camera-position.md) | 完了 | 未定 | 通常モードで撮影後に送る待機カメラ位置を追加し、既定OFFかつ初期Poseをプレイヤー基準の足元方向にした。 |
+ | 278 | [v0.1.8-b14 betaを作成する](maintenance-only/278-create-v018-b14-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b14` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |
+ | 279 | [b14で1枚目成功後に2枚目以降のSpout取得が失敗する](v0.1.8-b15/279-fix-b14-spout-sender-missing-after-first-shot.md) | 完了 | `v0.1.8-b15` | 1枚目成功後にSpout senderが空になる場合、ON再送で戻らなければOFF/ONトグルして連続撮影を成功させる。 |
+ | 280 | [待機カメラ位置の詳細設定ボタンを押せるようにする](v0.1.8-b16/280-fix-idle-camera-detail-button-disabled.md) | 完了 | `v0.1.8-b16` | 待機カメラ位置の詳細設定を開けるようにし、構図ごとの明るさと表示対象マスクも設定できるようにした。 |
+ | 281 | [v0.1.8-b16 betaを作成する](maintenance-only/281-create-v018-b16-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b16` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |
+ | 282 | [v0.1.8-b16確認後にmasterをdevelopで上書きする](maintenance-only/282-overwrite-master-with-develop-after-b16.md) | 完了 | 整理のみ | `master` を `develop` と同じ履歴へ上書きしてpushし、不要な作業ブランチを削除した。 |
++| 283 | [外部AvatarBeacon unitypackageのSHA256固定検証](unreleased/283-pin-avatarbeacon-release-package-sha256.md) | 完了 | 未定 | Release workflowで外部AvatarBeacon packageを固定SHA256で検証する。 |
+
+
+diff --git a/issues/closed/unreleased/283-pin-avatarbeacon-release-package-sha256.md b/issues/closed/unreleased/283-pin-avatarbeacon-release-package-sha256.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..a1ec6ad1e2b940c8eebed881d950e90989fa777b
+--- /dev/null
++++ b/issues/closed/unreleased/283-pin-avatarbeacon-release-package-sha256.md
+@@ -0,0 +1,49 @@
++# 外部AvatarBeacon unitypackageのSHA256固定検証
++
++## 指示
++
++> Aardvark detected a vulnerability in the repository https://github.com/hatolife/ClipForVRChat.
++>
++>             Follow these steps:
++>             1. Check whether the issue is still present in the HEAD of the current branch. Try
++>             to match the relevant lines in case the files get moved or renamed.
++>             2. If the issue doesn't exist anymore in HEAD, then **DO NOT**
++>             attempt to propose a code fix, **DO NOT** try to reintroduce the code functionality,
++>             **DO NOT** produce any code, **ONLY** explain your reasoning.
++>             3. If the issue still exists in HEAD, then propose a fix.
++>             4. Please produce a minimal code fix that remediates the issue while preserving existing
++>             functionality and tests.
++>
++>             The following information regarding the vulnerability is provided for your reference: {
++>   "title": "Unverified external Unity package bundled in releases"
++> }
++
++## 文脈
++
++Release workflowはAvatarBeaconの `.unitypackage` を外部GitHub Releaseからダウンロードし、通常zipと分離版zipへ同梱している。
++現状はダウンロード後のSHA256を記録するだけで、リポジトリで管理された期待値との照合を行っていない。
++
++## 解釈
++
++HEADでも外部パッケージの期待SHA256検証がない場合は、Release workflowに固定SHA256照合を追加して、想定外の内容を同梱しないようにする。
++
++## 問題
++
++外部Release asset、タグ、アカウント、GitHubホスト上のassetが差し替えられた場合でも、非空ファイルであれば公式Release zipへ混入する可能性がある。
++
++## 期待する挙動
++
++Release workflowはAvatarBeaconパッケージをダウンロード後、リポジトリに固定されたSHA256期待値と一致する場合だけ後続のパッケージングへ進む。
++
++## 受け入れ条件
++
++- [x] HEADで脆弱性が残っているか確認する。
++- [x] `.github/workflows/release.yml` にAvatarBeaconパッケージの期待SHA256を固定する。
++- [x] ダウンロードしたパッケージのSHA256不一致時にRelease workflowが失敗する。
++- [x] 既存のbuild metadataには検証済みSHA256を引き続き記録する。
++
++## 完了メモ
++
++- HEADで外部AvatarBeacon unitypackageの固定SHA256検証がないことを確認した。
++- Release workflowに期待SHA256形式検証とダウンロード後SHA256照合を追加した。
++- 暫定の期待値は安全側に倒すためゼロ値にしており、実Release前に手動検証済みdigestへ更新する必要がある。
+
+# Attack-path analysis
+Final: high | Decider: model_decided | Matrix severity: high | Policy adjusted: high
+## Rationale
+Kept as high rather than critical. The issue is in-scope because release integrity is part of the product threat model, and the code clearly downloads and redistributes a mutable external Unity package without a pinned digest/signature check. The impact is major: a substituted package can be delivered inside official release zips and later execute in a user's Unity environment. However, it is not critical because the attack is not 0-click and does not directly compromise the ClipForVRChat executable or signing key; it requires upstream asset compromise/replacement and user import of the .unitypackage. Probability is therefore medium while impact is high.
+## Likelihood
+high - The vulnerable workflow path is definite and release-reachable, but exploitation requires control over the external AvatarBeacon release asset or related account/repository/asset infrastructure before a ClipForVRChat release, plus user import of the bundled package. That is plausible for a supply-chain attacker but not a trivial unauthenticated path. | Remote network vector
+## Impact
+high - Successful exploitation can deliver attacker-controlled Unity package content through official ClipForVRChat release zips. Unity packages can contain scripts/assets that execute in the Unity Editor after import, leading to code execution under the user's account and potential theft/tampering of local project data and credentials available to that user.
+## Assumptions
+- GitHub release assets in the external AvatarBeacon repository are mutable by that repository's maintainers or by an attacker who compromises the repository/account/release asset path.
+- Users reasonably trust files bundled inside official ClipForVRChat release zips and may import the bundled AvatarBeacon .unitypackage into Unity as documented.
+- A malicious Unity package can include Unity Editor scripts/assets capable of executing code in the importing user's Unity environment after import/compilation.
+- attacker can compromise, replace, or otherwise influence the external AvatarBeacon GitHub release asset before a ClipForVRChat release build
+- ClipForVRChat release workflow runs and downloads the external .unitypackage
+- user downloads an official ClipForVRChat release zip
+- user imports or uses the bundled AvatarBeacon .unitypackage in Unity
+## Path
+Attacker controls external AvatarBeacon asset
+  -> release.yml Invoke-WebRequest downloads it
+  -> no pinned SHA/signature comparison
+  -> package copied into official release zips
+  -> user imports .unitypackage in Unity
+  -> attacker code may run in Unity Editor as the user
+## Path evidence
+- `.github/workflows/release.yml:22-23` - Defines the external AvatarBeacon release asset URL and package name; no committed expected hash, signature, or attestation variable is defined here.
+- `.github/workflows/release.yml:167-188` - Downloads the external package with Invoke-WebRequest, checks only that it exists and is non-empty, then computes package_sha256 after download instead of comparing to a trusted value.
+- `.github/workflows/release.yml:210-219` - Copies the downloaded AvatarBeacon package into both release package directories that later become user-facing zips.
+- `.github/workflows/release.yml:222-243` - PGP signing and verification cover only dist/${ASSET_PREFIX}-windows-amd64.exe, not the zips or the bundled Unity package.
+- `.github/workflows/release.yml:254-258` - Creates the normal and separated release zips after copying in the Unity package; zip hashes are generated after packaging, not used to authenticate the external input.
+- `.github/workflows/release.yml:296-300` - Build metadata records the AvatarBeacon package hash and source after the fact, which is informational and does not prevent substitution.
+- `.github/workflows/release.yml:529-532` - Uploads the two zips and the executable signature; no detached signature for the zips or Unity package is uploaded.
+- `README.md:109-121` - Documents that official release zips include AvatarBeacon_v0.0.1.unitypackage and that users verifying PGP should verify only the zip's ClipForVRChat.exe and .exe.asc.
+- `docs/avatarbeacon-spec.md:18-19` - Documents that the ClipForVRChat release workflow obtains the .unitypackage from an external release and bundles it into both zips.
+- `docs/avatarbeacon-spec.md:293-296` - Documents the expected user path of importing the package into Unity and placing AvatarBeacon prefabs for use.
+## Narrative
+This is a real in-scope release supply-chain vulnerability. The release workflow defines an external AvatarBeacon .unitypackage URL and name but no expected digest or signature, downloads the package at release time, checks only existence and non-empty size, then records the downloaded hash after the fact. The package is copied into both official release zip layouts. The workflow signs/verifies only the standalone executable, while the zips containing the Unity package are merely created and uploaded. Project documentation tells users the normal release zip includes AvatarBeacon_v0.0.1.unitypackage and expects Unity import. Therefore, compromise or replacement of the external AvatarBeacon release asset before a ClipForVRChat release can put attacker-controlled Unity package content into official ClipForVRChat release zips without breaking the executable signature.
+## Controls
+- Release workflow runs on tags or workflow_dispatch, not on arbitrary runtime user input.
+- Build job has contents: read and release job has contents: write.
+- Executable is detached-signed with a GitHub Actions GPG secret and immediately verified.
+- Release asset validation checks expected filenames and zip contents.
+- Artifact and package hashes are computed, but the AvatarBeacon package hash is computed after download and is not compared to a trusted expected value.
+- No signature, attestation, or pinned digest authenticates the external Unity package before redistribution.
+- Release zips containing the Unity package are not themselves signed.
+## Blindspots
+- Static-only review cannot prove the current external GitHub asset is benign or immutable.
+- Static-only review did not execute Unity to demonstrate Editor script execution from a malicious .unitypackage; this is based on Unity package behavior and the documented import workflow.
+- Repository artifacts do not show external AvatarBeacon repository protections such as branch protection, release approval, signed provenance, or asset immutability.
+- Could not assess real user verification behavior beyond repository documentation stating only the executable signature is verified.

@@ -1,0 +1,134 @@
+Signed single exe can run unsigned adjacent Spout helper
+Link: https://chatgpt.com/codex/cloud/security/findings/0a3a04c8e55c819191605ec086b69951?sev=critical%2Chigh
+Criticality: high
+Status: new
+
+# Metadata
+Repo: hatolife/ClipForVRChat
+Commit: 25582bd
+Author: poppo@hato.life
+Created: 2026/7/8 3:06:02
+Assignee: Unassigned
+Signals: Security
+
+# Summary
+Introduced a release-integrity bypass / binary planting issue in the new embedded Spout helper flow. The default helper path is eligible for embedded fallback, but the resolver returns an executable beside the app before trying the embedded helper, and later code executes the returned path.
+This commit changes the primary release artifact to a signed single executable with embedded `spout-capture.exe` and `SpoutLibrary.dll`. However, `ResolveSpoutHelperPath` still checks for `spout-capture.exe` beside the main executable first and returns it before using the embedded helper. As a result, a user can verify the PGP signature of `ClipForVRChat-vX.Y.Z-windows-amd64.exe`, place or already have an attacker-controlled `spout-capture.exe` in the same directory, and the app will execute that unsigned adjacent helper when the Spout helper check, sender refresh, or Stream capture path is used. This defeats the security benefit of embedding the helper in the signed single exe. The external helper should only be used when explicitly configured, or when the build has no embedded helper available; for the default helper name in an embedded build, the embedded asset should be preferred over an adjacent file.
+
+# Evidence
+src/internal/appcore/spout.go (L135 to 148)
+  Note: The embedded helper extraction path exists, but it is only reached after the adjacent-helper check has already had priority.
+```
+func resolveEmbeddedSpoutHelper() (string, error) {
+	dir, err := embeddedSpoutHelperDir(embeddedSpoutHelperEXE, embeddedSpoutLibraryDLL)
+	if err != nil {
+		return "", err
+	}
+	helperPath := filepath.Join(dir, spoutHelperFileName)
+	dllPath := filepath.Join(dir, spoutLibraryDLLName)
+	if err := ensureEmbeddedSpoutFile(helperPath, embeddedSpoutHelperEXE, true); err != nil {
+		return "", err
+	}
+	if err := ensureEmbeddedSpoutFile(dllPath, embeddedSpoutLibraryDLL, false); err != nil {
+		return "", err
+	}
+	return helperPath, nil
+```
+
+src/internal/appcore/spout.go (L242 to 249)
+  Note: The resolved helper path is executed for the helper version check, so an attacker-controlled adjacent helper can be launched.
+```
+func checkSpoutHelperVersion(ctx context.Context, helper string, logPath string) (string, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	commandCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(commandCtx, helper, "--version") // #nosec G204 -- local helper path from config or release folder.
+	output, err := cmd.CombinedOutput()
+```
+
+src/internal/appcore/spout.go (L271 to 287)
+  Note: The resolved helper path is also executed when refreshing Spout senders.
+```
+func ListSpoutSenders(ctx context.Context, cfg AutoCaptureStreamConfig, logPath string) (SpoutListResult, error) {
+	helper, err := ResolveSpoutHelperPath(cfg.SpoutHelperPath)
+	if err != nil {
+		return SpoutListResult{}, err
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	timeout := time.Duration(cfg.CaptureTimeoutMS) * time.Millisecond
+	if timeout <= 0 {
+		timeout = 10 * time.Second
+	}
+	commandCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	diagAutoCapture(logPath, "spout list begin: helper=%q timeout_ms=%d", helper, timeout.Milliseconds())
+	cmd := exec.CommandContext(commandCtx, helper, "--list-senders") // #nosec G204 -- local helper path from config or release folder.
+	output, err := cmd.CombinedOutput()
+```
+
+src/internal/appcore/spout.go (L316 to 337)
+  Note: The resolved helper path is executed during Stream capture, giving the planted helper another execution path.
+```
+func captureStreamFrameWithSpout(ctx context.Context, cfg AutoCaptureStreamConfig, outputPath string, logPath string) (SpoutCaptureResult, error) {
+	helper, err := ResolveSpoutHelperPath(cfg.SpoutHelperPath)
+	if err != nil {
+		diagAutoCapture(logPath, "spout helper missing: path=%q err=%v", cfg.SpoutHelperPath, err)
+		return SpoutCaptureResult{}, err
+	}
+	timeout := time.Duration(cfg.CaptureTimeoutMS) * time.Millisecond
+	if timeout <= 0 {
+		timeout = 10 * time.Second
+	}
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+		return SpoutCaptureResult{}, err
+	}
+	commandCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	args := []string{"--capture", "--output", outputPath, "--timeout-ms", fmt.Sprintf("%d", timeout.Milliseconds())}
+	if strings.TrimSpace(cfg.SpoutSenderName) != "" && !cfg.SpoutAutoSelect {
+		args = append(args, "--sender", cfg.SpoutSenderName)
+	}
+	diagAutoCapture(logPath, "spout capture begin: helper=%q args=%q output=%q sender=%q auto_select=%t timeout_ms=%d os=%s", helper, strings.Join(args, " "), outputPath, cfg.SpoutSenderName, cfg.SpoutAutoSelect, timeout.Milliseconds(), runtime.GOOS)
+	cmd := exec.CommandContext(commandCtx, helper, args...) // #nosec G204 -- local helper path from config or release folder.
+	output, err := cmd.CombinedOutput()
+```
+
+src/internal/appcore/spout.go (L86 to 116)
+  Note: For the default helper name, embedded fallback is available, but an executable next to the main app is returned first. This lets an unsigned adjacent spout-capture.exe override the embedded signed asset.
+```
+func ResolveSpoutHelperPath(helperPath string) (string, error) {
+	helperPath = strings.Trim(strings.TrimSpace(helperPath), `"`)
+	useEmbeddedFallback := helperPath == "" || helperPath == spoutHelperFileName
+	if helperPath == "" {
+		helperPath = spoutHelperFileName
+	}
+	if strings.ContainsAny(helperPath, `\/`) || filepath.IsAbs(helperPath) {
+		info, err := os.Stat(helperPath)
+		if err != nil {
+			return "", fmt.Errorf("Spout helperが見つかりません: %w", err)
+		}
+		if info.IsDir() {
+			return "", fmt.Errorf("Spout helperパスがフォルダを指しています。spout-capture.exeを指定してください")
+		}
+		return helperPath, nil
+	}
+	if candidate, ok := spoutHelperNextToExecutable(helperPath); ok {
+		return candidate, nil
+	}
+	if useEmbeddedFallback && embeddedSpoutHelperAvailable() {
+		embedded, err := resolveEmbeddedSpoutHelper()
+		if err != nil {
+			return "", err
+		}
+		return embedded, nil
+	}
+	resolved, err := exec.LookPath(helperPath)
+	if err != nil {
+		return "", fmt.Errorf("Spout helperが見つかりません。単一exe版では埋め込みhelperを利用します。分離版zipを使う場合は%sをアプリと同じフォルダに置くか、設定でhelperパスを指定してください", spoutHelperFileName)
+	}
+	return resolved, nil
+```

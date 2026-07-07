@@ -1,0 +1,209 @@
+Hidden imported config can exfiltrate watched images
+Link: https://chatgpt.com/codex/cloud/security/findings/03a74009d25c8191ad9d77784977701a?sev=critical%2Chigh
+Criticality: high
+Status: new
+
+# Metadata
+Repo: hatolife/ClipForVRChat
+Commit: 1f9ecd9
+Author: poppo@hato.life
+Created: 2026/7/8 3:40:53
+Assignee: Unassigned
+Signals: Security
+
+# Summary
+Introduced. The commit reorganizes the settings page by replacing the old auto-post tab and its folder/interval controls with only high-level toggles and webhook inputs, while leaving hidden configuration fields active and saved. This creates a config-import review bypass for security-sensitive settings.
+This commit removes the auto-post settings tab that previously exposed `autoPhoto.photoDirectory`, `screenshotAutoPost.screenshotDirectory`, and scan intervals, and it also removes the maximum input size control. However, the frontend still submits the entire `state.config` object to the backend. Those hidden JSON fields are still parsed, normalized only lightly, persisted, and used by `restartAutoPhotoWatcher` to start background watchers. In the threat model, third-party config JSON is attacker-controlled if the user opens it. After this change, a malicious config can set `output.uploadDiscord=true`, set a Discord webhook, enable auto processing, and set a hidden watch directory such as a broad Pictures/Desktop folder. The UI only shows generic auto-processing toggles and password-style webhook fields, so the user has no meaningful way to inspect or correct the watched directory before saving. Once saved, future supported images created in that hidden directory are automatically processed and uploaded to the configured webhook.
+
+# Evidence
+src/app.go (L457 to 475)
+  Note: After saving, the backend starts watchers using the hidden configured directories and webhook URLs, causing matching future images to be processed/uploaded.
+```
+	if cfg.AutoPhoto.Enabled {
+		watcher := appcore.AutoPhotoWatcher{
+			Config:     cfg,
+			Directory:  cfg.AutoPhoto.PhotoDirectory,
+			WebhookURL: cfg.AutoPhoto.WebhookURL,
+			Interval:   time.Duration(cfg.AutoPhoto.ScanIntervalSeconds) * time.Second,
+			Handler:    handler,
+		}
+		go watcher.Run(ctx)
+	}
+	if cfg.ScreenshotAutoPost.Enabled {
+		watcher := appcore.AutoPhotoWatcher{
+			Config:     cfg,
+			Directory:  cfg.ScreenshotAutoPost.ScreenshotDirectory,
+			WebhookURL: cfg.ScreenshotAutoPost.WebhookURL,
+			Interval:   time.Duration(cfg.ScreenshotAutoPost.ScanIntervalSeconds) * time.Second,
+			Handler:    handler,
+		}
+		go watcher.Run(ctx)
+```
+
+src/frontend/src/main.js (L622 to 633)
+  Note: Saving submits the entire state.config object, including fields no longer visible in the settings UI.
+```
+    async saveSettings() {
+      this.saving = true
+      this.saved = false
+      this.error = ''
+      try {
+        this.sanitizeOutputDirectory()
+        this.sanitizePhotoDirectory()
+        this.sanitizeScreenshotDirectory()
+        if (this.state.processOnSave) {
+          this.state = await api.SaveConfigAndProcess(this.state.config, this.state.pendingPaths || [])
+        } else {
+          await api.SaveConfig(this.state.config)
+```
+
+src/frontend/src/main.js (L866 to 884)
+  Note: The new Feature tab exposes only auto-processing enabled toggles; it does not expose the configured watch directories that determine which local files are monitored.
+```
+          <section v-if="settingsTab === 'feature'" class="settings-group" role="tabpanel">
+            <h3>機能</h3>
+            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord }">
+              <div><strong>VRChat写真自動処理</strong><p>VRChat上で撮影されたときに処理します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="state.config.autoPhoto.enabled" :disabled="!state.config.output.uploadDiscord" /><span></span></label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord }">
+              <div><strong>スクリーンショット自動処理</strong><p>Win + Shift + Sでスクリーンショットが撮られたときに処理します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="state.config.screenshotAutoPost.enabled" :disabled="!state.config.output.uploadDiscord" /><span></span></label>
+            </div>
+            <div class="setting-row">
+              <div><strong>Discord投稿</strong><p>縮小した画像をDiscord Webhookへ投稿し、VRChatで使うURLを取得します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="state.config.output.uploadDiscord" /><span></span></label>
+            </div>
+            <div class="setting-row">
+              <div><strong>QRコードURL検出</strong><p>画像内のQRコードからURLを取得します。取得したURLはDiscord本文と結果画面に表示します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="state.config.output.detectQrCodeUrls" /><span></span></label>
+            </div>
+          </section>
+```
+
+src/frontend/src/main.js (L946 to 968)
+  Note: The Webhook tab exposes webhook fields but not the auto-processing folder fields, so an imported config can combine a visible/obscured webhook with hidden watch locations.
+```
+          <section v-if="settingsTab === 'webhook'" class="settings-group" role="tabpanel">
+            <h3>Webhook</h3>
+            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord }">
+              <div>
+                <strong>通常投稿用Webhook URL</strong>
+                <p>Discordの投稿先チャンネルでWebhookを作成し、そのURLを貼り付けます。</p>
+                <button class="link-button" @click="openURL(webhookGuideUrl)" :disabled="!state.config.output.uploadDiscord">Discord公式: Webhookの作成方法</button>
+              </div>
+              <label>
+              <input type="password" v-model="state.config.discord.webhookUrl" placeholder="https://discord.com/api/webhooks/..." :disabled="!state.config.output.uploadDiscord" />
+              </label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord || !state.config.autoPhoto.enabled }">
+              <div><strong>VRChat写真自動投稿用Webhook URL</strong><p>通常投稿とは別の投稿先にしたい場合だけ入力します。空の場合は通常投稿用Webhook URLへ投稿します。</p></div>
+              <label>
+                <input type="password" v-model="state.config.autoPhoto.webhookUrl" placeholder="空なら通常投稿用Webhook URLを使用" :disabled="!state.config.output.uploadDiscord || !state.config.autoPhoto.enabled" />
+              </label>
+            </div>
+            <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord || !state.config.screenshotAutoPost.enabled }">
+              <div><strong>スクリーンショット自動投稿用Webhook URL</strong><p>通常投稿とは別の投稿先にしたい場合だけ入力します。空の場合は通常投稿用Webhook URLへ投稿します。</p></div>
+              <label>
+                <input type="password" v-model="state.config.screenshotAutoPost.webhookUrl" placeholder="空なら通常投稿用Webhook URLを使用" :disabled="!state.config.output.uploadDiscord || !state.config.screenshotAutoPost.enabled" />
+              </label>
+```
+
+src/internal/appcore/config.go (L182 to 202)
+  Note: Normalization preserves any non-empty auto-processing directories from an imported config rather than resetting them to safe defaults.
+```
+	c.AutoPhoto.PhotoDirectory = strings.Trim(strings.TrimSpace(c.AutoPhoto.PhotoDirectory), `"`)
+	if c.AutoPhoto.PhotoDirectory == "" {
+		c.AutoPhoto.PhotoDirectory = DefaultVRChatPhotoDirectory()
+	}
+	c.AutoPhoto.WebhookURL = strings.Trim(strings.TrimSpace(c.AutoPhoto.WebhookURL), `"`)
+	if c.AutoPhoto.ScanIntervalSeconds <= 0 {
+		c.AutoPhoto.ScanIntervalSeconds = 2
+	}
+	if c.AutoPhoto.ScanIntervalSeconds > 3600 {
+		c.AutoPhoto.ScanIntervalSeconds = 3600
+	}
+	c.ScreenshotAutoPost.ScreenshotDirectory = strings.Trim(strings.TrimSpace(c.ScreenshotAutoPost.ScreenshotDirectory), `"`)
+	if c.ScreenshotAutoPost.ScreenshotDirectory == "" {
+		c.ScreenshotAutoPost.ScreenshotDirectory = DefaultScreenshotsDirectory()
+	}
+	c.ScreenshotAutoPost.WebhookURL = strings.Trim(strings.TrimSpace(c.ScreenshotAutoPost.WebhookURL), `"`)
+	if c.ScreenshotAutoPost.ScanIntervalSeconds <= 0 {
+		c.ScreenshotAutoPost.ScanIntervalSeconds = 2
+	}
+	if c.ScreenshotAutoPost.ScanIntervalSeconds > 3600 {
+		c.ScreenshotAutoPost.ScanIntervalSeconds = 3600
+```
+
+src/internal/appcore/config.go (L50 to 61)
+  Note: The hidden auto-processing directories and scan intervals remain persisted JSON configuration fields.
+```
+type AutoPhotoConfig struct {
+	Enabled             bool   `json:"enabled"`
+	PhotoDirectory      string `json:"photoDirectory"`
+	WebhookURL          string `json:"webhookUrl"`
+	ScanIntervalSeconds int    `json:"scanIntervalSeconds"`
+}
+
+type ScreenshotAutoPostConfig struct {
+	Enabled             bool   `json:"enabled"`
+	ScreenshotDirectory string `json:"screenshotDirectory"`
+	WebhookURL          string `json:"webhookUrl"`
+	ScanIntervalSeconds int    `json:"scanIntervalSeconds"`
+```
+
+src/SETTINGS_SPEC.md (L28 to 78)
+  Note: The new settings specification lists only high-level auto-processing toggles and webhook URLs; it omits watch directory settings from the UI model.
+```
+### 機能
+
+- VRChat写真自動処理
+  - 種別: ON/OFF
+  - 説明: VRChat上で撮影されたときに処理する。
+- スクリーンショット自動処理
+  - 種別: ON/OFF
+  - 説明: Win + Shift + S でスクリーンショットが撮られたときに処理する。
+- Discord投稿
+  - 種別: ON/OFF
+  - 説明: 処理した画像をDiscord Webhookへ投稿する。
+- QRコードURL検出
+  - 種別: ON/OFF
+  - 説明: 画像内のQRコードからURLを取得する。
+
+### 処理
+
+- ローカル保存
+  - 種別: ON/OFF
+  - 説明: 処理した画像をローカルに保存する。
+- 投稿URLの自動コピー
+  - 種別: ON/OFF
+  - 説明: Discordに投稿したURLをクリップボードに保存する。
+- 出力先フォルダ
+  - 種別: フォルダパス入力 + 選択ボタン
+  - 説明: ローカル保存時の保存先。
+- ファイル名サフィックス
+  - 種別: テキスト入力
+  - 説明: ローカル保存時のファイル名末尾に付ける文字。
+- 出力形式
+  - 種別: 選択
+  - 値: `PNG`, `JPG`
+  - 説明: 保存または投稿に使う画像形式。
+- JPEG品質
+  - 種別: 数値入力
+  - 説明: JPG出力時の画質。
+- 履歴削除時にoutputも削除
+  - 種別: ON/OFF
+  - 説明: Discord削除済み履歴を削除するとき、ローカル保存したoutput画像も削除する。
+
+### Webhook
+
+- 通常投稿用Webhook URL
+  - 種別: パスワード入力
+  - 説明: 通常のDiscord投稿先。
+- VRChat写真自動処理用Webhook URL
+  - 種別: パスワード入力
+  - 説明: VRChat写真自動処理だけ別のDiscordチャンネルへ投稿したい場合に使う。空の場合は通常投稿用Webhook URLを使う。
+- スクリーンショット自動処理用Webhook URL
+  - 種別: パスワード入力
+  - 説明: スクリーンショット自動処理だけ別のDiscordチャンネルへ投稿したい場合に使う。空の場合は通常投稿用Webhook URLを使う。
+```

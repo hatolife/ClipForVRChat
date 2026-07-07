@@ -1,0 +1,112 @@
+Unpinned Spout2 FetchContent in release build
+Link: https://chatgpt.com/codex/cloud/security/findings/87e03cb4699c8191b7cc0e5a4c3830d3?sev=critical%2Chigh
+Criticality: high (attack path: high)
+Status: new
+
+# Metadata
+Repo: hatolife/ClipForVRChat
+Commit: ec5c825
+Author: poppo@hato.life
+Created: 2026/7/8 3:10:30
+Assignee: Unassigned
+Signals: Security, Validated, Attack-path
+
+# Summary
+Introduced: the commit added tools/spout-capture/CMakeLists.txt with FetchContent pulling Spout2 by mutable tag and added release workflow steps that build and package the resulting executable. This creates a new supply-chain/release-integrity risk.
+The new Spout helper build uses CMake FetchContent to clone Spout2 from https://github.com/leadedge/Spout2.git with GIT_TAG set to the tag-like string 2.007.015 instead of a full immutable commit SHA or vendored source with hash verification. FetchContent processes the fetched project's CMake code during the release job. Because the release workflow runs this build before packaging, signing, and publishing, a compromised upstream repository/tag or maliciously moved tag could execute code on the release runner, modify the helper or other release artifacts, and ship a malicious spout-capture.exe inside the official zip. The helper is explicitly copied into the release package. The later signing step signs only ClipForVRChat.exe, not the helper executable or the whole zip, so users verifying the detached exe signature would not detect a tampered helper.
+
+# Validation
+## Rubric
+- [x] Confirm the commit introduced a new helper CMake build using FetchContent for an external dependency.
+- [x] Confirm the dependency is pinned by a mutable tag-like value rather than an immutable commit SHA or verified archive hash.
+- [x] Confirm the release workflow executes the helper CMake configure/build before packaging.
+- [x] Confirm the helper executable is copied into and required in the official release package.
+- [x] Confirm release signing covers only ClipForVRChat.exe and not spout-capture.exe or the full zip.
+## Report
+Validated the finding as a release-integrity/supply-chain issue rather than a memory-safety crash. Evidence: `tools/spout-capture/CMakeLists.txt:4-14` includes CMake FetchContent, fetches `https://github.com/leadedge/Spout2.git`, and pins only `GIT_TAG 2.007.015`, not an immutable commit SHA or hash-verified archive. Running the actual project configure command showed CMake immediately attempts to populate `spout2` by cloning that external repository during configure: output included `-- Populating spout2`, `Performing download step (git clone)`, and `Failed to clone repository: 'https://github.com/leadedge/Spout2.git'` due the container network policy. The release workflow executes this path in `.github/workflows/release.yml:65-69` using `cmake -S tools/spout-capture ...` and then builds target `spout-capture`. The resulting helper is copied into the official package at `.github/workflows/release.yml:142-146`, required in validation at lines `235-242`, zipped at line `183`, and uploaded at lines `335-339`. The signing step at `.github/workflows/release.yml:155-176` detaches a GPG signature only for `dist/ClipForVRChat/ClipForVRChat.exe`; no detached signature is produced for `spout-capture.exe` or for the zip as a whole. To demonstrate exploitability of the exact FetchContent/tag pattern, I created a local PoC where a victim CMake project uses `FetchContent_Declare(... GIT_TAG 2.007.015)` against a local stand-in Spout2 repo. First configure fetched a benign tag and executed benign CMake code. Then I force-moved the same tag name to a new commit with CMake code that writes `MOVED_TAG_CODE_EXECUTED.txt`; a clean second configure fetched `HEAD is now at ... moved-tag-malicious` and produced marker `MALICIOUS CMAKE CODE EXECUTED FROM MOVED TAG`. This confirms that a moved/compromised upstream tag can execute changed CMake code in the release build without any repository change here. Crash/valgrind/debugger validation is not applicable because this finding is not a runtime memory-corruption bug; the relevant execution primitive is build-time CMake code execution.
+
+# Evidence
+github/workflows/release.yml (L142 to 146)
+  Note: The executable produced from the fetched dependency is copied into the official release package.
+
+github/workflows/release.yml (L155 to 173)
+  Note: Only ClipForVRChat.exe is detached-signed after the helper build; the packaged helper executable is not separately signed, so tampering in the helper path is not covered by this signature.
+
+github/workflows/release.yml (L65 to 69)
+  Note: The release job executes the CMake configure/build for the helper, causing the fetched third-party CMake project to run in the release environment.
+
+tools/spout-capture/CMakeLists.txt (L4 to 14)
+  Note: FetchContent downloads Spout2 from GitHub at build time and pins only a mutable tag-like value, not an immutable commit SHA or verified archive hash.
+```
+include(FetchContent)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+FetchContent_Declare(
+  Spout2
+  GIT_REPOSITORY https://github.com/leadedge/Spout2.git
+  GIT_TAG 2.007.015
+)
+FetchContent_MakeAvailable(Spout2)
+```
+
+Proposed patch: (no diff available)
+
+# Attack-path analysis
+Final: high | Decider: model_decided | Matrix severity: high | Policy adjusted: high
+## Rationale
+Kept as high. The finding is real and in scope: tools/spout-capture/CMakeLists.txt fetches a mutable external Spout2 tag, the release workflow builds it, packages the resulting helper, and uploads it as an official release asset. The impact is major because malicious upstream CMake/build content can alter shipped executable artifacts and the helper is later executed by the desktop app's Spout capture path. However, the likelihood is not high enough for critical because exploitation requires compromise/control of an external upstream dependency or mutable tag and a subsequent maintainer release build; it is not a directly exposed public service or 0-click path against installed users. Existing controls such as read-only build contents permission and signing of the main executable reduce but do not eliminate the risk, especially because the helper and full zip are not signed.
+## Likelihood
+high - The vulnerable path is automatically reached during official release builds, but an attacker needs a non-trivial precondition: control of the upstream Spout2 repository/tag or an equivalent dependency-delivery compromise before maintainers publish a release. This is plausible supply-chain risk, not a directly internet-exposed unauthenticated application endpoint. | Remote network vector
+## Impact
+high - A successful attack can execute code in the release build and ship a malicious bundled executable through the official release zip. Because the helper is executed by product functionality and is not separately covered by the detached signature, this can lead to end-user code execution under the user's account and potentially release-signing workflow abuse if future-step environment/path poisoning is achieved.
+## Assumptions
+- The GitHub Actions release workflow is the authoritative path for producing official Windows release assets.
+- CMake FetchContent processes the fetched Spout2 project's CMake/build logic during configure/build.
+- An attacker must gain control over the upstream Spout2 repository, the referenced tag, or an equivalent dependency-delivery path before a release build runs.
+- GitHub Actions standard environment behavior allows build steps to affect the workspace and potentially future steps via files and workflow environment/path mechanisms, although this was not dynamically tested against GitHub Actions.
+- Compromise or control of https://github.com/leadedge/Spout2.git or mutable tag 2.007.015
+- A maintainer-triggered release build after the upstream tag/repository is malicious
+- Release consumers download or run the official zip containing the helper
+## Path
+Attacker controls Spout2 tag
+        |
+        v
+Release CMake FetchContent clones tag
+        |
+        v
+Fetched CMake/build code runs on release runner
+        |
+        v
+spout-capture.exe/workspace can be modified
+        |
+        v
+Official zip includes helper; only main exe is signed
+        |
+        v
+Users run bundled helper during Stream capture
+## Path evidence
+- `tools/spout-capture/CMakeLists.txt:4-14` - Includes FetchContent, declares Spout2 from https://github.com/leadedge/Spout2.git, and uses mutable tag-like GIT_TAG 2.007.015 without a commit SHA or hash.
+- `.github/workflows/release.yml:65-69` - Official release workflow runs CMake configure/build for the Spout helper, causing the fetched dependency's build logic to execute during release.
+- `.github/workflows/release.yml:142-146` - The produced spout-capture.exe is found under the build directory and copied into the release package directory.
+- `.github/workflows/release.yml:155-176` - Signing step imports release GPG secrets and creates/verifies a detached signature only for dist/ClipForVRChat/ClipForVRChat.exe.
+- `.github/workflows/release.yml:178-186` - The package directory is compressed into the official Windows zip and only a SHA256 checksum is produced for the zip.
+- `.github/workflows/release.yml:235-242` - Release validation explicitly requires dist/ClipForVRChat/spout-capture.exe, confirming the helper is intended release content.
+- `.github/workflows/release.yml:335-339` - Release job uploads the zip, checksum, exe signature, and metadata as GitHub release assets.
+- `src/internal/appcore/spout.go:137-158` - Runtime auto-capture path resolves and executes the bundled/configured helper with --capture, showing the helper is product functionality, not unused build output.
+## Narrative
+This is a real in-scope release-integrity vulnerability. The helper CMake project uses FetchContent to fetch Spout2 from GitHub and pins only GIT_TAG 2.007.015, not a commit SHA or verified archive hash. The official release workflow runs this CMake configure/build before packaging. The resulting spout-capture.exe is copied into dist/ClipForVRChat, required by validation, zipped, and uploaded as a release asset. The GPG detached signature is generated only for ClipForVRChat.exe, leaving the bundled helper and whole zip outside that signature's coverage. Runtime code also executes the helper for Spout capture, confirming it is part of the shipped product. Exploitation is not internet-trivial because it requires upstream dependency/tag compromise or control and a subsequent release build, but successful exploitation can ship malicious code to users through the official release channel.
+## Controls
+- Release workflow top-level permissions are contents: read, and build job permissions are contents: read.
+- Separate release job has contents: write only for creating/uploading GitHub release assets.
+- Release signing exists for ClipForVRChat.exe.
+- npm audit, Go tests, and govulncheck run before packaging.
+- Release asset validation checks required files, including spout-capture.exe.
+- No control found that pins Spout2 to an immutable commit SHA or verifies a source archive hash.
+- No control found that signs spout-capture.exe or the complete zip.
+## Blindspots
+- Static-only analysis did not verify actual GitHub tag protection or immutability settings for the upstream Spout2 repository.
+- Static-only analysis did not execute the real GitHub Actions workflow or confirm whether runner environment/path poisoning would expose signing secrets in practice.
+- No cloud or GitHub APIs were called, so actual repository secrets, environment protections, and release approval gates could not be inspected.
+- User verification behavior for the detached signature is unknown; impact assessment assumes some users trust official release assets without independently verifying every executable.
