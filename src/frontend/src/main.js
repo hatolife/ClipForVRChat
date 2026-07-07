@@ -352,23 +352,21 @@ const vueApp = createApp({
       const primaryWebhook = String(discord.webhookUrl || '').trim()
       if (output.uploadDiscord && autoPhoto.enabled) {
         const target = this.effectiveWebhookURL(autoPhoto.webhookUrl, primaryWebhook)
-        if (!target) {
-          items.push({
-            label: 'VRChat写真自動処理',
-            detail: `監視フォルダ: ${autoPhoto.photoDirectory || '(未設定)'}`,
-            discord: 'Discord投稿: ON / 送信先: 未設定'
-          })
-        }
+        items.push({
+          label: 'VRChat写真自動処理',
+          detail: `監視フォルダ: ${autoPhoto.photoDirectory || '(未設定)'}`,
+          discord: target ? `Discord投稿: ON / 送信先: ${this.maskWebhook(target)}` : 'Discord投稿: ON / 送信先: 未設定',
+          warning: this.autoProcessingWatchDirectoryWarning(autoPhoto.photoDirectory)
+        })
       }
       if (output.uploadDiscord && screenshot.enabled) {
         const target = this.effectiveWebhookURL(screenshot.webhookUrl, primaryWebhook)
-        if (!target) {
-          items.push({
-            label: 'スクリーンショット自動処理',
-            detail: `監視フォルダ: ${screenshot.screenshotDirectory || '(未設定)'}`,
-            discord: 'Discord投稿: ON / 送信先: 未設定'
-          })
-        }
+        items.push({
+          label: 'スクリーンショット自動処理',
+          detail: `監視フォルダ: ${screenshot.screenshotDirectory || '(未設定)'}`,
+          discord: target ? `Discord投稿: ON / 送信先: ${this.maskWebhook(target)}` : 'Discord投稿: ON / 送信先: 未設定',
+          warning: this.autoProcessingWatchDirectoryWarning(screenshot.screenshotDirectory)
+        })
       }
       if (autoCaptureSchedule.enabled && (autoCaptureDiscord.enabled || output.uploadDiscord)) {
         const target = this.effectiveWebhookURL(autoCaptureDiscord.webhookUrl, primaryWebhook)
@@ -910,6 +908,42 @@ const vueApp = createApp({
       const shortToken = token.length > 8 ? `${token.slice(0, 4)}...${token.slice(-4)}` : '****'
       return `${id}/${shortToken}`
     },
+    normalizedWatchDirectory(path) {
+      return String(path || '')
+        .trim()
+        .replace(/^"+|"+$/g, '')
+        .replace(/\\/g, '/')
+        .replace(/\/+$/g, '')
+    },
+    autoProcessingWatchDirectoryWarning(path) {
+      const normalized = this.normalizedWatchDirectory(path)
+      if (!normalized) return '監視フォルダが未設定です。'
+      const lower = normalized.toLowerCase()
+      if (/^[a-z]:$/i.test(normalized) || normalized === '/') {
+        return 'ドライブ直下やルートフォルダは監視範囲が広すぎます。専用フォルダを指定してください。'
+      }
+      const parts = lower.split('/').filter(Boolean)
+      const leaf = parts[parts.length - 1] || ''
+      if (/^[a-z]:$/i.test(parts[0] || '') && parts.length <= 2) {
+        return 'ユーザーフォルダ全体に近い場所です。専用フォルダを指定してください。'
+      }
+      if (/^[a-z]:$/i.test(parts[0] || '') && parts[1] === 'users' && parts.length <= 3) {
+        return 'ユーザーフォルダ全体に近い場所です。専用フォルダを指定してください。'
+      }
+      if (parts[0] === 'home' && parts.length <= 2) {
+        return 'ユーザーフォルダ全体に近い場所です。専用フォルダを指定してください。'
+      }
+      if (parts[0] === 'users' && parts.length <= 2) {
+        return 'ユーザーフォルダ全体に近い場所です。専用フォルダを指定してください。'
+      }
+      if (parts.length >= 3 && parts[0] === 'users' && ['desktop', 'downloads', 'documents', 'pictures', 'videos', 'music', 'onedrive'].includes(leaf)) {
+        return '広い既知フォルダです。意図しない画像が自動投稿されないよう、専用フォルダを推奨します。'
+      }
+      if (['desktop', 'downloads', 'documents', 'pictures', 'videos', 'music', 'onedrive'].includes(leaf)) {
+        return '広い既知フォルダです。意図しない画像が自動投稿されないよう、専用フォルダを推奨します。'
+      }
+      return ''
+    },
     requestAutoPostConfirmation(action) {
       this.pendingAutoPostConfirmation = action
       this.logUserAction('settings_confirmation_required', `auto_post ${action}`)
@@ -929,12 +963,24 @@ const vueApp = createApp({
     },
     openDiscordWebhookSettings() {
       this.logUserAction('button_click', 'open_discord_webhook_settings_from_banner')
+      this.pendingAutoPostConfirmation = null
       if (this.isSettings) {
         this.settingsTab = 'webhook'
         return
       }
       void this.openSettings().then(() => {
         this.settingsTab = 'webhook'
+      })
+    },
+    openAutoProcessingSettings() {
+      this.logUserAction('button_click', 'open_auto_processing_settings_from_confirmation')
+      this.pendingAutoPostConfirmation = null
+      if (this.isSettings) {
+        this.settingsTab = 'feature'
+        return
+      }
+      void this.openSettings().then(() => {
+        this.settingsTab = 'feature'
       })
     },
     resultPlaceholder(path, index, total) {
@@ -2468,9 +2514,29 @@ const vueApp = createApp({
               <div><strong>VRChat写真自動処理</strong><p>VRChat上で撮影されたときに処理します。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.autoPhoto.enabled" /><span></span></label>
             </div>
+            <div class="setting-row" :class="[{ disabled: !state.config.autoPhoto.enabled }, settingRowChangedClass('autoPhoto.photoDirectory')]">
+              <div><strong>VRChat写真の監視フォルダ</strong><p>このフォルダに追加された画像を自動処理します。</p></div>
+              <div class="settings-control-stack">
+                <input v-model="state.config.autoPhoto.photoDirectory" :disabled="!state.config.autoPhoto.enabled" />
+                <div class="inline-actions">
+                  <button type="button" class="secondary" @click="choosePhotoDirectory" :disabled="!state.config.autoPhoto.enabled" title="VRChat写真の監視フォルダを選択する">フォルダを選択</button>
+                </div>
+                <p v-if="state.config.autoPhoto.enabled && autoProcessingWatchDirectoryWarning(state.config.autoPhoto.photoDirectory)" class="setting-note warning">{{ autoProcessingWatchDirectoryWarning(state.config.autoPhoto.photoDirectory) }}</p>
+              </div>
+            </div>
             <div class="setting-row" :class="settingRowChangedClass('screenshotAutoPost.enabled')">
               <div><strong>スクリーンショット自動処理</strong><p>Win + Shift + Sでスクリーンショットが撮られたときに処理します。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.screenshotAutoPost.enabled" /><span></span></label>
+            </div>
+            <div class="setting-row" :class="[{ disabled: !state.config.screenshotAutoPost.enabled }, settingRowChangedClass('screenshotAutoPost.screenshotDirectory')]">
+              <div><strong>スクリーンショットの監視フォルダ</strong><p>このフォルダに追加された画像を自動処理します。</p></div>
+              <div class="settings-control-stack">
+                <input v-model="state.config.screenshotAutoPost.screenshotDirectory" :disabled="!state.config.screenshotAutoPost.enabled" />
+                <div class="inline-actions">
+                  <button type="button" class="secondary" @click="chooseScreenshotDirectory" :disabled="!state.config.screenshotAutoPost.enabled" title="スクリーンショットの監視フォルダを選択する">フォルダを選択</button>
+                </div>
+                <p v-if="state.config.screenshotAutoPost.enabled && autoProcessingWatchDirectoryWarning(state.config.screenshotAutoPost.screenshotDirectory)" class="setting-note warning">{{ autoProcessingWatchDirectoryWarning(state.config.screenshotAutoPost.screenshotDirectory) }}</p>
+              </div>
             </div>
             <div class="setting-row" :class="settingRowChangedClass('output.detectQrCodeUrls')">
               <div><strong>QRコードURL検出</strong><p>画像内のQRコードからURLを取得します。取得したURLはDiscord本文と結果画面に表示します。</p></div>
@@ -3293,19 +3359,21 @@ const vueApp = createApp({
       </div>
       <div v-if="pendingAutoPostConfirmation" class="modal-backdrop" role="dialog" aria-modal="true">
         <div class="confirm-dialog">
-          <h2>自動処理の送信先を確認してください</h2>
-          <p>Discord投稿がONですが、下記の自動処理は送信先Webhook URLが未設定です。専用Webhook URL、またはフォールバック先の通常投稿用Webhook URLを設定してください。</p>
+          <h2>自動処理の投稿内容を確認してください</h2>
+          <p>下記の自動処理は、監視フォルダに追加された画像をDiscordへ投稿します。保存前に監視フォルダと送信先を確認してください。</p>
           <ul class="confirmation-list">
             <li v-for="item in autoPostConfirmationItems" :key="item.label">
               <strong>{{ item.label }}</strong>
               <span>{{ item.detail }}</span>
               <span>{{ item.discord }}</span>
+              <span v-if="item.warning" class="warning">{{ item.warning }}</span>
             </li>
           </ul>
-          <p>通常投稿用Webhook URLが設定済みの場合、専用Webhook URLが空でもこの確認は表示されません。</p>
+          <p>送信先が未設定の場合は投稿に失敗します。広いフォルダを監視すると、意図しない画像も投稿対象になります。</p>
           <p v-if="error" class="error">{{ error }}</p>
           <div class="button-row dialog-actions">
             <button @click="confirmAutoPostSettings" :disabled="saving" :title="saving ? '保存中です' : 'この内容で保存する'">{{ saving ? '保存中' : '確認して保存' }}</button>
+            <button class="secondary" @click="openAutoProcessingSettings" :disabled="saving" :title="saving ? '保存中です' : '機能設定を開く'">機能設定を開く</button>
             <button class="secondary" @click="openDiscordWebhookSettings" :disabled="saving" :title="saving ? '保存中です' : 'Discord投稿設定を開く'">Discord投稿設定を開く</button>
             <button class="secondary" @click="cancelAutoPostConfirmation" :disabled="saving" :title="saving ? '保存中です' : '確認を閉じる'">キャンセル</button>
           </div>

@@ -1649,6 +1649,10 @@ small {
   overflow-wrap: anywhere;
 }
 
+.confirmation-list span.warning {
+  color: #9a4c00;
+}
+
 .busy-backdrop {
   z-index: 45;
   background: rgba(23, 33, 43, 0.42);
