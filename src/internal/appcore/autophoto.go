@@ -34,6 +34,7 @@ type AutoPhotoWatcher struct {
 	Interval           time.Duration
 	Handler            func(AutoPhotoEvent)
 	Process            func(string) Result
+	ShouldSkip         func(string) bool
 	seen               map[string]time.Time
 }
 
@@ -69,6 +70,10 @@ func (w *AutoPhotoWatcher) tick() {
 			break
 		}
 		if !fileLooksStable(path) {
+			continue
+		}
+		if w.ShouldSkip != nil && w.ShouldSkip(path) {
+			w.seen[path] = modTime
 			continue
 		}
 		w.seen[path] = modTime

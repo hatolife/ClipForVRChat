@@ -53,39 +53,41 @@ func emitWailsEvent(ctx context.Context, name string, data any) {
 }
 
 type App struct {
-	ctx                   context.Context
-	configPath            string
-	state                 appcore.UIState
-	autoCancel            context.CancelFunc
-	oscCancel             context.CancelFunc
-	oscReceiverHost       string
-	oscReceiverPort       int
-	oscReceiverLogPath    string
-	oscReceiverForwardKey string
-	oscReceiverSeq        uint64
-	oscReceiverDone       chan struct{}
-	latestPose            appcore.CameraPoseConfig
-	poseAt                time.Time
-	userCameraSamples     map[string]userCameraOSCSample
-	latestAvatarOSCBasis  avatarOSCBasisState
-	avatarBeaconVersion   string
-	avatarOSCContextKey   string
-	avatarOSCContextAt    time.Time
-	avatarOSCBasisSamples map[string]avatarOSCBasisSample
-	oscLogEntries         []OSCLogEntry
-	oscSendLogEntries     []OSCLogEntry
-	oscLogSeq             uint64
-	oscSendLogSeq         uint64
-	oscLogLastEmit        time.Time
-	oscSendLogLastEmit    time.Time
-	oscLogDirty           bool
-	oscSendLogDirty       bool
-	oscLogLastWrite       time.Time
-	oscSendLogLastWrite   time.Time
-	oscTraceCleanup       func()
-	settingsDraftDirty    bool
-	allowClose            bool
-	mu                    sync.Mutex
+	ctx                      context.Context
+	configPath               string
+	state                    appcore.UIState
+	autoCancel               context.CancelFunc
+	oscCancel                context.CancelFunc
+	oscReceiverHost          string
+	oscReceiverPort          int
+	oscReceiverLogPath       string
+	oscReceiverForwardKey    string
+	oscReceiverSeq           uint64
+	oscReceiverDone          chan struct{}
+	latestPose               appcore.CameraPoseConfig
+	poseAt                   time.Time
+	userCameraSamples        map[string]userCameraOSCSample
+	latestAvatarOSCBasis     avatarOSCBasisState
+	avatarBeaconVersion      string
+	avatarOSCContextKey      string
+	avatarOSCContextAt       time.Time
+	avatarOSCBasisSamples    map[string]avatarOSCBasisSample
+	oscLogEntries            []OSCLogEntry
+	oscSendLogEntries        []OSCLogEntry
+	oscLogSeq                uint64
+	oscSendLogSeq            uint64
+	oscLogLastEmit           time.Time
+	oscSendLogLastEmit       time.Time
+	oscLogDirty              bool
+	oscSendLogDirty          bool
+	oscLogLastWrite          time.Time
+	oscSendLogLastWrite      time.Time
+	oscTraceCleanup          func()
+	settingsDraftDirty       bool
+	autoCapturePhotoActive   bool
+	autoPhotoSuppressedPaths map[string]struct{}
+	allowClose               bool
+	mu                       sync.Mutex
 }
 
 type userCameraOSCSample struct {
@@ -179,6 +181,73 @@ func NewApp(configPath string, initial appcore.UIState) *App {
 		state:              initial,
 		settingsDraftDirty: initial.UnsavedSettingsDraft,
 	}
+}
+
+func (a *App) beginAutoCapturePhotoSuppressionLocked(cfg appcore.Config) bool {
+	if !cfg.AutoPhoto.Enabled || !strings.EqualFold(strings.TrimSpace(cfg.AutoCapture.Capture.Mode), "photo") || strings.TrimSpace(cfg.AutoPhoto.PhotoDirectory) == "" {
+		return false
+	}
+	if a.autoPhotoSuppressedPaths == nil {
+		a.autoPhotoSuppressedPaths = map[string]struct{}{}
+	}
+	a.autoCapturePhotoActive = true
+	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "auto-photo suppression begin: reason=%q photo_dir=%q", "auto_capture_photo", cfg.AutoPhoto.PhotoDirectory)
+	return true
+}
+
+func (a *App) endAutoCapturePhotoSuppression() {
+	a.mu.Lock()
+	active := a.autoCapturePhotoActive
+	a.autoCapturePhotoActive = false
+	a.mu.Unlock()
+	if active {
+		appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "auto-photo suppression end: reason=%q", "auto_capture_photo")
+	}
+}
+
+func (a *App) reserveAutoCapturePhotoPath(path string) {
+	key := autoPhotoSuppressionKey(path)
+	if key == "" {
+		return
+	}
+	a.mu.Lock()
+	if a.autoPhotoSuppressedPaths == nil {
+		a.autoPhotoSuppressedPaths = map[string]struct{}{}
+	}
+	a.autoPhotoSuppressedPaths[key] = struct{}{}
+	a.mu.Unlock()
+	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "auto-photo suppression reserve: path=%q", path)
+}
+
+func (a *App) shouldSkipAutoPhotoPath(path string) bool {
+	key := autoPhotoSuppressionKey(path)
+	if key == "" {
+		return false
+	}
+	a.mu.Lock()
+	active := a.autoCapturePhotoActive
+	_, reserved := a.autoPhotoSuppressedPaths[key]
+	if reserved {
+		delete(a.autoPhotoSuppressedPaths, key)
+	}
+	a.mu.Unlock()
+	if !active && !reserved {
+		return false
+	}
+	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "auto-photo suppression skip: path=%q active=%t reserved=%t", path, active, reserved)
+	return true
+}
+
+func autoPhotoSuppressionKey(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+	cleaned := filepath.Clean(path)
+	if abs, err := filepath.Abs(cleaned); err == nil {
+		cleaned = abs
+	}
+	return strings.ToLower(filepath.Clean(cleaned))
 }
 
 func (a *App) startup(ctx context.Context) {
@@ -1150,9 +1219,17 @@ func (a *App) TestAutoCaptureView(viewID string) ([]appcore.Result, error) {
 		cfg.AutoCapture.Stream.DebugRecordingDirectory = spoutDebugRecordingDir(cfg.AutoCapture.Output.Directory, viewID)
 		appcore.AppendDiagnosticLog(cfg.DiagnosticLogPath, "spout debug recording enabled for test capture: view_id=%q dir=%q frames=%d", viewID, cfg.AutoCapture.Stream.DebugRecordingDirectory, cfg.AutoCapture.Stream.DebugFrameCount)
 	}
+	suppressAutoPhoto := a.beginAutoCapturePhotoSuppressionLocked(cfg)
 	a.mu.Unlock()
+	if suppressAutoPhoto {
+		defer a.endAutoCapturePhotoSuppression()
+	}
 
-	results, err := appcore.AutoCaptureRunner{Config: cfg}.RunOnce(context.Background())
+	runner := appcore.AutoCaptureRunner{Config: cfg}
+	if suppressAutoPhoto {
+		runner.ReserveSourcePath = a.reserveAutoCapturePhotoPath
+	}
+	results, err := runner.RunOnce(context.Background())
 
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -1624,6 +1701,7 @@ func (a *App) restartAutoPhotoWatcher(cfg appcore.Config) {
 			WebhookURL:         cfg.AutoPhoto.WebhookURL,
 			Interval:           time.Duration(cfg.AutoPhoto.ScanIntervalSeconds) * time.Second,
 			Handler:            handler,
+			ShouldSkip:         a.shouldSkipAutoPhotoPath,
 		}
 		go watcher.Run(ctx)
 	}
@@ -1845,8 +1923,8 @@ func (a *App) runAutoCaptureBatch(ctx context.Context, cfg appcore.Config) {
 	cfg.DiagnosticLogPath = logPath
 	a.mu.Lock()
 	cfg, err := a.prepareAutoCaptureConfigForRunLocked(cfg)
-	a.mu.Unlock()
 	if err != nil {
+		a.mu.Unlock()
 		appcore.AppendDiagnosticLog(logPath, "auto-capture batch error: player_local basis resolve failed: %v", err)
 		a.mu.Lock()
 		a.state.Message = "自動撮影でエラーが発生しました: " + err.Error()
@@ -1854,12 +1932,20 @@ func (a *App) runAutoCaptureBatch(ctx context.Context, cfg appcore.Config) {
 		a.mu.Unlock()
 		return
 	}
+	suppressAutoPhoto := a.beginAutoCapturePhotoSuppressionLocked(cfg)
+	a.mu.Unlock()
+	if suppressAutoPhoto {
+		defer a.endAutoCapturePhotoSuppression()
+	}
 	appcore.AppendDiagnosticLog(logPath, "auto-capture batch begin")
 	runner := appcore.AutoCaptureRunner{
 		Config: cfg,
 		Handler: func(event appcore.AutoCaptureEvent) {
 			emitWailsEvent(a.ctx, "auto-capture:result", event)
 		},
+	}
+	if suppressAutoPhoto {
+		runner.ReserveSourcePath = a.reserveAutoCapturePhotoPath
 	}
 	results, err := runner.RunOnce(ctx)
 	a.mu.Lock()

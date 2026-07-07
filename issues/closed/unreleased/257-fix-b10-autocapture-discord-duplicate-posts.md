@@ -8,6 +8,8 @@
 
 > photoでどうなるかコードからチェック
 
+> 257に対処したい
+
 ## 文脈
 
 `v0.1.8-b10` の実行結果で、3枚撮影される想定の自動撮影がDiscordへ6枚投稿された。ユーザーから実行環境の `history.json` と `logs/` が提示された。
@@ -30,6 +32,13 @@
 
 - [x] 提示された `history.json` と `logs/` から重複の発生箇所を特定する。
 - [x] 自動撮影のDiscord投稿が重複しないよう修正する。
+- [x] 関連テストを追加または更新する。
+- [x] 関連チェックが通る。
+
+## 追加受け入れ条件
+
+- [x] Photo方式の自動撮影で作成されたVRChat写真を、通常のVRChat写真自動処理が二重投稿しない。
+- [x] フォールバックモード時も同じ抑制が効く。
 - [x] 関連テストを追加または更新する。
 - [x] 関連チェックが通る。
 
@@ -58,3 +67,16 @@
 - フォールバックモードの `preplaced_local_anchor` はカメラPose/Options送信をスキップするだけで、Photo方式の検出対象ディレクトリや `photoPath` は変えない。
 - VRChat写真自動処理の `AutoPhotoWatcher` は `ExcludeDirectories` として `AutoCapture.Output.Directory` のみ受け取り、`AutoPhoto.PhotoDirectory` 直下の写真は除外しない。
 - そのためPhoto方式でVRChat写真自動処理も有効な場合、同じVRChat写真を自動撮影側で投稿した後、通常のVRChat写真自動処理が再処理してDiscordへ投稿し得る。Stream方式向けに入れた出力ディレクトリ除外だけではPhoto方式の二重投稿抑制にならない。
+
+## 追加対応
+
+- `AutoPhotoWatcher` に `ShouldSkip` を追加し、外部から抑制された写真を処理済み扱いにできるようにした。
+- Photo方式の自動撮影バッチ中は通常のVRChat写真自動処理を一時抑制し、自動撮影ランナーが検出した写真パスも予約してバッチ直後の監視tickで二重投稿しないようにした。
+- フォールバックモードは同じPhoto方式の検出経路を通るため、同じ抑制が適用される。
+
+## 追加対応後の確認
+
+- `cd src && go test ./internal/appcore -run 'TestAutoPhotoWatcher'`
+- `cd src && TMPDIR=/tmp GOCACHE=/tmp/clipforvrchat-go-cache go test . -run 'TestAppAutoCapturePhotoSuppression|TestAppStartupStartsAutoPhotoWatcherWithoutDiscordUpload'`
+- `cd src && go test ./...`
+- `git diff --check`

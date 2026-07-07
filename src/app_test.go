@@ -262,6 +262,36 @@ func TestAppStartupDoesNotStartAutoPhotoWatcherWhileReviewingSettings(t *testing
 	}
 }
 
+func TestAppAutoCapturePhotoSuppressionSkipsActiveAndReservedPaths(t *testing.T) {
+	dir := t.TempDir()
+	cfg := appcore.DefaultConfig()
+	cfg.AutoPhoto.Enabled = true
+	cfg.AutoPhoto.PhotoDirectory = dir
+	cfg.AutoCapture.Capture.Mode = "photo"
+
+	app := NewApp(filepath.Join(t.TempDir(), "config.json"), appcore.UIState{Mode: appcore.ModeResults, Config: cfg})
+	activePath := filepath.Join(dir, "active.png")
+	reservedPath := filepath.Join(dir, "reserved.png")
+
+	app.mu.Lock()
+	if !app.beginAutoCapturePhotoSuppressionLocked(cfg) {
+		t.Fatal("suppression was not started")
+	}
+	app.mu.Unlock()
+	if !app.shouldSkipAutoPhotoPath(activePath) {
+		t.Fatal("active auto capture photo should be skipped")
+	}
+
+	app.reserveAutoCapturePhotoPath(reservedPath)
+	app.endAutoCapturePhotoSuppression()
+	if !app.shouldSkipAutoPhotoPath(reservedPath) {
+		t.Fatal("reserved auto capture photo should be skipped")
+	}
+	if app.shouldSkipAutoPhotoPath(reservedPath) {
+		t.Fatal("reserved path should be consumed after one skip")
+	}
+}
+
 func TestExplorerSelectArgsRejectsMissingPath(t *testing.T) {
 	if _, err := explorerRevealPath("", ""); err == nil {
 		t.Fatal("expected empty path error")

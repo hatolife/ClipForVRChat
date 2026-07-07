@@ -139,6 +139,43 @@ func TestAutoPhotoWatcherExcludesAutoCaptureOutputDirectory(t *testing.T) {
 	}
 }
 
+func TestAutoPhotoWatcherShouldSkipMarksPathSeen(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "auto-capture-photo.png")
+	if err := os.WriteFile(source, []byte("x"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	processed := 0
+	skipped := 0
+	watcher := AutoPhotoWatcher{
+		Config: Config{AutoPhoto: AutoPhotoConfig{PhotoDirectory: dir}},
+		seen:   map[string]time.Time{},
+		ShouldSkip: func(path string) bool {
+			if path == source {
+				skipped++
+				return true
+			}
+			return false
+		},
+		Process: func(path string) Result {
+			processed++
+			return Result{Name: filepath.Base(path), SourcePath: path}
+		},
+	}
+
+	watcher.tick()
+	watcher.ShouldSkip = nil
+	watcher.tick()
+
+	if skipped != 1 {
+		t.Fatalf("skipped = %d, want 1", skipped)
+	}
+	if processed != 0 {
+		t.Fatalf("processed = %d, want 0", processed)
+	}
+}
+
 func TestAutoPhotoWatcherProcessDoesNotForceDiscordUpload(t *testing.T) {
 	dir := t.TempDir()
 	source := filepath.Join(dir, "source.png")

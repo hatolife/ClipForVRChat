@@ -116,8 +116,9 @@ type PresenceUser struct {
 }
 
 type AutoCaptureRunner struct {
-	Config  Config
-	Handler func(AutoCaptureEvent)
+	Config            Config
+	Handler           func(AutoCaptureEvent)
+	ReserveSourcePath func(string)
 }
 
 type CameraPoseSnapshot struct {
@@ -820,6 +821,7 @@ func (r AutoCaptureRunner) capturePhotoShot(ctx context.Context, client oscClien
 		diagAutoCapture(logPath, "shot photo detection failed: view_id=%q photo_dir=%q output_dir=%q before_files=%d before_latest=%s", view.ID, photoDir, cfg.Output.Directory, len(before), photoFileSummary(before))
 		return Result{Name: name, Error: "撮影後のVRChat写真ファイルを検出できませんでした。Photo方式ではUser Cameraが表示され、VRChatの写真保存先が正しい必要があります。Stream方式を使う場合はffmpeg入力設定を確認してください。"}
 	}
+	r.reserveSourcePath(photoPath)
 	return r.finalizeAutoCaptureImage(photoPath, batchID, shotID, view, sidecarUsers, discordUsers, confidence, world, SpoutCaptureResult{})
 }
 
@@ -1123,6 +1125,12 @@ func (r AutoCaptureRunner) finalizeAutoCaptureImage(photoPath string, batchID st
 func (r AutoCaptureRunner) emit(event AutoCaptureEvent) {
 	if r.Handler != nil {
 		r.Handler(event)
+	}
+}
+
+func (r AutoCaptureRunner) reserveSourcePath(path string) {
+	if r.ReserveSourcePath != nil && strings.TrimSpace(path) != "" {
+		r.ReserveSourcePath(path)
 	}
 }
 
