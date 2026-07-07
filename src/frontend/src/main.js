@@ -146,6 +146,10 @@ const vueApp = createApp({
     isJpegOutput() {
       return this.state.config?.image?.outputFormat === 'jpg'
     },
+    usesEncodedImageOutput() {
+      const output = this.state.config?.output || {}
+      return Boolean(output.saveLocal || output.uploadDiscord)
+    },
     processedCount() {
       return (this.state.results || []).filter((item) => !item.processing).length
     },
@@ -469,9 +473,7 @@ const vueApp = createApp({
       window.addEventListener('dragenter', this.showDropOverlay)
       window.addEventListener('dragover', this.showDropOverlay)
       window.addEventListener('dragleave', this.hideDropOverlay)
-      window.addEventListener('drop', () => {
-        this.dragging = false
-      })
+      window.addEventListener('drop', this.handleWindowDrop)
       window.addEventListener('keydown', this.handleKeyDown)
       this.setStartupStatus('起動後の状態確認を開始しています。')
       void this.checkForUpdate()
@@ -526,6 +528,11 @@ const vueApp = createApp({
     showDropOverlay(event) {
       event.preventDefault()
       this.dragging = true
+    },
+    handleWindowDrop(event) {
+      event.preventDefault()
+      event.stopPropagation()
+      this.dragging = false
     },
     hideDropOverlay(event) {
       if (event.clientX <= 0 || event.clientY <= 0 || event.clientX >= window.innerWidth || event.clientY >= window.innerHeight) {
@@ -3179,19 +3186,19 @@ const vueApp = createApp({
                 <input v-model="state.config.image.suffix" :disabled="!state.config.output.saveLocal" />
               </label>
             </div>
-            <div class="setting-row" :class="[{ disabled: !state.config.output.saveLocal }, settingRowChangedClass('image.outputFormat')]">
-              <div><strong>出力形式</strong><p>保存または投稿に使う画像形式です。PNGは画質を保ちやすく、JPGは写真向きです。</p></div>
+            <div class="setting-row" :class="[{ disabled: !usesEncodedImageOutput }, settingRowChangedClass('image.outputFormat')]">
+              <div><strong>出力形式</strong><p>保存やDiscord投稿に使う画像形式です。PNGは画質を保ちやすく、JPGは写真向きです。</p></div>
               <label>
-                <select v-model="state.config.image.outputFormat" :disabled="!state.config.output.saveLocal">
+                <select v-model="state.config.image.outputFormat" :disabled="!usesEncodedImageOutput">
                   <option value="png">PNG</option>
                   <option value="jpg">JPG</option>
                 </select>
               </label>
             </div>
-            <div class="setting-row" :class="[{ disabled: !state.config.output.saveLocal || !isJpegOutput }, settingRowChangedClass('image.jpegQuality')]">
-              <div><strong>JPEG品質</strong><p>{{ state.config.output.saveLocal && isJpegOutput ? 'JPG出力時の画質です。数字が大きいほど高画質です。' : 'ローカル保存OFFまたはPNG出力では使用しません。' }}</p></div>
+            <div class="setting-row" :class="[{ disabled: !usesEncodedImageOutput || !isJpegOutput }, settingRowChangedClass('image.jpegQuality')]">
+              <div><strong>JPEG品質</strong><p>{{ isJpegOutput ? 'JPG出力時の画質です。数字が大きいほど高画質です。Discord投稿でも使います。' : 'PNG出力では使用しません。' }}</p></div>
               <label>
-                <input type="number" min="1" max="100" v-model.number="state.config.image.jpegQuality" :disabled="!state.config.output.saveLocal || !isJpegOutput" />
+                <input type="number" min="1" max="100" v-model.number="state.config.image.jpegQuality" :disabled="!usesEncodedImageOutput || !isJpegOutput" />
               </label>
             </div>
           </section>
