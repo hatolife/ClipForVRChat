@@ -238,3 +238,4 @@
 | 270 | [AvatarBeacon READMEのYL-ATG関係と謝辞を修正する](unreleased/270-refine-avatarbeacon-readme-yl-atg-and-license.md) | 完了 | 未定 | YL-ATGとの関係を指定文へ修正し、謝辞追加、配布物・詳細仕様セクション削除を行った。 |
 | 271 | [AvatarBeaconからHeadForwardAnchorを削除する](unreleased/271-remove-avatarbeacon-head-forward-anchor.md) | 完了 | 未定 | 位置と向きの追跡対象をHead基準の `point` へ統合し、不要になった `HeadForwardAnchor` を削除した。 |
 | 272 | [AvatarBeacon mainと_12のfloat精度を調査する](investigation-only/272-investigate-avatarbeacon-main-12-float-precision.md) | 完了 | 調査のみ | mainと_12のfloat表現、復元範囲、理論分解能、実機未確認要因を整理した。 |
+| 273 | [v0.1.8-b12 betaを作成する](maintenance-only/273-create-v018-b12-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b12` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |

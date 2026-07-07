@@ -25,8 +25,20 @@
 
 ## 受け入れ条件
 
-- [ ] `develop` の未push変更をGitHubへpushする。
-- [ ] `v0.1.8-b12` タグを作成してGitHubへpushする。
-- [ ] Release workflowが成功する。
-- [ ] GitHub Release `v0.1.8-b12` が prerelease として作成される。
-- [ ] 公開Assetが通常利用者向けzip、単一exe署名asc、separated zip、AvatarBeacon source zipの4種類であることを確認する。
+- [x] `develop` の未push変更をGitHubへpushする。
+- [x] `v0.1.8-b12` タグを作成してGitHubへpushする。
+- [x] Release workflowが成功する。
+- [x] GitHub Release `v0.1.8-b12` が prerelease として作成される。
+- [x] 公開Assetが通常利用者向けzip、単一exe署名asc、separated zip、AvatarBeacon source zipの4種類であることを確認する。
+
+## 対応メモ
+
+- `v0.1.8-b12` タグを `0309bbae4d7753162330902c62c908654930687c` に作成し、GitHubへpushした。
+- Release workflow run `28867151953` が成功した。
+- GitHub Release: https://github.com/hatolife/ClipForVRChat/releases/tag/v0.1.8-b12
+- GitHub Releaseは `prerelease: true`、`draft: false` で作成された。
+- 公開Assetは以下4件のみであることを確認した。
+  - `ClipForVRChat-v0.1.8-b12-windows-amd64.zip`
+  - `ClipForVRChat-v0.1.8-b12-windows-amd64.exe.asc`
+  - `ClipForVRChat-v0.1.8-b12-windows-amd64-separated.zip`
+  - `AvatarBeacon-v0.1.8-b12-source.zip`
