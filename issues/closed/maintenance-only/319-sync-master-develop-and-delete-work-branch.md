@@ -27,8 +27,13 @@
 
 ## 受け入れ条件
 
-- [ ] `master` が現在の完了commitを指す。
-- [ ] `develop` が現在の完了commitを指す。
-- [ ] `origin/master` と `origin/develop` が同一commitを指す。
-- [ ] local/remoteの `fix/prefer-embedded-spout-helper` が削除される。
-- [ ] 作業ツリーがcleanである。ただし今回作業外の既存未追跡ファイルは対象外とする。
+- [x] `master` が現在の完了commitを指す。
+- [x] `develop` が現在の完了commitを指す。
+- [x] `origin/master` と `origin/develop` が同一commitを指す。
+- [x] local/remoteの `fix/prefer-embedded-spout-helper` が削除される。
+- [x] 作業ツリーがcleanである。ただし今回作業外の既存未追跡ファイルは対象外とする。
+
+## 作業メモ
+
+2026-07-08: rc3後の整理状態を通常開発ブランチへ反映するために、localの `master` と `develop` を「旧remote commit `3916c74f88b5fc9e8a558d51d9a6820981d6bd7a`」から「本issue完了記録を含む最終commit」へ進める。
+このcommit作成後に `origin/master` と `origin/develop` へ同一commitをpushし、local/remoteの `fix/prefer-embedded-spout-helper` を削除する。

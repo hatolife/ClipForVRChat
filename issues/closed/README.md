@@ -285,3 +285,4 @@
 | 316 | [Release署名鍵をビルドジョブから分離する](unreleased/316-isolate-release-signing-secrets-from-build-job.md) | 完了 | 未定 | Release workflowをbuild/sign/package/releaseへ分割し、署名secretを署名専用jobだけへ渡すようにした。 |
 | 317 | [v0.1.8-rc3 release candidateを作成する](maintenance-only/317-create-v018-rc3.md) | 完了 | 整理のみ | `v0.1.8-rc3` を作成し、Release workflow、GitHub Release、公開Asset、zip内容を確認した。 |
 | 318 | [Windows C++のmin/max macro衝突対策を再発防止として記録する](unreleased/318-document-windows-minmax-macro-prevention.md) | 完了 | 未定 | Windows header由来の `min` / `max` macro衝突対策をAGENTS.mdへ明文化した。 |
+| 319 | [master/developを同一状態にして作業ブランチを削除する](maintenance-only/319-sync-master-develop-and-delete-work-branch.md) | 完了 | 整理のみ | `master` と `develop` を同一commitへ揃え、作業ブランチをlocal/remoteから削除した。 |
