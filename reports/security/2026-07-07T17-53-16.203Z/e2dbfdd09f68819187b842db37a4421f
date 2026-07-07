@@ -1,0 +1,179 @@
+Auto-photo scan cap can leak old photos and starve new ones
+Link: https://chatgpt.com/codex/cloud/security/findings/e2dbfdd09f68819187b842db37a4421f?sev=critical%2Chigh%2Cmedium%2Clow%2Cinformational&page=2
+Criticality: medium (attack path: medium)
+Status: new
+
+# Metadata
+Repo: hatolife/ClipForVRChat
+Commit: d9a7f58
+Author: poppo@hato.life
+Created: 2026/6/29 13:35:44
+Assignee: Unassigned
+Signals: Security, Validated, Attack-path
+
+# Summary
+Introduced. The commit partially mitigates unbounded scan/process work, but it applies the cap before maintaining a complete baseline or queue. That creates a new correctness and security issue: unbaselined existing files beyond the cap can later be auto-uploaded, and files after attacker-controlled cap fillers can be starved indefinitely.
+The commit limits auto-photo scanning to the first MaxAutoPhotoScanFiles supported paths discovered by WalkDir. AutoPhotoWatcher.Run initializes w.seen from this limited result, not from the full directory. As a result, in a watched directory with more than 5000 supported image paths, all existing files after the cutoff are absent from the startup baseline. If earlier files are deleted or an attacker removes lexicographically early filler files, previously existing user photos can enter the limited scan result, appear absent from w.seen, and be processed as if they were newly created. Auto-photo processing forces Discord upload, so this can disclose older local photos to the configured webhook without the user's intent. Conversely, an attacker who can create 5000 lexicographically early supported filenames in the watched folder can keep genuine later photos permanently outside the scan result, causing feature-level denial of service.
+
+# Validation
+## Rubric
+- [x] Confirm the commit introduced a hard MaxAutoPhotoScanFiles cap and scanPhotoFiles now returns only the capped result.
+- [x] Confirm Run() builds the startup seen baseline from that capped scan, leaving pre-existing files beyond the cap unbaselined.
+- [x] Confirm tick() processes a path when it later appears in the capped current scan but is absent from seen, reproducing unintended processing of an old file.
+- [x] Confirm 5000 lexicographically early supported filenames can keep a later genuine photo outside the capped scan, reproducing starvation/DoS.
+- [x] Confirm default auto-photo processing forces Discord upload, making unintended processing a plausible privacy leak for valid images.
+## Report
+Validated the finding as a logic vulnerability. Crash-style validation was attempted by compiling and running a debug Go test binary; no crash is expected because this is not a memory-safety flaw, but the PoC deterministically reproduced the undesired processing behavior. Valgrind was attempted but is not installed in the container. LLDB was used non-interactively to trace execution into AutoPhotoWatcher.tick.
+
+Key code evidence: src/internal/appcore/autophoto.go:35 initializes w.seen from scanPhotoFiles; src/internal/appcore/autophoto.go:99-130 shows scanPhotoFiles delegates to scanPhotoFilesLimited, which stops after MaxAutoPhotoScanFiles with filepath.SkipAll; src/internal/appcore/autophoto.go:48-64 processes any current path absent from w.seen; src/internal/appcore/autophoto.go:80-89 forces cfg.Output.UploadDiscord=true for default auto-photo processing; src/internal/appcore/processor.go:91-102 performs Discord upload when UploadDiscord is true.
+
+Dynamic PoC: I added src/internal/appcore/autophoto_cap_poc_test.go. The first subtest creates 5001 pre-existing supported filenames 00000.png through 05000.png, initializes watcher.seen exactly as Run() does, verifies 05000.png is absent from the capped startup baseline, deletes 00000.png, then calls watcher.tick(). Output shows the old pre-existing 05000.png is treated as new and processed: 'handler observed auto-photo processing of 05000.png' and 'pre-existing file outside startup baseline was treated as new and processed: 05000.png'. The second subtest creates 5000 early filler photos, then creates zzzz_genuine_new.png and calls tick(); no processing occurs and scanPhotoFiles still cannot see the later file, demonstrating starvation while cap fillers remain.
+
+Reproduction command output from `go test ./internal/appcore -run TestAutoPhotoCapPoCDisclosureAndStarvation -count=1 -v` included both PASSing subtests with the expected logs. LLDB trace used a breakpoint on AutoPhotoWatcher.tick and showed the call chain: AutoPhotoWatcher.tick at autophoto.go:49 called from TestAutoPhotoCapPoCDisclosureAndStarvation.func1 at autophoto_cap_poc_test.go:52, then testing.tRunner. This confirms the PoC exercises the real watcher tick path.
+
+Limitations: the PoC uses the watcher Process hook to avoid network/Discord side effects and uses tiny placeholder files because the vulnerability is in watcher classification before image decoding. The upload consequence is supported by direct code inspection of w.process and Processor.processImage.
+
+# Evidence
+src/internal/appcore/autophoto.go (L31 to 35)
+  Note: The startup seen baseline is populated from scanPhotoFiles, which is now capped; files beyond the cap are not marked as pre-existing.
+```
+func (w *AutoPhotoWatcher) Run(ctx context.Context) {
+	if w.Interval <= 0 {
+		w.Interval = 2 * time.Second
+	}
+	w.seen = scanPhotoFiles(w.Config.AutoPhoto.PhotoDirectory)
+```
+
+src/internal/appcore/autophoto.go (L48 to 64)
+  Note: Later ticks process any path in the capped current scan that is absent from w.seen, so old files that enter the capped window later are treated as new.
+```
+func (w *AutoPhotoWatcher) tick() {
+	current := scanPhotoFiles(w.Config.AutoPhoto.PhotoDirectory)
+	processed := 0
+	for _, path := range sortedPhotoPaths(current) {
+		modTime := current[path]
+		if _, ok := w.seen[path]; ok {
+			continue
+		}
+		if processed >= MaxAutoPhotoProcessPerTick {
+			break
+		}
+		if !fileLooksStable(path) {
+			continue
+		}
+		w.seen[path] = modTime
+		processed++
+		result := w.process(path)
+```
+
+src/internal/appcore/autophoto.go (L80 to 89)
+  Note: Auto-photo processing forces Discord upload, making unintended processing of old files a privacy leak to the configured webhook.
+```
+func (w *AutoPhotoWatcher) process(path string) Result {
+	if w.Process != nil {
+		return w.Process(path)
+	}
+	cfg := w.Config
+	cfg.Output.UploadDiscord = true
+	if strings.TrimSpace(cfg.AutoPhoto.WebhookURL) != "" {
+		cfg.Discord.WebhookURL = cfg.AutoPhoto.WebhookURL
+	}
+	results, err := Processor{Config: cfg}.ProcessPaths([]string{path})
+```
+
+src/internal/appcore/autophoto.go (L99 to 130)
+  Note: The scanner records only the first maxFiles supported paths and stops with filepath.SkipAll, creating the incomplete baseline and starvation window.
+```
+func scanPhotoFiles(dir string) map[string]time.Time {
+	return scanPhotoFilesLimited(dir, MaxAutoPhotoScanFiles)
+}
+
+func scanPhotoFilesLimited(dir string, maxFiles int) map[string]time.Time {
+	files := make(map[string]time.Time)
+	if strings.TrimSpace(dir) == "" {
+		return files
+	}
+	if maxFiles <= 0 {
+		return files
+	}
+	paths := make([]string, 0, maxFiles)
+	_ = filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
+		if err != nil || entry.IsDir() || !isSupportedPhotoPath(path) {
+			return nil
+		}
+		if len(paths) >= maxFiles {
+			return filepath.SkipAll
+		}
+		paths = append(paths, path)
+		return nil
+	})
+	sort.Strings(paths)
+	for _, path := range paths {
+		info, err := os.Stat(path)
+		if err != nil {
+			continue
+		}
+		files[path] = info.ModTime()
+	}
+	return files
+```
+
+src/internal/appcore/processor.go (L91 to 102)
+  Note: Processed auto-photo images are uploaded to Discord and returned with message/webhook metadata.
+```
+	if p.Config.Output.UploadDiscord {
+		name := filepath.Base(sourcePath)
+		name = name[:len(name)-len(filepath.Ext(name))] + encoded.Extension
+		uploaded, err := UploadDiscord(p.Config.Discord.WebhookURL, name, encoded)
+		if err != nil {
+			result.Error = err.Error()
+			return result
+		}
+		result.URL = uploaded.URL
+		result.DiscordMessageID = uploaded.MessageID
+		result.DiscordWebhookID = uploaded.WebhookID
+		result.DiscordToken = uploaded.Token
+```
+
+# Attack-path analysis
+Final: medium | Decider: model_decided | Matrix severity: ignore | Policy adjusted: ignore
+## Rationale
+Kept at medium. Static evidence and the prior executable Go test PoC support that the logic bug is real: the capped scanner is used for the initial baseline, tick() processes paths absent from that baseline, and process() forces Discord upload. It is in scope because the main app starts this watcher for the auto-photo feature and watched-folder files are part of the threat model. However, probability and blast radius are limited: auto-photo is disabled by default, exploitation needs local watched-directory file influence and over-5000 supported files, and disclosure is to the configured Discord webhook rather than an arbitrary attacker-chosen network sink unless the attacker also controls or can observe that webhook. The availability impact is limited to the user's auto-photo feature. These constraints do not support high or critical severity, but the unintended external upload of local images and reliable feature starvation are enough to remain security-relevant at medium.
+## Likelihood
+low - Exploitation requires non-default auto-photo enablement, a watched directory with more than 5000 supported image paths, and attacker write/delete influence over that local directory. Those preconditions are plausible in the stated desktop/local-file threat model but not broadly internet-reachable.
+## Impact
+medium - Impact is meaningful but bounded: unintended processing can upload older local images to the user's configured Discord webhook, and filler files can deny the auto-photo feature. There is no code execution, privilege escalation, arbitrary destination upload bypass, or cross-tenant/server compromise.
+## Assumptions
+- Auto-photo must be enabled by the user and pointed at a directory containing more than 5000 supported image paths.
+- For confidentiality impact, Discord upload must be configured with a valid webhook and the processed old image must be a valid decodable image.
+- The attacker needs local or otherwise practical write/delete influence over the configured watched directory, such as a shared/synced folder, another local account with permissions, or malware running in the user's context.
+- No cloud infrastructure, public service, Kubernetes, or load balancer artifacts are present for this finding; the affected component is a desktop runtime file watcher.
+- desktop application running
+- AutoPhoto.Enabled is true
+- configured watched photo directory contains more than MaxAutoPhotoScanFiles supported image paths
+- attacker can add or delete files in the watched directory
+- Discord webhook configured for actual external upload impact
+## Path
+attacker file influence -> watched directory -> capped scan(5000) -> incomplete seen baseline -> tick processes old path as new -> forced Discord upload
+                                         \-> early filler files keep genuine later photos outside capped scan -> auto-photo DoS
+## Path evidence
+- `src/internal/appcore/autophoto.go:31-35` - AutoPhotoWatcher.Run initializes w.seen from scanPhotoFiles(), so the startup baseline inherits the scan cap.
+- `src/internal/appcore/autophoto.go:48-64` - tick() scans the current directory and processes any path not present in w.seen, up to the per-tick limit.
+- `src/internal/appcore/autophoto.go:80-89` - Default auto-photo processing forces cfg.Output.UploadDiscord = true and then processes the file.
+- `src/internal/appcore/autophoto.go:99-130` - scanPhotoFiles delegates to scanPhotoFilesLimited with MaxAutoPhotoScanFiles and stops traversal with filepath.SkipAll after the cap.
+- `src/internal/appcore/processor.go:91-102` - When UploadDiscord is true, the processed image is uploaded to the configured Discord webhook and webhook/message metadata is recorded.
+- `src/app.go:383-408` - The main application starts AutoPhotoWatcher when AutoPhoto.Enabled is true and stores successful auto-photo results in history.
+- `src/internal/appcore/config.go:45-72` - AutoPhoto has an enabled flag and configured photo directory; default config disables auto-photo, limiting default exposure.
+## Narrative
+The finding is real and reachable in the product's auto-photo mode. The commit introduced a 5000-file cap into scanPhotoFiles(), and Run() uses that capped result as the initial seen baseline. tick() later processes any path in the capped current scan that is absent from seen. Therefore, a pre-existing image beyond the startup cap can later enter the capped window and be handled as new. The default auto-photo processing path forces Discord upload, so the consequence can be unintended external disclosure of an old local image to the configured webhook. The same cap also enables feature-level starvation by keeping later real photos outside the scan window with 5000 earlier supported filenames. Severity remains medium rather than high because exploitation is local/configuration-dependent, auto-photo is disabled by default, a valid webhook is needed for disclosure, and the impact is limited to the affected user's images/feature availability rather than code execution, authentication bypass, or broad compromise.
+## Controls
+- AutoPhoto.Enabled feature flag is default false
+- MaxAutoPhotoProcessPerTick limits processing to 5 files per tick
+- fileLooksStable requires non-empty stable file size and mtime before processing
+- Discord webhook URL validation restricts uploads to HTTPS discord.com/discordapp.com webhook paths
+- No public ingress, listening port, cloud identity, or multi-tenant service boundary is involved
+## Blindspots
+- No live Discord webhook call was made during this static attack-path review.
+- Repository-only review cannot verify real Windows ACLs or whether typical user photo directories are shared with other local accounts or sync services.
+- The exact exploitability of influencing VRChat photo-directory contents remotely through VRChat behavior was not established from repository artifacts.
+- No deployment manifests or cloud identities exist for this desktop app finding, so infrastructure exposure assessment is limited to absence in repository artifacts.

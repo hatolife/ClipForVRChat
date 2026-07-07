@@ -272,3 +272,8 @@
 | 303 | [F39/F41を即時修正する](unreleased/303-f39-f41-qr-upscale-and-clipboard-png-size-guard.md) | 完了 | 未定 | QR upscaling の総ピクセル上限と Windows clipboard PNG の GlobalSize 上限を追加した。 |
 | 304 | [F15/F23/F25/F26/F35/F36 の即時修正を行う](unreleased/304-fix-security-findings-f15-f23-f25-f26-f35-f36.md) | 完了 | 未定 | localhost IPC、Explorer reveal、update URL、Windows COM shell呼び出しの境界を強化した。 |
 | 305 | [Spout diagnoseのsender寸法上限とoverflow対策を入れる](unreleased/305-fix-spout-diagnose-unbounded-sender-dimensions.md) | 完了 | 未定 | Spout senderの幅/高さを検証し、capture/diagnoseで巨大確保とoverflowを防いだ。 |
+| 306 | [Codex Security findings 19:48 CSVを底本に再分析する](unreleased/306-reanalyze-security-findings-1948-report.md) | 完了 | 未定 | 19:48 CSVの50件を底本に、既存管理レポートを更新して追加findingを記録した。 |
+| 307 | [Codex Security findings 19:48 CSVを分類して追記する](unreleased/307-classify-security-findings-1948-report.md) | 完了 | 未定 | 新規追加findingとF05/F12追加情報を含む50件を、重大仕様変更、追加情報要否、即時修正対象へ再分類した。 |
+| 308 | [Codex Security findings 19:48 CSVの即時修正をサブエージェントで監督する](unreleased/308-supervise-security-findings-1948-subagents.md) | 完了 | 未定 | 仕様変更・追加情報待ちを除いた19:48 CSVの即時修正対象を作業単位へ分け、サブエージェントに委任して統合した。 |
+| 309 | [Codex Security findings 19:48 CSVの修正作業結果をレポートへ追記する](unreleased/309-append-security-findings-1948-work-report.md) | 完了 | 未定 | 19:48 CSV基準の対応内容、テスト、保留理由、コミットを管理レポートへ追記した。 |
+| 312 | [Auto-photo scan capによる旧画像漏えいを再検証する](unreleased/312-revalidate-autophoto-scan-cap-old-photo-leak.md) | 完了 | 未定 | 追加情報を再検証し、既存の全件baseline scan修正で旧画像投稿とstarvationが解消済みであることを確認した。 |

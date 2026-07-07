@@ -1,0 +1,105 @@
+Raw issue quoting can leak user secrets
+Link: https://chatgpt.com/codex/cloud/security/findings/69b57f2de0b081919021d7b078b7778c?sev=critical%2Chigh%2Cmedium%2Clow%2Cinformational
+Criticality: medium (attack path: medium)
+Status: new
+
+# Metadata
+Repo: hatolife/ClipForVRChat
+Commit: 46386b6
+Author: poppo@hato.life
+Created: 2026/7/8 2:05:38
+Assignee: Unassigned
+Signals: Security, Validated, Attack-path
+
+# Summary
+Introduced: a process-level information disclosure risk. The new issue-writing rule requires verbatim user text and the new issue demonstrates that format, but there is no carve-out for redacting webhook URLs, tokens, local paths, or other sensitive data before committing issue records.
+AGENTS.md now instructs contributors/agents to write the user's original statement exactly as-is into issue files. In this project, user reports may naturally include sensitive values such as Discord webhook URLs, webhook tokens, local paths, QR-code URLs, logs, config snippets, or diagnostic excerpts. Because issue files are committed into the repository and moved under issues/closed, this creates a durable disclosure path for bearer secrets and private data. The rule should require preserving user intent while redacting or replacing secrets and privacy-sensitive values before committing.
+
+# Validation
+## Rubric
+- [x] Confirm the commit introduced a new requirement to record user statements verbatim in issue files.
+- [x] Confirm issue files are repository-tracked artifacts and are moved into closed issue directories rather than treated as private transient notes.
+- [x] Confirm the new rule and related scripts contain no explicit exception or sanitizer for webhook URLs, tokens, local paths, logs, QR URLs, or other private data.
+- [x] Confirm the project context makes such sensitive values likely in user reports, especially Discord Webhook URLs/tokens and local diagnostic paths.
+- [x] Demonstrate with a safe PoC that following the new rule preserves a fake webhook URL and local path verbatim in an issue markdown file.
+## Report
+Validated as a process/documentation-level information disclosure risk, not a runtime memory-safety bug. Dynamic crash/Valgrind/debugger validation is not applicable to the finding because the introduced behavior is an AGENTS.md workflow rule; the only changed executable script is an index-sort checker. I still ran the relevant script: `node scripts/check-closed-issue-index.mjs` returned `Closed issue index OK: 202 rows sorted`. `command -v valgrind` and `command -v gdb` returned nothing in the container, while `node` was present.
+
+Evidence of introduction: parent commit AGENTS.md line 6 only required concise `問題`, `期待する挙動`, and `受け入れ条件`; current AGENTS.md:5-6 now requires creating/updating an issue before work and says the `指示` section must quote the user's statement `誤字も含めて原文のまま引用する` (verbatim including typos). AGENTS.md:8 then says completed tickets are moved into `issues/closed/...` and indexed, so these records are committed repository artifacts. The new issue file `issues/closed/unreleased/236-sort-closed-issue-index-and-preserve-user-instructions.md` is tracked and demonstrates the storage pattern: lines 3-22 place the raw user instruction in a fenced `text` block, and lines 40-45 accept that the new issue itself uses the new format.
+
+Evidence the data can naturally be sensitive: README.md:130-145 explains users configure Discord Webhook URLs and explicitly warns that a Webhook URL can post and should not be shared. Existing closed security issues show the project already treats these values and local paths as sensitive: `issues/closed/v0.1.7/098-redact-diagnostic-secrets.md`:5-15 requires redacting Webhook URLs and Discord tokens from diagnostic data; `issues/closed/v0.1.7/102-redact-diagnostic-log-paths.md`:5-15 requires suppressing local user paths and Webhook/token values in logs. I checked the relevant workflow files/scripts and found no redaction carve-out or automation: `grep` over AGENTS/issues/docs showed no AGENTS.md rule for redacting secrets, and `grep -RIn --include='*.mjs' ... scripts` found only `scripts/check-closed-issue-index.mjs`, which validates sort order only.
+
+PoC reproduction: I created a safe fake Discord-webhook-shaped URL and a fake Windows user path, then generated an issue markdown file following the new AGENTS.md rule. The PoC output showed exact persistence: `REPRODUCED: fake webhook URL and local path persisted verbatim in /workspace/validation_artifacts/clipforvrchat-verbatim-issue-poc/poc-output-issue.md`, with line 6 containing `webhookUrl=https://discord.com/api/webhooks/123456789012345678/FAKE_TOKEN_DO_NOT_USE_ABCDEFGHIJKLMNOPQRSTUVWXYZ` and line 7 containing `outputPath=C:\Users\alice\Pictures\VRChat\2026-07-07\secret-world.png`. This confirms that under the introduced rule, a user report containing a real bearer webhook URL/token or private path would be durably written to committed issue records unless the process adds an explicit redaction exception.
+
+# Evidence
+AGENTS.md (L5 to 6)
+  Note: The new workflow requires creating/updating issue files for user requests and preserving the user's statement verbatim, with no redaction exception for secrets or private data.
+```
+- ユーザーから不具合、改善、仕様変更、調査依頼などの指示があった場合は、まず `issues/` に日本語のチケットを作成または追記してから作業する。
+- チケットには先頭から「指示」「文脈」「解釈」を書き、その後に「問題」「期待する挙動」「受け入れ条件」を簡潔に書く。「指示」にはユーザー発言を誤字も含めて原文のまま引用する。
+```
+
+issues/closed/unreleased/236-sort-closed-issue-index-and-preserve-user-instructions.md (L5 to 22)
+  Note: The new issue format records raw user instructions in committed markdown, illustrating the storage pattern that would also preserve any sensitive values included in future reports.
+```
+```text
+issues/closedのreadmeの表が昇順になっていない　修正　対策
+---
+
+issueを書くとき私の発言を丸々記載しておいてほしい　誤字も含めてそのまま維持してほしい
+下記のイメージ
+
+```
+## 指示
+私の発言
+## 文脈
+それまでのやり取りから考えられる文脈
+## 解釈
+指示に対するあなたの解釈
+
+以降は現状と同じ記載方法
+```
+```
+```
+
+# Attack-path analysis
+Final: medium | Decider: model_decided | Matrix severity: medium | Policy adjusted: medium
+## Rationale
+Medium is appropriate. Evidence supports a real disclosure path: AGENTS.md requires verbatim user text in repository issue files, the new issue demonstrates raw text persistence, and project documentation/closed issues establish Discord webhook URLs, tokens, local paths, and diagnostics as sensitive. The likely impact can be meaningful, especially unauthorized Discord webhook posting or privacy disclosure. However, it is not high/critical because it is a developer/support workflow issue rather than a remotely reachable runtime flaw; it requires user interaction and contributor action; it only exposes secrets the user included in the report; and it does not enable code execution, authentication bypass, broad privilege escalation, release compromise, or automatic mass exploitation.
+## Likelihood
+high - The vulnerable workflow is easy for contributors to follow and the project naturally receives webhook/config/diagnostic-related reports, but exploitation requires the user to include a sensitive value and the contributor to commit it without redaction. Public exploitation then depends on repository or issue artifact readability. | Remote network vector
+## Impact
+medium - A committed live Discord webhook URL is a bearer credential that can allow unauthorized posting into the associated Discord channel; committed logs/config snippets can also expose local paths, QR URLs, and private diagnostic context. The impact is limited to secrets supplied by the reporter and does not compromise the application, host, release signing, or user accounts directly.
+## Assumptions
+- The repository contents or committed issue files are accessible to the public or to a broader audience than the original reporter.
+- Contributors or agents follow AGENTS.md when converting user requests into tracked issue markdown files.
+- A user/support interaction may include sensitive values such as Discord webhook URLs, webhook tokens, local filesystem paths, QR-code URLs, logs, config excerpts, or diagnostic snippets.
+- A user includes a sensitive value in a request, bug report, log excerpt, config snippet, or diagnostic context.
+- A contributor or agent creates or updates a repository issue file according to AGENTS.md.
+- The issue file is committed and remains readable by unauthorized or unintended readers.
+## Path
+User report with secret
+  -> AGENTS.md verbatim quote rule
+  -> committed issue markdown / issues/closed
+  -> repo reader obtains secret
+  -> Discord webhook posting or privacy disclosure
+## Path evidence
+- `AGENTS.md:5-6` - Requires creating/updating an issue for user instructions and quoting the user's statement exactly as originally written, with no redaction exception.
+- `AGENTS.md:8` - States completed issue files are moved into issues/closed and indexed, confirming the records are durable repository artifacts.
+- `issues/closed/unreleased/236-sort-closed-issue-index-and-preserve-user-instructions.md:3-22` - Demonstrates the new issue format storing the raw user instruction in a fenced text block.
+- `README.md:130-145` - Documents that users configure Discord Webhook URLs and warns that a Webhook URL has posting authority and should not be shared.
+- `issues/closed/v0.1.7/098-redact-diagnostic-secrets.md:5-15` - Shows the project treats Webhook URLs and Discord tokens in diagnostics as secrets that must be redacted.
+- `issues/closed/v0.1.7/102-redact-diagnostic-log-paths.md:5-15` - Shows the project treats local user paths, Webhook URLs, and Discord tokens in logs as sensitive information.
+## Narrative
+The finding is a real process-level information disclosure risk. AGENTS.md now requires issue files to quote user statements verbatim, and completed issue files are moved into repository-tracked closed issue directories. The new issue file demonstrates raw user instructions being persisted in markdown. The project context makes sensitive input plausible because users configure Discord Webhook URLs, README warns those URLs grant posting ability and must not be shared, and older security issues require redacting webhook URLs, Discord tokens, and local paths from diagnostics/logs. No issue-writing redaction carve-out or sanitizer was found in the relevant workflow evidence. Exploitation is not automatic and requires a user/support interaction plus a contributor committing the raw issue, so this should not be high/critical; but if a live webhook URL or private diagnostic excerpt is committed to a public/shared repository, confidentiality impact is meaningful.
+## Controls
+- README warns users not to share Discord Webhook URLs.
+- Existing diagnostic/log workflows have redaction controls for webhook URLs, Discord tokens, and local paths.
+- No corresponding redaction rule was found for AGENTS.md issue quoting.
+- No runtime service, ingress, load balancer, or application authentication boundary is involved.
+- No executable sink or code execution path is implicated by this finding.
+## Blindspots
+- Static-only review cannot verify whether the GitHub repository is public at the time of exploitation without calling external APIs.
+- Static review cannot determine how often contributors actually follow AGENTS.md or whether maintainers manually redact despite the current wording.
+- No live secrets were inspected or validated; analysis intentionally avoids secret data.
+- The PoC described by validation used fake sensitive-looking values and demonstrates persistence, not abuse of a real Discord webhook.

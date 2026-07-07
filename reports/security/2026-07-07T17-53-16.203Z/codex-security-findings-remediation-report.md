@@ -76,15 +76,18 @@
 | F11 | Hidden camera auto-start settings remain active | 既存configのカメラ自動起動/終了設定を強制無効化するか、UIへ戻すかの仕様判断が必要。 | 保留 |
 | F30 | Tabbed settings hide webhook auto-post settings | 外部config保存時にセキュリティ関連タブの確認を必須化するか、現在のタブ+確認ダイアログ方式でよいかのUX/仕様判断が必要。 | 保留 |
 | F37 | Release signing key exposed to prior build-step code execution | 署名job分離、鍵管理方式、hardware/KMS/keyless signing等のRelease信頼モデル判断が必要。 | 保留 |
-| F43 | Auto-photo scan cap can leak old photos and starve new ones | scan cap時に古い写真をどう扱うか、baselineを全件保持するか、監視対象を制限するかの仕様判断が必要。 | 保留 |
 | F44 | History file stores Discord tokens with weak permissions | 再起動後のDiscord削除機能維持とtoken非保存をどう両立するかのデータモデル判断が必要。権限自体は現HEADでprivate file化済み。 | 保留 |
+
+### 重大な仕様変更・運用判断待ちから対応済みへ移した項目
+
+- F43 `Auto-photo scan cap can leak old photos and starve new ones`: 追加情報 `e2dbfdd09f68819187b842db37a4421f` を確認した結果、19:48-F30と同じ根本原因だった。`53b74d5 fix(autophoto): baseline full scans before tick limits` で、起動時baseline/current判定を「scan capに入った先頭N件だけを見る」処理から「対象画像を全件scanして既存/新規を判定し、処理件数だけper-tick上限で制限する」処理へ変更済みのため、旧画像が後から新規扱いで投稿される経路と、先頭fillerにより後方新規画像が永久に見えない経路は解消済みとして扱う。
 
 ### 仕様変更不要だが追加情報・方針確認が必要
 
 | ID | Title | 必要な追加情報・方針 | 今回の扱い |
 | --- | --- | --- | --- |
-| F05 | New diagnostic links are blocked by URL allow-list | `www.google.com` や `keys.openpgp.org` をアプリの外部URL許可リストへ入れるか、リンク先を許可済みhostへ変えるか判断が必要。 | 保留 |
-| F12 | New VRChat feedback help link is blocked | `feedback.vrchat.com` を許可リストへ入れるか、アプリ外導線を別形式にするか判断が必要。 | 保留 |
+| F05 | New diagnostic links are blocked by URL allow-list | 19:48再分析で追加情報を確認し、検索エンジンhostは許可せず、GnuPG公式/keys.openpgp.orgだけを許可する方針に決定した。 | 19:48 W10で対応 |
+| F12 | New VRChat feedback help link is blocked | 19:48再分析で追加情報を確認し、固定ヘルプリンク先として `feedback.vrchat.com` を許可する方針に決定した。 | 19:48 W10で対応 |
 
 ### 仕様変更不要かつ追加情報不要: 即時修正対象
 
@@ -214,7 +217,98 @@
 
 ## 残課題
 
-- 重大な仕様変更・運用判断待ち: F02, F07, F11, F30, F37, F43, F44。今回の即時修正からは除外し、上記分類表の理由に沿って別途仕様判断する。
-- 追加情報・方針確認待ち: F05, F12。外部URL許可リストへ追加するhostを決める必要があるため、今回の即時修正からは除外した。
+- 重大な仕様変更・運用判断待ち: F02, F07, F11, F30, F37, F44。今回の即時修正からは除外し、上記分類表の理由に沿って別途仕様判断する。F43は追加情報再検証によりW9修正で対応済みへ移した。
+- 追加情報・方針確認待ちだったF05/F12は、19:48再分析で方針を決定しW10で対応した。
 - 後続再確認: F19。F33/F34/F38/F41の修正後に、metadata失敗時のDiscord upload経路が未検証投稿にならないか再確認する。
 - HEAD確認済み・重複・軽減済み: F09, F16, F17, F20, F29, F40。追加コード修正は不要として扱った。
+
+## 19:48 CSV再分析
+
+### 概要
+
+- 底本CSV: `reports/security/2026-07-07T17-53-16.203Z/codex-security-findings-2026-07-07T19-48-25.660Z.csv`
+- 底本CSV timestamp: `2026-07-07T19-48-25.660Z`
+- finding件数: 50件
+- severity内訳: `high` 5件, `medium` 29件, `low` 10件, `informational` 6件
+- 前回19:00 CSVからの追加finding: 6件
+
+### 追加finding
+
+| 19:48 ID | Severity | Title | Commit | Relevant paths | 分類 |
+| --- | --- | --- | --- | --- | --- |
+| F04 | `high` | Closing imported settings keeps malicious config active | `0be5ba76b565` | src/frontend/src/main.js <br> src/app.go | 即時修正対象 |
+| F05 | `high` | Release workflow trusts mutable Actions with write token | `c9ff4a107af2` | github/workflows/release.yml | 重大な運用判断待ち |
+| F29 | `medium` | Unbounded native clipboard PNG copy can exhaust memory | `933c8de17c46` | src/internal/appcore/clipboard.go <br> src/internal/appcore/clipboard_native_windows.go <br> src/internal/appcore/processor.go <br> src/internal/appcore/image.go | HEAD確認済み |
+| F30 | `medium` | Auto-photo scan cap can skip and later upload old images | `919ed595ef5f` | src/internal/appcore/autophoto.go | 即時修正対象 |
+| F32 | `medium` | Directory picker stats attacker-controlled UNC paths | `94419e78d92e` | src/frontend/src/main.js <br> src/app.go | 即時修正対象 |
+| F34 | `medium` | Dropped config becomes active without confirmation | `547f84a75e38` | frontend/src/main.js <br> app.go <br> internal/appcore/processor.go | 即時修正対象 |
+
+### 19:48版の分類差分
+
+#### 重大な仕様変更・運用判断が必要
+
+- 19:48-F05のために、Release workflowのmutable Action参照、GITHUB_TOKENのwrite権限、Release asset公開stepをどう分離・固定するか判断が必要である。Action SHA pinningだけでよいか、署名job分離や権限分割まで含めるかでRelease運用が変わるため、今回の即時修正対象から除外する。
+- 前回から継続して、19:48-F01/F02/F06/F08/F10/F16/F33相当は、タブ式設定確認、署名鍵隔離、auto-capture Discord同意境界、原文引用redaction、隠しcamera設定、metadata失敗時upload、history token保存モデルの判断待ちとして扱う。
+
+#### 仕様変更不要だが追加情報・方針確認が必要
+
+- 19:48-F45/F46相当の外部URL許可リストは、追加情報 `e9333711518881918aca4b091f8c2741` と `72a14374ab94819184eedb836966f795` により、セキュリティではなく固定リンクの機能退行と確認した。方針は「検索エンジンhostは許可せず、固定用途の公式/参照先hostだけを許可する」とし、即時修正対象へ移した。
+
+#### 仕様変更不要かつ追加情報不要: 即時修正対象
+
+- 19:48-F04/F34のために、Dropped/OpenSettingsで読み込んだ外部configを「即座に `a.configPath` へ採用する」処理から「保存前previewとして保持し、明示保存時だけ既存のactive configへ反映する」処理へ変更する。
+- 19:48-F32のために、directory pickerの既定ディレクトリ決定を「ユーザー制御文字列へ直接 `os.Stat` する」処理から「UNC/device/networkなど危険なpathをstat前に既定値なしへ落とす」処理へ変更する。
+- 19:48-F30のために、auto-photo watcherの初期baselineを「scan capに入った先頭N件だけをseen扱いする」処理から「既存の対象画像を後から新規扱いしない」処理へ変更する。
+- 19:48-F29は、前回F41対応でWindows native clipboard PNGを `GlobalSize` 検証後にcopyする処理へ変更済みのため、HEAD確認済みとして扱う。
+
+### 19:48版 作業割り当て
+
+| Work | 対象finding | 担当 | 状態 | 主なファイル | メモ |
+| --- | --- | --- | --- | --- | --- |
+| W8 | 19:48-F04, 19:48-F32, 19:48-F34 | Pascal | 完了 | `src/app.go`, tests | imported config preview / directory picker境界 |
+| W9 | 19:48-F30 | Plato | 完了 | `src/internal/appcore/autophoto.go`, tests | auto-photo scan cap baseline |
+| W10 | 旧F05/旧F12, 19:48-F45, 19:48-F46 | メインエージェント | 完了 | `src/app.go`, `src/frontend/src/main.js`, tests | 外部URL許可リスト方針決定 |
+
+### 19:48版 作業結果
+
+#### W8: imported config preview / directory picker境界
+
+- 19:48-F04/F34のために、`OpenSettings(path)` を「渡されたJSON pathを即座に `a.configPath` へ採用する」処理から「active `configPath` を維持したままimported configを未保存previewとして `state.Config` へ表示する」処理へ変更し、Dropped configを保存前にruntime設定として使わないようにした。
+- 19:48-F04/F34のために、`CloseSettings()` を「設定画面を閉じるだけ」から「`SettingsBaselineConfig` がある場合はactive configへ戻してdraft metadataを解除する」処理へ変更し、閉じる/破棄でimported configが残らないようにした。
+- 19:48-F32のために、directory pickerの既定ディレクトリ決定を「ユーザー制御のcurrent pathへ直接 `os.Stat` する」処理から「UNC/device/network形式を `pickerDefaultDirectory` で空にしてからstatする」処理へ変更し、pickerボタンで攻撃者管理のUNC pathへ接続しないようにした。
+
+#### W9: auto-photo scan cap baseline
+
+- 19:48-F30のために、auto-photo watcherの起動時baseline scanを「`MaxAutoPhotoScanFiles` で打ち切った先頭N件だけを `seen` に入れる」処理から「既存の対象画像を全件 `seen` に入れる」処理へ変更し、上限外にあった古い画像が後から新規扱いで投稿されないようにした。
+- 19:48-F30のために、tick時のscanを「処理候補の発見自体をscan capで打ち切る」処理から「全件scanで既存/新規を判定し、実際の処理件数は既存のper-tick上限で制限する」処理へ変更し、古い画像の誤投稿防止と1tickあたりの処理上限を分離した。
+- 旧F43の追加情報 `e2dbfdd09f68819187b842db37a4421f` のために、W9修正後の `Run` / `tick` が全件scanを使うことを再確認し、追加情報で指摘された旧画像再浮上と新規画像starvationが同じ修正で解消済みであることを管理レポートへ追記した。
+
+#### W10: 外部URL許可リスト方針
+
+- 旧F05/19:48-F45のために、診断説明内のGPG案内リンクを「`www.google.com` の検索結果を開く」処理から「GnuPG公式サイト `https://gnupg.org/` を開く」処理へ変更し、検索エンジンhostを外部URL許可リストへ追加しない方針にした。
+- 旧F05/19:48-F45のために、`trustedExternalURL` を「既存4hostのみ許可」から「`gnupg.org` と `keys.openpgp.org` も許可する」処理へ変更し、診断説明のGPG公式情報と作者公開鍵リンクだけを開けるようにした。
+- 旧F12/19:48-F46のために、`trustedExternalURL` を「VRChat Feedback hostを拒否する」処理から「`feedback.vrchat.com` を許可する」処理へ変更し、Camera OSC不具合報告の固定ヘルプリンクを開けるようにした。
+- 旧F05のために、`www.google.com` はテストで拒否されるhostとして固定し、検索エンジン全体を許可リストへ広げないことを確認できるようにした。
+
+### 19:48版 テスト結果
+
+- `cd src && go test ./...` を実行し、成功した。
+- `node scripts/check-frontend-template-literals.mjs` を実行し、成功した。
+- `node scripts/check-wails-api-surface.mjs` を実行し、成功した。
+- `cd src && go test ./internal/appcore -run 'TestScanPhotoFilesAllWithExcludesStatusIgnoresScanCap|TestAutoPhotoWatcherFullScanBaselineDoesNotResurfaceDeletedOldFiles|TestAutoPhotoWatcherFullScanBaselineProcessesLateArrivingFile' -count=1` を追加実行し、旧F43追加情報の再検証として成功した。
+- Pascalが `go test ./... -run 'TestAppSaveConfigAndOpenSettings|TestAppOpenSettingsImportedConfigIsPreviewUntilSaved|TestAppOpenSettingsKeepsConfigPathOnLoadError|TestPickerDefaultDirectoryRejectsUnsafeNetworkPaths'` を実行し、成功した。
+- Platoが `go test ./internal/appcore -run '^(TestScanPhotoFilesLimitsFileCount|TestScanPhotoFilesReportsMissingDirectory|TestScanPhotoFilesAllWithExcludesStatusIgnoresScanCap|TestAutoPhotoWatcherFullScanBaselineDoesNotResurfaceDeletedOldFiles|TestAutoPhotoWatcherFullScanBaselineProcessesLateArrivingFile)$'` を実行し、成功した。
+
+### 19:48版 コミット
+
+- `9be15d1 fix(settings): keep imported configs as preview`: 19:48-F04/F32/F34のために、imported config preview、CloseSettingsのbaseline復帰、picker default pathのUNC/device/network拒否を実装した。
+- `53b74d5 fix(autophoto): baseline full scans before tick limits`: 19:48-F30のために、auto-photoの全件baseline scanとper-tick処理上限を分離した。
+- `65c580e fix(help): keep diagnostic links on trusted hosts`: 旧F05のために、GPG説明リンクをGoogle検索からGnuPG公式へ変更した。旧F05/旧F12のhost許可とテストは `9be15d1` に含まれる。
+- `docs(issues): record 1948 security remediation work`: 19:48 CSV、追加情報、分類、作業結果、残課題を記録する。
+
+### 19:48版 残課題
+
+- 重大な仕様変更・運用判断待ち: 19:48-F01/F02/F05/F06/F08/F10/F16/F33。Release workflowのAction pinning/write token分離、署名鍵隔離、auto-capture Discord同意境界、設定タブ確認、原文引用redaction、隠しcamera設定、metadata失敗時upload、history token保存モデルは別途仕様判断が必要。
+- 旧F43/19:48-F30相当のauto-photo scan cap policyは、追加情報再検証によりW9修正で対応済みへ移した。
+- 追加情報・方針確認待ちは、旧F05/旧F12の方針決定により今回分では解消した。
+- HEAD確認済み・重複・軽減済み: 19:48-F13/F14/F27/F29/F38/F47相当は前回修正または確認済みとして扱う。

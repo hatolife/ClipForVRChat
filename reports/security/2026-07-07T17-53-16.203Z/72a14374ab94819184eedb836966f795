@@ -1,0 +1,91 @@
+New VRChat feedback help link is blocked
+Link: https://chatgpt.com/codex/cloud/security/findings/72a14374ab94819184eedb836966f795?sev=critical%2Chigh%2Cmedium%2Clow%2Cinformational&page=3
+Criticality: informational (attack path: ignore)
+Status: new
+
+# Metadata
+Repo: hatolife/ClipForVRChat
+Commit: e6825c2
+Author: poppo@hato.life
+Created: 2026/7/8 2:25:31
+Assignee: Unassigned
+Signals: Validated, Attack-path
+
+# Summary
+Introduced a non-security UI/backend allowlist mismatch: the newly added VRChat Feedback link cannot be opened through the existing trustedExternalURL policy.
+The new auto-capture help text includes a button that calls OpenURL with https://feedback.vrchat.com/bug-reports/p/camera-osc-does-not-work-unless-camera-ui-is-open. OpenURL validates all outbound browser URLs through trustedExternalURL, whose allowlist only includes github.com, hatolife.booth.pm, support.discord.com, and x.com. Because feedback.vrchat.com was not added, the newly introduced button returns an error instead of opening the referenced help page. This is a functional bug in the new guidance, not a security vulnerability.
+
+# Validation
+## Rubric
+- [x] Confirm the checked-out commit and locate the newly introduced VRChat Feedback button URL in the frontend.
+- [x] Verify the frontend button uses the normal openURL/api.OpenURL bridge rather than bypassing backend validation.
+- [x] Verify backend OpenURL enforces trustedExternalURL and that feedback.vrchat.com is not in the allowlist.
+- [x] Execute a minimal PoC against the real Go backend path using the exact URL, with a control allowed URL to prove the policy is functioning.
+- [x] Attempt compiled-stack validation steps: direct debug test execution produced no crash because this is functional, valgrind was unavailable, Go ASan passed, and LLDB traced the rejection branch.
+## Report
+Validated the finding at commit e6825c2dd5495f55d3e36fc9b1a2c6e66b28b62c. Code inspection showed the new UI button at src/frontend/src/main.js:1974 calls openURL('https://feedback.vrchat.com/bug-reports/p/camera-osc-does-not-work-unless-camera-ui-is-open'). The frontend openURL method at src/frontend/src/main.js:1022-1025 directly awaits api.OpenURL(url). The backend App.OpenURL at src/app.go:248-253 calls trustedExternalURL before opening. trustedExternalURL at src/app.go:263-273 only allowlists github.com, hatolife.booth.pm, support.discord.com, and x.com; feedback.vrchat.com is absent and therefore reaches src/app.go:271, returning "許可されていないURLです". I added a targeted Go test that calls (&App{}).OpenURL() with the exact frontend URL and checks for the allowlist rejection, plus a control test for a known allowed GitHub URL. Because tests require the embedded frontend/dist path, I created a minimal placeholder directory for go:embed. Command output: `go test ./ -run 'TestValidation(VRChatFeedbackLinkRejectedByOpenURLPolicy|ExistingAllowedExternalURLAccepted)' -count=1 -v` passed, including `TestValidationVRChatFeedbackLinkRejectedByOpenURLPolicy` and `TestValidationExistingAllowedExternalURLAccepted`. I also built a debug test binary with `go test -c -gcflags=all='-N -l'` and ran LLDB non-interactively. The LLDB trace stopped at src/app.go:271 (`return "", fmt.Errorf("許可されていないURLです")`) with backtrace: trustedExternalURL -> (*App).OpenURL at app.go:249 -> TestValidationVRChatFeedbackLinkRejectedByOpenURLPolicy at validation_feedback_link_test.go:12. This proves the UI-provided VRChat Feedback link is rejected by the existing URL policy. Crash validation was not applicable because this is a non-crashing functional allowlist mismatch; a debug test binary ran successfully. Valgrind was attempted but is not installed in the container; Go ASan was also run and passed, as expected for a non-memory bug.
+
+# Evidence
+src/app.go (L263 to 273)
+  Note: OpenURL uses trustedExternalURL, whose allowlist does not include feedback.vrchat.com, causing the new button URL to be rejected.
+```
+func trustedExternalURL(rawURL string) (string, error) {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || parsed.Scheme != "https" {
+		return "", fmt.Errorf("開けないURLです")
+	}
+	switch strings.ToLower(parsed.Hostname()) {
+	case "github.com", "hatolife.booth.pm", "support.discord.com", "x.com":
+	default:
+		return "", fmt.Errorf("許可されていないURLです")
+	}
+	return parsed.String(), nil
+```
+
+src/frontend/src/main.js (L1974 to 1974)
+  Note: The newly added help button attempts to open a feedback.vrchat.com URL through the OpenURL bridge.
+```
+                <button type="button" class="link-button inline" @click="openURL('https://feedback.vrchat.com/bug-reports/p/camera-osc-does-not-work-unless-camera-ui-is-open')" title="VRChat FeedbackのCamera OSC不具合報告を開く">VRChat Feedback: Camera OSC does not work unless Camera UI is open</button>
+```
+
+# Attack-path analysis
+Final: ignore | Decider: model_decided | Matrix severity: ignore | Policy adjusted: ignore
+## Rationale
+Although the finding is valid as a product bug, it should be ignored for security criticality. The affected code is in scope for the runtime, but the data flow is a hard-coded frontend help URL at src/frontend/src/main.js:1974 through api.OpenURL at src/frontend/src/main.js:1022-1025 into App.OpenURL at src/app.go:248-253. The backend allowlist at src/app.go:263-273 blocks feedback.vrchat.com because it is absent from the approved host list. That is a failure to open intended documentation, not an attacker-controlled open redirect or allowlist bypass. There is no public ingress, no service account or cloud identity, no secrets involved, and no security impact beyond user inconvenience.
+## Likelihood
+ignore - The broken behavior is easy for a user to trigger, but it is not exploitable by an attacker in a security-relevant way because the URL is hard-coded and the backend rejects rather than opens an untrusted destination.
+## Impact
+ignore - The only demonstrated impact is a blocked help link. There is no data exposure, privilege escalation, arbitrary URL opening, SSRF, code execution, persistence, or compromise of Discord webhook secrets.
+## Assumptions
+- Analysis is limited to repository artifacts in /workspace/ClipForVRChat and does not call cloud APIs.
+- The Wails desktop application is the main shipped runtime component; the Vite localhost development server is development-only unless explicitly run by a developer.
+- The reported behavior is evaluated as an external URL allowlist mismatch, not as a bypass of the allowlist.
+- A user runs the desktop application
+- The user navigates to the auto-capture guidance UI
+- The user clicks the VRChat Feedback help button
+## Path
+User click
+  -> Vue openURL('https://feedback.vrchat.com/...')
+  -> api.OpenURL / App.OpenURL
+  -> trustedExternalURL allowlist check
+  -> feedback.vrchat.com not allowed
+  -> help link fails to open
+## Path evidence
+- `src/frontend/src/main.js:1974` - The UI button passes a hard-coded https://feedback.vrchat.com help URL to openURL.
+- `src/frontend/src/main.js:1022-1025` - The frontend openURL method logs the click and calls the Wails api.OpenURL bridge without any security-sensitive transformation.
+- `src/app.go:248-253` - The backend App.OpenURL validates the URL using trustedExternalURL before calling runtime.BrowserOpenURL.
+- `src/app.go:263-273` - trustedExternalURL enforces HTTPS and only allowlists github.com, hatolife.booth.pm, support.discord.com, and x.com, excluding feedback.vrchat.com.
+- `src/main.go:213-230` - The application is a Wails desktop app with embedded assets and a bound local App object, not a public network service.
+- `src/wails.json:1-12` - Repository configuration identifies ClipForVRChat as a Wails application; the localhost Vite URL is a development server setting.
+## Narrative
+Static review confirms a real functional bug: the frontend added a hard-coded VRChat Feedback help button, but the backend OpenURL policy only permits github.com, hatolife.booth.pm, support.discord.com, and x.com. The validation evidence also showed the exact URL reaches the rejection branch. This is not a security vulnerability because there is no attacker-controlled URL, no public service exposure, no bypass of the allowlist, no secret access, no code execution, and no cross-boundary impact. The only proven impact is that a local user cannot open the intended help page from the application.
+## Controls
+- HTTPS-only external URL validation
+- Explicit trustedExternalURL host allowlist
+- Wails desktop app local bridge rather than public ingress
+- Vue template escaping for rendered UI content
+- BrowserOpenURL reached only after backend policy validation
+## Blindspots
+- Static analysis cannot confirm the exact user-visible UI error behavior on a real Windows Wails/WebView2 runtime.
+- No dynamic end-to-end GUI execution was performed in this attack-path stage.
+- Repository review cannot prove whether future releases or external packaging modify the allowlist behavior.

@@ -1,0 +1,102 @@
+Auto-capture Discord opt-out bypass leaks captures
+Link: https://chatgpt.com/codex/cloud/security/findings/b825b8f570a881919546b22faf5da6cf?sev=critical%2Chigh%2Cmedium%2Clow%2Cinformational
+Criticality: medium (attack path: medium)
+Status: new
+
+# Metadata
+Repo: hatolife/ClipForVRChat
+Commit: 823aeee
+Author: poppo@hato.life
+Created: 2026/7/8 1:49:08
+Assignee: Unassigned
+Signals: Security, Validated, Attack-path
+
+# Summary
+Introduced a privacy/security bug: the auto-capture-specific Discord enabled flag no longer gates auto-capture uploads. The upload path is now enabled by the unrelated global output.uploadDiscord setting and can use a disabled auto-capture webhook URL.
+The new autoCaptureDiscordUploadEnabled helper returns true when either autoCapture.discord.enabled or the global output.uploadDiscord flag is set. finalizeAutoCaptureImage then uploads every auto-capture result and first prefers autoCapture.discord.webhookUrl before falling back to the primary Discord webhook. This means an existing or imported configuration with autoCapture.schedule.enabled=true, output.uploadDiscord=true, and autoCapture.discord.enabled=false will start posting scheduled/test auto-capture images after this update. If a stale or attacker-supplied autoCapture.discord.webhookUrl is present, it is used even though the auto-capture Discord feature is disabled. This can disclose VRChat capture images and configured Discord presence metadata to an unintended Discord webhook. Webhook URL validation still restricts the destination to Discord, so this is an information disclosure/consent bypass rather than arbitrary SSRF or code execution.
+
+# Validation
+## Rubric
+- [x] Confirm auto-capture photo/stream completion reaches finalizeAutoCaptureImage, the upload decision point.
+- [x] Confirm the current upload gate allows output.uploadDiscord to enable auto-capture Discord posting even when autoCapture.discord.enabled is false.
+- [x] Compare with the parent behavior to determine the global OR gate was introduced by this commit.
+- [x] Confirm webhook selection prefers autoCapture.discord.webhookUrl regardless of autoCapture.discord.enabled.
+- [x] Dynamically exercise the logic with a bounded PoC test that avoids real Discord network posting but proves the vulnerable path is entered and the disabled webhook is selected.
+## Report
+Validated the finding. This is a logic/privacy bug rather than a memory-safety crash. I built and ran a targeted Go PoC test against the real appcore package. Evidence: current src/internal/appcore/autocapture.go:1118 enters the Discord upload block via autoCaptureDiscordUploadEnabled(r.Config); lines 1119-1122 prefer cfg.AutoCapture.Discord.WebhookURL before falling back to the primary r.Config.Discord.WebhookURL; lines 1127-1130 post either image or content; and lines 1154-1155 define the gate as cfg.AutoCapture.Discord.Enabled || cfg.Output.UploadDiscord. The parent commit used only cfg.Discord.Enabled, confirming the new global OR behavior was introduced. The actual capture flows call finalizeAutoCaptureImage from both photo and stream capture paths at src/internal/appcore/autocapture.go:837 and :965. The frontend also documents the changed behavior at src/frontend/src/main.js:2694-2700: normal Discord posting OR the auto-capture switch causes auto-captured images to be posted. Dynamic PoC: I added src/internal/appcore/autocapture_privacy_poc_test.go. TestPoCGlobalOutputEnablesAutoCaptureUploadDespiteDisabledAutoCaptureDiscord sets autoCapture.discord.enabled=false and output.uploadDiscord=true. It receives a Discord URL validation error, proving finalizeAutoCaptureImage entered the Discord posting path despite the auto-capture-specific flag being disabled. TestPoCDisabledAutoCaptureWebhookTakesPrecedenceWhenGloballyEnabled additionally sets a non-empty disabled autoCapture.discord.webhookUrl and a different primary webhook; the observed error corresponds to the disabled auto-capture webhook, proving that field is preferred once the global flag opens the path. Command output: `go test ./internal/appcore -run 'TestPoC' -count=1 -v` passed and logged: `first PoC result.Error="Discord Webhook URLは https:// で始まるURLを指定してください。"` and `second PoC result.Error="Discord Webhook URLは https:// で始まるURLを指定してください。"`. I also compiled a debug test binary with `go test ./internal/appcore -run 'TestPoC' -count=1 -gcflags='all=-N -l' -c -o /tmp/appcore_poc.test` and ran it successfully. Crash validation was not applicable because the issue is a consent-bypass/information-disclosure logic flaw; the debug binary did not crash. Valgrind and debugger attempts were made but unavailable in the container: `bash: command not found: valgrind`, `bash: command not found: gdb`, and `bash: command not found: dlv`.
+
+# Evidence
+src/frontend/src/main.js (L2694 to 2700)
+  Note: The UI now documents that normal Discord posting also enables auto-capture posting, so the auto-capture Discord switch is no longer an effective opt-out for auto-capture uploads.
+```
+                <div class="setting-row">
+                  <div><strong>Discord自動投稿</strong><p>通常Discord投稿ON、またはこの設定ONのとき、自動撮影した画像をDiscord Webhookへ投稿します。</p></div>
+                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.discord.enabled" /><span></span></label>
+                </div>
+                <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord && !autoCaptureSettings.discord.enabled }">
+                  <div><strong>Discordに画像を添付する</strong><p>OFFの場合は撮影情報の本文だけを投稿します。画像はローカル保存先とsidecar JSONで保持します。</p></div>
+                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.discord.includeImages" :disabled="!state.config.output.uploadDiscord && !autoCaptureSettings.discord.enabled" /><span></span></label>
+```
+
+src/internal/appcore/autocapture.go (L1118 to 1122)
+  Note: Auto-capture now enters the Discord upload path based on autoCaptureDiscordUploadEnabled and uses autoCapture.discord.webhookUrl before falling back to the primary webhook, even when autoCapture.discord.enabled is false.
+```
+	if autoCaptureDiscordUploadEnabled(r.Config) {
+		webhook := cfg.Discord.WebhookURL
+		if strings.TrimSpace(webhook) == "" {
+			webhook = r.Config.Discord.WebhookURL
+		}
+```
+
+src/internal/appcore/autocapture.go (L1154 to 1155)
+  Note: The new OR condition makes global output.uploadDiscord sufficient to enable auto-capture Discord uploads, bypassing the auto-capture-specific opt-in flag.
+```
+func autoCaptureDiscordUploadEnabled(cfg Config) bool {
+	return cfg.AutoCapture.Discord.Enabled || cfg.Output.UploadDiscord
+```
+
+# Attack-path analysis
+Final: medium | Decider: model_decided | Matrix severity: low | Policy adjusted: low
+## Rationale
+Medium is appropriate. The finding is not a false positive: repository evidence shows photo and stream auto-capture results reach finalizeAutoCaptureImage, the upload gate is an OR of autoCapture.discord.enabled and output.uploadDiscord, and the disabled auto-capture webhook is preferred before the primary webhook. It is in-scope because it affects the main desktop app's Discord posting and local image privacy surfaces. The severity should not be raised to high because exploitation is not internet-exposed or zero-click, requires user/config preconditions, and webhook validation confines the destination to Discord rather than enabling arbitrary SSRF or code execution. It should not be lowered to low because the leaked content can include private VRChat captures and presence metadata, and an attacker-controlled imported/stale webhook is a plausible threat-model path.
+## Likelihood
+medium - The code path is directly reachable through normal auto-capture operation, and the validation PoC exercised the vulnerable branch. However, attacker-directed exploitation needs user interaction and configuration preconditions: global Discord posting plus auto-capture use plus a stale or attacker-supplied valid Discord webhook.
+## Impact
+medium - Successful exploitation can disclose private VRChat capture images and auto-capture Discord content/presence metadata to an unintended Discord webhook. The impact is meaningful privacy loss, but it is limited to data the local app captures/posts, requires Discord webhook validation, and does not provide arbitrary network access, code execution, privilege escalation, or multi-tenant compromise.
+## Assumptions
+- The installed Wails desktop application uses the checked-in src/internal/appcore/autocapture.go code for scheduled/test auto-capture processing.
+- A realistic attacker path is social engineering a user to import/save a configuration, or relying on a stale previously configured autoCapture.discord.webhookUrl while the user believes auto-capture Discord posting is disabled.
+- No cloud APIs or live Discord APIs were called for this attack-path analysis; evidence is from repository artifacts and provided validation results.
+- Victim runs the desktop application and uses auto-capture photo or stream capture.
+- autoCapture.schedule.enabled is enabled, or the user starts a test/manual auto-capture run.
+- output.uploadDiscord is true while autoCapture.discord.enabled is false.
+- For attacker-directed exfiltration, autoCapture.discord.webhookUrl is non-empty and points to an attacker-controlled valid Discord webhook, or the primary webhook points to an unintended channel.
+## Path
+Imported/stale config
+  -> output.uploadDiscord=true + autoCapture.discord.enabled=false
+  -> auto-capture photo/stream completes
+  -> autoCaptureDiscordUploadEnabled uses OR gate
+  -> disabled autoCapture.discord.webhookUrl is preferred
+  -> Discord webhook receives image/content
+## Path evidence
+- `src/internal/appcore/autocapture.go:837` - The photo auto-capture path returns through finalizeAutoCaptureImage, making the upload decision reachable after a captured VRChat photo is detected.
+- `src/internal/appcore/autocapture.go:965` - The stream auto-capture path also returns through finalizeAutoCaptureImage after producing an output image.
+- `src/internal/appcore/autocapture.go:1118-1130` - finalizeAutoCaptureImage enters the Discord upload block, selects cfg.AutoCapture.Discord.WebhookURL first, falls back to r.Config.Discord.WebhookURL only if empty, then posts either the image or content.
+- `src/internal/appcore/autocapture.go:1154-1155` - The gate uses cfg.AutoCapture.Discord.Enabled || cfg.Output.UploadDiscord, making global Discord posting sufficient to enable auto-capture Discord posting.
+- `src/internal/appcore/config.go:50-53` - output.uploadDiscord is a global output setting separate from the auto-capture Discord enable flag.
+- `src/internal/appcore/config.go:276-280` - AutoCaptureDiscordConfig has a separate enabled flag and webhookUrl, supporting the stale/disabled webhook selection path.
+- `src/frontend/src/main.js:2694-2700` - The UI documents that normal Discord posting or the auto-capture toggle enables auto-capture Discord posting, confirming the global flag is intended by current UI but also demonstrating the opt-out ambiguity.
+- `src/internal/appcore/discord.go:218-242` - ValidateDiscordWebhookURL restricts outbound webhook destinations to HTTPS discord.com/discordapp.com /api/webhooks/{id}/{token}, limiting impact to Discord data exfiltration rather than arbitrary SSRF.
+## Narrative
+The finding is real and reachable in the main desktop application. Both photo and stream auto-capture paths call finalizeAutoCaptureImage. That function enters the Discord upload path if autoCaptureDiscordUploadEnabled returns true, and the helper currently returns true when either autoCapture.discord.enabled or the unrelated global output.uploadDiscord flag is true. Once in the block, the code first uses cfg.AutoCapture.Discord.WebhookURL and only falls back to the primary Discord webhook if it is empty, without checking whether autoCapture.discord.enabled is false. Discord URL validation restricts destinations to Discord webhook URLs, so this is not arbitrary SSRF or code execution. The realistic impact is confidentiality/privacy loss: scheduled or test VRChat captures and configured presence metadata can be posted to an unintended Discord webhook after user/config preconditions.
+## Controls
+- Discord webhook URL validation restricts scheme, host, and /api/webhooks/{id}/{token} path.
+- No public ingress, listening port, load balancer, Kubernetes manifest, Dockerfile, or Terraform artifact was found in the repository checkout.
+- Default configuration disables output.uploadDiscord and autoCapture.schedule.enabled.
+- Desktop app has no application authentication boundary; settings are local user-controlled state.
+- No executable sink is involved in this path; the observed sink is outbound HTTP POST to Discord.
+## Blindspots
+- Static-only attack-path review did not run the full Wails GUI or a live Discord webhook.
+- Windows runtime behavior, including actual local file ACL enforcement and user import flows, was not re-tested in this container.
+- No cloud/IaC deployment artifacts were present, so exposure assessment is limited to repository artifacts.
+- The analysis relies partly on provided validation PoC results for dynamic reachability; no additional network tests were performed.

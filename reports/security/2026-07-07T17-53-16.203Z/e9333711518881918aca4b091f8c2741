@@ -1,0 +1,98 @@
+New diagnostic links are blocked by URL allow-list
+Link: https://chatgpt.com/codex/cloud/security/findings/e9333711518881918aca4b091f8c2741?sev=critical%2Chigh%2Cmedium%2Clow%2Cinformational&page=3
+Criticality: informational (attack path: ignore)
+Status: new
+
+# Metadata
+Repo: hatolife/ClipForVRChat
+Commit: 84591e3
+Author: poppo@hato.life
+Created: 2026/7/8 2:00:45
+Assignee: Unassigned
+Signals: Validated, Attack-path
+
+# Summary
+Introduced non-security bug: the new diagnostic guidance links are unreachable because their hosts were not added to the existing trustedExternalURL allow-list.
+The new diagnostic report guidance adds two inline buttons that call openURL with hard-coded URLs on www.google.com and keys.openpgp.org. The Wails bridge routes this through App.OpenURL, which validates the target using trustedExternalURL. That function only allows github.com, hatolife.booth.pm, support.discord.com, and x.com. As a result, clicking the newly added gpg-file search link or public-key link returns an error and does not open the browser. This is a UI/functionality regression, not a security vulnerability, because the allow-list remains restrictive and does not expose arbitrary URL opening.
+
+# Validation
+## Rubric
+- [x] Identify new diagnostic guidance buttons and exact URLs in src/frontend/src/main.js.
+- [x] Confirm frontend openURL method calls backend App.OpenURL/Wails binding without a local bypass.
+- [x] Confirm backend App.OpenURL validates via trustedExternalURL before BrowserOpenURL.
+- [x] Exercise the backend path for the new URLs and an allowed control URL to show rejection is specific to missing hosts.
+- [x] Attempt dynamic validation/crash/valgrind/debugger where feasible: direct PoC produced no crash but reproduced the functional error; valgrind unavailable; LLDB trace confirmed the OpenURL call path.
+## Report
+Validated the finding. The commit adds two diagnostic guidance buttons in src/frontend/src/main.js:2176 and src/frontend/src/main.js:2197 that call openURL() with https://www.google.com/search?q=gpg... and https://keys.openpgp.org/search?q=poppo@hato.life. The frontend openURL method calls the Wails backend directly via api.OpenURL at src/frontend/src/main.js:1251-1253. The backend App.OpenURL calls trustedExternalURL before opening the browser at src/app.go:408-413. trustedExternalURL only permits github.com, hatolife.booth.pm, support.discord.com, and x.com at src/app.go:423-433, so neither newly added host is allowed. I added a targeted Go test exercising App.OpenURL with both new URLs. Command output: App.OpenURL("https://www.google.com/search?q=gpg%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB") rejected before browser open: 許可されていないURLです; App.OpenURL("https://keys.openpgp.org/search?q=poppo@hato.life") rejected before browser open: 許可されていないURLです; allowed control accepted by same allow-list: https://github.com/hatolife/ClipForVRChat/releases/latest. Direct crash reproduction was attempted via the PoC test; no crash occurred, as expected for this functional regression. Valgrind was attempted but is not installed in the container. LLDB was available and a non-interactive trace hit (*App).OpenURL at src/app.go:409 from TestDiagnosticGuidanceOpenURLRejected, confirming the same backend path used by the UI.
+
+# Evidence
+src/app.go (L423 to 433)
+  Note: The backend URL validator only permits github.com, hatolife.booth.pm, support.discord.com, and x.com, so the newly added Google and keys.openpgp.org links are rejected.
+```
+func trustedExternalURL(rawURL string) (string, error) {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil || parsed.Scheme != "https" {
+		return "", fmt.Errorf("開けないURLです")
+	}
+	switch strings.ToLower(parsed.Hostname()) {
+	case "github.com", "hatolife.booth.pm", "support.discord.com", "x.com":
+	default:
+		return "", fmt.Errorf("許可されていないURLです")
+	}
+	return parsed.String(), nil
+```
+
+src/frontend/src/main.js (L2174 to 2177)
+  Note: The commit adds a new button that attempts to open a www.google.com URL through openURL.
+```
+          <ol>
+            <li>2の元データとなるzipファイル 内容物確認用</li>
+            <li>暗号化された<button class="link-button inline" @click="openURL('https://www.google.com/search?q=gpg%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB')" title="gpgファイルを検索する">gpgファイル</button> 不具合報告用</li>
+          </ol>
+```
+
+src/frontend/src/main.js (L2195 to 2198)
+  Note: The commit adds a new button that attempts to open keys.openpgp.org through openURL.
+```
+            ただpgpで暗号化されたデータがこのzipのデータだと信じられない場合もあろうかと思います。
+            この場合、ClipForVRChatの暗号化処理が信用できないという状態なので、
+            <button class="link-button inline" @click="openURL('https://keys.openpgp.org/search?q=poppo@hato.life')" title="作者の公開鍵を開く">作者の公開鍵</button> を使用して暗号化する作業をご自身でして頂く必要があると思います。
+            作者としてはどちらでも構いません。
+```
+
+# Attack-path analysis
+Final: ignore | Decider: model_decided | Matrix severity: ignore | Policy adjusted: ignore
+## Rationale
+The finding is a valid functional regression but not a security vulnerability. Static evidence and validation both show that the new frontend buttons call the backend OpenURL path, and the backend allow-list rejects the new Google and keys.openpgp.org hosts. This restrictive failure mode prevents navigation rather than enabling arbitrary URL opening. There is no public exposure, no attacker-controlled input, no privilege or identity change, no secret disclosure, and no cross-boundary effect. Probability of security exploitation is therefore effectively none, and security impact is none; adjusted criticality is ignore.
+## Likelihood
+ignore - The UI regression is easy for a user to trigger, but there is no meaningful attacker exploitation path. The hard-coded URLs are not attacker-controlled and the backend rejects them before opening a browser.
+## Impact
+ignore - The impact is limited to diagnostic guidance buttons failing to open in the affected user's local desktop UI. The behavior does not expose secrets, does not broaden network access, does not allow attacker-controlled URL opening, and does not execute code.
+## Assumptions
+- The analyzed repository checkout is the complete product source for the affected commit.
+- The Wails desktop application is the relevant runtime deployment; no server, cloud deployment, Kubernetes, or load balancer artifacts are present in the repository checkout.
+- The provided validation evidence accurately reflects the same commit and normal backend code path used by the frontend Wails binding.
+- A user runs the affected desktop application build
+- The user opens the diagnostic report guidance UI
+- The user clicks one of the newly added diagnostic guidance link buttons
+## Path
+User click -> Vue openURL -> Wails api.OpenURL -> App.OpenURL -> trustedExternalURL allow-list -> rejection/error
+## Path evidence
+- `src/frontend/src/main.js:1251-1253` - The frontend openURL method logs the action and directly calls the Wails backend api.OpenURL with the supplied URL.
+- `src/frontend/src/main.js:2174-2177` - The diagnostic guidance includes a new inline button that calls openURL with a hard-coded https://www.google.com/search URL.
+- `src/frontend/src/main.js:2195-2198` - The diagnostic guidance includes a new inline button that calls openURL with a hard-coded https://keys.openpgp.org/search URL.
+- `src/app.go:408-413` - App.OpenURL validates the supplied URL with trustedExternalURL before invoking runtime.BrowserOpenURL.
+- `src/app.go:423-433` - trustedExternalURL requires HTTPS and only allows github.com, hatolife.booth.pm, support.discord.com, and x.com, so the two new hosts are rejected.
+- `src/wails.json:1-12` - The repository configuration identifies this as a Wails desktop application; only a localhost frontend dev server is configured for development, not a production public network service.
+## Narrative
+The reported behavior is real and reachable in the main desktop application: two new diagnostic guidance buttons call openURL with www.google.com and keys.openpgp.org, and the frontend forwards those URLs to the Wails backend. The backend then validates with trustedExternalURL before calling BrowserOpenURL. Because the allow-list contains only github.com, hatolife.booth.pm, support.discord.com, and x.com, the new links are rejected. This causes broken UI links, but the security control remains restrictive. There is no attacker-controlled input, no inbound exposure, no secret access, no arbitrary URL opening, and no cross-boundary impact. The appropriate security criticality is ignore.
+## Controls
+- trustedExternalURL enforces HTTPS-only external browser targets
+- trustedExternalURL uses exact hostname allow-listing
+- App.OpenURL validates before BrowserOpenURL
+- New hard-coded URLs are blocked rather than opened
+- No public ingress, load balancer, or service port artifacts found in the repository checkout
+## Blindspots
+- Static review did not run the full Wails GUI, though the backend path was validated by the provided executable test evidence.
+- Operating-system-specific BrowserOpenURL behavior was not independently tested because the relevant URLs are rejected before that sink.
+- Repository-only analysis cannot prove behavior of unofficial downstream builds that modify the allow-list.

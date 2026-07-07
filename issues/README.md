@@ -43,10 +43,12 @@
 | 208 | [自動撮影説明を改善し、カメラ自動起動/終了を既定OFFにする](208-improve-auto-capture-help-and-disable-camera-auto-open-close.md) | 要確認 | `v0.1.8` | 自動撮影説明とAvatarBeacon状態表示を整理し、Camera OSCの不安定さを避けるためカメラ自動起動/終了を設定化して既定OFFにする。 |
 | 228 | [全Markdownドキュメントを現状仕様に合わせて更新する](228-update-all-markdown-documents.md) | 要対応 | 未定 | リポジトリ内のMarkdownを横断確認し、古い説明や矛盾を現状仕様に合わせて整理する。 |
 | 241 | [AvatarBeacon_mainとAvatarBeacon_12を追加しparameter pathをavatar_beacon配下へ変更する](241-add-avatarbeacon-main-and-12-prefabs-with-prefixed-parameters.md) | 要確認 | 未定 | AvatarBeaconのmain方式Prefabを通常版として追加し、12方式Prefabと `avatar_beacon/...` parameter pathへ移行する。 |
-| 306 | [Codex Security findings 19:48 CSVを底本に再分析する](306-reanalyze-security-findings-1948-report.md) | 要対応 | 未定 | 19:48 CSVの50件を底本に、既存管理レポートを更新して追加findingを記録する。 |
-| 307 | [Codex Security findings 19:48 CSVを分類して追記する](307-classify-security-findings-1948-report.md) | 要対応 | 未定 | 新規追加findingを含む50件を、重大仕様変更、追加情報要否、即時修正対象へ再分類する。 |
-| 308 | [Codex Security findings 19:48 CSVの即時修正をサブエージェントで監督する](308-supervise-security-findings-1948-subagents.md) | 要対応 | 未定 | 仕様変更・追加情報待ちを除いた19:48 CSVの即時修正対象を作業単位へ分け、サブエージェントに委任して統合する。 |
-| 309 | [Codex Security findings 19:48 CSVの修正作業結果をレポートへ追記する](309-append-security-findings-1948-work-report.md) | 要対応 | 未定 | 19:48 CSV基準の対応内容、テスト、保留理由、コミットを管理レポートへ追記する。 |
+| 310 | [自動撮影Discord opt-outを自動撮影アップロードへ厳密に適用する](310-enforce-autocapture-discord-opt-out.md) | 要対応 | 未定 | 自動撮影専用Discord投稿OFFを実効ゲートにし、通常投稿ONだけで自動撮影画像が投稿されないようにする。 |
+| 311 | [非表示のカメラ自動起動/終了設定を無効化する](311-disable-hidden-camera-auto-start-settings.md) | 要対応 | 未定 | UIで非表示のカメラ自動起動/終了フラグが既存・インポートconfigのtrue値で実行されないようにする。 |
+| 313 | [Discord履歴のWebhook削除トークン保存を保護する](313-protect-history-discord-token-storage.md) | 要対応 | 未定 | Discord履歴に削除用tokenを保存せず、UI state露出をなくし、削除機能との両立方針を決める。 |
+| 314 | [issue原文引用で秘密情報を永続化しない](314-redact-secrets-in-verbatim-issue-quotes.md) | 要対応 | 未定 | issueの原文引用ルールに、Webhook URLやtokenなどの秘密情報をredactする例外を追加する。 |
+| 315 | [非表示タブのWebhook/自動投稿設定を保存前確認する](315-confirm-hidden-webhook-autopost-settings-before-save.md) | 要対応 | 未定 | タブ外のWebhook、自動投稿、監視フォルダ差分を保存前に具体的に確認できるようにする。 |
+| 316 | [Release署名鍵をビルドジョブから分離する](316-isolate-release-signing-secrets-from-build-job.md) | 要対応 | 未定 | Release signing secretをビルドjobから分離し、署名専用jobでビルド済みartifactだけを署名する。 |
 
 ## 状態の意味
 

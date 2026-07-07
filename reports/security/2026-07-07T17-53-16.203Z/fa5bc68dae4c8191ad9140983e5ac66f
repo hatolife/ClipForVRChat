@@ -1,0 +1,735 @@
+Tabbed settings hide webhook auto-post settings
+Link: https://chatgpt.com/codex/cloud/security/findings/fa5bc68dae4c8191ad9140983e5ac66f?sev=critical%2Chigh%2Cmedium%2Clow%2Cinformational
+Criticality: high (attack path: high)
+Status: new
+
+# Metadata
+Repo: hatolife/ClipForVRChat
+Commit: c10d11b
+Author: poppo@hato.life
+Created: 2026/7/8 3:44:02
+Assignee: Unassigned
+Signals: Security, Validated, Patch generated, Attack-path
+
+# Summary
+A security-relevant UI regression was introduced. Previously, the save control followed all settings groups on the same page; after this change, sensitive groups can be completely hidden behind inactive tabs while the full config is still saved.
+This commit changes the settings page from a single scrollable review to separate tabs and always resets new settings sessions to the Output tab. Sensitive destinations and background-upload controls, including the Discord webhook URL and VRChat/screenshot auto-post webhook settings, are now only rendered when their tabs are selected. However, the global Save button still sends the entire state.config object to the backend. If an attacker convinces a user to open and save a supplied config, the user can save attacker-controlled Discord and auto-post settings without ever seeing those fields. Saving then persists the configuration and restarts enabled auto-post watchers, which can upload future VRChat photos or screenshots to the configured Discord webhook. This is not a remote code execution issue and still requires user interaction, but it weakens review of security-sensitive imported settings and can lead to image exfiltration.
+
+# Validation
+## Rubric
+- [x] Confirm the commit introduced tabbed settings and resets new/imported settings sessions to the non-sensitive Output tab.
+- [x] Confirm sensitive Discord and auto-post controls are not rendered on the initial Output tab and require explicit tab switching.
+- [x] Confirm the Save action is global and sends the entire state.config object, not only visible tab fields.
+- [x] Confirm the backend persists those hidden values and restarts enabled auto-post watchers from the just-saved config.
+- [x] Confirm auto-post processing forces Discord upload and resolves the configured webhook URL, enabling future image disclosure to the saved destination.
+## Report
+Validated the finding as a UI/security-review regression, not a memory-safety crash. Key evidence: (1) The commit introduces settings tabs and `rememberSettingsBaseline()` resets every settings session to the Output tab: `src/frontend/src/main.js:111-118` and `src/frontend/src/main.js:174-176`. (2) The Discord webhook input is rendered only when `settingsTab === 'discord'`: `src/frontend/src/main.js:945-955`. (3) Auto-post enable flags, watched directories, and per-feature webhook URLs are rendered only when `settingsTab === 'autoPost'`: `src/frontend/src/main.js:959-1013`. (4) The footer Save button remains outside the tab-gated sections and `saveSettings()` submits the full `this.state.config` to `api.SaveConfig` / `api.SaveConfigAndProcess`: `src/frontend/src/main.js:623-635` and `src/frontend/src/main.js:1015-1017`. (5) Backend save persists the supplied config and restarts auto-photo watchers: `src/app.go:239-247`; enabled autoPhoto/screenshotAutoPost settings create background watchers: `src/app.go:457-475`; watcher processing forces Discord upload and applies the configured webhook override: `src/internal/appcore/autophoto.go:121-126`. I also compared the commit diff: before this commit these settings groups were ordinary sections; after the commit they are gated by tab-specific `v-if` / `template v-if` conditions while Save remains global. A targeted frontend validator printed PASS for: reset to Output tab, Discord field gated behind Discord tab, auto-post fields gated behind AutoPost tab, and Save sending the whole state.config. A targeted Go validation test passed and showed that attacker-controlled Discord/auto-post webhook values and enabled flags are persisted by `SaveConfig`/`LoadConfig`, and the auto-photo watcher resolves the saved per-feature webhook URLs. Direct crash validation was attempted with the Go test and no crash occurred, as expected for this logic bug. `valgrind`, `gdb`, and `dlv` were not installed in the container, so valgrind/debugger validation could not be performed. A broader `go test ./...` was also environment-limited by missing downloaded deps and missing frontend/dist, but `internal/appcore` tests ran successfully.
+
+# Evidence
+src/app.go (L239 to 248)
+  Note: Saving the config persists it and restarts auto-photo watchers using the just-saved hidden settings.
+```
+func (a *App) saveConfigLocked(cfg appcore.Config) error {
+	if err := appcore.SaveConfig(a.configPath, cfg); err != nil {
+		return err
+	}
+	a.state.Config = cfg
+	a.state.Mode = appcore.ModeResults
+	a.state.Message = ""
+	a.state.Results = nil
+	a.restartAutoPhotoWatcher(cfg)
+	return nil
+```
+
+src/app.go (L457 to 475)
+  Note: Enabled VRChat photo or screenshot auto-post settings start background watchers based on the saved configuration.
+```
+	if cfg.AutoPhoto.Enabled {
+		watcher := appcore.AutoPhotoWatcher{
+			Config:     cfg,
+			Directory:  cfg.AutoPhoto.PhotoDirectory,
+			WebhookURL: cfg.AutoPhoto.WebhookURL,
+			Interval:   time.Duration(cfg.AutoPhoto.ScanIntervalSeconds) * time.Second,
+			Handler:    handler,
+		}
+		go watcher.Run(ctx)
+	}
+	if cfg.ScreenshotAutoPost.Enabled {
+		watcher := appcore.AutoPhotoWatcher{
+			Config:     cfg,
+			Directory:  cfg.ScreenshotAutoPost.ScreenshotDirectory,
+			WebhookURL: cfg.ScreenshotAutoPost.WebhookURL,
+			Interval:   time.Duration(cfg.ScreenshotAutoPost.ScanIntervalSeconds) * time.Second,
+			Handler:    handler,
+		}
+		go watcher.Run(ctx)
+```
+
+src/frontend/src/main.js (L174 to 176)
+  Note: Each settings session is forced onto the Output tab, so imported configurations are not initially shown on the Discord or auto-post tabs where sensitive destinations are configured.
+```
+    rememberSettingsBaseline() {
+      this.settingsBaseline = this.serializeSettings(this.state.config)
+      this.settingsTab = 'output'
+```
+
+src/frontend/src/main.js (L623 to 635)
+  Note: The Save action persists the entire state.config object, including settings hidden on inactive tabs.
+```
+    async saveSettings() {
+      this.saving = true
+      this.saved = false
+      this.error = ''
+      try {
+        this.sanitizeOutputDirectory()
+        this.sanitizePhotoDirectory()
+        this.sanitizeScreenshotDirectory()
+        if (this.state.processOnSave) {
+          this.state = await api.SaveConfigAndProcess(this.state.config, this.state.pendingPaths || [])
+        } else {
+          await api.SaveConfig(this.state.config)
+          this.state = await api.CloseSettings()
+```
+
+src/frontend/src/main.js (L945 to 955)
+  Note: The primary Discord webhook URL is now hidden unless the user explicitly switches to the Discord tab.
+```
+          <section v-if="settingsTab === 'discord'" class="settings-group" role="tabpanel">
+            <h3>Discord</h3>
+            <div class="setting-row">
+              <div>
+                <strong>Webhook URL</strong>
+                <p>Discordの投稿先チャンネルでWebhookを作成し、そのURLを貼り付けます。</p>
+                <button class="link-button" @click="openURL(webhookGuideUrl)">Discord公式: Webhookの作成方法</button>
+              </div>
+              <label>
+              <input type="password" v-model="state.config.discord.webhookUrl" placeholder="https://discord.com/api/webhooks/..." />
+              </label>
+```
+
+src/frontend/src/main.js (L959 to 1013)
+  Note: Auto-post enable flags, watched folders, and auto-post webhook URLs are hidden unless the user explicitly switches to the auto-post tab.
+```
+          <template v-if="settingsTab === 'autoPost'">
+          <section class="settings-group" role="tabpanel">
+            <h3>VRChat写真自動投稿</h3>
+            <div class="setting-row">
+              <div><strong>自動投稿</strong><p>VRChatの写真フォルダに新しい画像が保存されたら、自動で縮小してDiscordへ投稿します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="state.config.autoPhoto.enabled" /><span></span></label>
+            </div>
+            <div class="setting-row">
+              <div><strong>スキャン間隔</strong><p>自動投稿でフォルダを確認する間隔です。短くすると反映は早くなりますが、PCへの負荷が少し増えます。</p></div>
+              <label>
+                <input type="number" min="1" max="3600" v-model.number="state.config.autoPhoto.scanIntervalSeconds" />
+              </label>
+            </div>
+            <div class="setting-row">
+              <div><strong>写真フォルダ</strong><p>VRChatが写真を保存するフォルダです。通常は「ピクチャ」内のVRChatフォルダです。</p></div>
+              <div class="input-with-button">
+                <input v-model="state.config.autoPhoto.photoDirectory" @blur="sanitizePhotoDirectory" placeholder="C:\\Users\\...\\Pictures\\VRChat" />
+                <button class="secondary" @click="choosePhotoDirectory">選択</button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div><strong>自動投稿用Webhook URL</strong><p>通常のDiscord投稿とは別の投稿先にしたい場合だけ入力します。空の場合は上のDiscord Webhook URLへ投稿します。</p></div>
+              <label>
+                <input type="password" v-model="state.config.autoPhoto.webhookUrl" placeholder="空なら通常のWebhook URLを使用" />
+              </label>
+            </div>
+          </section>
+
+          <section class="settings-group" role="tabpanel">
+            <h3>スクリーンショット自動投稿</h3>
+            <div class="setting-row">
+              <div><strong>自動投稿</strong><p>Win+Shift+SなどでScreenshotsフォルダに保存された画像を、自動で縮小してDiscordへ投稿します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="state.config.screenshotAutoPost.enabled" /><span></span></label>
+            </div>
+            <div class="setting-row">
+              <div><strong>スキャン間隔</strong><p>スクリーンショット自動投稿でフォルダを確認する間隔です。短くすると反映は早くなりますが、PCへの負荷が少し増えます。</p></div>
+              <label>
+                <input type="number" min="1" max="3600" v-model.number="state.config.screenshotAutoPost.scanIntervalSeconds" />
+              </label>
+            </div>
+            <div class="setting-row">
+              <div><strong>Screenshotsフォルダ</strong><p>Windowsのスクリーンショット保存先です。通常は「ピクチャ」内のScreenshotsフォルダです。</p></div>
+              <div class="input-with-button">
+                <input v-model="state.config.screenshotAutoPost.screenshotDirectory" @blur="sanitizeScreenshotDirectory" placeholder="C:\\Users\\...\\Pictures\\Screenshots" />
+                <button class="secondary" @click="chooseScreenshotDirectory">選択</button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div><strong>スクリーンショット投稿用Webhook URL</strong><p>通常のDiscord投稿とは別の投稿先にしたい場合だけ入力します。空の場合は上のDiscord Webhook URLへ投稿します。</p></div>
+              <label>
+                <input type="password" v-model="state.config.screenshotAutoPost.webhookUrl" placeholder="空なら通常のWebhook URLを使用" />
+              </label>
+            </div>
+          </section>
+          </template>
+```
+
+src/internal/appcore/autophoto.go (L121 to 126)
+  Note: The auto-post watcher forces Discord upload and uses the configured webhook URL when processing new files.
+```
+	cfg := w.Config
+	cfg.Output.UploadDiscord = true
+	if strings.TrimSpace(w.webhookURL()) != "" {
+		cfg.Discord.WebhookURL = w.webhookURL()
+	}
+	results, err := Processor{Config: cfg}.ProcessPaths([]string{path})
+```
+
+Proposed patch:
+diff --git a/issues/closed/README.md b/issues/closed/README.md
+index 9ca56585c694a879e6cefdec028e06ec5ba4de01..1005c6c1d4d56d4082c274962312c887567571ea 100644
+--- a/issues/closed/README.md
++++ b/issues/closed/README.md
+@@ -228,25 +228,26 @@
+ | 260 | [OSSライセンス表記を監査し本文を表示する](unreleased/260-audit-oss-license-notices-and-show-full-text.md) | 完了 | 未定 | OSS表示を実依存に合わせて監査し、不足・誤表記・テスト専用項目を整理して全項目のライセンス本文を表示できるようにした。 |
+ | 261 | [AvatarBeaconライセンスをOSS画面の最下部に分けて表示する](unreleased/261-show-avatarbeacon-license-separately.md) | 完了 | 未定 | AvatarBeacon関連ライセンスを通常OSS一覧とは別セクションとしてOSSライセンス画面の最下部に表示するようにした。 |
+ | 262 | [処理タブを機能と自動撮影の間に移動する](unreleased/262-move-process-settings-tab-before-autocapture.md) | 完了 | 未定 | 設定画面のタブ順を、機能、処理、自動撮影、OSC、Discord投稿、その他に変更した。 |
+ | 263 | [Discord投稿タブを処理と自動撮影の間に移動する](unreleased/263-move-discord-settings-tab-between-process-and-autocapture.md) | 完了 | 未定 | 設定画面のタブ順を、機能、処理、Discord投稿、自動撮影、OSC、その他に変更した。 |
+ | 264 | [v0.1.8-b11 betaを作成する](maintenance-only/264-create-v018-b11-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b11` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |
+ | 265 | [AvatarBeaconを専用リポジトリへ配置する](avatarbeacon-v0.0.1/265-extract-avatarbeacon-to-dedicated-repository.md) | 完了 | `AvatarBeacon v0.0.1` | 既存AvatarBeacon元ファイルを専用リポジトリへ初期配置し、CI設定、push、最新main CI確認を行った。 |
+ | 266 | [AvatarBeacon READMEを作り直し、ClipForVRChat側をsubmodule化する](unreleased/266-rewrite-avatarbeacon-readme-and-use-submodule.md) | 完了 | 未定 | AvatarBeacon READMEを利用者向けに全面改稿し、ClipForVRChat側のAvatarBeaconをsubmodule参照へ置き換えた。 |
+ | 267 | [AvatarBeacon READMEを汎用OSCギミックとして修正する](unreleased/267-rewrite-avatarbeacon-readme-as-generic-osc-gimmick.md) | 完了 | 未定 | READMEからClipForVRChat固有説明を外し、汎用OSCギミックとしての説明、ライセンス表記、句点改行を整理した。 |
+ | 267 | [exeへD&Dされた画像以外のパスをGPG暗号化する](unreleased/267-encrypt-non-image-exe-drop-paths.md) | 完了 | 未定 | exeへ渡されたパスを画像なら入力画像、画像以外のファイルやフォルダならGPG暗号化対象として扱うようにした。 |
+ | 268 | [自動撮影用Webhook URLが想定外にグレーアウトする](unreleased/268-fix-auto-capture-webhook-url-unexpected-disabled.md) | 完了 | 未定 | 自動撮影用Webhook URL欄を自動撮影Discord投稿OFF時でも編集できるようにした。 |
+ | 269 | [AvatarBeaconの位置取得をHips基準からHead基準へ変更する](unreleased/269-use-head-position-for-avatarbeacon.md) | 完了 | 未定 | AvatarBeaconの位置用 `point` をHeadへ追従させ、説明文をHead基準position/yawに統一した。 |
+ | 270 | [AvatarBeacon READMEのYL-ATG関係と謝辞を修正する](unreleased/270-refine-avatarbeacon-readme-yl-atg-and-license.md) | 完了 | 未定 | YL-ATGとの関係を指定文へ修正し、謝辞追加、配布物・詳細仕様セクション削除を行った。 |
+ | 271 | [AvatarBeaconからHeadForwardAnchorを削除する](unreleased/271-remove-avatarbeacon-head-forward-anchor.md) | 完了 | 未定 | 位置と向きの追跡対象をHead基準の `point` へ統合し、不要になった `HeadForwardAnchor` を削除した。 |
+ | 272 | [AvatarBeacon mainと_12のfloat精度を調査する](investigation-only/272-investigate-avatarbeacon-main-12-float-precision.md) | 完了 | 調査のみ | mainと_12のfloat表現、復元範囲、理論分解能、実機未確認要因を整理した。 |
+ | 273 | [v0.1.8-b12 betaを作成する](maintenance-only/273-create-v018-b12-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b12` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |
+ | 274 | [外部AvatarBeacon unitypackageを配布zipへ同梱する](unreleased/274-package-external-avatarbeacon-unitypackage.md) | 完了 | 未定 | AvatarBeacon source zipの公開添付をやめ、外部Releaseのunitypackageを通常zipと分離zipへ同梱するようにした。 |
+ | 275 | [v0.1.8-b13 betaを作成する](maintenance-only/275-create-v018-b13-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b13` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |
+ | 276 | [b13でStream自動撮影後にカメラ終了・サムネイル未表示・Discord未投稿になる](unreleased/276-investigate-b13-stream-camera-close-thumbnail-discord.md) | 完了 | 未定 | 指定フォルダのログと設定から原因を切り分け、復元/Spout復旧の終了方向OSC送信、サムネイル生成、自動撮影Discord投稿条件を修正した。 |
+ | 277 | [自動撮影の通常モードに待機カメラ位置を追加する](unreleased/277-add-autocapture-idle-camera-position.md) | 完了 | 未定 | 通常モードで撮影後に送る待機カメラ位置を追加し、既定OFFかつ初期Poseをプレイヤー基準の足元方向にした。 |
+ | 278 | [v0.1.8-b14 betaを作成する](maintenance-only/278-create-v018-b14-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b14` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |
+ | 279 | [b14で1枚目成功後に2枚目以降のSpout取得が失敗する](v0.1.8-b15/279-fix-b14-spout-sender-missing-after-first-shot.md) | 完了 | `v0.1.8-b15` | 1枚目成功後にSpout senderが空になる場合、ON再送で戻らなければOFF/ONトグルして連続撮影を成功させる。 |
+ | 280 | [待機カメラ位置の詳細設定ボタンを押せるようにする](v0.1.8-b16/280-fix-idle-camera-detail-button-disabled.md) | 完了 | `v0.1.8-b16` | 待機カメラ位置の詳細設定を開けるようにし、構図ごとの明るさと表示対象マスクも設定できるようにした。 |
+ | 281 | [v0.1.8-b16 betaを作成する](maintenance-only/281-create-v018-b16-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b16` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |
+ | 282 | [v0.1.8-b16確認後にmasterをdevelopで上書きする](maintenance-only/282-overwrite-master-with-develop-after-b16.md) | 完了 | 整理のみ | `master` を `develop` と同じ履歴へ上書きしてpushし、不要な作業ブランチを削除した。 |
+ | 283 | [カメラ移動時の飛行モードON時間を短くする](v0.1.8-rc1/283-shorten-usercamera-flying-during-pose-move.md) | 完了 | `v0.1.8-rc1` | カメラPose送信直前だけ飛行モードをONにし、移動後すぐOFFへ戻してRC1を作成した。 |
++| 284 | [インポート設定保存時に隠れたWebhook/自動投稿設定を確認する](unreleased/284-review-hidden-sensitive-imported-settings.md) | 完了 | 未定 | Webhookや自動処理設定の変更を保存前に確認し、非表示タブのまま保存されることを防ぐ。 |
+
+
+diff --git a/issues/closed/unreleased/284-review-hidden-sensitive-imported-settings.md b/issues/closed/unreleased/284-review-hidden-sensitive-imported-settings.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..50a5c64ae6a9254e36acc9923388a4d4c53d802d
+--- /dev/null
++++ b/issues/closed/unreleased/284-review-hidden-sensitive-imported-settings.md
+@@ -0,0 +1,40 @@
++# 284: インポート設定保存時に隠れたWebhook/自動投稿設定を確認する
++
++## 指示
++
++> Aardvark detected a vulnerability in the repository https://github.com/hatolife/ClipForVRChat.
++>
++>             Follow these steps:
++>             1. Check whether the issue is still present in the HEAD of the current branch. Try
++>             to match the relevant lines in case the files get moved or renamed.
++>             2. If the issue doesn't exist anymore in HEAD, then **DO NOT**
++>             attempt to propose a code fix, **DO NOT** try to reintroduce the code functionality,
++>             **DO NOT** produce any code, **ONLY** explain your reasoning.
++>             3. If the issue still exists in HEAD, then propose a fix.
++>             4. Please produce a minimal code fix that remediates the issue while preserving existing
++>             functionality and tests.
++>
++>             The following information regarding the vulnerability is provided for your reference: {...}
++
++## 文脈
++
++Aardvarkは、タブ化された設定画面でDiscord Webhook URLやVRChat写真/スクリーンショット自動投稿設定が非表示タブに隠れたまま、グローバル保存ボタンで設定全体が保存されると報告している。
++
++## 解釈
++
++HEADでは設定タブ構成が変更されているが、機能タブ・Discord投稿タブ・自動撮影詳細などに分散したセキュリティ上重要な設定が、保存前に必ず視認されるとは限らない。外部configを開いた際に、通常Webhookや自動処理の有効化・送信先が変更されている場合は、保存前に明示確認を挟む必要がある。
++
++## 問題
++
++攻撃者が用意したconfigをユーザーが開いて保存すると、ユーザーが該当タブを見ないままDiscord送信先や自動処理設定を保存し、以後の画像が意図しないWebhookへ送られる可能性がある。
++
++## 期待する挙動
++
++保存対象にWebhook URLや自動処理の有効化/監視先などの変更が含まれる場合、保存前に変更内容の確認ダイアログを表示し、ユーザーが確認してから保存できる。
++
++## 受け入れ条件
++
++- 通常投稿用Webhook、自動処理用Webhook、自動処理の有効化、監視フォルダ、自動撮影のDiscord/スケジュール設定の変更が保存前確認に出る。
++- 確認ダイアログから該当タブを開いて詳細確認できる。
++- 既存の未設定Webhook警告と保存フローを壊さない。
++- フロントエンドテンプレート検査が通る。
+
+
+diff --git a/src/frontend/src/main.js b/src/frontend/src/main.js
+index 71e9b385351b9cbfd5a95561bce5bc7c58ae7a1b..adea2a15fde194aa8b6a599669d6059a76ef5d46 100644
+--- a/src/frontend/src/main.js
++++ b/src/frontend/src/main.js
+@@ -43,50 +43,51 @@ const vueApp = createApp({
+       webhookGuideUrl: 'https://support.discord.com/hc/ja/articles/228383668-%E3%82%A6%E3%82%A7%E3%83%96%E3%83%95%E3%83%83%E3%82%AF%E3%81%AE%E3%81%94%E7%B4%B9%E4%BB%8B',
+       issuesUrl: 'https://github.com/hatolife/ClipForVRChat/issues',
+       authorTwitterUrl: 'https://x.com/hato_poppo_life',
+       feedbackTweetUrl: 'https://x.com/hato_poppo_life/status/2068611307830710667',
+       releasesUrl: 'https://github.com/hatolife/ClipForVRChat/releases',
+       latestReleaseUrl: 'https://github.com/hatolife/ClipForVRChat/releases/latest',
+       boothUrl: 'https://hatolife.booth.pm/items/8531663',
+       updateInfo: { available: false, currentVersion: '', currentReleaseTime: '', latestVersion: '', latestReleasePublished: '', url: '' },
+       startupShortcutStatus: { supported: false, enabled: false, shortcutName: 'ClipForVRChat.lnk', shortcutPath: '', currentTarget: '', currentExe: '', targetMatchesCurrentExe: false, error: '' },
+       startupShortcutUpdating: false,
+       updateBannerDismissed: false,
+       view: 'main',
+       processing: false,
+       dragging: false,
+       selectedHistoryIds: [],
+       lastSelectedHistoryIndex: -1,
+       toast: '',
+       saving: false,
+       saved: false,
+       error: '',
+       settingsBaseline: '',
+       settingsTab: 'feature',
+       pendingSettingsLeave: null,
+       autoCaptureDetailView: '',
+       pendingAutoPostConfirmation: null,
++      pendingSensitiveSettingsConfirmation: null,
+       autoCaptureHelpExpanded: false,
+       pendingDropPaths: [],
+       historyDragSelecting: false,
+       historySelectionAdditive: false,
+       historyDragStart: { x: 0, y: 0 },
+       historyDragCurrent: { x: 0, y: 0 },
+       historyDragBaseIds: [],
+       diagnosticGenerating: false,
+       autoCaptureTestResults: {},
+       spoutStatus: null,
+       spoutChecking: false,
+       spoutSendersLoading: false,
+       avatarOscBasisStatus: null,
+       avatarOscStatusLoading: false,
+       avatarOscStatusPollTimer: null,
+       oscLogEntries: [],
+       oscSendLogEntries: [],
+       oscLogFilter: '',
+       avatarBeaconOSCExcludeRegex: '',
+       oscLogUnsubscribe: null,
+       oscSendLogUnsubscribe: null,
+       debugOSCInput: '/chatbox/input test',
+       debugOSCSending: false,
+       debugOSCResult: null,
+       settingsDraftSyncTimer: null,
+@@ -363,50 +364,93 @@ const vueApp = createApp({
+       if (output.uploadDiscord && screenshot.enabled) {
+         const target = this.effectiveWebhookURL(screenshot.webhookUrl, primaryWebhook)
+         if (!target) {
+           items.push({
+             label: 'スクリーンショット自動処理',
+             detail: `監視フォルダ: ${screenshot.screenshotDirectory || '(未設定)'}`,
+             discord: 'Discord投稿: ON / 送信先: 未設定'
+           })
+         }
+       }
+       if (autoCaptureSchedule.enabled && (autoCaptureDiscord.enabled || output.uploadDiscord)) {
+         const target = this.effectiveWebhookURL(autoCaptureDiscord.webhookUrl, primaryWebhook)
+         if (!target) {
+           items.push({
+             label: '自動撮影',
+             detail: `保存先: ${autoCapture.output?.directory || '(未設定)'}`,
+             discord: 'Discord投稿: ON / 送信先: 未設定'
+           })
+         }
+       }
+       return items
+     },
+     shouldConfirmAutoPostSettings() {
+       return this.autoPostConfirmationItems.length > 0
+     },
++    sensitiveSettingsConfirmationItems() {
++      if (!this.hasUnsavedSettings) return []
++      let baseline
++      try {
++        baseline = JSON.parse(this.settingsBaseline || '{}')
++      } catch {
++        return []
++      }
++      const config = this.state.config || {}
++      const get = (source, path) => path.split('.').reduce((value, key) => (value == null ? undefined : value[key]), source)
++      const format = (value, secret = false) => {
++        if (secret) return this.maskWebhook(value) || '(空)'
++        if (typeof value === 'boolean') return value ? 'ON' : 'OFF'
++        const text = String(value ?? '').trim()
++        return text || '(空)'
++      }
++      const candidates = [
++        { path: 'output.uploadDiscord', label: 'Discord投稿', tab: 'webhook' },
++        { path: 'discord.webhookUrl', label: '通常投稿用Webhook URL', tab: 'webhook', secret: true },
++        { path: 'autoPhoto.enabled', label: 'VRChat写真自動処理', tab: 'feature' },
++        { path: 'autoPhoto.photoDirectory', label: 'VRChat写真監視フォルダ', tab: 'feature' },
++        { path: 'autoPhoto.webhookUrl', label: 'VRChat写真用Webhook URL', tab: 'webhook', secret: true },
++        { path: 'screenshotAutoPost.enabled', label: 'スクリーンショット自動処理', tab: 'feature' },
++        { path: 'screenshotAutoPost.screenshotDirectory', label: 'スクリーンショット監視フォルダ', tab: 'feature' },
++        { path: 'screenshotAutoPost.webhookUrl', label: 'スクリーンショット用Webhook URL', tab: 'webhook', secret: true },
++        { path: 'autoCapture.schedule.enabled', label: '自動撮影スケジュール', tab: 'autoCapture' },
++        { path: 'autoCapture.discord.enabled', label: '自動撮影Discord投稿', tab: 'autoCapture' },
++        { path: 'autoCapture.discord.webhookUrl', label: '自動撮影用Webhook URL', tab: 'webhook', secret: true }
++      ]
++      return candidates.flatMap((item) => {
++        const before = get(baseline, item.path)
++        const after = get(config, item.path)
++        if (JSON.stringify(before) === JSON.stringify(after)) return []
++        return [{
++          ...item,
++          before: format(before, item.secret),
++          after: format(after, item.secret)
++        }]
++      })
++    },
++    shouldConfirmSensitiveSettings() {
++      return this.sensitiveSettingsConfirmationItems.length > 0
++    },
+     oscLogFilterError() {
+       const query = String(this.oscLogFilter || '').trim()
+       if (!query) return ''
+       try {
+         new RegExp(query)
+         return ''
+       } catch (err) {
+         return String(err.message || err)
+       }
+     },
+     filteredOSCLogEntries() {
+       const entries = this.oscLogEntries || []
+       const query = String(this.oscLogFilter || '').trim()
+       if (!query) return entries
+       let re
+       try {
+         re = new RegExp(query)
+       } catch {
+         return []
+       }
+       return entries.filter((entry) => re.test(this.formatOSCLogLine(entry)))
+     },
+     filteredOSCSendLogEntries() {
+       const entries = this.oscSendLogEntries || []
+       const query = String(this.oscLogFilter || '').trim()
+@@ -683,52 +727,57 @@ const vueApp = createApp({
+         this.resetSettingsBaseline()
+         this.autoCaptureDetailView = ''
+       }
+       if (action === 'quit') {
+         if (api?.QuitAfterSettingsDecision) {
+           api.QuitAfterSettingsDecision()
+         }
+         return
+       }
+       if (action === 'help') {
+         this.setView('help', 'after_settings')
+       } else if (action === 'about') {
+         this.setView('about', 'after_settings')
+       } else if (action === 'history') {
+         this.setView('history', 'after_settings')
+         this.state.history = await api.GetHistory()
+       } else if (action === 'drop') {
+         const paths = [...this.pendingDropPaths]
+         this.pendingDropPaths = []
+         this.setView('main', 'drop_after_settings')
+         await this.handleDrop(paths, true)
+       } else {
+         this.setView('main', 'after_settings')
+       }
+     },
+-    async confirmSaveAndLeaveSettings(skipAutoPostConfirmation = false, overrideAction = '') {
++    async confirmSaveAndLeaveSettings(skipAutoPostConfirmation = false, overrideAction = '', skipSensitiveSettingsConfirmation = false) {
+       const action = overrideAction || this.pendingSettingsLeave || 'home'
++      if (!skipSensitiveSettingsConfirmation && this.shouldConfirmSensitiveSettings) {
++        this.pendingSettingsLeave = null
++        this.requestSensitiveSettingsConfirmation(`leave:${action}`)
++        return
++      }
+       if (!skipAutoPostConfirmation && this.shouldConfirmAutoPostSettings) {
+         this.pendingSettingsLeave = null
+         this.requestAutoPostConfirmation(`leave:${action}`)
+         return
+       }
+       this.pendingSettingsLeave = null
+       this.saving = true
+       this.saved = false
+       this.error = ''
+       try {
+         this.sanitizeOutputDirectory()
+         this.sanitizePhotoDirectory()
+         this.sanitizeScreenshotDirectory()
+         if (this.state.processOnSave) {
+           this.logUserAction('button_click', 'settings_save_and_process')
+           this.state = await api.SaveConfigAndProcess(this.state.config, this.state.pendingPaths || [])
+           if (this.shouldWarnMissingPrimaryWebhook()) {
+             this.logUserAction('settings_warning', 'missing_primary_discord_webhook')
+           }
+           this.resetSettingsBaseline()
+           this.setView('main', 'save_config_and_process')
+           return
+         }
+         this.logUserAction('button_click', 'settings_save')
+         await api.SaveConfig(this.state.config)
+@@ -888,50 +937,73 @@ const vueApp = createApp({
+     effectiveWebhookURL(specificWebhookURL, primaryWebhookURL = this.state.config?.discord?.webhookUrl) {
+       return String(specificWebhookURL || primaryWebhookURL || '').trim()
+     },
+     webhookFallbackNote(specificWebhookURL, enabled = true) {
+       if (!enabled) return ''
+       const specific = String(specificWebhookURL || '').trim()
+       if (specific) return 'この欄のWebhook URLへ送信します。'
+       const primary = String(this.state.config?.discord?.webhookUrl || '').trim()
+       if (primary) return '空欄のため通常投稿用Webhook URLへ送信します。'
+       return '空欄です。通常投稿用Webhook URLも空の場合はDiscordへ投稿できません。'
+     },
+     webhookFallbackNoteClass(specificWebhookURL, enabled = true) {
+       if (!enabled) return 'muted'
+       return this.effectiveWebhookURL(specificWebhookURL) ? 'ok' : 'warning'
+     },
+     maskWebhook(value) {
+       const text = String(value || '').trim()
+       if (!text) return ''
+       const parts = text.split('/')
+       if (parts.length < 2) return '(設定済み)'
+       const id = parts[parts.length - 2] || ''
+       const token = parts[parts.length - 1] || ''
+       const shortToken = token.length > 8 ? `${token.slice(0, 4)}...${token.slice(-4)}` : '****'
+       return `${id}/${shortToken}`
+     },
++    requestSensitiveSettingsConfirmation(action) {
++      this.pendingSensitiveSettingsConfirmation = action
++      this.logUserAction('settings_confirmation_required', `sensitive_settings ${action}`)
++    },
++    async confirmSensitiveSettings() {
++      const action = this.pendingSensitiveSettingsConfirmation || 'save'
++      this.pendingSensitiveSettingsConfirmation = null
++      if (action.startsWith('leave:')) {
++        await this.confirmSaveAndLeaveSettings(false, action.slice('leave:'.length) || 'home', true)
++        return
++      }
++      await this.saveSettings(false, true)
++    },
++    cancelSensitiveSettingsConfirmation() {
++      this.logUserAction('button_click', 'cancel_sensitive_settings_confirmation')
++      this.pendingSensitiveSettingsConfirmation = null
++    },
++    openSensitiveSettingsTab(tabId) {
++      this.logUserAction('button_click', `open_sensitive_settings_tab ${tabId || 'webhook'}`)
++      this.pendingSensitiveSettingsConfirmation = null
++      this.settingsTab = tabId || 'webhook'
++      this.autoCaptureDetailView = ''
++    },
+     requestAutoPostConfirmation(action) {
+       this.pendingAutoPostConfirmation = action
+       this.logUserAction('settings_confirmation_required', `auto_post ${action}`)
+     },
+     async confirmAutoPostSettings() {
+       const action = this.pendingAutoPostConfirmation || 'save'
+       this.pendingAutoPostConfirmation = null
+       if (action.startsWith('leave:')) {
+         await this.confirmSaveAndLeaveSettings(true, action.slice('leave:'.length) || 'home')
+         return
+       }
+       await this.saveSettings(true)
+     },
+     cancelAutoPostConfirmation() {
+       this.logUserAction('button_click', 'cancel_auto_post_confirmation')
+       this.pendingAutoPostConfirmation = null
+     },
+     openDiscordWebhookSettings() {
+       this.logUserAction('button_click', 'open_discord_webhook_settings_from_banner')
+       if (this.isSettings) {
+         this.settingsTab = 'webhook'
+         return
+       }
+       void this.openSettings().then(() => {
+         this.settingsTab = 'webhook'
+@@ -2014,61 +2086,66 @@ const vueApp = createApp({
+         this.error = String(err)
+       }
+     },
+     async choosePhotoDirectory() {
+       this.sanitizePhotoDirectory()
+       try {
+         const selected = await api.SelectPhotoDirectory(this.state.config.autoPhoto.photoDirectory)
+         if (selected) {
+           this.state.config.autoPhoto.photoDirectory = selected
+         }
+       } catch (err) {
+         this.error = String(err)
+       }
+     },
+     async chooseScreenshotDirectory() {
+       this.sanitizeScreenshotDirectory()
+       try {
+         const selected = await api.SelectScreenshotDirectory(this.state.config.screenshotAutoPost.screenshotDirectory)
+         if (selected) {
+           this.state.config.screenshotAutoPost.screenshotDirectory = selected
+         }
+       } catch (err) {
+         this.error = String(err)
+       }
+     },
+-    async saveSettings(skipAutoPostConfirmation = false) {
++    async saveSettings(skipAutoPostConfirmation = false, skipSensitiveSettingsConfirmation = false) {
+       const settingsTabBeforeSave = this.settingsTab
+       const autoCaptureDetailBeforeSave = this.autoCaptureDetailView
+       const scrollPosition = this.isSettings ? this.captureSettingsScrollPosition() : null
+       this.saving = true
+       this.saved = false
+       this.error = ''
+       try {
+         this.sanitizeOutputDirectory()
+         this.sanitizePhotoDirectory()
+         this.sanitizeScreenshotDirectory()
++        if (!skipSensitiveSettingsConfirmation && this.shouldConfirmSensitiveSettings) {
++          this.saving = false
++          this.requestSensitiveSettingsConfirmation('save')
++          return
++        }
+         if (!skipAutoPostConfirmation && this.shouldConfirmAutoPostSettings) {
+           this.saving = false
+           this.requestAutoPostConfirmation('save')
+           return
+         }
+         if (this.state.processOnSave) {
+           this.state = await api.SaveConfigAndProcess(this.state.config, this.state.pendingPaths || [])
+           if (this.shouldWarnMissingPrimaryWebhook()) {
+             this.logUserAction('settings_warning', 'missing_primary_discord_webhook')
+           }
+         } else {
+           const savedConfig = await api.SaveConfig(this.state.config)
+           if (savedConfig) {
+             this.state.config = savedConfig
+           }
+           if (this.shouldWarnMissingPrimaryWebhook()) {
+             this.logUserAction('settings_warning', 'missing_primary_discord_webhook')
+           }
+           this.rememberSettingsBaseline({ resetView: false })
+         }
+         if (api?.ClearSettingsDraft) {
+           await api.ClearSettingsDraft()
+         }
+         if (this.isSettings) {
+           this.settingsTab = settingsTabBeforeSave
+@@ -3269,50 +3346,69 @@ const vueApp = createApp({
+               <small v-if="item.error" class="error">{{ item.error }}</small>
+             </article>
+           </div>
+           <p v-else class="empty">まだ処理結果はありません。</p>
+         </div>
+       </section>
+ 
+       <div v-if="dragging" class="drop-overlay">
+         <div>
+           <strong>ここにドロップ</strong>
+           <span>画像ファイルまたは config.json を処理できます</span>
+         </div>
+       </div>
+       <div v-if="pendingSettingsLeave" class="modal-backdrop" role="dialog" aria-modal="true">
+         <div class="confirm-dialog">
+           <h2>設定が保存されていません</h2>
+           <p>変更した設定を保存してから移動しますか。保存しない場合、変更前の設定が維持されます。</p>
+           <p v-if="error" class="error">{{ error }}</p>
+           <div class="button-row dialog-actions">
+             <button @click="confirmSaveAndLeaveSettings()" :disabled="saving" :title="saving ? '保存中です' : '保存して移動する'">{{ saving ? '保存中' : '保存して移動' }}</button>
+             <button class="secondary" @click="discardSettingsAndLeave" :disabled="saving" :title="saving ? '保存中です' : '保存せずに移動する'">保存せずに移動</button>
+             <button class="secondary" @click="cancelSettingsLeave" :disabled="saving" :title="saving ? '保存中です' : '移動を取りやめる'">キャンセル</button>
+           </div>
+         </div>
+       </div>
++      <div v-if="pendingSensitiveSettingsConfirmation" class="modal-backdrop" role="dialog" aria-modal="true">
++        <div class="confirm-dialog">
++          <h2>送信先と自動処理設定を確認してください</h2>
++          <p>保存しようとしている設定には、Discord送信先または自動処理に関わる変更が含まれています。意図した内容か確認してから保存してください。</p>
++          <ul class="confirmation-list">
++            <li v-for="item in sensitiveSettingsConfirmationItems" :key="item.path">
++              <strong>{{ item.label }}</strong>
++              <span>変更前: {{ item.before }}</span>
++              <span>変更後: {{ item.after }}</span>
++            </li>
++          </ul>
++          <p v-if="error" class="error">{{ error }}</p>
++          <div class="button-row dialog-actions">
++            <button @click="confirmSensitiveSettings" :disabled="saving" :title="saving ? '保存中です' : 'この内容で保存する'">{{ saving ? '保存中' : '確認して保存' }}</button>
++            <button class="secondary" @click="openSensitiveSettingsTab(sensitiveSettingsConfirmationItems[0]?.tab || 'webhook')" :disabled="saving" :title="saving ? '保存中です' : '該当する設定タブを開く'">設定タブを開く</button>
++            <button class="secondary" @click="cancelSensitiveSettingsConfirmation" :disabled="saving" :title="saving ? '保存中です' : '確認を閉じる'">キャンセル</button>
++          </div>
++        </div>
++      </div>
+       <div v-if="pendingAutoPostConfirmation" class="modal-backdrop" role="dialog" aria-modal="true">
+         <div class="confirm-dialog">
+           <h2>自動処理の送信先を確認してください</h2>
+           <p>Discord投稿がONですが、下記の自動処理は送信先Webhook URLが未設定です。専用Webhook URL、またはフォールバック先の通常投稿用Webhook URLを設定してください。</p>
+           <ul class="confirmation-list">
+             <li v-for="item in autoPostConfirmationItems" :key="item.label">
+               <strong>{{ item.label }}</strong>
+               <span>{{ item.detail }}</span>
+               <span>{{ item.discord }}</span>
+             </li>
+           </ul>
+           <p>通常投稿用Webhook URLが設定済みの場合、専用Webhook URLが空でもこの確認は表示されません。</p>
+           <p v-if="error" class="error">{{ error }}</p>
+           <div class="button-row dialog-actions">
+             <button @click="confirmAutoPostSettings" :disabled="saving" :title="saving ? '保存中です' : 'この内容で保存する'">{{ saving ? '保存中' : '確認して保存' }}</button>
+             <button class="secondary" @click="openDiscordWebhookSettings" :disabled="saving" :title="saving ? '保存中です' : 'Discord投稿設定を開く'">Discord投稿設定を開く</button>
+             <button class="secondary" @click="cancelAutoPostConfirmation" :disabled="saving" :title="saving ? '保存中です' : '確認を閉じる'">キャンセル</button>
+           </div>
+         </div>
+       </div>
+       <div v-if="diagnosticGenerating" class="modal-backdrop busy-backdrop" role="dialog" aria-modal="true" aria-live="polite">
+         <div class="busy-dialog">
+           <h2>不具合報告用データを作成しています</h2>
+           <p>ログ、設定、履歴、実行ファイルをzip化し、添付用に暗号化しています。</p>
+           <div class="indeterminate-progress"><span></span></div>
+
+# Attack-path analysis
+Final: high | Decider: model_decided | Matrix severity: medium | Policy adjusted: medium
+## Rationale
+Raised from the original medium to high in this repository context because the affected code is in the main product, the threat model explicitly treats valid imported configs that silently enable auto-post to attacker Discord as a high-impact class, and the static path is complete: attacker-controlled config is loaded by OpenSettings, sensitive Discord/auto-post fields are hidden by tab gating, global Save persists the full config, and backend watcher restart can exfiltrate future images. It is not critical because exploitation requires user interaction, has no inbound network exposure or RCE, validates destination to Discord webhooks, and primarily affects future supported image files.
+## Likelihood
+medium - The attack requires social engineering and user save interaction, but config.json import/drop is a supported workflow and the security-sensitive fields are hidden by default behind inactive tabs, making the review failure plausible.
+## Impact
+high - Successful exploitation can disclose future local VRChat photos or screenshots to an attacker-controlled Discord channel. These images may contain private user activity or sensitive screen contents. Impact is reduced because it does not execute code, does not grant filesystem-wide read of existing files, and initially marks existing watched images as seen.
+## Assumptions
+- The victim can be persuaded to open or drag-and-drop an attacker-supplied config.json, which is a documented product workflow.
+- The victim clicks the global Save button without explicitly visiting the Discord and auto-post tabs.
+- The attacker controls a valid Discord webhook URL and the victim host can make outbound HTTPS requests to Discord.
+- The victim later creates new supported image files in a watched VRChat photo or screenshot directory while the app is running.
+- Attacker supplies a crafted local JSON config file
+- User opens/drops the JSON config or launches the app with it
+- User saves settings while sensitive tabs are not reviewed
+- Saved config enables autoPhoto or screenshotAutoPost with a valid Discord webhook
+- New supported image files appear in the configured watched directory
+## Path
+attacker config.json -> user opens/drops config -> settings starts on Output tab -> Discord/auto-post settings hidden -> user clicks global Save -> SaveConfig persists all fields -> watchers restart -> new images uploaded to attacker Discord webhook
+## Path evidence
+- `src/main.go:205-210` - Wails desktop app enables file drop and binds the Go App object to the frontend bridge.
+- `src/main.go:71-83` - Launching with a single .json argument loads that file as a config and opens settings mode.
+- `src/frontend/src/main.js:341-345` - Dropping exactly one .json path calls api.OpenSettings on that attacker-supplied path.
+- `src/app.go:262-281` - OpenSettings loads the specified config path, switches the app config path, and places the config into UI state.
+- `src/frontend/src/main.js:174-176` - Every settings session records a baseline and resets the active tab to output.
+- `src/frontend/src/main.js:945-955` - The primary Discord webhook field is rendered only when settingsTab is discord.
+- `src/frontend/src/main.js:959-1013` - Auto-post enable flags, watched directories, and per-feature webhook URLs are rendered only when settingsTab is autoPost.
+- `src/frontend/src/main.js:623-635` - The Save action submits the full state.config object to SaveConfig or SaveConfigAndProcess, not only the visible tab.
+- `src/frontend/src/main.js:1015-1017` - The footer Save button is outside the tab-gated sections and remains available while sensitive fields are hidden.
+- `src/app.go:239-247` - Backend save persists the supplied config into state/storage and immediately restarts auto-photo watchers.
+- `src/app.go:457-475` - Enabled VRChat photo or screenshot auto-post settings start background watchers using saved directories and webhook URLs.
+- `src/internal/appcore/autophoto.go:121-126` - Watcher processing forces Discord upload and applies the configured watcher webhook URL before processing the new file.
+- `src/internal/appcore/discord.go:176-187` - A control exists: webhook URLs must be HTTPS Discord webhook URLs, limiting exfiltration destination to Discord webhooks but not preventing attacker-controlled Discord channels.
+- `src/internal/appcore/autophoto.go:39-45` - A mitigating behavior exists: watcher startup initially records existing files as seen, so the primary impact is future new images rather than immediate upload of all existing files.
+## Narrative
+This is a real, reachable security issue in the main desktop app. The app supports opening config.json files, and OpenSettings loads the specified local config into application state. The commit changes the settings page so each session resets to the Output tab and Discord/auto-post controls are rendered only when their tabs are selected. However, the footer Save button remains global and saveSettings submits the entire state.config object. The backend then persists that config and restarts enabled auto-post watchers. Those watchers force Discord upload and use the configured per-feature webhook override. An attacker who persuades a user to open and save a crafted config can therefore hide attacker-controlled webhook and background-upload settings from the initial review path and receive future VRChat photos or screenshots. There is no inbound network service or code execution, and existing images are initially marked seen by the watcher, but the data-exfiltration impact is still meaningful.
+## Controls
+- No public ingress or listening service identified; this is a local desktop/Wails workflow.
+- Victim interaction is required: open/drop the config and click Save.
+- Discord webhook URL validation restricts uploads to https://discord.com or discordapp.com /api/webhooks paths.
+- Auto-post scans are bounded by MaxAutoPhotoScanFiles and MaxAutoPhotoProcessPerTick.
+- Watcher startup marks existing files as seen, limiting impact mostly to future new images.
+- Config writes use private file mode where the operating system honors it.
+- No executable sink was identified in this path; the sink is image processing plus Discord upload.
+## Blindspots
+- Static-only analysis; the full Wails GUI was not run interactively in this stage.
+- Actual Windows WebView rendering, focus behavior, and user-visible warnings were not observed dynamically.
+- The validation PoC was considered from prior evidence but not re-executed during this static pass.
+- Windows ACL effectiveness for private config/history storage was not verified.
+- Real-world severity depends on how often users import third-party configs and keep the app running while creating sensitive screenshots/photos.

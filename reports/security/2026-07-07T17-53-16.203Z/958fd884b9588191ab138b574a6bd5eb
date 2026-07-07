@@ -1,0 +1,135 @@
+History file stores Discord tokens with weak permissions
+Link: https://chatgpt.com/codex/cloud/security/findings/958fd884b9588191ab138b574a6bd5eb?sev=critical%2Chigh%2Cmedium%2Clow%2Cinformational&page=2
+Criticality: medium (attack path: medium)
+Status: new
+
+# Metadata
+Repo: hatolife/ClipForVRChat
+Commit: 709370d
+Author: poppo@hato.life
+Created: 2026/6/29 13:39:52
+Assignee: Unassigned
+Signals: Security, Validated, Attack-path
+
+# Summary
+Introduced: the commit adds HistoryEntry fields for DiscordToken and DiscordMessageID, populates them from upload results, and persists them to a newly created history.json using world-readable file permissions.
+The new history feature persists Discord deletion metadata, including DiscordWebhookID, DiscordToken, and DiscordMessageID, for every successful upload. SaveHistory writes history.json with mode 0644 and creates its parent directory with 0755, making the file readable by other local users on platforms where POSIX modes apply and by any process/account that can access the app directory. A reader of this file can recover Discord webhook bearer tokens plus message IDs for historical uploads, enabling unauthorized posting to the webhook and deletion of recorded Discord messages. The data is also included in UI state/results even though the frontend only needs opaque history IDs to request deletion, increasing exposure to any renderer compromise or accidental state disclosure.
+
+# Validation
+## Rubric
+- [x] Sensitive Discord deletion metadata is represented in serializable structs with JSON fields.
+- [x] The upload/processing path populates Result/HistoryEntry with webhook token, webhook ID, and message ID.
+- [x] SaveHistory writes the metadata to history.json using broad permissions, specifically 0755 for directories and 0644 for the file.
+- [x] A dynamic PoC using the real appcore functions confirms the token/message ID are written to disk and the resulting file has mode 0644 under the default umask.
+- [x] The same sensitive values are exposed to frontend/API state through UIState Results/History.
+## Report
+Validated the finding with targeted code review plus a dynamic PoC using the real Go functions. Rubric results are included below. Key code evidence: src/internal/appcore/history.go:13-23 defines HistoryEntry with discordMessageId, discordWebhookId, and discordToken JSON fields; src/internal/appcore/history.go:52-60 writes history.json after MkdirAll(..., 0755) and WriteFile(..., 0644); src/internal/appcore/history.go:63-88 copies Discord metadata from Result into HistoryEntry and saves it; src/internal/appcore/processor.go:91-102 copies UploadDiscord output into Result; src/internal/appcore/discord.go:30-88 parses the webhook token from the webhook URL and returns it with the Discord message ID; src/internal/appcore/types.go:12-18 includes full HistoryEntry objects in UIState, and app.go:199-202 / 236-240 places history and results into state. Dynamic reproduction: I added src/validation_poc/main.go, which runs an httptest fake Discord webhook, calls appcore.UploadDiscord, then appcore.AddResultsToHistory/SaveHistory. Command `cd /workspace/ClipForVRChat/src && go run ./validation_poc` produced: history_dir_mode=0755, history_file_mode=0644, persisted_contains_token=true, persisted_contains_message_id=true, ui_state_contains_token=true, followed by history.json containing `"discordMessageId":"MSG_SECRET_123"`, `"discordWebhookId":"WEBHOOK_PUBLIC_456"`, and `"discordToken":"TOKEN_SECRET_ABC"`. The environment umask was 0022. I also verified local cross-account readability in the constructed reachable app directory: `su nobody -s /bin/sh -c 'head -c 120 /tmp/clipforvrchat-history-poc/appconfig/history.json'` successfully printed the beginning of history.json. Crash/Valgrind/debugger attempts: this is not a crash-class bug; a debug build/run completed normally and demonstrated the issue. Valgrind and gdb/dlv were not installed, so memory-check/debugger traces were unavailable and not applicable to this information disclosure.
+
+# Evidence
+src/internal/appcore/history.go (L13 to 23)
+  Note: HistoryEntry now contains sensitive Discord webhook deletion metadata, including the webhook token and message ID.
+```
+type HistoryEntry struct {
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	URL              string `json:"url"`
+	Thumbnail        string `json:"thumbnail"`
+	SourcePath       string `json:"sourcePath"`
+	OutputPath       string `json:"outputPath"`
+	DiscordMessageID string `json:"discordMessageId"`
+	DiscordWebhookID string `json:"discordWebhookId"`
+	DiscordToken     string `json:"discordToken"`
+	Cleared          bool   `json:"cleared"`
+```
+
+src/internal/appcore/history.go (L52 to 60)
+  Note: SaveHistory persists the sensitive history file using 0755 directories and 0644 file permissions instead of private permissions such as 0700/0600.
+```
+func SaveHistory(path string, history []HistoryEntry) error {
+	data, err := json.MarshalIndent(history, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, append(data, '\n'), 0644)
+```
+
+src/internal/appcore/history.go (L73 to 83)
+  Note: AddResultsToHistory copies DiscordMessageID, DiscordWebhookID, and DiscordToken from processing results into persisted history entries.
+```
+		entry := HistoryEntry{
+			ID:               historyID(now, len(history)),
+			Name:             results[i].Name,
+			URL:              results[i].URL,
+			Thumbnail:        results[i].Thumbnail,
+			SourcePath:       results[i].SourcePath,
+			OutputPath:       results[i].OutputPath,
+			DiscordMessageID: results[i].DiscordMessageID,
+			DiscordWebhookID: results[i].DiscordWebhookID,
+			DiscordToken:     results[i].DiscordToken,
+			CreatedAt:        now,
+```
+
+src/internal/appcore/processor.go (L99 to 102)
+  Note: The processor stores the parsed Discord message ID, webhook ID, and bearer token in the Result object, which is later written to history and returned to UI state.
+```
+		result.URL = uploaded.URL
+		result.DiscordMessageID = uploaded.MessageID
+		result.DiscordWebhookID = uploaded.WebhookID
+		result.DiscordToken = uploaded.Token
+```
+
+src/internal/appcore/types.go (L14 to 18)
+  Note: UIState includes full HistoryEntry objects, so the persisted DiscordToken values are also exposed to the frontend state.
+```
+	Message       string         `json:"message"`
+	ConfigPath    string         `json:"configPath"`
+	Config        Config         `json:"config"`
+	Results       []Result       `json:"results"`
+	History       []HistoryEntry `json:"history"`
+```
+
+# Attack-path analysis
+Final: medium | Decider: model_decided | Matrix severity: low | Policy adjusted: low
+## Rationale
+Kept at medium. Code evidence confirms the issue is real: secret Discord webhook deletion metadata is serialized into history.json and written with broad POSIX permissions, and prior executable validation confirmed cross-account readability in a constructed app directory. The issue is in core runtime code and is reachable through normal Discord upload use. It does not justify high or critical because exploitation is local/preconditioned, Windows ACL behavior may limit cross-user exposure on the primary target platform, and the compromised secret is scoped to a Discord webhook rather than a full account, host, signing key, or cloud control-plane credential.
+## Likelihood
+medium - The vulnerable write occurs during normal successful Discord upload and has executable PoC evidence. However, the attacker must already have local read access to the app/config directory or a renderer/process state disclosure path; there is no remote unauthenticated entry point.
+## Impact
+medium - Disclosure of Discord webhook bearer tokens and message IDs enables unauthorized posting to the configured webhook and deletion of recorded Discord messages. The credential is sensitive but scoped to a webhook, not a full Discord account or broader infrastructure identity.
+## Assumptions
+- The affected code is part of the main Wails desktop application, not a test-only or developer-only component.
+- A realistic attacker is a local unprivileged account/process, or another process able to read the application directory, as described in the project threat model.
+- The user has configured Discord webhook upload and has successfully uploaded at least one image, causing history entries to be created.
+- On platforms where POSIX modes apply, a 0755 directory and 0644 history file are readable by other local users if parent-directory traversal permits it; on Windows, effective ACL exposure may differ.
+- Victim uses the Discord upload feature with a valid webhook URL
+- At least one successful upload creates a history entry
+- Attacker has local read access to the application/config directory or compromises a renderer/process that can read UI state
+- Filesystem permissions or inherited ACLs allow the attacker to read history.json
+## Path
+Victim upload -> UploadDiscord(token,msgID) -> Result -> HistoryEntry -> history.json 0644 -> local read -> Discord webhook post/delete
+## Path evidence
+- `src/internal/appcore/history.go:13-23` - HistoryEntry defines JSON-serialized DiscordMessageID, DiscordWebhookID, and DiscordToken fields.
+- `src/internal/appcore/history.go:52-60` - SaveHistory writes history.json after MkdirAll(..., 0755) and WriteFile(..., 0644), which is not private on POSIX filesystems.
+- `src/internal/appcore/history.go:63-88` - AddResultsToHistory copies Discord deletion metadata from processing results into persisted history entries.
+- `src/internal/appcore/processor.go:91-102` - The normal Discord upload path stores uploaded.MessageID, uploaded.WebhookID, and uploaded.Token in Result.
+- `src/internal/appcore/discord.go:30-88` - UploadDiscord parses the webhook token from the webhook URL and returns it together with the Discord message and webhook IDs.
+- `src/internal/appcore/discord.go:91-96` - DeleteDiscordMessage demonstrates that the stored webhook ID, token, and message ID are sufficient bearer material for Discord message deletion.
+- `src/internal/appcore/types.go:12-33` - UIState includes Results and History; Result also serializes DiscordToken, exposing the token to frontend state.
+- `src/app.go:199-202` - SaveConfigAndProcess adds results to history and then returns the full results in application state.
+- `src/app.go:236-240` - ProcessToState similarly persists history and returns results/history to state after normal processing.
+## Narrative
+The finding is real and reachable through normal product use. A successful Discord upload returns the webhook token and message ID, processor state copies those fields, AddResultsToHistory writes them into HistoryEntry, and SaveHistory serializes the entries to history.json using 0644 file permissions after creating the directory as 0755. UIState also includes full Results and HistoryEntry objects, so the token is exposed to the renderer state. Prior validation used the real appcore functions with a fake Discord endpoint and confirmed the token/message ID were persisted, the file mode was 0644, and another local account could read the constructed history file. Severity remains medium: the impact is meaningful credential disclosure for a Discord webhook, but exploitation requires local file/read access or renderer compromise and does not compromise a Discord account, cloud control plane, or remote server.
+## Controls
+- Local desktop application with no public listener or internet-exposed ingress
+- Exploitation requires local read access or a renderer/process compromise
+- Discord impact is limited to the configured webhook credential rather than full Discord account takeover
+- No executable sink was identified in this attack path
+- HTTP clients use outbound Discord API calls rather than exposing an inbound network service
+## Blindspots
+- Static review did not verify effective Windows ACLs for the packaged application directory.
+- Actual exposure depends on installation location, parent-directory permissions, and user filesystem layout.
+- Live Discord API abuse was not exercised; prior validation used a fake Discord webhook endpoint to prove persistence and readability.
+- Same-user malware can already read most local user files, so the main incremental risk is cross-account/shared-directory readability or renderer/state disclosure.

@@ -1,0 +1,532 @@
+Release signing key exposed to prior build-step code execution
+Link: https://chatgpt.com/codex/cloud/security/findings/f23b0a6320c481919bc02541a59d01da?sev=critical%2Chigh%2Cmedium%2Clow%2Cinformational
+Criticality: high (attack path: high)
+Status: new
+
+# Metadata
+Repo: hatolife/ClipForVRChat
+Commit: 96dedea
+Author: poppo@hato.life
+Created: 2026/7/8 3:55:43
+Assignee: Unassigned
+Signals: Security, Validated, Patch generated, Attack-path
+
+# Summary
+A security bug was introduced by adding release signing secrets to a job that has already executed untrusted or supply-chain-controllable code. The bug is not in GPG itself, but in the workflow trust boundary: secrets for release signing are made available after earlier steps had an opportunity to modify the runner environment used by the signing step.
+The commit adds a detached GPG signing step that receives CI_RELEASE_GPG_PRIVATE_KEY and CI_RELEASE_GPG_PASSPHRASE and pipes them into gpg. This step runs in the same GitHub Actions job after dependency installation and build/test commands such as npm ci, npm run build, go test, govulncheck via go run, go install wails, and wails build. Those earlier commands execute code from the repository and third-party dependencies without access to the signing secrets at that moment, but they can still persist state for later steps on the same runner. For example, malicious dependency lifecycle code or a compromised build tool can write to GitHub Actions environment files such as GITHUB_ENV/GITHUB_PATH, set BASH_ENV for the later bash signing step, or place a fake gpg earlier in PATH. When the new signing step starts, that persisted hook can read RELEASE_GPG_PRIVATE_KEY, RELEASE_GPG_PASSPHRASE, or intercept the stdin passed to gpg, exfiltrating the release signing key. Because the generated signature and public key are then published as release assets, compromise of this key undermines the new authenticity mechanism and can allow future malicious executables to appear officially signed. The signing operation should be isolated into a separate, minimal job that does not run dependency/build code, downloads an immutable build artifact, uses tightly scoped permissions/environment protection, and preferably uses a hardware/KMS/keyless signing mechanism rather than exposing a long-lived private key to a general-purpose build runner.
+
+# Validation
+## Rubric
+- [x] Confirm the commit introduced a new release signing step and signature assets compared with the parent workflow.
+- [x] Confirm the same job runs dependency/build-controlled commands before the signing step.
+- [x] Confirm signing secrets are exposed as environment variables in that later same-job step.
+- [x] Confirm the signing step invokes unqualified gpg without isolating PATH or runner state.
+- [x] Demonstrate that persisted runner state from an earlier step can intercept the signing step and read the private key/passphrase while allowing the workflow to continue.
+## Report
+Validated the finding as a CI workflow trust-boundary/secret-exposure issue, not a memory-corruption crash. Evidence: .github/workflows/release.yml runs dependency/build-controlled commands before signing: npm ci/build at lines 34-44, go test/govulncheck/go install at lines 46-55, and wails build at lines 64-67. The commit then adds a same-job bash signing step at lines 85-107 that exposes RELEASE_GPG_PRIVATE_KEY, RELEASE_GPG_PASSPHRASE, and RELEASE_GPG_FINGERPRINT from GitHub secrets at lines 87-90 and invokes unqualified gpg at lines 98, 99, 104, and 107. Release assets include the signature and exported public key at lines 109-116, and README.md lines 29-31 instruct users to rely on these signature artifacts. The parent workflow did not contain the signing step or signature release assets, so this trust-boundary was introduced by the checked-out commit.
+
+I built a targeted PoC that models an earlier malicious dependency/build step writing an attacker directory to GITHUB_PATH, then the runner prepending that directory before the later signing step. The fake gpg logs environment variables and stdin while emulating enough gpg behavior for the signing block to complete. Running /workspace/validation_work/ci-signing-secret-persistence-poc/poc_release_signing_path_hijack.sh produced: fake_gpg=/tmp/.../attacker-bin/gpg; signing_step_exit=0; the leak log contained RELEASE_GPG_PRIVATE_KEY=DUMMY_PRIVATE_KEY_CAN_BE_STOLEN and RELEASE_GPG_PASSPHRASE=DUMMY_PASSPHRASE_CAN_BE_STOLEN, plus stdin containing DUMMY_PRIVATE_KEY_CAN_BE_STOLEN during --import and DUMMY_PASSPHRASE_CAN_BE_STOLEN during --passphrase-fd 0. It also generated dist/ClipForVRChat.exe.asc and dist/ClipForVRChat-release-signing-public-key.asc, showing the workflow could continue successfully after interception.
+
+Crash/Valgrind/Debugger note: a direct crash is not expected for this YAML/shell CI secret-exposure bug; the direct behavioral PoC exited 0 while leaking secrets. valgrind and gdb were checked and are not installed in the container, and they are not meaningful validation tools for this workflow trust-boundary issue.
+
+# Evidence
+github/workflows/release.yml (L109 to 116)
+  Note: The workflow publishes the generated signature and exported public key as release assets, so compromise of the signing key undermines the release authenticity mechanism added by this commit.
+
+github/workflows/release.yml (L34 to 67)
+  Note: These earlier release-job steps execute npm, Go, Wails, and build commands before the signing secrets are introduced. Code run here can persist PATH or shell/environment hooks for later steps in the same job.
+
+github/workflows/release.yml (L85 to 107)
+  Note: The newly added signing step exposes the long-lived GPG private key and passphrase as environment variables and pipes them into gpg in the same job after prior code execution, allowing persisted hooks or a fake gpg to steal them.
+
+Proposed patch:
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index 51d48508e46bffbe713ed0a22268b66e4eed7033..12ef10c95c6e9d2ca374f32a4c205388163ad09c 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -11,50 +11,59 @@ on:
+         required: true
+         type: string
+ 
+ permissions:
+   contents: read
+ 
+ env:
+   GO_VERSION: "1.26.4"
+   NODE_VERSION: "22"
+   WAILS_VERSION: "v2.12.0"
+   GOVULNCHECK_VERSION: "v1.1.4"
+   AVATARBEACON_PACKAGE_URL: "https://github.com/hatolife/AvatarBeacon/releases/download/v0.0.1/AvatarBeacon_v0.0.1.unitypackage"
+   AVATARBEACON_PACKAGE_NAME: "AvatarBeacon_v0.0.1.unitypackage"
+ 
+ jobs:
+   build:
+     name: Build exe and package release assets
+     runs-on: windows-latest
+     permissions:
+       contents: read
+     outputs:
+       tag_name: ${{ steps.version.outputs.version }}
+       asset_prefix: ${{ steps.version.outputs.asset_prefix }}
+       draft: ${{ steps.version.outputs.draft }}
+       prerelease: ${{ steps.version.outputs.prerelease }}
++      app_version: ${{ steps.version.outputs.app_version }}
++      commit_sha: ${{ steps.version.outputs.commit_sha }}
++      revision: ${{ steps.version.outputs.revision }}
++      release_time: ${{ steps.version.outputs.release_time }}
++      spout_helper_sha256: ${{ steps.spout.outputs.helper_sha256 }}
++      spout_dll_sha256: ${{ steps.spout.outputs.dll_sha256 }}
++      avatarbeacon_package_url: ${{ steps.avatarbeacon.outputs.package_url }}
++      avatarbeacon_package_name: ${{ steps.avatarbeacon.outputs.package_name }}
++      avatarbeacon_package_sha256: ${{ steps.avatarbeacon.outputs.package_sha256 }}
+ 
+     steps:
+       - name: Checkout
+         uses: actions/checkout@v7
+         with:
+           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref }}
+           fetch-depth: 0
+           submodules: recursive
+ 
+       - name: Prepare version
+         id: version
+         shell: pwsh
+         env:
+           TAG_NAME: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag_name }}
+         run: |
+           $tagName = $env:TAG_NAME
+           if ($tagName -notmatch '^v\d+\.\d+\.\d+(-(a|b|rc)\d+)?$') {
+             throw "Release tag must match vX.Y.Z, vX.Y.Z-aN, vX.Y.Z-bN, or vX.Y.Z-rcN: $tagName"
+           }
+           $commitSha = git rev-parse HEAD
+           $shortSha = git rev-parse --short=7 HEAD
+           $releaseTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+           $isPrerelease = $tagName -match '^v\d+\.\d+\.\d+-(a|b|rc)\d+$'
+           $assetPrefix = "ClipForVRChat-$tagName"
+           "app_version=$tagName.$shortSha" >> $env:GITHUB_OUTPUT
+@@ -197,138 +206,198 @@ jobs:
+         run: |
+           if (!(Test-Path "src/build/bin/ClipForVRChat.exe")) {
+             throw "src/build/bin/ClipForVRChat.exe was not created"
+           }
+           New-Item -ItemType Directory -Force dist | Out-Null
+           Copy-Item "src/build/bin/ClipForVRChat.exe" "dist/$env:ASSET_PREFIX-windows-amd64.exe" -Force
+           New-Item -ItemType Directory -Force "dist/ClipForVRChat" | Out-Null
+           Copy-Item "src/build/bin/ClipForVRChat.exe" "dist/ClipForVRChat/"
+           Copy-Item $env:SPOUT_HELPER_PATH "dist/ClipForVRChat/"
+           Copy-Item $env:SPOUT_DLL_PATH "dist/ClipForVRChat/"
+           Copy-Item "README.md" "dist/ClipForVRChat/"
+           Copy-Item "LICENSE" "dist/ClipForVRChat/"
+           Copy-Item "third_party/Spout2-LICENSE.txt" "dist/ClipForVRChat/"
+           Copy-Item $env:AVATARBEACON_PACKAGE_PATH "dist/ClipForVRChat/"
+           @(
+             "[InternetShortcut]",
+             "URL=https://keys.openpgp.org/search?q=release-signing@hato.life"
+           ) | Set-Content -Encoding ASCII "dist/ClipForVRChat/Release-signing-public-key.url"
+           New-Item -ItemType Directory -Force "dist/ClipForVRChat-user-package" | Out-Null
+           Copy-Item "src/build/bin/ClipForVRChat.exe" "dist/ClipForVRChat-user-package/"
+           Copy-Item "README.md" "dist/ClipForVRChat-user-package/"
+           Copy-Item "LICENSE" "dist/ClipForVRChat-user-package/"
+           Copy-Item $env:AVATARBEACON_PACKAGE_PATH "dist/ClipForVRChat-user-package/"
+           Copy-Item "dist/ClipForVRChat/Release-signing-public-key.url" "dist/ClipForVRChat-user-package/"
+ 
++      - name: Upload unsigned release payload artifact
++        uses: actions/upload-artifact@v6
++        with:
++          name: unsigned-release-payload-${{ steps.version.outputs.asset_prefix }}
++          path: |
++            dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64.exe
++            dist/ClipForVRChat/**
++            dist/ClipForVRChat-user-package/**
++            dist/${{ env.AVATARBEACON_PACKAGE_NAME }}
++
++  sign:
++    name: Sign executable
++    runs-on: ubuntu-latest
++    needs: build
++    permissions:
++      contents: read
++    environment: release-signing
++
++    steps:
++      - name: Download unsigned release payload artifact
++        uses: actions/download-artifact@v7
++        with:
++          name: unsigned-release-payload-${{ needs.build.outputs.asset_prefix }}
++          path: dist
++
+       - name: Sign executable
+         shell: bash
+         env:
+-          ASSET_PREFIX: ${{ steps.version.outputs.asset_prefix }}
++          ASSET_PREFIX: ${{ needs.build.outputs.asset_prefix }}
+           RELEASE_GPG_PRIVATE_KEY: ${{ secrets.CI_RELEASE_GPG_PRIVATE_KEY }}
+           RELEASE_GPG_PASSPHRASE: ${{ secrets.CI_RELEASE_GPG_PASSPHRASE }}
+           RELEASE_GPG_FINGERPRINT: ${{ secrets.CI_RELEASE_GPG_FINGERPRINT }}
+         run: |
++          set -euo pipefail
+           test -n "$RELEASE_GPG_PRIVATE_KEY"
+           test -n "$RELEASE_GPG_PASSPHRASE"
+           test -n "$RELEASE_GPG_FINGERPRINT"
+           export GNUPGHOME="$(mktemp -d)"
+           chmod 700 "$GNUPGHOME"
+-          printf '%s' "$RELEASE_GPG_PRIVATE_KEY" | gpg --batch --import
+-          printf '%s' "$RELEASE_GPG_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
++          /usr/bin/printf '%s' "$RELEASE_GPG_PRIVATE_KEY" | /usr/bin/gpg --batch --import
++          /usr/bin/printf '%s' "$RELEASE_GPG_PASSPHRASE" | /usr/bin/gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+             --local-user "$RELEASE_GPG_FINGERPRINT" \
+             --armor --detach-sign \
+             --output "dist/${ASSET_PREFIX}-windows-amd64.exe.asc" \
+             "dist/${ASSET_PREFIX}-windows-amd64.exe"
+-          gpg --batch --verify \
++          /usr/bin/gpg --batch --verify \
+             "dist/${ASSET_PREFIX}-windows-amd64.exe.asc" \
+             "dist/${ASSET_PREFIX}-windows-amd64.exe"
+ 
++      - name: Upload signature artifact
++        uses: actions/upload-artifact@v6
++        with:
++          name: signed-executable-${{ needs.build.outputs.asset_prefix }}
++          path: dist/${{ needs.build.outputs.asset_prefix }}-windows-amd64.exe.asc
++
++  package:
++    name: Package and validate release assets
++    runs-on: windows-latest
++    needs:
++      - build
++      - sign
++    permissions:
++      contents: read
++
++    steps:
++      - name: Checkout
++        uses: actions/checkout@v7
++        with:
++          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref }}
++          fetch-depth: 0
++
++      - name: Download unsigned release payload artifact
++        uses: actions/download-artifact@v7
++        with:
++          name: unsigned-release-payload-${{ needs.build.outputs.asset_prefix }}
++          path: dist
++
++      - name: Download signature artifact
++        uses: actions/download-artifact@v7
++        with:
++          name: signed-executable-${{ needs.build.outputs.asset_prefix }}
++          path: dist
++
+       - name: Package executable
+         shell: pwsh
+         env:
+-          ASSET_PREFIX: ${{ steps.version.outputs.asset_prefix }}
++          ASSET_PREFIX: ${{ needs.build.outputs.asset_prefix }}
+         run: |
+           Get-FileHash "dist/$env:ASSET_PREFIX-windows-amd64.exe" -Algorithm SHA256 |
+             ForEach-Object { "$($_.Hash.ToLower())  $env:ASSET_PREFIX-windows-amd64.exe" } |
+             Set-Content "dist/$env:ASSET_PREFIX-windows-amd64.exe.sha256"
+           Copy-Item "dist/$env:ASSET_PREFIX-windows-amd64.exe.asc" "dist/ClipForVRChat-user-package/" -Force
+           Compress-Archive -Path "dist/ClipForVRChat-user-package/*" -DestinationPath "dist/$env:ASSET_PREFIX-windows-amd64.zip" -Force
+           Get-FileHash "dist/$env:ASSET_PREFIX-windows-amd64.zip" -Algorithm SHA256 |
+             ForEach-Object { "$($_.Hash.ToLower())  $env:ASSET_PREFIX-windows-amd64.zip" } |
+             Set-Content "dist/$env:ASSET_PREFIX-windows-amd64.zip.sha256"
+           Compress-Archive -Path "dist/ClipForVRChat/*" -DestinationPath "dist/$env:ASSET_PREFIX-windows-amd64-separated.zip" -Force
+           Get-FileHash "dist/$env:ASSET_PREFIX-windows-amd64-separated.zip" -Algorithm SHA256 |
+             ForEach-Object { "$($_.Hash.ToLower())  $env:ASSET_PREFIX-windows-amd64-separated.zip" } |
+             Set-Content "dist/$env:ASSET_PREFIX-windows-amd64-separated.zip.sha256"
+ 
+       - name: Write build metadata
+         shell: pwsh
+         env:
+-          TAG_NAME: ${{ steps.version.outputs.version }}
+-          COMMIT_SHA: ${{ steps.version.outputs.commit_sha }}
+-          APP_FULL_VERSION: ${{ steps.version.outputs.app_version }}
+-          APP_VERSION: ${{ steps.version.outputs.version }}
+-          APP_REVISION: ${{ steps.version.outputs.revision }}
+-          APP_RELEASE_TIME: ${{ steps.version.outputs.release_time }}
+-          ASSET_PREFIX: ${{ steps.version.outputs.asset_prefix }}
+-          SPOUT_HELPER_SHA256: ${{ steps.spout.outputs.helper_sha256 }}
+-          SPOUT_DLL_SHA256: ${{ steps.spout.outputs.dll_sha256 }}
+-          AVATARBEACON_PACKAGE_URL: ${{ steps.avatarbeacon.outputs.package_url }}
+-          AVATARBEACON_PACKAGE_NAME: ${{ steps.avatarbeacon.outputs.package_name }}
+-          AVATARBEACON_PACKAGE_SHA256: ${{ steps.avatarbeacon.outputs.package_sha256 }}
++          TAG_NAME: ${{ needs.build.outputs.tag_name }}
++          COMMIT_SHA: ${{ needs.build.outputs.commit_sha }}
++          APP_FULL_VERSION: ${{ needs.build.outputs.app_version }}
++          APP_VERSION: ${{ needs.build.outputs.tag_name }}
++          APP_REVISION: ${{ needs.build.outputs.revision }}
++          APP_RELEASE_TIME: ${{ needs.build.outputs.release_time }}
++          ASSET_PREFIX: ${{ needs.build.outputs.asset_prefix }}
++          SPOUT_HELPER_SHA256: ${{ needs.build.outputs.spout_helper_sha256 }}
++          SPOUT_DLL_SHA256: ${{ needs.build.outputs.spout_dll_sha256 }}
++          AVATARBEACON_PACKAGE_URL: ${{ needs.build.outputs.avatarbeacon_package_url }}
++          AVATARBEACON_PACKAGE_NAME: ${{ needs.build.outputs.avatarbeacon_package_name }}
++          AVATARBEACON_PACKAGE_SHA256: ${{ needs.build.outputs.avatarbeacon_package_sha256 }}
+         run: |
+           $metadata = [ordered]@{
+             tag = $env:TAG_NAME
+             commit = $env:COMMIT_SHA
+             appVersion = $env:APP_FULL_VERSION
+             version = $env:APP_VERSION
+             revision = $env:APP_REVISION
+             releaseTime = $env:APP_RELEASE_TIME
+             goVersion = "${{ env.GO_VERSION }}"
+             nodeVersion = "${{ env.NODE_VERSION }}"
+             wailsVersion = "${{ env.WAILS_VERSION }}"
+             spout = [ordered]@{
+               helper = "spout-capture.exe"
+               helperSha256 = $env:SPOUT_HELPER_SHA256
+               library = "SpoutLibrary.dll"
+               librarySha256 = $env:SPOUT_DLL_SHA256
+               source = "embedded in main exe and included in separated zip"
+             }
+             avatarBeacon = [ordered]@{
+               package = $env:AVATARBEACON_PACKAGE_NAME
+               packageSha256 = $env:AVATARBEACON_PACKAGE_SHA256
+               source = $env:AVATARBEACON_PACKAGE_URL
+               distribution = "included in normal and separated zip"
+             }
+           }
+           $metadata | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 "dist/$env:ASSET_PREFIX-build-metadata.json"
+ 
+       - name: Validate release assets
+         shell: pwsh
+         env:
+-          ASSET_PREFIX: ${{ steps.version.outputs.asset_prefix }}
+-          TAG_NAME: ${{ steps.version.outputs.version }}
++          ASSET_PREFIX: ${{ needs.build.outputs.asset_prefix }}
++          TAG_NAME: ${{ needs.build.outputs.tag_name }}
+           AVATARBEACON_PACKAGE_NAME: ${{ env.AVATARBEACON_PACKAGE_NAME }}
+         run: |
+           $expectedUserZipSignature = "$env:ASSET_PREFIX-windows-amd64.exe.asc"
+           $expectedAvatarBeaconPackage = $env:AVATARBEACON_PACKAGE_NAME
+           $unexpected = Get-ChildItem dist -Recurse -File | Where-Object {
+             $_.Name -like "*release-signing-public-key.asc" -or
+             $_.Name -like "AvatarBeacon-*-source.zip" -or
+             $_.Name -like "AvatarBeacon-*-source.zip.sha256" -or
+             ($_.FullName -like "*\dist\ClipForVRChat\*" -and $_.Extension -eq ".asc") -or
+             ($_.FullName -like "*\dist\ClipForVRChat-user-package\*" -and $_.Extension -eq ".asc" -and $_.Name -ne $expectedUserZipSignature)
+           }
+           if ($unexpected) {
+             $unexpected | ForEach-Object { Write-Error "Unexpected file in release output: $($_.FullName)" }
+             throw "Unexpected release output files were found"
+           }
+           $zipCheckDir = Join-Path $env:RUNNER_TEMP "release-zip-check"
+           Remove-Item -Recurse -Force $zipCheckDir -ErrorAction SilentlyContinue
+           $userZipCheckDir = Join-Path $env:RUNNER_TEMP "release-user-zip-check"
+           Remove-Item -Recurse -Force $userZipCheckDir -ErrorAction SilentlyContinue
+           Expand-Archive "dist/$env:ASSET_PREFIX-windows-amd64.zip" -DestinationPath $userZipCheckDir
+           Expand-Archive "dist/$env:ASSET_PREFIX-windows-amd64-separated.zip" -DestinationPath $zipCheckDir
+           $unexpectedUserZipFiles = Get-ChildItem $userZipCheckDir -Recurse -File | Where-Object {
+             $_.Name -like "*release-signing-public-key.asc" -or
+             ($_.Extension -eq ".asc" -and $_.Name -ne $expectedUserZipSignature) -or
+             ($_.Extension -eq ".unitypackage" -and $_.Name -ne $expectedAvatarBeaconPackage) -or
+@@ -427,75 +496,77 @@ jobs:
+           }
+           if ($extraUserZip) {
+             $extraUserZip | ForEach-Object { Write-Error "Unexpected normal release zip file: $($_.FullName)" }
+             throw "Unexpected files were found in normal release zip"
+           }
+           $allowedSeparatedZip = @(
+             "ClipForVRChat.exe",
+             "README.md",
+             "LICENSE",
+             "Release-signing-public-key.url",
+             "spout-capture.exe",
+             "SpoutLibrary.dll",
+             "Spout2-LICENSE.txt",
+             "$expectedAvatarBeaconPackage"
+           )
+           $actualSeparatedZipFiles = Get-ChildItem $zipCheckDir -Recurse -File
+           $extraSeparatedZip = $actualSeparatedZipFiles | Where-Object {
+             $_.DirectoryName -ne $zipCheckDir -or $_.Name -notin $allowedSeparatedZip
+           }
+           if ($extraSeparatedZip) {
+             $extraSeparatedZip | ForEach-Object { Write-Error "Unexpected separated release zip file: $($_.FullName)" }
+             throw "Unexpected files were found in separated release zip"
+           }
+ 
+       - name: Prepare release notes
+-        if: steps.version.outputs.draft == 'false'
++        if: needs.build.outputs.draft == 'false'
+         env:
+-          TAG_NAME: ${{ steps.version.outputs.version }}
++          TAG_NAME: ${{ needs.build.outputs.tag_name }}
+         run: node scripts/extract-release-notes.mjs "$env:TAG_NAME" RELEASE_NOTES.md dist/release-body.md --fallback-rc-notes
+ 
+       - name: Prepare draft release notes
+-        if: steps.version.outputs.draft == 'true'
++        if: needs.build.outputs.draft == 'true'
+         env:
+-          TAG_NAME: ${{ steps.version.outputs.version }}
++          TAG_NAME: ${{ needs.build.outputs.tag_name }}
+         run: node scripts/extract-release-notes.mjs "$env:TAG_NAME" RELEASE_NOTES.md dist/release-body.md --fallback-draft-notes
+ 
+       - name: Upload release assets artifact
+         uses: actions/upload-artifact@v6
+         with:
+-          name: release-assets-${{ steps.version.outputs.asset_prefix }}
++          name: release-assets-${{ needs.build.outputs.asset_prefix }}
+           path: |
+-            dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64.exe.asc
+-            dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64.zip
+-            dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64-separated.zip
++            dist/${{ needs.build.outputs.asset_prefix }}-windows-amd64.exe.asc
++            dist/${{ needs.build.outputs.asset_prefix }}-windows-amd64.zip
++            dist/${{ needs.build.outputs.asset_prefix }}-windows-amd64-separated.zip
+             dist/release-body.md
+ 
+   release:
+     name: Create GitHub release
+     runs-on: ubuntu-latest
+-    needs: build
++    needs:
++      - build
++      - package
+     permissions:
+       contents: write
+ 
+     steps:
+       - name: Download release assets artifact
+         uses: actions/download-artifact@v7
+         with:
+           name: release-assets-${{ needs.build.outputs.asset_prefix }}
+           path: dist
+ 
+       - name: Create release
+         env:
+           GH_TOKEN: ${{ github.token }}
+           GH_REPO: ${{ github.repository }}
+           TAG_NAME: ${{ needs.build.outputs.tag_name }}
+           DRAFT: ${{ needs.build.outputs.draft }}
+           PRERELEASE: ${{ needs.build.outputs.prerelease }}
+         run: |
+           set -euo pipefail
+           args=(
+             --title "$TAG_NAME"
+             --notes-file dist/release-body.md
+           )
+           if [[ "$DRAFT" == "true" ]]; then
+             args+=(--draft)
+
+
+diff --git a/issues/closed/README.md b/issues/closed/README.md
+index 9ca56585c694a879e6cefdec028e06ec5ba4de01..df45d81152a75caebcfa1a02551d39084a8f77bb 100644
+--- a/issues/closed/README.md
++++ b/issues/closed/README.md
+@@ -228,25 +228,26 @@
+ | 260 | [OSSライセンス表記を監査し本文を表示する](unreleased/260-audit-oss-license-notices-and-show-full-text.md) | 完了 | 未定 | OSS表示を実依存に合わせて監査し、不足・誤表記・テスト専用項目を整理して全項目のライセンス本文を表示できるようにした。 |
+ | 261 | [AvatarBeaconライセンスをOSS画面の最下部に分けて表示する](unreleased/261-show-avatarbeacon-license-separately.md) | 完了 | 未定 | AvatarBeacon関連ライセンスを通常OSS一覧とは別セクションとしてOSSライセンス画面の最下部に表示するようにした。 |
+ | 262 | [処理タブを機能と自動撮影の間に移動する](unreleased/262-move-process-settings-tab-before-autocapture.md) | 完了 | 未定 | 設定画面のタブ順を、機能、処理、自動撮影、OSC、Discord投稿、その他に変更した。 |
+ | 263 | [Discord投稿タブを処理と自動撮影の間に移動する](unreleased/263-move-discord-settings-tab-between-process-and-autocapture.md) | 完了 | 未定 | 設定画面のタブ順を、機能、処理、Discord投稿、自動撮影、OSC、その他に変更した。 |
+ | 264 | [v0.1.8-b11 betaを作成する](maintenance-only/264-create-v018-b11-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b11` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |
+ | 265 | [AvatarBeaconを専用リポジトリへ配置する](avatarbeacon-v0.0.1/265-extract-avatarbeacon-to-dedicated-repository.md) | 完了 | `AvatarBeacon v0.0.1` | 既存AvatarBeacon元ファイルを専用リポジトリへ初期配置し、CI設定、push、最新main CI確認を行った。 |
+ | 266 | [AvatarBeacon READMEを作り直し、ClipForVRChat側をsubmodule化する](unreleased/266-rewrite-avatarbeacon-readme-and-use-submodule.md) | 完了 | 未定 | AvatarBeacon READMEを利用者向けに全面改稿し、ClipForVRChat側のAvatarBeaconをsubmodule参照へ置き換えた。 |
+ | 267 | [AvatarBeacon READMEを汎用OSCギミックとして修正する](unreleased/267-rewrite-avatarbeacon-readme-as-generic-osc-gimmick.md) | 完了 | 未定 | READMEからClipForVRChat固有説明を外し、汎用OSCギミックとしての説明、ライセンス表記、句点改行を整理した。 |
+ | 267 | [exeへD&Dされた画像以外のパスをGPG暗号化する](unreleased/267-encrypt-non-image-exe-drop-paths.md) | 完了 | 未定 | exeへ渡されたパスを画像なら入力画像、画像以外のファイルやフォルダならGPG暗号化対象として扱うようにした。 |
+ | 268 | [自動撮影用Webhook URLが想定外にグレーアウトする](unreleased/268-fix-auto-capture-webhook-url-unexpected-disabled.md) | 完了 | 未定 | 自動撮影用Webhook URL欄を自動撮影Discord投稿OFF時でも編集できるようにした。 |
+ | 269 | [AvatarBeaconの位置取得をHips基準からHead基準へ変更する](unreleased/269-use-head-position-for-avatarbeacon.md) | 完了 | 未定 | AvatarBeaconの位置用 `point` をHeadへ追従させ、説明文をHead基準position/yawに統一した。 |
+ | 270 | [AvatarBeacon READMEのYL-ATG関係と謝辞を修正する](unreleased/270-refine-avatarbeacon-readme-yl-atg-and-license.md) | 完了 | 未定 | YL-ATGとの関係を指定文へ修正し、謝辞追加、配布物・詳細仕様セクション削除を行った。 |
+ | 271 | [AvatarBeaconからHeadForwardAnchorを削除する](unreleased/271-remove-avatarbeacon-head-forward-anchor.md) | 完了 | 未定 | 位置と向きの追跡対象をHead基準の `point` へ統合し、不要になった `HeadForwardAnchor` を削除した。 |
+ | 272 | [AvatarBeacon mainと_12のfloat精度を調査する](investigation-only/272-investigate-avatarbeacon-main-12-float-precision.md) | 完了 | 調査のみ | mainと_12のfloat表現、復元範囲、理論分解能、実機未確認要因を整理した。 |
+ | 273 | [v0.1.8-b12 betaを作成する](maintenance-only/273-create-v018-b12-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b12` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |
+ | 274 | [外部AvatarBeacon unitypackageを配布zipへ同梱する](unreleased/274-package-external-avatarbeacon-unitypackage.md) | 完了 | 未定 | AvatarBeacon source zipの公開添付をやめ、外部Releaseのunitypackageを通常zipと分離zipへ同梱するようにした。 |
+ | 275 | [v0.1.8-b13 betaを作成する](maintenance-only/275-create-v018-b13-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b13` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |
+ | 276 | [b13でStream自動撮影後にカメラ終了・サムネイル未表示・Discord未投稿になる](unreleased/276-investigate-b13-stream-camera-close-thumbnail-discord.md) | 完了 | 未定 | 指定フォルダのログと設定から原因を切り分け、復元/Spout復旧の終了方向OSC送信、サムネイル生成、自動撮影Discord投稿条件を修正した。 |
+ | 277 | [自動撮影の通常モードに待機カメラ位置を追加する](unreleased/277-add-autocapture-idle-camera-position.md) | 完了 | 未定 | 通常モードで撮影後に送る待機カメラ位置を追加し、既定OFFかつ初期Poseをプレイヤー基準の足元方向にした。 |
+ | 278 | [v0.1.8-b14 betaを作成する](maintenance-only/278-create-v018-b14-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b14` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |
+ | 279 | [b14で1枚目成功後に2枚目以降のSpout取得が失敗する](v0.1.8-b15/279-fix-b14-spout-sender-missing-after-first-shot.md) | 完了 | `v0.1.8-b15` | 1枚目成功後にSpout senderが空になる場合、ON再送で戻らなければOFF/ONトグルして連続撮影を成功させる。 |
+ | 280 | [待機カメラ位置の詳細設定ボタンを押せるようにする](v0.1.8-b16/280-fix-idle-camera-detail-button-disabled.md) | 完了 | `v0.1.8-b16` | 待機カメラ位置の詳細設定を開けるようにし、構図ごとの明るさと表示対象マスクも設定できるようにした。 |
+ | 281 | [v0.1.8-b16 betaを作成する](maintenance-only/281-create-v018-b16-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b16` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |
+ | 282 | [v0.1.8-b16確認後にmasterをdevelopで上書きする](maintenance-only/282-overwrite-master-with-develop-after-b16.md) | 完了 | 整理のみ | `master` を `develop` と同じ履歴へ上書きしてpushし、不要な作業ブランチを削除した。 |
+ | 283 | [カメラ移動時の飛行モードON時間を短くする](v0.1.8-rc1/283-shorten-usercamera-flying-during-pose-move.md) | 完了 | `v0.1.8-rc1` | カメラPose送信直前だけ飛行モードをONにし、移動後すぐOFFへ戻してRC1を作成した。 |
++| 284 | [Release署名秘密鍵をbuild jobから分離する](unreleased/284-isolate-release-signing-secrets.md) | 完了 | 未定 | Release workflowの署名処理をbuild/test jobから分離し、未署名artifactを最小限の署名jobで署名してからpackagingへ渡すようにした。 |
+
+
+diff --git a/issues/closed/unreleased/284-isolate-release-signing-secrets.md b/issues/closed/unreleased/284-isolate-release-signing-secrets.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..5824753811c5a4a798f8fcb38b4b7d5dadeb2a7a
+--- /dev/null
++++ b/issues/closed/unreleased/284-isolate-release-signing-secrets.md
+@@ -0,0 +1,37 @@
++# Release署名秘密鍵をbuild jobから分離する
++
++## 指示
++
++> Aardvark detected a vulnerability in the repository https://github.com/hatolife/ClipForVRChat.
++>
++>             Follow these steps:
++>             1. Check whether the issue is still present in the HEAD of the current branch. Try
++>             to match the relevant lines in case the files get moved or renamed.
++>             2. If the issue doesn't exist anymore in HEAD, then **DO NOT**
++>             attempt to propose a code fix, **DO NOT** try to reintroduce the code functionality,
++>             **DO NOT** produce any code, **ONLY** explain your reasoning.
++>             3. If the issue still exists in HEAD, then propose a fix.
++>             4. Please produce a minimal code fix that remediates the issue while preserving existing
++>             functionality and tests.
++
++## 文脈
++
++Aardvarkは、Release workflowで依存関係インストール、テスト、Wails buildなどを実行した後、同じjob内で `CI_RELEASE_GPG_PRIVATE_KEY` と `CI_RELEASE_GPG_PASSPHRASE` をGPG署名stepへ渡している点を指摘している。
++
++## 解釈
++
++HEADでも同一job内でbuild系コマンド実行後にRelease署名秘密鍵を扱っている場合、先行stepが永続化したPATHやshell hookにより署名秘密鍵を読み取られる可能性が残るため、署名処理をbuild jobから分離する。
++
++## 問題
++
++Release署名秘密鍵が、依存関係やbuild toolのコード実行後と同じrunner状態で扱われる。
++
++## 期待する挙動
++
++署名秘密鍵は、build/test/package準備を行ったjobとは別の最小限のjobでのみ扱われる。
++
++## 受け入れ条件
++
++- Release workflowで、署名秘密鍵を使うstepがbuild/test/Wails buildを実行したjobから分離されている。
++- 署名jobは未署名exe artifactを受け取り、署名artifactだけを後続packagingへ渡す。
++- 既存のRelease公開Asset構成を維持する。
+
+# Attack-path analysis
+Final: high | Decider: model_decided | Matrix severity: medium | Policy adjusted: medium
+## Rationale
+High is appropriate on probability × impact. The impacted component is the official release pipeline, which is explicitly in scope for release integrity. Repository evidence shows prior npm/Go/Wails execution in .github/workflows/release.yml lines 34-67, followed by same-job exposure of CI_RELEASE_GPG_PRIVATE_KEY and CI_RELEASE_GPG_PASSPHRASE and unqualified gpg use at lines 85-107, then publication of signature artifacts at lines 109-116. The impact is severe because the release signing identity can be stolen. It is not raised to critical because exploitation requires a supply-chain or build-code compromise during a release workflow and does not provide direct public, unauthenticated control of GitHub releases or automatic compromise of all users.
+## Likelihood
+medium - The path is credible because the workflow runs dependency and build code before signing in the same job, but it is not internet-exposed or trivially reachable; an attacker needs a compromised dependency/build tool, malicious committed build code that reaches a release run, or a similar CI supply-chain foothold.
+## Impact
+high - Successful exploitation can disclose the official release signing private key and passphrase. That does not by itself grant GitHub repository control, but it can defeat the release-signature authenticity mechanism and support distribution of malicious executables that appear signed by the project.
+## Assumptions
+- The GitHub Actions secrets CI_RELEASE_GPG_PRIVATE_KEY, CI_RELEASE_GPG_PASSPHRASE, and CI_RELEASE_GPG_FINGERPRINT are configured for the release workflow and represent the official release signing identity.
+- The release workflow is used to publish official ClipForVRChat release assets.
+- Earlier commands in the same GitHub Actions job can persist runner state for later steps using normal runner mechanisms such as PATH/environment changes or files in the workspace.
+- A tagged release push or manual workflow_dispatch runs the release workflow.
+- A malicious or compromised dependency, repository build script, or build tool executes before the signing step.
+- That earlier code persists a hook or PATH/environment manipulation that affects the later bash signing step.
+- Release signing secrets are present in the repository or environment settings.
+## Path
+release tag/dispatch
+  -> npm/go/wails build steps
+  -> persisted PATH/env/shell hook in same runner
+  -> Sign executable step receives CI_RELEASE_GPG_* secrets
+  -> fake/hooked gpg captures key and passphrase
+  -> release signature trust can be abused
+## Path evidence
+- `.github/workflows/release.yml:9-10` - The release job has contents: write, enabling release asset publication through the workflow identity.
+- `.github/workflows/release.yml:34-67` - The same job executes npm, Go, Wails, and build commands before the signing secrets are introduced.
+- `.github/workflows/release.yml:85-107` - The signing step exposes the GPG private key/passphrase/fingerprint as environment variables and invokes unqualified gpg while piping the key and passphrase to stdin.
+- `.github/workflows/release.yml:109-116` - The workflow publishes the generated executable signature and exported public key as release assets.
+- `README.md:29-31` - User-facing release instructions describe the .asc signature and release signing public key as the PGP verification mechanism.
+## Narrative
+The finding is real and in scope. The release workflow runs multiple dependency/build-controlled commands before signing, then in the same job exposes release GPG private key and passphrase as environment variables and pipes them into unqualified gpg. Because GitHub Actions steps in a job share a runner/workspace and can persist PATH or environment state for later steps, malicious dependency or build-tool code executed earlier can intercept the signing step. The resulting impact is high: disclosure of the release signing key undermines the new authenticity mechanism and can allow future malicious executables to appear officially signed. Likelihood is medium rather than high because exploitation requires compromise of code executed during a release run or equivalent supply-chain control, not a public network endpoint.
+## Controls
+- Release workflow is triggered only by v* tags or workflow_dispatch, not by ordinary pull_request events.
+- Secrets are scoped to the Sign executable step environment rather than all prior steps, but same-job runner persistence still creates a trust-boundary issue.
+- The workflow creates a separate GNUPGHOME under RUNNER_TEMP with mode 700, which protects local GPG files but does not protect secrets from earlier same-job hooks.
+- npm audit and govulncheck are run before release, but they do not prevent compromised lifecycle/build code or persisted runner state.
+- No workflow environment protection, separate signing job, artifact handoff boundary, or non-exportable signing mechanism is visible in the repository workflow.
+## Blindspots
+- Static repository review cannot confirm actual GitHub secret values, environment protection rules, tag protection, branch protection, or who can dispatch releases.
+- Static review cannot prove whether the GPG key is reused outside this repository or how users validate the signing key out of band.
+- No cloud or GitHub APIs were called, so organization-level Actions restrictions and secret-scoping controls outside the checkout were not inspected.
+- The repository shows the vulnerable trust boundary, but actual exploitation would depend on a malicious dependency/build tool or other code execution during a release run.

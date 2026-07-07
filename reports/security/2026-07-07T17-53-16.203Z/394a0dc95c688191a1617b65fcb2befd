@@ -1,0 +1,222 @@
+Hidden camera auto-start settings remain active
+Link: https://chatgpt.com/codex/cloud/security/findings/394a0dc95c688191a1617b65fcb2befd?sev=critical%2Chigh%2Cmedium%2Clow%2Cinformational
+Criticality: medium (attack path: medium)
+Status: new
+
+# Metadata
+Repo: hatolife/ClipForVRChat
+Commit: 215f5de
+Author: poppo@hato.life
+Created: 2026/7/8 2:27:49
+Assignee: Unassigned
+Signals: Security, Validated, Attack-path
+
+# Summary
+Introduced UI/consent regression: the commit removed visible controls for security/privacy-sensitive auto camera behavior without clearing or ignoring persisted values.
+The frontend now hides the `openCameraBeforeBatch` and `closeCameraAfterBatch` controls from the auto-capture UI, but it only defaults them to false when they are undefined. If a user already had these fields set to true, or opens an attacker-supplied JSON config containing true values, the settings remain active with no normal UI control to review or disable them. The backend still uses these values to send OSC commands that open the VRChat camera, enable stream camera mode/streaming, and close the camera after capture. Combined with scheduled auto-capture and Discord auto-post settings, this can cause unexpected capture/posting behavior after a user saves an imported or stale config.
+
+# Validation
+## Rubric
+- [x] Confirm the commit/current frontend removed visible controls or v-model bindings for `openCameraBeforeBatch` and `closeCameraAfterBatch`.
+- [x] Confirm frontend defaulting only applies when the fields are undefined, preserving existing true values.
+- [x] Confirm imported/stale JSON config can enter the settings flow and be saved without clearing these hidden fields.
+- [x] Confirm backend config normalization/defaults do not forcibly clear persisted true values.
+- [x] Dynamically confirm backend auto-capture still honors true values by sending OSC camera open/stream/close commands.
+## Report
+Validated the suspected UI/consent regression. Targeted frontend check showed there are no remaining normal UI bindings for the two sensitive flags: `autoCaptureSettings.capture.openCameraBeforeBatch: 0`, `autoCaptureSettings.capture.closeCameraAfterBatch: 0`, and the old Japanese labels are absent. The only frontend references are `src/frontend/src/main.js:206-207`, which set defaults to false only when the fields are undefined, so existing/imported true values are preserved. The JSON import path is reachable via drag/drop: `src/frontend/src/main.js:737-742` calls `api.OpenSettings(jsonPaths[0])`, and saving uses the unmodified `state.config` via `api.SaveConfig` at `src/frontend/src/main.js:1634-1657`. Backend config normalization defines the fields at `src/internal/appcore/config.go:140-141` and defaults them false at `src/internal/appcore/config.go:371-372`, but `Normalize()` does not force persisted true values back to false. Backend execution still honors the flags: `src/internal/appcore/autocapture.go:269-299` sends `/usercamera/Mode`, `/usercamera/SmoothMovement`, and `/usercamera/Streaming=true` when `OpenCameraBeforeBatch` is true; `src/internal/appcore/autocapture.go:339-348` sends `/usercamera/Streaming=false` and `/usercamera/Close` when `CloseCameraAfterBatch` is true; `src/internal/appcore/autocapture.go:897-912` refreshes stream camera per shot when the open flag is true. I added a temporary targeted Go PoC test that wrote an attacker/stale JSON config with both flags true, loaded it with `LoadConfig`, ran one auto-capture against a local UDP OSC listener, and asserted the side effects. The test passed and logged OSC packets including `/usercamera/Mode` int 2, `/usercamera/Streaming` true, `/usercamera/Streaming` false, and `/usercamera/Close` true. Crash validation was not applicable because this is a logic/privacy regression; a debug test binary was built and run successfully. Valgrind and gdb were attempted but are not installed in the container.
+
+# Evidence
+src/frontend/src/main.js (L205 to 207)
+  Note: The frontend preserves existing true values for openCameraBeforeBatch and closeCameraAfterBatch, only defaulting them to false when undefined.
+```
+      autoCapture.capture ||= {}
+      if (autoCapture.capture.openCameraBeforeBatch === undefined) autoCapture.capture.openCameraBeforeBatch = false
+      if (autoCapture.capture.closeCameraAfterBatch === undefined) autoCapture.capture.closeCameraAfterBatch = false
+```
+
+src/frontend/src/main.js (L2106 to 2180)
+  Note: The new capture detail UI exposes stream/helper/output settings but no longer provides controls for the auto-open/auto-close camera flags.
+```
+              <template v-else-if="autoCaptureDetailView === 'capture'">
+                <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
+                  <div><strong>Spout helper</strong><p>Stream Camera(Spout)映像を受信する同梱ヘルパーです。通常は初期値のまま使います。</p></div>
+                  <div class="settings-control-stack">
+                    <input v-model="autoCaptureSettings.stream.spoutHelperPath" :disabled="autoCaptureSettings.capture.mode !== 'stream' || spoutChecking || spoutSendersLoading" placeholder="spout-capture.exe" />
+                    <div class="inline-actions">
+                      <button type="button" class="secondary" @click="checkSpoutHelper" :disabled="autoCaptureSettings.capture.mode !== 'stream' || spoutChecking || spoutSendersLoading" :title="autoCaptureSettings.capture.mode !== 'stream' ? 'Stream方式で使います' : spoutChecking ? '確認中です' : spoutSendersLoading ? 'sender一覧を取得中です' : 'Stream方式のSpout helperを確認する'">{{ spoutChecking ? '確認中' : 'helper確認' }}</button>
+                      <button type="button" class="secondary" @click="refreshSpoutSenders" :disabled="autoCaptureSettings.capture.mode !== 'stream' || spoutChecking || spoutSendersLoading" :title="autoCaptureSettings.capture.mode !== 'stream' ? 'Stream方式で使います' : spoutChecking ? '確認中です' : spoutSendersLoading ? '取得中です' : 'Spout sender一覧を更新する'">{{ spoutSendersLoading ? '取得中' : 'sender一覧更新' }}</button>
+                    </div>
+                    <p v-if="spoutStatus" :class="['setting-note', spoutStatus.available ? 'ok' : 'warning']">
+                      {{ spoutStatus.message }}
+                      <span v-if="spoutStatus.path"> / {{ spoutStatus.path }}</span>
+                    </p>
+                  </div>
+                </div>
+                <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
+                  <div><strong>Spout sender自動選択</strong><p>sender未指定時に単一senderまたはVRChatらしいsenderを自動選択します。複数候補で判断不能な場合は一覧から選択してください。</p></div>
+                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.stream.spoutAutoSelect" :disabled="autoCaptureSettings.capture.mode !== 'stream'" /><span></span></label>
+                </div>
+                <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' || autoCaptureSettings.stream.spoutAutoSelect }">
+                  <div><strong>Spout sender名</strong><p>自動選択をOFFにした場合に使うsender名です。VRChatでStream Cameraを起動してから一覧更新してください。</p></div>
+                  <div class="settings-control-stack">
+                    <input v-model="autoCaptureSettings.stream.spoutSenderName" :disabled="autoCaptureSettings.capture.mode !== 'stream' || autoCaptureSettings.stream.spoutAutoSelect" list="spout-senders" placeholder="VRChat Stream Camera" />
+                    <datalist id="spout-senders">
+                      <option v-for="sender in spoutStatus?.senders || []" :key="sender.name" :value="sender.name">{{ sender.name }}</option>
+                    </datalist>
+                    <p v-if="spoutStatus?.senders?.length" class="setting-note">
+                      検出: <span v-for="sender in spoutStatus.senders" :key="sender.name">{{ sender.name }} {{ sender.width && sender.height ? '(' + sender.width + 'x' + sender.height + ')' : '' }} </span>
+                    </p>
+                  </div>
+                </div>
+                <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
+                  <div><strong>Stream取得タイムアウト</strong><p>Spout helperが1枚のStream Cameraフレームを保存するまで待つ最大ミリ秒です。</p></div>
+                  <label>
+                    <input type="number" min="1000" max="60000" step="500" v-model.number="autoCaptureSettings.stream.captureTimeoutMs" :disabled="autoCaptureSettings.capture.mode !== 'stream'" />
+                  </label>
+                </div>
+                <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
+                  <div><strong>Stream起動後待機</strong><p>VRChat Stream CameraをONにしてからSpoutフレーム取得を始めるまで待つミリ秒です。</p></div>
+                  <label>
+                    <input type="number" min="0" max="10000" step="100" v-model.number="autoCaptureSettings.stream.startDelayMs" :disabled="autoCaptureSettings.capture.mode !== 'stream'" />
+                  </label>
+                </div>
+                <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
+                  <div><strong>Spout録画デバッグ</strong><p>テスト撮影時だけ、Spout helperが受信したPNG化前のRGBA生フレームとmetadata/logを保存します。</p></div>
+                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.stream.debugRecordingEnabled" :disabled="autoCaptureSettings.capture.mode !== 'stream'" /><span></span></label>
+                </div>
+                <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' || !autoCaptureSettings.stream.debugRecordingEnabled }">
+                  <div><strong>Spout録画デバッグ フレーム数</strong><p>テスト撮影1回で保存する最大フレーム数です。保存先は自動撮影保存先の spout-debug フォルダです。</p></div>
+                  <label>
+                    <input type="number" min="1" max="120" step="1" v-model.number="autoCaptureSettings.stream.debugFrameCount" :disabled="autoCaptureSettings.capture.mode !== 'stream' || !autoCaptureSettings.stream.debugRecordingEnabled" />
+                  </label>
+                </div>
+                <div class="setting-row">
+                  <div><strong>自動撮影保存先</strong><p>Stream方式で保存した画像と関連ファイルの保存先です。Photo方式ではVRChat写真フォルダに保存された画像を使います。</p></div>
+                  <label>
+                    <input v-model="autoCaptureSettings.output.directory" placeholder="%USERPROFILE%/Pictures/VRChat/VRC-AutoCapture" />
+                  </label>
+                </div>
+                <div class="setting-row">
+                  <div><strong>Stream保存形式</strong><p>Stream方式で保存する画像形式です。Spout helperはPNGで取得し、必要に応じて後続処理で扱います。</p></div>
+                  <label>
+                    <select v-model="autoCaptureSettings.output.imageFormat">
+                      <option value="png">PNG</option>
+                      <option value="jpg">JPG</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="setting-row">
+                  <div><strong>ファイル名テンプレート</strong><p>{timestamp_local}、{batch_id}、{shot_index}、{view_name}、{mode}、{ext} を使用できます。</p></div>
+                  <label>
+                    <input v-model="autoCaptureSettings.output.filenameTemplate" placeholder="{timestamp_local}_{batch_id}_{shot_index}_{view_name}_{mode}.{ext}" />
+                  </label>
+                </div>
+              </template>
+```
+
+src/frontend/src/main.js (L2339 to 2355)
+  Note: The normal auto-capture overview now only links to grouped detail pages and does not show the active auto-open/auto-close camera state.
+```
+            <div class="setting-row">
+              <div>
+                <strong>撮影・出力</strong>
+                <p>Spout helper、sender、Stream取得、録画デバッグ、保存先、ファイル名を設定します。</p>
+              </div>
+              <div class="settings-overview-controls">
+                <button type="button" class="secondary" title="撮影と出力の詳細設定を開きます。" aria-label="撮影と出力の詳細設定" @click="openAutoCaptureDetail('capture')">詳細設定</button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div>
+                <strong>保存・投稿・復元</strong>
+                <p>sidecar、画像メタデータ、同席ユーザー情報、Discord投稿、撮影後復元を設定します。</p>
+              </div>
+              <div class="settings-overview-controls">
+                <button type="button" class="secondary" title="保存、投稿、復元の詳細設定を開きます。" aria-label="保存、投稿、復元の詳細設定" @click="openAutoCaptureDetail('metadata')">詳細設定</button>
+              </div>
+```
+
+src/internal/appcore/autocapture.go (L269 to 280)
+  Note: The backend still honors OpenCameraBeforeBatch by sending OSC commands to switch the VRChat user camera mode.
+```
+	if ac.Capture.OpenCameraBeforeBatch {
+		cameraMode := 1
+		if ac.Capture.Mode == "stream" {
+			cameraMode = 2
+		}
+		diagAutoCapture(logPath, "osc send begin: address=%q value=%d capture_mode=%q", "/usercamera/Mode", cameraMode, ac.Capture.Mode)
+		if err := client.sendInt("/usercamera/Mode", int32(cameraMode)); err != nil {
+			diagAutoCapture(logPath, "osc send error: address=%q err=%v", "/usercamera/Mode", err)
+			return nil, err
+		}
+		diagAutoCapture(logPath, "osc send success: address=%q value=%d capture_mode=%q", "/usercamera/Mode", cameraMode, ac.Capture.Mode)
+		modeWait := 2500 * time.Millisecond
+```
+
+src/internal/appcore/autocapture.go (L339 to 348)
+  Note: The backend still honors CloseCameraAfterBatch by stopping stream camera mode and sending the camera close command.
+```
+	if ac.Capture.CloseCameraAfterBatch && (successCount > 0 || ac.Capture.Mode == "stream") {
+		if ac.Capture.Mode == "stream" {
+			diagAutoCapture(logPath, "osc button release begin: address=%q detail=%q", "/usercamera/Streaming", "stream_stop")
+			if err := sendCameraBoolCompat(client, logPath, "/usercamera/Streaming", false, "stream_stop"); err != nil {
+				diagAutoCapture(logPath, "stream stop failed: err=%v", err)
+			} else {
+				diagAutoCapture(logPath, "osc button release success: address=%q detail=%q", "/usercamera/Streaming", "stream_stop")
+			}
+		}
+		if err := sendCameraButton(ctx, client, "/usercamera/Close", ac.Capture.ButtonReleaseDelayMS, logPath, "batch_close"); err != nil {
+```
+
+# Attack-path analysis
+Final: medium | Decider: model_decided | Matrix severity: low | Policy adjusted: low
+## Rationale
+Kept at medium. The finding is real and in scope: main frontend code preserves hidden true camera automation flags, the settings import/save path is reachable, backend normalization does not clear the values, and auto-capture sends concrete VRChat OSC camera/streaming/close commands. The validation PoC strengthens confidence by observing OSC side effects. However, the attack is local/social-engineering driven, requires victim config import or stale state plus auto-capture execution, and the impact is privacy/consent loss and possible Discord posting rather than RCE, credential compromise, auth bypass, or broad cross-user compromise. These factors support medium rather than high/critical.
+## Likelihood
+medium - The vulnerable path is reachable through normal UI settings import/save and was validated with an executable PoC, but exploitation is not remote 0-click: it requires convincing a user to open/use a JSON config or relying on an existing stale config plus auto-capture conditions.
+## Impact
+medium - The proven effect is unauthorized or unexpected VRChat camera/stream state changes and potential automated capture/posting of images when combined with schedule and Discord settings. This is meaningful privacy exposure, but it is limited to a local desktop victim, does not execute code, does not bypass OS privileges, and requires user interaction/config import or stale state.
+## Assumptions
+- The user runs the normal Wails desktop application and may drag/drop or otherwise open a JSON settings file, which the threat model explicitly treats as attacker-controllable if supplied by a third party.
+- VRChat OSC is available at the configured host/port, typically localhost UDP 9000, so user camera OSC commands have an effect in the victim's VRChat session.
+- Privacy impact increases when auto-capture scheduling and Discord auto-post are also enabled in the imported or stale configuration.
+- Victim opens or has an existing config with autoCapture.capture.openCameraBeforeBatch and/or closeCameraAfterBatch set to true
+- Victim saves/uses the config in the desktop app
+- Auto-capture is manually run or schedule.enabled is true
+- VRChat OSC camera controls are reachable on the configured localhost/local OSC endpoint
+- For exfiltration rather than only camera state changes, Discord auto-post must be enabled with a usable webhook
+## Path
+Attacker/stale JSON
+  -> OpenSettings via drag/drop
+  -> hidden true open/close flags preserved
+  -> SaveConfig + auto-capture scheduler
+  -> /usercamera/Mode, /Streaming, /Close OSC
+  -> unexpected VRChat capture/posting
+## Path evidence
+- `src/frontend/src/main.js:206-207` - Frontend only sets openCameraBeforeBatch and closeCameraAfterBatch to false when the fields are undefined, so imported or stale true values are preserved.
+- `src/frontend/src/main.js:740` - Drag/drop of a single JSON file calls api.OpenSettings(jsonPaths[0]), making third-party settings import reachable through normal UI use.
+- `src/frontend/src/main.js:1642-1656` - Settings save path sends the current state.config to api.SaveConfig or SaveConfigAndProcess without clearing the hidden camera flags.
+- `src/frontend/src/main.js:2106-2180` - The new capture detail UI exposes stream helper/sender/timeouts/debug/output settings, but not the openCameraBeforeBatch or closeCameraAfterBatch controls.
+- `src/frontend/src/main.js:2326-2327` - Auto-capture schedule remains user-configurable from the overview, enabling the hidden camera flags to be exercised by the scheduler.
+- `src/internal/appcore/config.go:140-141` - Backend Config still defines OpenCameraBeforeBatch and CloseCameraAfterBatch JSON fields.
+- `src/internal/appcore/config.go:415-430` - LoadConfig unmarshals JSON into Config and calls Normalize; persisted boolean values survive unless normalization explicitly changes them.
+- `src/internal/appcore/config.go:507-552` - AutoCapture Normalize validates ranges and enum-like fields but does not force the two hidden camera booleans back to false.
+- `src/app.go:1050-1066` - OpenSettings accepts an explicit local config path and loads it into application state.
+- `src/app.go:540-553` - SaveConfig normalizes/saves the config and restarts camera pose receiver and auto watchers, causing saved auto-capture settings to take effect.
+- `src/app.go:1395-1478` - Auto watchers start when AutoCapture.Schedule.Enabled is true and launch the auto-capture scheduler.
+- `src/internal/appcore/autocapture.go:269-299` - Backend honors OpenCameraBeforeBatch by sending OSC commands to set /usercamera/Mode and, in stream mode, /usercamera/SmoothMovement and /usercamera/Streaming=true.
+- `src/internal/appcore/autocapture.go:339-348` - Backend honors CloseCameraAfterBatch by stopping /usercamera/Streaming and sending /usercamera/Close.
+- `src/internal/appcore/autocapture.go:899-912` - Per-shot stream camera refresh also depends on OpenCameraBeforeBatch and sends /usercamera/Mode and /usercamera/Streaming.
+## Narrative
+This is a real, reachable privacy/security regression in the main application. The frontend preserves existing/imported true values for autoCapture.capture.openCameraBeforeBatch and closeCameraAfterBatch by only defaulting them when undefined, while the grouped capture settings UI no longer exposes normal controls for those flags. A JSON settings file can be opened through the drag/drop OpenSettings path and later saved unchanged through SaveConfig. The Go backend config model still contains these fields and Normalize does not clear persisted true values. During auto-capture, the backend honors them by sending /usercamera/Mode, /usercamera/SmoothMovement, /usercamera/Streaming, and /usercamera/Close OSC commands. Validation also executed a targeted PoC against a local UDP OSC listener and observed the expected camera/streaming/close OSC packets. The issue is not RCE or privilege escalation, and it requires user interaction plus auto-capture conditions, so medium severity is appropriate.
+## Controls
+- Desktop-only Wails application; no public server ingress or multi-tenant authorization boundary.
+- Vue template escaping reduces XSS-style abuse but does not mitigate hidden persisted settings.
+- Default config values set the camera open/close flags to false for new configs, but imported/stale true values are not cleared.
+- Config files are written with private file modes where supported, which protects at-rest config from other local users but not from attacker-supplied import.
+- Discord webhook validation limits posting to Discord webhook endpoints, but a valid attacker-controlled Discord webhook remains a plausible exfiltration destination.
+## Blindspots
+- Static review did not run the full Windows Wails UI or VRChat client; runtime UX details may affect how noticeable imported schedule/Discord settings are.
+- The executable PoC evidence came from the prior validation artifact, not a committed repository test.
+- Actual Discord exfiltration severity depends on victim configuration, selected webhook, auto-capture views, and whether sensitive VRChat content is captured.
+- OSC behavior depends on the user's VRChat OSC configuration and local firewall/network state.
