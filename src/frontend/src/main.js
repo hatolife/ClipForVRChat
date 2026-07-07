@@ -2352,7 +2352,7 @@ const vueApp = createApp({
 
             <ol>
               <li>2の元データとなるzipファイル 内容物確認用</li>
-              <li>暗号化された<button class="link-button inline" @click="openURL('https://www.google.com/search?q=gpg%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB')" title="gpgファイルを検索する">gpgファイル</button> 不具合報告用</li>
+              <li>暗号化された<button class="link-button inline" @click="openURL('https://gnupg.org/')" title="GnuPG公式サイトを開く">gpgファイル</button> 不具合報告用</li>
             </ol>
 
             <p class="diagnostic-report-break">1.のzipファイルは、不具合報告データには何が含まれているのだろうと不安になる場合に内容を確認してもらうためのデータになります。</p>
