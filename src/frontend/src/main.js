@@ -267,6 +267,7 @@ const vueApp = createApp({
       if (idleView.pose.rotation.y === undefined) idleView.pose.rotation.y = 0
       if (idleView.pose.rotation.z === undefined) idleView.pose.rotation.z = 0
       if (idleView.zoom === undefined) idleView.zoom = 45
+      if (idleView.exposure === undefined || idleView.exposure === null) idleView.exposure = 0
       autoCapture.restore ||= {}
       autoCapture.restore.fallback ||= {}
       if (autoCapture.restore.enabled === undefined) autoCapture.restore.enabled = true
@@ -287,7 +288,7 @@ const vueApp = createApp({
       if (restoreFallback.pose.rotation.y === undefined) restoreFallback.pose.rotation.y = 0
       if (restoreFallback.pose.rotation.z === undefined) restoreFallback.pose.rotation.z = 0
       if (restoreFallback.zoom === undefined) restoreFallback.zoom = 45
-      if (restoreFallback.exposure === undefined) restoreFallback.exposure = 4
+      if (restoreFallback.exposure === undefined || restoreFallback.exposure === 4) restoreFallback.exposure = 0
       if (restoreFallback.focalDistance === undefined) restoreFallback.focalDistance = 1.5
       if (restoreFallback.aperture === undefined) restoreFallback.aperture = 15
       if (restoreFallback.showUiInCamera === undefined) restoreFallback.showUiInCamera = false
@@ -307,6 +308,11 @@ const vueApp = createApp({
         view.pose ||= {}
         view.pose.position ||= {}
         view.pose.rotation ||= {}
+        if (view.zoom === undefined || view.zoom === null) view.zoom = 45
+        if (view.exposure === undefined || view.exposure === null) view.exposure = 0
+        if (view.localPlayer === undefined || view.localPlayer === null) view.localPlayer = true
+        if (view.remotePlayer === undefined || view.remotePlayer === null) view.remotePlayer = true
+        if (view.environment === undefined || view.environment === null) view.environment = true
       })
       return views.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
     },
@@ -843,6 +849,7 @@ const vueApp = createApp({
       const enabled =
         viewId === 'composition' ||
         viewId === 'fallback' ||
+        viewId === 'idle' ||
         viewId === 'capture' ||
         viewId === 'metadata' ||
         (viewId === 'schedule' && this.autoCaptureSettings.schedule.enabled) ||
@@ -1345,14 +1352,14 @@ const vueApp = createApp({
           rotation: { x: 0, y: 0, z: 0, ...(overrides.pose?.rotation || {}) }
         },
         zoom: overrides.zoom ?? 45,
-        exposure: overrides.exposure ?? null,
+        exposure: overrides.exposure ?? 0,
         focalDistance: overrides.focalDistance ?? null,
         aperture: overrides.aperture ?? null,
         lookAtMe: overrides.lookAtMe ?? null,
         showUiInCamera: overrides.showUiInCamera ?? null,
-        localPlayer: overrides.localPlayer ?? null,
-        remotePlayer: overrides.remotePlayer ?? null,
-        environment: overrides.environment ?? null,
+        localPlayer: overrides.localPlayer ?? true,
+        remotePlayer: overrides.remotePlayer ?? true,
+        environment: overrides.environment ?? true,
         settleDelayMs: overrides.settleDelayMs ?? 1500,
         captureDelayMs: overrides.captureDelayMs ?? 0,
         calibrated: overrides.calibrated ?? false
@@ -2527,12 +2534,12 @@ const vueApp = createApp({
                     <div>
                       <h4>構図設定</h4>
                       <p>「撮影する」がONの構図を上から順番に撮影します。</p>
-                      <p v-if="effectiveAutoCapturePreplacedLocalAnchor">フォールバックモード中は、各構図の位置、拡大率、表示対象はOSC送信されないため編集できません。</p>
+                      <p v-if="effectiveAutoCapturePreplacedLocalAnchor">フォールバックモード中は、各構図の位置、拡大率、明るさ、表示対象はOSC送信されません。</p>
                       <p v-if="avatarOscBasisStatus?.autoFallback && !effectiveAutoCapturePreplacedLocalAnchor">AvatarBeaconのbasis受信が30秒以上ないため、フォールバックモードOFFでは通常撮影に失敗する可能性があります。</p>
                       <p v-else-if="!effectiveAutoCapturePreplacedLocalAnchor">プレイヤー基準構図はAvatarBeaconの受信状態がreadyのときに自動追従します。</p>
                     </div>
                     <div class="button-row">
-                      <button type="button" class="secondary" @click="resetCameraViewsToDefaults" :disabled="effectiveAutoCapturePreplacedLocalAnchor" :title="effectiveAutoCapturePreplacedLocalAnchor ? 'フォールバックモード中は構図位置やZoomを使いません' : '初期の3構図へ戻す'">初期3構図に戻す</button>
+                      <button type="button" class="secondary" @click="resetCameraViewsToDefaults" :disabled="effectiveAutoCapturePreplacedLocalAnchor" :title="effectiveAutoCapturePreplacedLocalAnchor ? 'フォールバックモード中は構図位置、Zoom、明るさを使いません' : '初期の3構図へ戻す'">初期3構図に戻す</button>
                     </div>
                   </div>
                   <div v-if="autoCaptureViews.length" class="view-list">
@@ -2568,6 +2575,12 @@ const vueApp = createApp({
                         <label><small>回転 Y</small><input type="number" step="0.001" v-model.number="cameraView.pose.rotation.y" :disabled="effectiveAutoCapturePreplacedLocalAnchor" /></label>
                         <label><small>回転 Z</small><input type="number" step="0.001" v-model.number="cameraView.pose.rotation.z" :disabled="effectiveAutoCapturePreplacedLocalAnchor" /></label>
                         <label><small>拡大率</small><input type="number" min="20" max="150" step="0.1" v-model.number="cameraView.zoom" :disabled="effectiveAutoCapturePreplacedLocalAnchor" /></label>
+                        <label><small>明るさ</small><input type="number" min="-10" max="10" step="0.1" v-model.number="cameraView.exposure" :disabled="effectiveAutoCapturePreplacedLocalAnchor" /></label>
+                      </div>
+                      <div class="view-mask-controls" :class="{ disabled: effectiveAutoCapturePreplacedLocalAnchor }">
+                        <label><input type="checkbox" v-model="cameraView.localPlayer" :disabled="effectiveAutoCapturePreplacedLocalAnchor" /> 自分</label>
+                        <label><input type="checkbox" v-model="cameraView.remotePlayer" :disabled="effectiveAutoCapturePreplacedLocalAnchor" /> 他ユーザー</label>
+                        <label><input type="checkbox" v-model="cameraView.environment" :disabled="effectiveAutoCapturePreplacedLocalAnchor" /> ワールド</label>
                       </div>
                       <div class="view-actions">
                         <button type="button" class="secondary" @click="moveAutoCaptureView(cameraView, -1)" :disabled="index === 0" :title="index === 0 ? '先頭なので上へ移動できません' : 'この構図を上へ移動'">↑</button>
@@ -2775,7 +2788,7 @@ const vueApp = createApp({
                 </div>
                 <div class="pose-grid" :class="{ disabled: !autoCaptureSettings.restore.enabled }">
                   <label><small>戻し先 拡大率</small><input type="number" min="20" max="150" step="0.1" v-model.number="autoCaptureSettings.restore.fallback.zoom" :disabled="!autoCaptureSettings.restore.enabled" /></label>
-                  <label><small>戻し先 露出</small><input type="number" min="0" max="10" step="0.1" v-model.number="autoCaptureSettings.restore.fallback.exposure" :disabled="!autoCaptureSettings.restore.enabled" /></label>
+                  <label><small>戻し先 明るさ</small><input type="number" min="-10" max="10" step="0.1" v-model.number="autoCaptureSettings.restore.fallback.exposure" :disabled="!autoCaptureSettings.restore.enabled" /></label>
                   <label><small>戻し先 焦点距離</small><input type="number" min="0" max="10" step="0.1" v-model.number="autoCaptureSettings.restore.fallback.focalDistance" :disabled="!autoCaptureSettings.restore.enabled" /></label>
                   <label><small>戻し先 絞り</small><input type="number" min="1.4" max="32" step="0.1" v-model.number="autoCaptureSettings.restore.fallback.aperture" :disabled="!autoCaptureSettings.restore.enabled" /></label>
                 </div>
@@ -2815,27 +2828,28 @@ const vueApp = createApp({
                 </div>
               </template>
               <template v-else-if="autoCaptureDetailView === 'idle'">
-                <div class="setting-row" :class="[{ disabled: effectiveAutoCapturePreplacedLocalAnchor }, settingRowChangedClass('autoCapture.idle.enabled')]">
-                  <div><strong>待機カメラ位置を使う</strong><p>通常モードの自動撮影バッチ終了後、下の位置へUser Cameraを移動します。</p></div>
-                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.idle.enabled" :disabled="effectiveAutoCapturePreplacedLocalAnchor" /><span></span></label>
+                <div class="setting-row" :class="settingRowChangedClass('autoCapture.idle.enabled')">
+                  <div><strong>待機カメラ位置を使う</strong><p>通常モードの自動撮影バッチ終了後、下の位置へUser Cameraを移動します。</p><p v-if="effectiveAutoCapturePreplacedLocalAnchor">フォールバックモード中は待機位置を送信しません。通常モードに戻すと反映されます。</p></div>
+                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.idle.enabled" /><span></span></label>
                 </div>
-                <div class="setting-row" :class="[{ disabled: effectiveAutoCapturePreplacedLocalAnchor || !autoCaptureSettings.idle.enabled }, settingRowChangedClass('autoCapture.idle.view.coordinateSpace')]">
+                <div class="setting-row" :class="[{ disabled: !autoCaptureSettings.idle.enabled }, settingRowChangedClass('autoCapture.idle.view.coordinateSpace')]">
                   <div><strong>待機位置の座標系</strong><p>初期値はプレイヤー基準です。AvatarBeaconまたはmanual基準からworld位置へ変換して送ります。</p></div>
                   <label>
-                    <select v-model="autoCaptureSettings.idle.view.coordinateSpace" :disabled="effectiveAutoCapturePreplacedLocalAnchor || !autoCaptureSettings.idle.enabled">
+                    <select v-model="autoCaptureSettings.idle.view.coordinateSpace" :disabled="!autoCaptureSettings.idle.enabled">
                       <option value="player_local">プレイヤー基準</option>
                       <option value="world">ワールド固定</option>
                     </select>
                   </label>
                 </div>
-                <div class="pose-grid" :class="{ disabled: effectiveAutoCapturePreplacedLocalAnchor || !autoCaptureSettings.idle.enabled }">
-                  <label><small>待機 位置 X</small><input type="number" step="0.001" v-model.number="autoCaptureSettings.idle.view.pose.position.x" :disabled="effectiveAutoCapturePreplacedLocalAnchor || !autoCaptureSettings.idle.enabled" /></label>
-                  <label><small>待機 位置 Y</small><input type="number" step="0.001" v-model.number="autoCaptureSettings.idle.view.pose.position.y" :disabled="effectiveAutoCapturePreplacedLocalAnchor || !autoCaptureSettings.idle.enabled" /></label>
-                  <label><small>待機 位置 Z</small><input type="number" step="0.001" v-model.number="autoCaptureSettings.idle.view.pose.position.z" :disabled="effectiveAutoCapturePreplacedLocalAnchor || !autoCaptureSettings.idle.enabled" /></label>
-                  <label><small>待機 回転 X</small><input type="number" step="0.001" v-model.number="autoCaptureSettings.idle.view.pose.rotation.x" :disabled="effectiveAutoCapturePreplacedLocalAnchor || !autoCaptureSettings.idle.enabled" /></label>
-                  <label><small>待機 回転 Y</small><input type="number" step="0.001" v-model.number="autoCaptureSettings.idle.view.pose.rotation.y" :disabled="effectiveAutoCapturePreplacedLocalAnchor || !autoCaptureSettings.idle.enabled" /></label>
-                  <label><small>待機 回転 Z</small><input type="number" step="0.001" v-model.number="autoCaptureSettings.idle.view.pose.rotation.z" :disabled="effectiveAutoCapturePreplacedLocalAnchor || !autoCaptureSettings.idle.enabled" /></label>
-                  <label><small>待機 拡大率</small><input type="number" min="20" max="150" step="0.1" v-model.number="autoCaptureSettings.idle.view.zoom" :disabled="effectiveAutoCapturePreplacedLocalAnchor || !autoCaptureSettings.idle.enabled" /></label>
+                <div class="pose-grid" :class="{ disabled: !autoCaptureSettings.idle.enabled }">
+                  <label><small>待機 位置 X</small><input type="number" step="0.001" v-model.number="autoCaptureSettings.idle.view.pose.position.x" :disabled="!autoCaptureSettings.idle.enabled" /></label>
+                  <label><small>待機 位置 Y</small><input type="number" step="0.001" v-model.number="autoCaptureSettings.idle.view.pose.position.y" :disabled="!autoCaptureSettings.idle.enabled" /></label>
+                  <label><small>待機 位置 Z</small><input type="number" step="0.001" v-model.number="autoCaptureSettings.idle.view.pose.position.z" :disabled="!autoCaptureSettings.idle.enabled" /></label>
+                  <label><small>待機 回転 X</small><input type="number" step="0.001" v-model.number="autoCaptureSettings.idle.view.pose.rotation.x" :disabled="!autoCaptureSettings.idle.enabled" /></label>
+                  <label><small>待機 回転 Y</small><input type="number" step="0.001" v-model.number="autoCaptureSettings.idle.view.pose.rotation.y" :disabled="!autoCaptureSettings.idle.enabled" /></label>
+                  <label><small>待機 回転 Z</small><input type="number" step="0.001" v-model.number="autoCaptureSettings.idle.view.pose.rotation.z" :disabled="!autoCaptureSettings.idle.enabled" /></label>
+                  <label><small>待機 拡大率</small><input type="number" min="20" max="150" step="0.1" v-model.number="autoCaptureSettings.idle.view.zoom" :disabled="!autoCaptureSettings.idle.enabled" /></label>
+                  <label><small>待機 明るさ</small><input type="number" min="-10" max="10" step="0.1" v-model.number="autoCaptureSettings.idle.view.exposure" :disabled="!autoCaptureSettings.idle.enabled" /></label>
                 </div>
               </template>
             </div>
@@ -2856,22 +2870,23 @@ const vueApp = createApp({
             <div class="setting-row" :class="settingRowChangedClass('autoCapture.views')">
               <div>
                 <strong>構図設定</strong>
-                <p>撮影する構図、座標系、位置、拡大率、並び順を設定します。</p>
+                <p>撮影する構図、座標系、位置、拡大率、明るさ、表示対象、並び順を設定します。</p>
                 <p>有効な構図: {{ enabledAutoCaptureViewCount }} / {{ autoCaptureViews.length }}</p>
               </div>
               <div class="settings-overview-controls">
                 <button type="button" class="secondary" title="構図設定の詳細画面を開きます。" aria-label="構図設定の詳細設定" @click="openAutoCaptureDetail('composition')">詳細設定</button>
               </div>
             </div>
-            <div class="setting-row" :class="[{ disabled: effectiveAutoCapturePreplacedLocalAnchor }, settingRowChangedClass('autoCapture.idle')]">
+            <div class="setting-row" :class="settingRowChangedClass('autoCapture.idle')">
               <div>
                 <strong>待機カメラ位置</strong>
                 <p>自動撮影バッチ終了後、通常モードのカメラを指定位置へ退避します。</p>
                 <p>初期値はプレイヤー基準で足元方向 Y=-5m です。</p>
+                <p v-if="effectiveAutoCapturePreplacedLocalAnchor">フォールバックモード中は送信しません。詳細設定は開けます。</p>
               </div>
               <div class="settings-overview-controls">
-                <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.idle.enabled" :disabled="effectiveAutoCapturePreplacedLocalAnchor" /><span></span></label>
-                <button type="button" class="secondary" :disabled="effectiveAutoCapturePreplacedLocalAnchor" title="待機カメラ位置の詳細設定を開きます。" aria-label="待機カメラ位置の詳細設定" @click="openAutoCaptureDetail('idle')">詳細設定</button>
+                <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.idle.enabled" /><span></span></label>
+                <button type="button" class="secondary" title="待機カメラ位置の詳細設定を開きます。" aria-label="待機カメラ位置の詳細設定" @click="openAutoCaptureDetail('idle')">詳細設定</button>
               </div>
             </div>
             <div class="setting-row" :class="settingRowChangedClass('autoCapture.schedule')">

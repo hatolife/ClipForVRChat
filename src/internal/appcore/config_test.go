@@ -85,6 +85,7 @@ func TestConfigNormalizeAppliesDefaultsAndTrimsQuotes(t *testing.T) {
 
 func TestCameraViewNormalizeRoundsPoseAndZoom(t *testing.T) {
 	zoom := 44.44449
+	exposure := -1.23449
 	view := CameraViewConfig{
 		ID:              "view",
 		Name:            "View",
@@ -93,7 +94,8 @@ func TestCameraViewNormalizeRoundsPoseAndZoom(t *testing.T) {
 			Position: CameraVector3Config{X: 1.23449, Y: -2.3455, Z: 3.0004},
 			Rotation: CameraVector3Config{X: 10.12349, Y: 20.5555, Z: -30.0004},
 		},
-		Zoom: &zoom,
+		Zoom:     &zoom,
+		Exposure: &exposure,
 	}
 	view.Normalize(0)
 	if view.Pose.Position.X != 1.234 || view.Pose.Position.Y != -2.346 || view.Pose.Position.Z != 3 {
@@ -104,6 +106,9 @@ func TestCameraViewNormalizeRoundsPoseAndZoom(t *testing.T) {
 	}
 	if view.Zoom == nil || *view.Zoom != 44.444 {
 		t.Fatalf("zoom = %v, want 44.444", view.Zoom)
+	}
+	if view.Exposure == nil || *view.Exposure != -1.234 {
+		t.Fatalf("exposure = %v, want -1.234", view.Exposure)
 	}
 }
 

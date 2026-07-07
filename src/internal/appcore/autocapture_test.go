@@ -61,6 +61,12 @@ func TestDefaultAutoCaptureConfig(t *testing.T) {
 	if *cfg.AutoCapture.Views[0].Zoom != 45 {
 		t.Fatalf("front view zoom = %v, want 45", *cfg.AutoCapture.Views[0].Zoom)
 	}
+	if cfg.AutoCapture.Views[0].Exposure == nil || *cfg.AutoCapture.Views[0].Exposure != 0 {
+		t.Fatalf("front view exposure = %v, want 0", cfg.AutoCapture.Views[0].Exposure)
+	}
+	if cfg.AutoCapture.Views[0].RemotePlayer == nil || !*cfg.AutoCapture.Views[0].RemotePlayer {
+		t.Fatalf("front view RemotePlayer should default on: %+v", cfg.AutoCapture.Views[0])
+	}
 	if cfg.AutoCapture.Views[0].CoordinateSpace != "player_local" || cfg.AutoCapture.Views[0].Pose.Position.Z != 1.0 {
 		t.Fatalf("default front view pose was not initialized: %+v", cfg.AutoCapture.Views[0])
 	}
@@ -105,7 +111,7 @@ func TestAutoCaptureConfigNormalize(t *testing.T) {
 	if cfg.AutoCapture.Stream.SpoutHelperPath != "spout-capture.exe" || !cfg.AutoCapture.Stream.SpoutAutoSelect || cfg.AutoCapture.Stream.CaptureTimeoutMS != 10000 {
 		t.Fatalf("stream normalize failed: %+v", cfg.AutoCapture.Stream)
 	}
-	if !cfg.AutoCapture.Restore.Enabled || !cfg.AutoCapture.Restore.PreferSnapshot || cfg.AutoCapture.Restore.Fallback.Zoom != 45 {
+	if !cfg.AutoCapture.Restore.Enabled || !cfg.AutoCapture.Restore.PreferSnapshot || cfg.AutoCapture.Restore.Fallback.Zoom != 45 || cfg.AutoCapture.Restore.Fallback.Exposure != 0 {
 		t.Fatalf("restore normalize failed: %+v", cfg.AutoCapture.Restore)
 	}
 	if !cfg.AutoCapture.Restore.Fallback.AutoLevelRoll {
@@ -1068,8 +1074,8 @@ func TestMergeUserCameraRestoreStatePrefersSnapshot(t *testing.T) {
 	if target.Zoom == nil || *target.Zoom != 80 {
 		t.Fatalf("zoom = %v, want snapshot 80", target.Zoom)
 	}
-	if target.Exposure == nil || *target.Exposure != 4 {
-		t.Fatalf("exposure = %v, want fallback 4", target.Exposure)
+	if target.Exposure == nil || *target.Exposure != 0 {
+		t.Fatalf("exposure = %v, want fallback 0", target.Exposure)
 	}
 }
 

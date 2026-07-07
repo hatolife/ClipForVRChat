@@ -793,6 +793,7 @@ func (a *App) SaveCurrentCameraPoseToView(viewID string) (appcore.Config, error)
 		return cfg, err
 	}
 	zoom := a.freshUserCameraZoomLocked(cfg)
+	exposure := a.freshUserCameraExposureLocked(cfg)
 	viewID = strings.TrimSpace(viewID)
 	found := false
 	for i := range cfg.AutoCapture.Views {
@@ -810,6 +811,9 @@ func (a *App) SaveCurrentCameraPoseToView(viewID string) (appcore.Config, error)
 		cfg.AutoCapture.Views[i].Pose = savedPose
 		if zoom != nil {
 			cfg.AutoCapture.Views[i].Zoom = zoom
+		}
+		if exposure != nil {
+			cfg.AutoCapture.Views[i].Exposure = exposure
 		}
 		cfg.AutoCapture.Views[i].Calibrated = true
 		found = true
@@ -835,6 +839,7 @@ func (a *App) AddCurrentCameraPoseAsView(viewID string) (appcore.Config, error) 
 		return cfg, err
 	}
 	currentZoom := a.freshUserCameraZoomLocked(cfg)
+	currentExposure := a.freshUserCameraExposureLocked(cfg)
 	viewID = strings.TrimSpace(viewID)
 	var sourceView appcore.CameraViewConfig
 	found := false
@@ -869,6 +874,9 @@ func (a *App) AddCurrentCameraPoseAsView(viewID string) (appcore.Config, error) 
 	if sourceView.Exposure != nil {
 		value := *sourceView.Exposure
 		exposure = &value
+	}
+	if currentExposure != nil {
+		exposure = currentExposure
 	}
 	var focalDistance *float64
 	if sourceView.FocalDistance != nil {
@@ -2767,6 +2775,15 @@ func (a *App) freshUserCameraZoomLocked(cfg appcore.Config) *float64 {
 		return nil
 	}
 	value := *state.Zoom
+	return &value
+}
+
+func (a *App) freshUserCameraExposureLocked(cfg appcore.Config) *float64 {
+	state := a.latestUserCameraStateLocked(cfg, time.Now())
+	if state.Exposure == nil {
+		return nil
+	}
+	value := *state.Exposure
 	return &value
 }
 

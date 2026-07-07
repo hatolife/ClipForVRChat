@@ -802,7 +802,7 @@ func TestAppRestartCameraPoseReceiverKeepsSameEndpoint(t *testing.T) {
 	}
 }
 
-func TestAppSaveCurrentCameraPoseToViewCapturesFreshZoom(t *testing.T) {
+func TestAppSaveCurrentCameraPoseToViewCapturesFreshZoomAndExposure(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	cfg := appcore.DefaultConfig()
 	cfg.Normalize()
@@ -823,6 +823,14 @@ func TestAppSaveCurrentCameraPoseToViewCapturesFreshZoom(t *testing.T) {
 			},
 			ReceivedAt: now,
 		},
+		"/usercamera/Exposure": {
+			UserCameraOSCSample: appcore.UserCameraOSCSample{
+				Address:  "/usercamera/Exposure",
+				Float:    -1.5,
+				HasFloat: true,
+			},
+			ReceivedAt: now,
+		},
 	}
 
 	got, err := app.SaveCurrentCameraPoseToView("front")
@@ -835,6 +843,9 @@ func TestAppSaveCurrentCameraPoseToViewCapturesFreshZoom(t *testing.T) {
 	}
 	if view.Zoom == nil || *view.Zoom != 72.5 {
 		t.Fatalf("zoom = %v, want 72.5", view.Zoom)
+	}
+	if view.Exposure == nil || *view.Exposure != -1.5 {
+		t.Fatalf("exposure = %v, want -1.5", view.Exposure)
 	}
 	if view.Pose.Position.X != 1.234 || view.Pose.Position.Y != 2.346 || view.Pose.Position.Z != 3 ||
 		view.Pose.Rotation.X != 4.123 || view.Pose.Rotation.Y != 5.556 || view.Pose.Rotation.Z != 6 || !view.Calibrated {

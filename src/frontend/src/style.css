@@ -919,6 +919,34 @@ small {
   cursor: not-allowed;
 }
 
+.view-mask-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  color: #455361;
+  font-size: 13px;
+}
+
+.view-mask-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+}
+
+.view-mask-controls input {
+  width: auto;
+}
+
+.view-mask-controls.disabled {
+  opacity: 0.52;
+}
+
+.view-mask-controls.disabled input {
+  cursor: not-allowed;
+}
+
 .view-actions {
   justify-content: flex-end;
 }

@@ -25,6 +25,13 @@ const (
 	userCameraZoomDefault = 45
 )
 
+const (
+	userCameraExposureMin        = -10
+	userCameraExposureMax        = 10
+	userCameraExposureDefault    = 0
+	oldUserCameraExposureDefault = 4
+)
+
 type Config struct {
 	Image              ImageConfig              `json:"image"`
 	Output             OutputConfig             `json:"output"`
@@ -680,6 +687,18 @@ func (c *AutoCaptureConfig) Normalize() {
 			if c.Views[i].Zoom == nil {
 				c.Views[i].Zoom = defaultView.Zoom
 			}
+			if c.Views[i].Exposure == nil {
+				c.Views[i].Exposure = defaultView.Exposure
+			}
+			if c.Views[i].LocalPlayer == nil {
+				c.Views[i].LocalPlayer = defaultView.LocalPlayer
+			}
+			if c.Views[i].RemotePlayer == nil || (defaultView.RemotePlayer != nil && !*c.Views[i].RemotePlayer) {
+				c.Views[i].RemotePlayer = defaultView.RemotePlayer
+			}
+			if c.Views[i].Environment == nil {
+				c.Views[i].Environment = defaultView.Environment
+			}
 		}
 	}
 }
@@ -730,7 +749,8 @@ func defaultAutoCaptureIdleConfig() AutoCaptureIdleConfig {
 			Pose: CameraPoseConfig{
 				Position: CameraVector3Config{Y: -5},
 			},
-			Zoom: float64ConfigPtr(userCameraZoomDefault),
+			Zoom:     float64ConfigPtr(userCameraZoomDefault),
+			Exposure: float64ConfigPtr(userCameraExposureDefault),
 		},
 	}
 }
@@ -760,7 +780,7 @@ func defaultAutoCaptureUserCameraFallbackConfig() AutoCaptureUserCameraFallbackC
 		SmoothMovement:         true,
 		RestorePose:            false,
 		Zoom:                   45,
-		Exposure:               4,
+		Exposure:               userCameraExposureDefault,
 		FocalDistance:          1.5,
 		Aperture:               15,
 		Hue:                    120,
@@ -819,8 +839,11 @@ func (c *AutoCaptureUserCameraFallbackConfig) Normalize() {
 	if c.Mode < 0 || c.Mode > 6 {
 		c.Mode = 0
 	}
+	if c.Exposure == oldUserCameraExposureDefault {
+		c.Exposure = userCameraExposureDefault
+	}
 	c.Zoom = clampFiniteDefault(c.Zoom, userCameraZoomMin, userCameraZoomMax, userCameraZoomDefault)
-	c.Exposure = clampFiniteDefault(c.Exposure, 0, 10, 4)
+	c.Exposure = clampFiniteDefault(c.Exposure, userCameraExposureMin, userCameraExposureMax, userCameraExposureDefault)
 	c.FocalDistance = clampFiniteDefault(c.FocalDistance, 0, 10, 1.5)
 	c.Aperture = clampFiniteDefault(c.Aperture, 1.4, 32, 15)
 	c.Hue = clampFiniteDefault(c.Hue, 0, 360, 120)
@@ -973,6 +996,14 @@ func (v *CameraViewConfig) Normalize(index int) {
 	if v.Zoom != nil {
 		zoom := roundFloat(clampFiniteDefault(*v.Zoom, userCameraZoomMin, userCameraZoomMax, userCameraZoomDefault), 3)
 		v.Zoom = float64ConfigPtr(zoom)
+	} else {
+		v.Zoom = float64ConfigPtr(userCameraZoomDefault)
+	}
+	if v.Exposure != nil {
+		exposure := roundFloat(clampFiniteDefault(*v.Exposure, userCameraExposureMin, userCameraExposureMax, userCameraExposureDefault), 3)
+		v.Exposure = float64ConfigPtr(exposure)
+	} else {
+		v.Exposure = float64ConfigPtr(userCameraExposureDefault)
 	}
 }
 
@@ -1083,9 +1114,10 @@ func defaultCameraView(id string, name string, order int, coordinateSpace string
 		CoordinateSpace: coordinateSpace,
 		Pose:            pose,
 		Zoom:            float64ConfigPtr(zoom),
+		Exposure:        float64ConfigPtr(userCameraExposureDefault),
 		LookAtMe:        boolConfigPtr(true),
 		LocalPlayer:     boolConfigPtr(true),
-		RemotePlayer:    boolConfigPtr(false),
+		RemotePlayer:    boolConfigPtr(true),
 		Environment:     boolConfigPtr(true),
 		SettleDelayMS:   1500,
 		CaptureDelayMS:  0,
