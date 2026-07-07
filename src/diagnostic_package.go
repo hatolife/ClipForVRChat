@@ -38,6 +38,13 @@ const (
 	diagnosticGPGPrefix      = "※これを添付してください "
 )
 
+var (
+	cliEncryptionMaxFileSize       int64 = 64 << 20
+	cliEncryptionMaxDirectorySize  int64 = 128 << 20
+	cliEncryptionMaxDirectoryFiles       = 2000
+	cliEncryptionMaxDirectoryDepth       = 32
+)
+
 type diagnosticPackageManifest struct {
 	CreatedAt    string                  `json:"createdAt"`
 	AppVersion   string                  `json:"appVersion"`
@@ -126,9 +133,12 @@ func encryptPathWithPublicKey(path string) (string, error) {
 	if strings.TrimSpace(path) == "" {
 		return "", fmt.Errorf("暗号化するファイルまたはフォルダを指定してください")
 	}
-	info, err := os.Stat(path) // #nosec G304,G703 -- path comes from explicit CLI file drop or command-line argument.
+	info, err := os.Lstat(path) // #nosec G304,G703 -- path comes from explicit CLI file drop or command-line argument.
 	if err != nil {
 		return "", fmt.Errorf("暗号化対象を確認できません: %w", err)
+	}
+	if err := validateCLIEncryptionInput(path, info); err != nil {
+		return "", err
 	}
 	entities, err := openpgp.ReadArmoredKeyRing(strings.NewReader(releaseSigningPublicKeyArmored))
 	if err != nil {
@@ -148,6 +158,9 @@ func encryptPathWithPublicKey(path string) (string, error) {
 		outputPath = path + ".zip.gpg"
 		fileName += ".zip"
 	} else {
+		if info.Size() > cliEncryptionMaxFileSize {
+			return "", fmt.Errorf("暗号化対象ファイルが大きすぎます: %d bytes exceeds limit of %d bytes", info.Size(), cliEncryptionMaxFileSize)
+		}
 		data, err = os.ReadFile(path) // #nosec G304,G703 -- path comes from explicit CLI file drop or command-line argument.
 		if err != nil {
 			return "", fmt.Errorf("暗号化対象を読み込めません: %w", err)
@@ -165,6 +178,17 @@ func encryptPathWithPublicKey(path string) (string, error) {
 
 func encryptDiagnosticZip(zipData []byte, entities openpgp.EntityList) ([]byte, error) {
 	return encryptBytes(zipData, entities, "diagnostics.zip", "診断パッケージ")
+}
+
+func validateCLIEncryptionInput(path string, info os.FileInfo) error {
+	mode := info.Mode()
+	if mode.IsRegular() {
+		return nil
+	}
+	if info.IsDir() {
+		return validateDirectoryEncryptionInput(path)
+	}
+	return fmt.Errorf("暗号化対象は通常ファイルまたはフォルダのみです: %s", path)
 }
 
 func encryptBytes(data []byte, entities openpgp.EntityList, fileName string, label string) ([]byte, error) {
@@ -396,6 +420,9 @@ func zipDirectory(sourceDir string, zipPath string) error {
 }
 
 func zipDirectoryBytes(sourceDir string) ([]byte, error) {
+	if err := validateDirectoryEncryptionInput(sourceDir); err != nil {
+		return nil, err
+	}
 	var buf bytes.Buffer
 	zipWriter := zip.NewWriter(&buf)
 	err := filepath.WalkDir(sourceDir, func(path string, entry os.DirEntry, walkErr error) error {
@@ -440,6 +467,53 @@ func addFileToZip(zipWriter *zip.Writer, name, path string) error {
 		return fmt.Errorf("%s をzipへ書き込めません: %w", name, err)
 	}
 	return nil
+}
+
+func validateDirectoryEncryptionInput(sourceDir string) error {
+	var totalSize int64
+	fileCount := 0
+	return filepath.WalkDir(sourceDir, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		rel, err := filepath.Rel(sourceDir, path)
+		if err != nil {
+			return err
+		}
+		if depth := relativePathDepth(rel); depth > cliEncryptionMaxDirectoryDepth {
+			return fmt.Errorf("暗号化対象のフォルダが深すぎます: %s depth=%d limit=%d", rel, depth, cliEncryptionMaxDirectoryDepth)
+		}
+		info, err := os.Lstat(path) // #nosec G304,G703 -- path is inside user-supplied CLI input directory under explicit validation.
+		if err != nil {
+			return fmt.Errorf("%s を確認できません: %w", rel, err)
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("暗号化対象のフォルダには通常ファイルのみを含めてください: %s", rel)
+		}
+		if info.Size() > cliEncryptionMaxFileSize {
+			return fmt.Errorf("暗号化対象ファイルが大きすぎます: %s size=%d limit=%d", rel, info.Size(), cliEncryptionMaxFileSize)
+		}
+		fileCount++
+		if fileCount > cliEncryptionMaxDirectoryFiles {
+			return fmt.Errorf("暗号化対象のファイル数が多すぎます: %d limit=%d", fileCount, cliEncryptionMaxDirectoryFiles)
+		}
+		totalSize += info.Size()
+		if totalSize > cliEncryptionMaxDirectorySize {
+			return fmt.Errorf("暗号化対象フォルダの総サイズが大きすぎます: %d bytes exceeds limit of %d bytes", totalSize, cliEncryptionMaxDirectorySize)
+		}
+		return nil
+	})
+}
+
+func relativePathDepth(rel string) int {
+	rel = filepath.Clean(rel)
+	if rel == "." || rel == "" {
+		return 0
+	}
+	return len(strings.Split(filepath.ToSlash(rel), "/"))
 }
 
 func isDiagnosticTextFile(name string) bool {

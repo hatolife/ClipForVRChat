@@ -2,6 +2,7 @@ package appcore
 
 import (
 	"errors"
+	"fmt"
 
 	"golang.design/x/clipboard"
 )
@@ -23,7 +24,9 @@ func ReadClipboardImage() ([]byte, error) {
 	if err := InitClipboard(); err != nil {
 		return nil, err
 	}
-	if data, err := readNativeClipboardPNG(); err == nil && len(data) > 0 {
+	if data, err := readNativeClipboardPNG(); err != nil {
+		return nil, err
+	} else if len(data) > 0 {
 		return data, nil
 	}
 	data := clipboard.Read(clipboard.FmtImage)
@@ -46,5 +49,20 @@ func WriteClipboardImage(pngData []byte) error {
 		return err
 	}
 	clipboard.Write(clipboard.FmtImage, pngData)
+	return nil
+}
+
+func clipboardPNGMaxBytes() int64 {
+	return maxImageInputBytes(DefaultMaxImageInputMB)
+}
+
+func validateClipboardPNGSize(size uintptr) error {
+	maxBytes := clipboardPNGMaxBytes()
+	if size == 0 {
+		return errors.New("クリップボードのPNGデータが空です。")
+	}
+	if size > uintptr(maxBytes) {
+		return fmt.Errorf("クリップボードのPNGデータが大きすぎます。%dMB以下の画像をコピーしてください。", maxBytes/1024/1024)
+	}
 	return nil
 }

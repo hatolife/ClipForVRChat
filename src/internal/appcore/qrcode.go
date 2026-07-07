@@ -13,6 +13,8 @@ import (
 	"github.com/makiuchi-d/gozxing/qrcode"
 )
 
+const qrVariantMaxPixels = MaxImagePixels
+
 type qrDetectionResult struct {
 	URLs        []string
 	Diagnostics []string
@@ -60,10 +62,15 @@ func qrImageVariants(img image.Image) []qrImageVariant {
 	variants := []qrImageVariant{{name: "original", image: img}}
 	b := img.Bounds()
 	width := b.Dx()
+	height := b.Dy()
 	if width <= 0 {
 		return variants
 	}
-	if width < 1800 {
+	if height <= 0 {
+		return variants
+	}
+	basePixels := int64(width) * int64(height)
+	if width < 1800 && qrUpscaleWithinPixelLimit(basePixels, 2) {
 		up2 := imaging.Resize(img, width*2, 0, imaging.NearestNeighbor)
 		variants = append(variants,
 			qrImageVariant{name: "upscale2", image: up2},
@@ -71,13 +78,15 @@ func qrImageVariants(img image.Image) []qrImageVariant {
 			qrImageVariant{name: "upscale2-threshold140", image: thresholdGray(up2, 140)},
 		)
 	}
-	if width < 900 {
+	if width < 900 && qrUpscaleWithinPixelLimit(basePixels, 3) {
 		up3 := imaging.Resize(img, width*3, 0, imaging.NearestNeighbor)
 		variants = append(variants,
 			qrImageVariant{name: "upscale3", image: up3},
 			qrImageVariant{name: "upscale3-threshold120", image: thresholdGray(up3, 120)},
 			qrImageVariant{name: "upscale3-threshold140", image: thresholdGray(up3, 140)},
 		)
+	}
+	if width < 900 && qrUpscaleWithinPixelLimit(basePixels, 4) {
 		up4 := imaging.Resize(img, width*4, 0, imaging.NearestNeighbor)
 		variants = append(variants,
 			qrImageVariant{name: "upscale4", image: up4},
@@ -85,6 +94,13 @@ func qrImageVariants(img image.Image) []qrImageVariant {
 		)
 	}
 	return variants
+}
+
+func qrUpscaleWithinPixelLimit(basePixels int64, scale int64) bool {
+	if scale <= 1 {
+		return true
+	}
+	return basePixels <= qrVariantMaxPixels/(scale*scale)
 }
 
 func decodeQRCodeTexts(img image.Image) ([]string, string) {

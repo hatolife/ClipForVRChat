@@ -3,7 +3,6 @@
 package appcore
 
 import (
-	"errors"
 	"runtime"
 	"syscall"
 	"unsafe"
@@ -24,13 +23,17 @@ var (
 )
 
 func readNativeClipboardPNG() ([]byte, error) {
+	var firstErr error
 	for _, formatName := range []string{"PNG", "image/png"} {
 		data, err := readRegisteredClipboardFormat(formatName)
 		if err == nil && len(data) > 0 {
 			return data, nil
 		}
+		if err != nil && firstErr == nil {
+			firstErr = err
+		}
 	}
-	return nil, nil
+	return nil, firstErr
 }
 
 func readRegisteredClipboardFormat(formatName string) ([]byte, error) {
@@ -63,8 +66,8 @@ func readRegisteredClipboardFormat(formatName string) ([]byte, error) {
 	defer winGlobalUnlock.Call(handle)
 
 	size, _, _ := winGlobalSize.Call(handle)
-	if size == 0 {
-		return nil, errors.New("clipboard PNG data is empty")
+	if err := validateClipboardPNGSize(size); err != nil {
+		return nil, err
 	}
 
 	data := unsafe.Slice((*byte)(unsafe.Pointer(ptr)), int(size))

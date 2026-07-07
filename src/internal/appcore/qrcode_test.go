@@ -44,6 +44,30 @@ func TestQRDiscordContentFormatsMultipleURLs(t *testing.T) {
 	}
 }
 
+func TestQRImageVariantsSkipsUpscalesWhenScaledPixelsExceedLimit(t *testing.T) {
+	img := staticTestImage{rect: image.Rect(0, 0, 2, MaxImagePixels/2)}
+
+	variants := qrImageVariants(img)
+	if len(variants) != 1 {
+		t.Fatalf("len(variants) = %d, want 1: %+v", len(variants), variantNames(variants))
+	}
+	if variants[0].name != "original" {
+		t.Fatalf("variants[0].name = %q, want original", variants[0].name)
+	}
+}
+
+func TestQRImageVariantsKeepsUpscalesWithinLimit(t *testing.T) {
+	img := staticTestImage{rect: image.Rect(0, 0, 16, 16)}
+
+	variants := qrImageVariants(img)
+	names := variantNames(variants)
+	for _, want := range []string{"upscale2", "upscale3", "upscale4"} {
+		if !containsString(names, want) {
+			t.Fatalf("variant names = %+v, want %q", names, want)
+		}
+	}
+}
+
 func compositeQRImage(t *testing.T, values []string) image.Image {
 	t.Helper()
 	const qrSize = 180
@@ -76,4 +100,31 @@ func writeImagePNG(t *testing.T, path string, img image.Image) {
 	if err := os.WriteFile(path, buf.Bytes(), 0600); err != nil {
 		t.Fatal(err)
 	}
+}
+
+type staticTestImage struct {
+	rect image.Rectangle
+}
+
+func (s staticTestImage) ColorModel() color.Model { return color.NRGBAModel }
+
+func (s staticTestImage) Bounds() image.Rectangle { return s.rect }
+
+func (s staticTestImage) At(x, y int) color.Color { return color.White }
+
+func variantNames(variants []qrImageVariant) []string {
+	names := make([]string, 0, len(variants))
+	for _, variant := range variants {
+		names = append(names, variant.name)
+	}
+	return names
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
