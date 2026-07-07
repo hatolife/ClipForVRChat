@@ -51,8 +51,17 @@ AvatarBeacon専用リポジトリのREADMEとUnity配布内READMEから、ClipFo
 
 ## 受け入れ条件
 
-- [ ] AvatarBeacon READMEから指定されたClipForVRChat固有文と確認セクションを削除する。
-- [ ] READMEから前提セクションを削除する。
-- [ ] `AvatarBeacon_12.prefab` の「精度確認や互換検証が必要な場合だけ」文を削除する。
-- [ ] ライセンス表記をAvatarBeacon本体とYL-ATG由来部分に分ける。
-- [ ] 日本語文を `。` ごとに改行する。
+- [x] AvatarBeacon READMEから指定されたClipForVRChat固有文と確認セクションを削除する。
+- [x] READMEから前提セクションを削除する。
+- [x] `AvatarBeacon_12.prefab` の「精度確認や互換検証が必要な場合だけ」文を削除する。
+- [x] ライセンス表記をAvatarBeacon本体とYL-ATG由来部分に分ける。
+- [x] 日本語文を `。` ごとに改行する。
+
+## 完了メモ
+
+- AvatarBeacon専用リポジトリのルートREADMEとUnity配布内READMEを、ClipForVRChat固有説明なしの汎用OSCギミック説明へ修正した。
+- `前提` セクション、指定されたClipForVRChat確認セクション、指定された `AvatarBeacon_12.prefab` 利用誘導文を削除した。
+- AvatarBeacon本体のMIT License本文を `LICENSE` と `Assets/PoppoWorks/AvatarBeacon/LICENSES/AvatarBeacon-MIT.txt` に追加した。
+- READMEのライセンス欄を `AvatarBeacon: MIT License, Copyright (c) 2026 hatolife` と `YL-ATG: MIT License, Copyright (c) 2024 YozoraKurage` が分かる形へ変更した。
+- AvatarBeacon専用リポジトリの最新 `main` は `bddd206`。GitHub Actions CI成功とsource artifact upload成功を確認した。
+- ClipForVRChat側のsubmodule pointerを `bddd206` へ更新し、CI/ReleaseのAvatarBeacon source zip検証に `LICENSE` と `AvatarBeacon-MIT.txt` を追加した。
