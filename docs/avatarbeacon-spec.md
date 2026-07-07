@@ -15,8 +15,8 @@ YL-ATG由来部分は `avatar-gimmicks/AvatarBeacon/Assets/PoppoWorks/AvatarBeac
 - Modular Avatar
 - VRChat Avatar Dynamics Contact / Constraint
 
-CIで作る `AvatarBeacon-*-source.zip` には VRCSDK と Modular Avatar 本体を含めません。
-Unity側で `.unitypackage` を手作業作成するときも、外部依存本体は同梱しません。
+AvatarBeacon側で作る `AvatarBeacon_v0.0.1.unitypackage` には VRCSDK と Modular Avatar 本体を含めません。
+ClipForVRChat側のRelease workflowは、この `.unitypackage` を外部Releaseから取得して通常zipと分離版zipへ同梱します。
 
 ## 追跡対象
 

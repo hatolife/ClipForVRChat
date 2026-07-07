@@ -177,7 +177,7 @@ ONの場合、縮小画像をファイルとして保存します。
 v0.1.8では、設定画面の「自動撮影」タブからVRChat User CameraをOSCで操作し、構図ごとに撮影します。
 `player_local` の basis は `manual` と `avatar_osc` を選べます。`avatar_osc` は専用アバターギミックからOSC Avatar Parametersを受信する経路で、標準OSCだけでは動きません。
 
-AvatarBeacon は `avatar_osc` basis の確認に使う汎用アバターギミックであり、ClipForVRChat専用ではありません。CIでは `AvatarBeacon-vX.Y.Z-source.zip` の元ファイルzipを作成します。source zipをUnity projectへ展開すると `Assets/PoppoWorks/AvatarBeacon/...` になる形を想定します。Prefab構造とparameter仕様は `docs/avatarbeacon-spec.md` に記録します。
+AvatarBeacon は `avatar_osc` basis の確認に使う汎用アバターギミックであり、ClipForVRChat専用ではありません。AvatarBeaconの元ファイルは別リポジトリで管理し、ClipForVRChatのRelease workflowでは外部Releaseの `AvatarBeacon_v0.0.1.unitypackage` を通常zipと分離版zipへ同梱します。Unity projectへimportすると `Assets/PoppoWorks/AvatarBeacon/...` になる形を想定します。Prefab構造とparameter仕様は `docs/avatarbeacon-spec.md` に記録します。
 
 自動撮影スケジュール自体は既定OFFです。開始時撮影は既定ONですが、スケジュール有効時に `avatar_osc` basisが新鮮な状態、またはフォールバックモードが有効な状態になるまで待機してから実行します。VRChat output logからworld/instance情報を読む設定がONの場合は、world metadataが安定するまで待ってから開始します。
 
@@ -796,6 +796,7 @@ GitHub Release の通常利用者向けWindows配布物は、単一化したexe�
 - `Release-signing-public-key.url`
 - `README.md`
 - `LICENSE`
+- `AvatarBeacon_v0.0.1.unitypackage`
 
 zip内の `ClipForVRChat.exe` には、Stream Camera(Spout)受信用のWindows helperである `spout-capture.exe` と、その実行時依存DLLである `SpoutLibrary.dll` を埋め込みます。
 実行時は管理フォルダへhash検証付きで展開し、helperを別プロセスとして起動します。
@@ -817,12 +818,13 @@ GitHub Release には、検証・切り分け用の分離版zipも添付しま�
 - `Release-signing-public-key.url`
 - `README.md`
 - `LICENSE`
+- `AvatarBeacon_v0.0.1.unitypackage`
 
 分離版zipで `spout-capture.exe` または `SpoutLibrary.dll` が欠けている場合は、v0.1.8のStream方式として不完全です。
 
-CIで生成するAvatarBeacon source zipは、GitHub Releaseへ公開添付する標準Assetです。リリース担当者がUnityで `.unitypackage` を手動作成する場合も、このsource zipを元ファイルとして使います。
+AvatarBeaconの配布packageは別リポジトリのReleaseから取得し、ClipForVRChatのGitHub Release公開Assetとしては添付せず、通常zipと分離版zipの中に含めます。
 
-- `AvatarBeacon-vX.Y.Z-source.zip`
+- `AvatarBeacon_v0.0.1.unitypackage`
 
 安全性確認の観点:
 
@@ -830,7 +832,7 @@ CIで生成するAvatarBeacon source zipは、GitHub Releaseへ公開添付す�
 - Spout2はBSD 2-Clause Licenseの `SpoutLibrary` を使用し、GPL-3.0のSpoutRecorder由来コードをコピー、リンク、派生利用しません。
 - `spout-capture.exe` はClipForVRChat本体からタイムアウト付きで起動されるCLI helperで、常駐サービスや自動起動項目として登録しません。
 - `spout-capture.exe` はネットワーク送信を行わず、入力はSpout sender、出力は指定されたPNGファイルと標準出力JSONに限定します。
-- Release確認では、GitHub Release本文が `RELEASE_NOTES.md` から作成されること、Release添付ファイルが通常利用者向けzip、単一exe署名asc、分離版zip、AvatarBeacon source zipの4種類だけであること、各zip内の必須ファイル、不要なSpoutRecorder由来ファイルやデバッグ成果物が含まれないことを確認します。
+- Release確認では、GitHub Release本文が `RELEASE_NOTES.md` から作成されること、Release添付ファイルが通常利用者向けzip、単一exe署名asc、分離版zipの3種類だけであること、各zip内に `AvatarBeacon_v0.0.1.unitypackage` が含まれること、AvatarBeacon source zipや不要なSpoutRecorder由来ファイル、デバッグ成果物が含まれないことを確認します。
 
 Release asset にはsha256、個別exe、build metadataを添付しません。
 
@@ -846,5 +848,4 @@ PGP署名を検証する利用者向け説明では、Release assetに同梱ま�
 ClipForVRChat-vX.Y.Z-windows-amd64.zip
 ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc
 ClipForVRChat-vX.Y.Z-windows-amd64-separated.zip
-AvatarBeacon-vX.Y.Z-source.zip
 ```

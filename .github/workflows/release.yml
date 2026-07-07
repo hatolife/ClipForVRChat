@@ -19,6 +19,8 @@ env:
   NODE_VERSION: "22"
   WAILS_VERSION: "v2.12.0"
   GOVULNCHECK_VERSION: "v1.1.4"
+  AVATARBEACON_PACKAGE_URL: "https://github.com/hatolife/AvatarBeacon/releases/download/v0.0.1/AvatarBeacon_v0.0.1.unitypackage"
+  AVATARBEACON_PACKAGE_NAME: "AvatarBeacon_v0.0.1.unitypackage"
 
 jobs:
   build:
@@ -55,14 +57,12 @@ jobs:
           $releaseTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
           $isPrerelease = $tagName -match '^v\d+\.\d+\.\d+-(a|b|rc)\d+$'
           $assetPrefix = "ClipForVRChat-$tagName"
-          $avatarAssetPrefix = "AvatarBeacon-$tagName-source"
           "app_version=$tagName.$shortSha" >> $env:GITHUB_OUTPUT
           "version=$tagName" >> $env:GITHUB_OUTPUT
           "commit_sha=$commitSha" >> $env:GITHUB_OUTPUT
           "revision=$shortSha" >> $env:GITHUB_OUTPUT
           "release_time=$releaseTime" >> $env:GITHUB_OUTPUT
           "asset_prefix=$assetPrefix" >> $env:GITHUB_OUTPUT
-          "avatar_asset_prefix=$avatarAssetPrefix" >> $env:GITHUB_OUTPUT
           "draft=false" >> $env:GITHUB_OUTPUT
           "prerelease=$($isPrerelease.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
 
@@ -164,12 +164,36 @@ jobs:
           APP_RELEASE_TIME: ${{ steps.version.outputs.release_time }}
         run: wails build -v 2 -m -nosyncgomod -skipbindings -webview2 browser -tags embeddedspout -ldflags "-X main.version=$env:APP_VERSION -X main.revision=$env:APP_REVISION -X main.releaseTime=$env:APP_RELEASE_TIME -X main.buildChannel=release"
 
+      - name: Download AvatarBeacon package
+        id: avatarbeacon
+        shell: pwsh
+        env:
+          AVATARBEACON_PACKAGE_URL: ${{ env.AVATARBEACON_PACKAGE_URL }}
+          AVATARBEACON_PACKAGE_NAME: ${{ env.AVATARBEACON_PACKAGE_NAME }}
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $packagePath = Join-Path "dist" $env:AVATARBEACON_PACKAGE_NAME
+          Invoke-WebRequest -Uri $env:AVATARBEACON_PACKAGE_URL -OutFile $packagePath
+          if (!(Test-Path $packagePath)) {
+            throw "AvatarBeacon package was not downloaded: $packagePath"
+          }
+          $item = Get-Item $packagePath
+          if ($item.Length -le 0) {
+            throw "AvatarBeacon package is empty: $packagePath"
+          }
+          $hash = (Get-FileHash $packagePath -Algorithm SHA256).Hash.ToLower()
+          "package_path=$packagePath" >> $env:GITHUB_OUTPUT
+          "package_name=$env:AVATARBEACON_PACKAGE_NAME" >> $env:GITHUB_OUTPUT
+          "package_url=$env:AVATARBEACON_PACKAGE_URL" >> $env:GITHUB_OUTPUT
+          "package_sha256=$hash" >> $env:GITHUB_OUTPUT
+
       - name: Prepare package directory
         shell: pwsh
         env:
           ASSET_PREFIX: ${{ steps.version.outputs.asset_prefix }}
           SPOUT_HELPER_PATH: ${{ steps.spout.outputs.helper_path }}
           SPOUT_DLL_PATH: ${{ steps.spout.outputs.dll_path }}
+          AVATARBEACON_PACKAGE_PATH: ${{ steps.avatarbeacon.outputs.package_path }}
         run: |
           if (!(Test-Path "src/build/bin/ClipForVRChat.exe")) {
             throw "src/build/bin/ClipForVRChat.exe was not created"
@@ -183,6 +207,7 @@ jobs:
           Copy-Item "README.md" "dist/ClipForVRChat/"
           Copy-Item "LICENSE" "dist/ClipForVRChat/"
           Copy-Item "third_party/Spout2-LICENSE.txt" "dist/ClipForVRChat/"
+          Copy-Item $env:AVATARBEACON_PACKAGE_PATH "dist/ClipForVRChat/"
           @(
             "[InternetShortcut]",
             "URL=https://keys.openpgp.org/search?q=release-signing@hato.life"
@@ -191,6 +216,7 @@ jobs:
           Copy-Item "src/build/bin/ClipForVRChat.exe" "dist/ClipForVRChat-user-package/"
           Copy-Item "README.md" "dist/ClipForVRChat-user-package/"
           Copy-Item "LICENSE" "dist/ClipForVRChat-user-package/"
+          Copy-Item $env:AVATARBEACON_PACKAGE_PATH "dist/ClipForVRChat-user-package/"
           Copy-Item "dist/ClipForVRChat/Release-signing-public-key.url" "dist/ClipForVRChat-user-package/"
 
       - name: Sign executable
@@ -234,67 +260,6 @@ jobs:
             ForEach-Object { "$($_.Hash.ToLower())  $env:ASSET_PREFIX-windows-amd64-separated.zip" } |
             Set-Content "dist/$env:ASSET_PREFIX-windows-amd64-separated.zip.sha256"
 
-      - name: Update AvatarBeacon version metadata
-        env:
-          TAG_NAME: ${{ steps.version.outputs.version }}
-        run: |
-          node scripts/update-avatarbeacon-version.mjs "$env:TAG_NAME"
-          node scripts/update-avatarbeacon-version.mjs "$env:TAG_NAME" --check
-
-      - name: Package AvatarBeacon source zip
-        shell: pwsh
-        env:
-          AVATAR_ASSET_PREFIX: ${{ steps.version.outputs.avatar_asset_prefix }}
-        run: |
-          $sourceRoot = "avatar-gimmicks/AvatarBeacon"
-          if (!(Test-Path $sourceRoot)) {
-            throw "AvatarBeacon source root was not found: $sourceRoot"
-          }
-          $zipName = "$env:AVATAR_ASSET_PREFIX.zip"
-          $zipPath = Join-Path "dist" $zipName
-          $shaPath = "$zipPath.sha256"
-          $checkDir = Join-Path $env:RUNNER_TEMP "avatarbeacon-source-check"
-          Remove-Item -Recurse -Force $checkDir -ErrorAction SilentlyContinue
-          $items = @(
-            Join-Path $sourceRoot "README.md"
-            Join-Path $sourceRoot "LICENSE"
-            Join-Path $sourceRoot "Assets"
-          )
-          if (!$items) {
-            throw "AvatarBeacon source root is empty: $sourceRoot"
-          }
-          Compress-Archive -Path $items -DestinationPath $zipPath -Force
-          $hash = (Get-FileHash $zipPath -Algorithm SHA256).Hash.ToLower()
-          "$hash  $zipName" | Set-Content -Encoding ASCII $shaPath
-          Expand-Archive $zipPath -DestinationPath $checkDir
-          $required = @(
-            "README.md",
-            "LICENSE",
-            "Assets/PoppoWorks/AvatarBeacon",
-            "Assets/PoppoWorks/AvatarBeacon/README.md",
-            "Assets/PoppoWorks/AvatarBeacon/Version.txt",
-            "Assets/PoppoWorks/AvatarBeacon/LICENSES/AvatarBeacon-MIT.txt",
-            "Assets/PoppoWorks/AvatarBeacon/LICENSES/YL-ATG-MIT.txt"
-          )
-          foreach ($path in $required) {
-            if (!(Test-Path (Join-Path $checkDir $path))) {
-              throw "Required AvatarBeacon source file was not created: $path"
-            }
-          }
-          $unexpected = Get-ChildItem $checkDir -Recurse -Force | Where-Object {
-            $_.Name -like "*.unitypackage" -or
-            $_.FullName -match '([\\/])(Library|Temp)([\\/]|$)' -or
-            $_.FullName -match 'VRCSDK|Modular[ _-]?Avatar|ModularAvatar'
-          }
-          if ($unexpected) {
-            $unexpected | ForEach-Object { Write-Error "Unexpected file in AvatarBeacon source zip: $($_.FullName)" }
-            throw "Unexpected files were found in AvatarBeacon source zip"
-          }
-          $shaLine = Get-Content -Raw $shaPath
-          if ($shaLine.Trim() -ne "$hash  $zipName") {
-            throw "AvatarBeacon source zip sha256 file does not match"
-          }
-
       - name: Write build metadata
         shell: pwsh
         env:
@@ -307,6 +272,9 @@ jobs:
           ASSET_PREFIX: ${{ steps.version.outputs.asset_prefix }}
           SPOUT_HELPER_SHA256: ${{ steps.spout.outputs.helper_sha256 }}
           SPOUT_DLL_SHA256: ${{ steps.spout.outputs.dll_sha256 }}
+          AVATARBEACON_PACKAGE_URL: ${{ steps.avatarbeacon.outputs.package_url }}
+          AVATARBEACON_PACKAGE_NAME: ${{ steps.avatarbeacon.outputs.package_name }}
+          AVATARBEACON_PACKAGE_SHA256: ${{ steps.avatarbeacon.outputs.package_sha256 }}
         run: |
           $metadata = [ordered]@{
             tag = $env:TAG_NAME
@@ -325,6 +293,12 @@ jobs:
               librarySha256 = $env:SPOUT_DLL_SHA256
               source = "embedded in main exe and included in separated zip"
             }
+            avatarBeacon = [ordered]@{
+              package = $env:AVATARBEACON_PACKAGE_NAME
+              packageSha256 = $env:AVATARBEACON_PACKAGE_SHA256
+              source = $env:AVATARBEACON_PACKAGE_URL
+              distribution = "included in normal and separated zip"
+            }
           }
           $metadata | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 "dist/$env:ASSET_PREFIX-build-metadata.json"
 
@@ -333,10 +307,14 @@ jobs:
         env:
           ASSET_PREFIX: ${{ steps.version.outputs.asset_prefix }}
           TAG_NAME: ${{ steps.version.outputs.version }}
+          AVATARBEACON_PACKAGE_NAME: ${{ env.AVATARBEACON_PACKAGE_NAME }}
         run: |
           $expectedUserZipSignature = "$env:ASSET_PREFIX-windows-amd64.exe.asc"
+          $expectedAvatarBeaconPackage = $env:AVATARBEACON_PACKAGE_NAME
           $unexpected = Get-ChildItem dist -Recurse -File | Where-Object {
             $_.Name -like "*release-signing-public-key.asc" -or
+            $_.Name -like "AvatarBeacon-*-source.zip" -or
+            $_.Name -like "AvatarBeacon-*-source.zip.sha256" -or
             ($_.FullName -like "*\dist\ClipForVRChat\*" -and $_.Extension -eq ".asc") -or
             ($_.FullName -like "*\dist\ClipForVRChat-user-package\*" -and $_.Extension -eq ".asc" -and $_.Name -ne $expectedUserZipSignature)
           }
@@ -353,6 +331,7 @@ jobs:
           $unexpectedUserZipFiles = Get-ChildItem $userZipCheckDir -Recurse -File | Where-Object {
             $_.Name -like "*release-signing-public-key.asc" -or
             ($_.Extension -eq ".asc" -and $_.Name -ne $expectedUserZipSignature) -or
+            ($_.Extension -eq ".unitypackage" -and $_.Name -ne $expectedAvatarBeaconPackage) -or
             $_.Name -in @("spout-capture.exe", "SpoutLibrary.dll", "Spout2-LICENSE.txt")
           }
           if ($unexpectedUserZipFiles) {
@@ -360,41 +339,14 @@ jobs:
             throw "Unexpected files were found in normal release zip"
           }
           $unexpectedSeparatedZipFiles = Get-ChildItem $zipCheckDir -Recurse -File | Where-Object {
-            $_.Name -like "*release-signing-public-key.asc" -or $_.Extension -eq ".asc"
+            $_.Name -like "*release-signing-public-key.asc" -or
+            $_.Name -like "AvatarBeacon-*-source.zip" -or
+            $_.Extension -eq ".asc" -or
+            ($_.Extension -eq ".unitypackage" -and $_.Name -ne $expectedAvatarBeaconPackage)
           }
           if ($unexpectedSeparatedZipFiles) {
             $unexpectedSeparatedZipFiles | ForEach-Object { Write-Error "Unexpected file in separated release zip: $($_.FullName)" }
             throw "Unexpected files were found in separated release zip"
-          }
-          $avatarZipCheckDir = Join-Path $env:RUNNER_TEMP "release-avatarbeacon-zip-check"
-          Remove-Item -Recurse -Force $avatarZipCheckDir -ErrorAction SilentlyContinue
-          Expand-Archive "dist/AvatarBeacon-$env:TAG_NAME-source.zip" -DestinationPath $avatarZipCheckDir
-          $avatarRequired = @(
-            "README.md",
-            "Assets/PoppoWorks/AvatarBeacon",
-            "Assets/PoppoWorks/AvatarBeacon/README.md",
-            "Assets/PoppoWorks/AvatarBeacon/Version.txt",
-            "Assets/PoppoWorks/AvatarBeacon/LICENSES/YL-ATG-MIT.txt"
-          )
-          foreach ($path in $avatarRequired) {
-            if (!(Test-Path (Join-Path $avatarZipCheckDir $path))) {
-              throw "Required AvatarBeacon source zip file was not created: $path"
-            }
-          }
-          $avatarUnexpected = Get-ChildItem $avatarZipCheckDir -Recurse -Force | Where-Object {
-            $_.Name -like "*.unitypackage" -or
-            $_.FullName -match '([\\/])(Library|Temp)([\\/]|$)' -or
-            $_.FullName -match 'VRCSDK|Modular[ _-]?Avatar|ModularAvatar'
-          }
-          if ($avatarUnexpected) {
-            $avatarUnexpected | ForEach-Object { Write-Error "Unexpected file in AvatarBeacon source zip: $($_.FullName)" }
-            throw "Unexpected files were found in AvatarBeacon source zip"
-          }
-          $avatarShaFile = "dist/AvatarBeacon-$env:TAG_NAME-source.zip.sha256"
-          $avatarShaLine = Get-Content -Raw $avatarShaFile
-          $avatarHash = (Get-FileHash "dist/AvatarBeacon-$env:TAG_NAME-source.zip" -Algorithm SHA256).Hash.ToLower()
-          if ($avatarShaLine.Trim() -ne "$avatarHash  AvatarBeacon-$env:TAG_NAME-source.zip") {
-            throw "AvatarBeacon source zip sha256 file does not match"
           }
           & "dist/ClipForVRChat/spout-capture.exe" --help
           & "dist/ClipForVRChat/spout-capture.exe" --version
@@ -407,13 +359,13 @@ jobs:
             "dist/$env:ASSET_PREFIX-windows-amd64.zip.sha256",
             "dist/$env:ASSET_PREFIX-windows-amd64-separated.zip",
             "dist/$env:ASSET_PREFIX-windows-amd64-separated.zip.sha256",
-            "dist/AvatarBeacon-$env:TAG_NAME-source.zip",
-            "dist/AvatarBeacon-$env:TAG_NAME-source.zip.sha256",
+            "dist/$expectedAvatarBeaconPackage",
             "dist/$env:ASSET_PREFIX-build-metadata.json",
             "dist/ClipForVRChat/ClipForVRChat.exe",
             "dist/ClipForVRChat/README.md",
             "dist/ClipForVRChat/LICENSE",
             "dist/ClipForVRChat/Release-signing-public-key.url",
+            "dist/ClipForVRChat/$expectedAvatarBeaconPackage",
             "dist/ClipForVRChat/spout-capture.exe",
             "dist/ClipForVRChat/SpoutLibrary.dll",
             "dist/ClipForVRChat/Spout2-LICENSE.txt"
@@ -428,7 +380,8 @@ jobs:
             "README.md",
             "LICENSE",
             "Release-signing-public-key.url",
-            "$env:ASSET_PREFIX-windows-amd64.exe.asc"
+            "$env:ASSET_PREFIX-windows-amd64.exe.asc",
+            "$expectedAvatarBeaconPackage"
           )
           foreach ($name in $requiredZip) {
             if (!(Test-Path (Join-Path $userZipCheckDir $name))) {
@@ -442,7 +395,8 @@ jobs:
             "Release-signing-public-key.url",
             "spout-capture.exe",
             "SpoutLibrary.dll",
-            "Spout2-LICENSE.txt"
+            "Spout2-LICENSE.txt",
+            "$expectedAvatarBeaconPackage"
           )
           foreach ($name in $requiredSeparatedZip) {
             if (!(Test-Path (Join-Path $zipCheckDir $name))) {
@@ -464,7 +418,8 @@ jobs:
             "README.md",
             "LICENSE",
             "Release-signing-public-key.url",
-            "$env:ASSET_PREFIX-windows-amd64.exe.asc"
+            "$env:ASSET_PREFIX-windows-amd64.exe.asc",
+            "$expectedAvatarBeaconPackage"
           )
           $actualUserZipFiles = Get-ChildItem $userZipCheckDir -Recurse -File
           $extraUserZip = $actualUserZipFiles | Where-Object {
@@ -474,9 +429,23 @@ jobs:
             $extraUserZip | ForEach-Object { Write-Error "Unexpected normal release zip file: $($_.FullName)" }
             throw "Unexpected files were found in normal release zip"
           }
-          $avatarHashLine = Get-Content -Raw "dist/AvatarBeacon-$env:TAG_NAME-source.zip.sha256"
-          if ($avatarHashLine.Trim() -ne "$avatarHash  AvatarBeacon-$env:TAG_NAME-source.zip") {
-            throw "AvatarBeacon source zip sha256 file does not match"
+          $allowedSeparatedZip = @(
+            "ClipForVRChat.exe",
+            "README.md",
+            "LICENSE",
+            "Release-signing-public-key.url",
+            "spout-capture.exe",
+            "SpoutLibrary.dll",
+            "Spout2-LICENSE.txt",
+            "$expectedAvatarBeaconPackage"
+          )
+          $actualSeparatedZipFiles = Get-ChildItem $zipCheckDir -Recurse -File
+          $extraSeparatedZip = $actualSeparatedZipFiles | Where-Object {
+            $_.DirectoryName -ne $zipCheckDir -or $_.Name -notin $allowedSeparatedZip
+          }
+          if ($extraSeparatedZip) {
+            $extraSeparatedZip | ForEach-Object { Write-Error "Unexpected separated release zip file: $($_.FullName)" }
+            throw "Unexpected files were found in separated release zip"
           }
 
       - name: Prepare release notes
@@ -499,7 +468,6 @@ jobs:
             dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64.exe.asc
             dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64.zip
             dist/${{ steps.version.outputs.asset_prefix }}-windows-amd64-separated.zip
-            dist/AvatarBeacon-${{ steps.version.outputs.version }}-source.zip
             dist/release-body.md
 
   release:
@@ -544,7 +512,6 @@ jobs:
             "ClipForVRChat-${TAG_NAME}-windows-amd64.zip"
             "ClipForVRChat-${TAG_NAME}-windows-amd64.exe.asc"
             "ClipForVRChat-${TAG_NAME}-windows-amd64-separated.zip"
-            "AvatarBeacon-${TAG_NAME}-source.zip"
           )
           mapfile -t existing_assets < <(gh release view "$TAG_NAME" --json assets --jq '.assets[].name')
           for asset in "${existing_assets[@]}"; do
@@ -562,5 +529,4 @@ jobs:
           gh release upload "$TAG_NAME" --clobber \
             "dist/ClipForVRChat-${TAG_NAME}-windows-amd64.zip" \
             "dist/ClipForVRChat-${TAG_NAME}-windows-amd64.exe.asc" \
-            "dist/ClipForVRChat-${TAG_NAME}-windows-amd64-separated.zip" \
-            "dist/AvatarBeacon-${TAG_NAME}-source.zip"
+            "dist/ClipForVRChat-${TAG_NAME}-windows-amd64-separated.zip"

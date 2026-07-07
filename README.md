@@ -106,9 +106,9 @@ Stream方式はVRChat Stream CameraのSpout映像を内蔵の `spout-capture.exe
 
 安全性を確認しやすいように、`spout-capture.exe` の役割は限定しています。利用可能なSpout senderの列挙、指定senderからの1フレーム受信、指定された保存先へのPNG書き込み、結果JSONの出力だけを行います。Discord Webhook URLや設定ファイルを読み取らず、画像や設定を外部へ送信するネットワーク通信も行いません。`SpoutLibrary.dll` はSpout2 SDKの実行時DLLで、`spout-capture.exe` がsender列挙とフレーム受信に使います。ヘルパーのソースは `tools/spout-capture/main.cpp`、ビルド設定は `tools/spout-capture/CMakeLists.txt` にあり、Spout2はBSD 2-Clause Licenseの `SpoutLibrary` を使用します。
 
-配布物を確認するときは、公式Releaseまたは公式配布元から通常利用者向けzipを取得してください。通常利用者向けzipには `ClipForVRChat.exe`、`ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc`、`Release-signing-public-key.url`、`README.md`、`LICENSE` が入ります。PGP署名まで確認する場合は、zip内の `ClipForVRChat.exe` と `.exe.asc` を検証してください。
+配布物を確認するときは、公式Releaseまたは公式配布元から通常利用者向けzipを取得してください。通常利用者向けzipには `ClipForVRChat.exe`、`ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc`、`Release-signing-public-key.url`、`README.md`、`LICENSE`、`AvatarBeacon_v0.0.1.unitypackage` が入ります。PGP署名まで確認する場合は、zip内の `ClipForVRChat.exe` と `.exe.asc` を検証してください。
 
-Release Assetsには、検証・切り分け用に `ClipForVRChat-vX.Y.Z-windows-amd64-separated.zip` も添付します。このzipには `ClipForVRChat.exe`、`spout-capture.exe`、`SpoutLibrary.dll`、`Spout2-LICENSE.txt` が入ります。helper単体確認や外部helper指定での切り分けが必要な場合だけ使用してください。`spout-capture.exe` だけ、または `SpoutLibrary.dll` だけではStream方式は動作しません。
+Release Assetsには、検証・切り分け用に `ClipForVRChat-vX.Y.Z-windows-amd64-separated.zip` も添付します。このzipには `ClipForVRChat.exe`、`spout-capture.exe`、`SpoutLibrary.dll`、`Spout2-LICENSE.txt`、`AvatarBeacon_v0.0.1.unitypackage` が入ります。helper単体確認や外部helper指定での切り分けが必要な場合だけ使用してください。`spout-capture.exe` だけ、または `SpoutLibrary.dll` だけではStream方式は動作しません。
 
 Stream方式で `Spout helperが見つかりません`、`Spout helperは見つかりましたが実行確認に失敗しました` と表示される場合は、単一exe版を使っているか、分離版zipを使う場合は `spout-capture.exe` と `SpoutLibrary.dll` が両方残っているか確認してください。
 
@@ -118,7 +118,7 @@ Stream方式で `Spout helperが見つかりません`、`Spout helperは見つ�
 
 AvatarBeaconが使えない環境では、フォールバックモードを使えます。フォールバックモードでは、VRChat内であらかじめ配置したローカルアンカーCameraを使うため、ClipForVRChatはCamera Poseを送信しません。AvatarBeacon未受信時の自動ON、受信復帰時の自動OFFも設定できますが、どちらも既定OFFです。
 
-AvatarBeacon は `avatar_osc` basis 確認用の汎用アバターギミックで、ClipForVRChat専用ではありません。CIは `AvatarBeacon-vX.Y.Z-source.zip` の元ファイルzipを作成します。source zipをUnity projectへ展開すると `Assets/PoppoWorks/AvatarBeacon/...` になる形を想定しています。
+AvatarBeacon は `avatar_osc` basis 確認用の汎用アバターギミックで、ClipForVRChat専用ではありません。AvatarBeaconの元ファイルは別リポジトリで管理し、ClipForVRChatの通常zipと分離版zipには当面 `AvatarBeacon_v0.0.1.unitypackage` を同梱します。Unityへimportすると `Assets/PoppoWorks/AvatarBeacon/...` が追加される形を想定しています。
 
 RC確認時の詳しい確認手順は、`docs/v0.1.8-stream-spout-verification.md`、`docs/v0.1.8-player-local-verification.md`、`docs/v0.1.8-embedded-metadata-verification.md` を参照してください。
 

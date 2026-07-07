@@ -12,6 +12,7 @@
 - 自動撮影画像にsidecar JSONとPNG/JPEGメタデータを保存し、VRChat output logから推定した同席ユーザー、world ID、instance IDも記録できるようにしました。
 - 自動撮影結果を既存の結果/履歴画面、ローカル保存、Discord投稿へ統合しました。専用Webhook URLが空欄の場合は通常投稿用Webhook URLへフォールバックします。
 - AvatarBeaconからOSC Avatar Parametersで受け取る `avatar_osc` basisを使い、プレイヤー基準の構図をアバター位置と向きに追従できるようにしました。
+- AvatarBeaconの `AvatarBeacon_v0.0.1.unitypackage` を通常利用者向けzipと分離版zipへ同梱するようにしました。
 - 設定画面に「OSC」タブを追加し、OSC送受信ポート、カメラOSCリセット、AvatarBeacon受信状態、player_local basis取得元をまとめました。
 - VRChatから受信したOSC packetを別UDPポートへ転送できるようにし、他OSC受信アプリとのポート競合を避けやすくしました。
 - Stream Camera(Spout)取得の起動待ち、空フレーム待ち、PNG書き出し、失敗画像の隔離を改善し、Stream方式の撮影失敗を減らしました。
