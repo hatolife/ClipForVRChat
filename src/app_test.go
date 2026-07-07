@@ -446,25 +446,25 @@ func TestAppLatestPlayerLocalBasisAvatarOSC(t *testing.T) {
 	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.MaxAbsForward = 2000
 	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
 	app.avatarOSCBasisSamples = map[string]avatarOSCBasisSample{
-		"coord/x":       {Float: 0.877, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
-		"coord/xSign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
-		"coord/y":       {Float: 0.544, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
-		"coord/ySign":   {Float: 0, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
-		"coord/z":       {Float: 0.211, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
-		"coord/zSign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
-		"forward/x":     {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
-		"forward/xSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
-		"forward/y":     {Float: 0.5, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
-		"forward/ySign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
-		"forward/z":     {Float: 0, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
-		"forward/zSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/coord/x":       {Float: 0.877, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/coord/xSign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/coord/y":       {Float: 0.544, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/coord/ySign":   {Float: 0, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/coord/z":       {Float: 0.211, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/coord/zSign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/forward/x":     {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/forward/xSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/forward/y":     {Float: 0.5, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/forward/ySign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/forward/z":     {Float: 0, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/forward/zSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
 	}
 
 	got := app.latestPlayerLocalBasisLocked(app.state.Config, now)
 	if got.Source != "avatar_osc" || got.Status != "ready" || !got.Fresh {
 		t.Fatalf("snapshot = %+v", got)
 	}
-	if got.ParameterPrefix != "coord" || got.RawSampleCount != 12 || got.LastReceivedAddress == "" {
+	if got.ParameterPrefix != "avatar_beacon" || got.RawSampleCount != 12 || got.LastReceivedAddress == "" {
 		t.Fatalf("unexpected raw OSC status: %+v", got)
 	}
 	if math.Abs(got.Pose.Position.X-123) > 0.000001 || math.Abs(got.Pose.Position.Y+456) > 0.000001 || math.Abs(got.Pose.Position.Z-789) > 0.000001 {
@@ -488,7 +488,7 @@ func TestAppAvatarOSCBasisStatusIgnoresManualBasisMissing(t *testing.T) {
 	if strings.Contains(got.Error, "プレイヤー基準Pose") {
 		t.Fatalf("error = %q, want avatar OSC diagnostic", got.Error)
 	}
-	if !strings.Contains(got.Error, "avatar OSC parameter") || !strings.Contains(got.Error, "coord/* / forward/*") {
+	if !strings.Contains(got.Error, "avatar OSC parameter") || !strings.Contains(got.Error, "avatar_beacon/coord/* / avatar_beacon/forward/*") {
 		t.Fatalf("error = %q, want AvatarBeacon basis guidance", got.Error)
 	}
 }
@@ -501,18 +501,18 @@ func TestAppAvatarOSCBasisStatusResolvesEvenWhenManualBasisMissing(t *testing.T)
 	app.state.Config.AutoCapture.PlayerLocal.Calibrated = false
 	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
 	app.avatarOSCBasisSamples = map[string]avatarOSCBasisSample{
-		"coord/x":       {Float: 0.8, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
-		"coord/xSign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
-		"coord/y":       {Float: 0.5, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
-		"coord/ySign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
-		"coord/z":       {Float: 0.2, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
-		"coord/zSign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
-		"forward/x":     {Float: 0, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
-		"forward/xSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
-		"forward/y":     {Float: 0, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
-		"forward/ySign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
-		"forward/z":     {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
-		"forward/zSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/coord/x":       {Float: 0.8, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/coord/xSign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/coord/y":       {Float: 0.5, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/coord/ySign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/coord/z":       {Float: 0.2, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/coord/zSign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/forward/x":     {Float: 0, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/forward/xSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/forward/y":     {Float: 0, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/forward/ySign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/forward/z":     {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"avatar_beacon/forward/zSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
 	}
 
 	got := app.latestAvatarOSCBasisSnapshotLocked(app.state.Config, now)
@@ -532,19 +532,19 @@ func TestAppAvatarOSCBasisStatusExplainsStaleWithNonBasisLastParameter(t *testin
 	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
 	staleAt := now.Add(-31 * time.Second)
 	app.avatarOSCBasisSamples = map[string]avatarOSCBasisSample{
-		"coord/x":       {Float: 0.8, HasFloat: true, ReceivedAt: staleAt},
-		"coord/xSign":   {Float: 1, HasFloat: true, ReceivedAt: staleAt},
-		"coord/y":       {Float: 0.5, HasFloat: true, ReceivedAt: staleAt},
-		"coord/ySign":   {Float: 1, HasFloat: true, ReceivedAt: staleAt},
-		"coord/z":       {Float: 0.2, HasFloat: true, ReceivedAt: staleAt},
-		"coord/zSign":   {Float: 1, HasFloat: true, ReceivedAt: staleAt},
-		"forward/x":     {Float: 1, HasFloat: true, ReceivedAt: staleAt},
-		"forward/xSign": {Float: 1, HasFloat: true, ReceivedAt: staleAt},
-		"forward/y":     {Float: 0, HasFloat: true, ReceivedAt: staleAt},
-		"forward/ySign": {Float: 1, HasFloat: true, ReceivedAt: staleAt},
-		"forward/z":     {Float: 0, HasFloat: true, ReceivedAt: staleAt},
-		"forward/zSign": {Float: 1, HasFloat: true, ReceivedAt: staleAt},
-		"Ahoge_Angle":   {Float: 0.4, HasFloat: true, ReceivedAt: now},
+		"avatar_beacon/coord/x":       {Float: 0.8, HasFloat: true, ReceivedAt: staleAt},
+		"avatar_beacon/coord/xSign":   {Float: 1, HasFloat: true, ReceivedAt: staleAt},
+		"avatar_beacon/coord/y":       {Float: 0.5, HasFloat: true, ReceivedAt: staleAt},
+		"avatar_beacon/coord/ySign":   {Float: 1, HasFloat: true, ReceivedAt: staleAt},
+		"avatar_beacon/coord/z":       {Float: 0.2, HasFloat: true, ReceivedAt: staleAt},
+		"avatar_beacon/coord/zSign":   {Float: 1, HasFloat: true, ReceivedAt: staleAt},
+		"avatar_beacon/forward/x":     {Float: 1, HasFloat: true, ReceivedAt: staleAt},
+		"avatar_beacon/forward/xSign": {Float: 1, HasFloat: true, ReceivedAt: staleAt},
+		"avatar_beacon/forward/y":     {Float: 0, HasFloat: true, ReceivedAt: staleAt},
+		"avatar_beacon/forward/ySign": {Float: 1, HasFloat: true, ReceivedAt: staleAt},
+		"avatar_beacon/forward/z":     {Float: 0, HasFloat: true, ReceivedAt: staleAt},
+		"avatar_beacon/forward/zSign": {Float: 1, HasFloat: true, ReceivedAt: staleAt},
+		"Ahoge_Angle":                 {Float: 0.4, HasFloat: true, ReceivedAt: now},
 	}
 
 	got := app.latestAvatarOSCBasisSnapshotLocked(app.state.Config, now)
@@ -557,7 +557,7 @@ func TestAppAvatarOSCBasisStatusExplainsStaleWithNonBasisLastParameter(t *testin
 	if got.LastReceivedAddress != "Ahoge_Angle" {
 		t.Fatalf("last address = %q, want Ahoge_Angle", got.LastReceivedAddress)
 	}
-	for _, want := range []string{"coord/* / forward/*", "AvatarBeaconのbasis parameterではありません", "Ahoge_Angle"} {
+	for _, want := range []string{"avatar_beacon/coord/* / avatar_beacon/forward/*", "AvatarBeaconのbasis parameterではありません", "Ahoge_Angle"} {
 		if !strings.Contains(got.Error, want) {
 			t.Fatalf("error = %q, want %q", got.Error, want)
 		}
@@ -571,7 +571,7 @@ func TestAppRebuildAvatarOSCBasisDoesNotRepeatPartialLog(t *testing.T) {
 	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
 	now := time.Date(2026, 7, 3, 12, 0, 0, 0, time.UTC)
 	app.avatarOSCBasisSamples = map[string]avatarOSCBasisSample{
-		"coord/x": {Float: 0.8, HasFloat: true, ReceivedAt: now},
+		"avatar_beacon/coord/x": {Float: 0.8, HasFloat: true, ReceivedAt: now},
 	}
 
 	app.rebuildAvatarOSCBasisLocked(now, logPath)
@@ -898,10 +898,10 @@ func TestAppAvatarOSCBasisAddressAffectsBasisOnlyForConfiguredAxes(t *testing.T)
 	cfg := appcore.DefaultConfig()
 
 	for _, address := range []string{
-		"/avatar/parameters/coord/x",
-		"/avatar/parameters/coord/xSign",
-		"/avatar/parameters/forward/z",
-		"/avatar/parameters/forward/zSign",
+		"/avatar/parameters/avatar_beacon/coord/x",
+		"/avatar/parameters/avatar_beacon/coord/xSign",
+		"/avatar/parameters/avatar_beacon/forward/z",
+		"/avatar/parameters/avatar_beacon/forward/zSign",
 	} {
 		if !app.avatarOSCBasisAddressAffectsBasisLocked(address, cfg) {
 			t.Fatalf("%s should affect AvatarBeacon basis", address)
@@ -910,7 +910,7 @@ func TestAppAvatarOSCBasisAddressAffectsBasisOnlyForConfiguredAxes(t *testing.T)
 	for _, address := range []string{
 		"/avatar/parameters/GestureLeft",
 		"/avatar/parameters/Viseme",
-		"/avatar/parameters/coord/debug",
+		"/avatar/parameters/avatar_beacon/coord/debug",
 	} {
 		if app.avatarOSCBasisAddressAffectsBasisLocked(address, cfg) {
 			t.Fatalf("%s should not affect AvatarBeacon basis", address)
@@ -926,22 +926,65 @@ func TestAppFormatAvatarOSCBasisValuesOmitsDebugPing(t *testing.T) {
 	if strings.Contains(got, "avatar_beacon/debug/ping") {
 		t.Fatalf("summary values include removed debug ping: %q", got)
 	}
-	for _, want := range []string{"coord/x=<missing>", "forward/zSign=<missing>"} {
+	for _, want := range []string{"avatar_beacon/coord/x=<missing>", "avatar_beacon/forward/z=<missing>"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("summary values = %q, want %q", got, want)
 		}
 	}
 }
 
+func TestAppAvatarOSCBasisStatusSupportsMainWithoutSignParameters(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+	now := time.Date(2026, 7, 7, 12, 0, 0, 0, time.UTC)
+	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
+	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.PositionScale = 1000
+	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.InvertMagnitude = true
+	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.PositiveFlagThreshold = 0
+	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.MaxAbsPosition = 2000
+	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.MaxAbsForward = 2000
+	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
+	app.avatarOSCBasisSamples = map[string]avatarOSCBasisSample{
+		"avatar_beacon/coord/x":   {Float: 0.75, HasFloat: true, ReceivedAt: now.Add(-time.Second)}, // +0.5
+		"avatar_beacon/coord/y":   {Float: 0.25, HasFloat: true, ReceivedAt: now.Add(-time.Second)}, // -0.5
+		"avatar_beacon/coord/z":   {Float: 0.5, HasFloat: true, ReceivedAt: now.Add(-time.Second)},  // 0
+		"avatar_beacon/forward/x": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},    // +1
+		"avatar_beacon/forward/y": {Float: 0.5, HasFloat: true, ReceivedAt: now.Add(-time.Second)},  // 0
+		"avatar_beacon/forward/z": {Float: 0.5, HasFloat: true, ReceivedAt: now.Add(-time.Second)},  // 0
+	}
+
+	got := app.latestAvatarOSCBasisSnapshotLocked(app.state.Config, now)
+	if got.Source != "avatar_osc" || got.Status != "ready" || !got.Fresh {
+		t.Fatalf("snapshot = %+v, want ready avatar_osc", got)
+	}
+	if got.RawSampleCount != 6 {
+		t.Fatalf("RawSampleCount = %d, want 6", got.RawSampleCount)
+	}
+	if math.Abs(got.Pose.Position.X-500) > 0.000001 || math.Abs(got.Pose.Position.Y+500) > 0.000001 || math.Abs(got.Pose.Position.Z) > 0.000001 {
+		t.Fatalf("pose = %+v", got.Pose)
+	}
+	if math.Abs(got.Pose.Rotation.Y-90) > 0.000001 {
+		t.Fatalf("rotation = %+v", got.Pose.Rotation)
+	}
+}
+
+func TestAvatarOSCBasisAddressSchemeDoesNotFallbackToLegacyCoordForward(t *testing.T) {
+	scheme, positionRoot, forwardRoot, signSuffix := avatarOSCBasisAddressScheme("coord")
+
+	if scheme != "custom" || positionRoot != "coord/p" || forwardRoot != "coord/f" || signSuffix != "Sign" {
+		t.Fatalf("scheme = %q %q %q %q, want custom coord/p coord/f Sign", scheme, positionRoot, forwardRoot, signSuffix)
+	}
+}
+
 func TestLatestAvatarOSCSampleTimeUsesLatestBasisParameter(t *testing.T) {
 	now := time.Date(2026, 7, 4, 6, 0, 0, 0, time.UTC)
 	got := latestAvatarOSCSampleTime(map[string]avatarOSCBasisSample{
-		"coord/x":     {Float: 1, HasFloat: true, ReceivedAt: now.Add(-30 * time.Second)},
-		"coord/y":     {Float: 1, HasFloat: true, ReceivedAt: now.Add(-20 * time.Second)},
-		"coord/z":     {Float: 1, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
-		"forward/y":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
-		"Ahoge_Angle": {Float: 1, HasFloat: true, ReceivedAt: now},
-	}, "coord", "forward", "Sign")
+		"avatar_beacon/coord/x":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-30 * time.Second)},
+		"avatar_beacon/coord/y":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-20 * time.Second)},
+		"avatar_beacon/coord/z":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-10 * time.Second)},
+		"avatar_beacon/forward/y": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-time.Second)},
+		"Ahoge_Angle":             {Float: 1, HasFloat: true, ReceivedAt: now},
+	}, "avatar_beacon/coord", "avatar_beacon/forward", "Sign")
 	if !got.Equal(now.Add(-time.Second)) {
 		t.Fatalf("latestAvatarOSCSampleTime = %s, want %s", got, now.Add(-time.Second))
 	}
@@ -980,18 +1023,18 @@ func TestAppPrepareAutoCaptureConfigKeepsFallbackOffAfterAvatarBeaconTimeout(t *
 	app.state.Config.AutoCapture.Capture.AutoEnablePreplaced = false
 	app.state.Config.AutoCapture.Capture.AutoDisablePreplaced = false
 	app.avatarOSCBasisSamples = map[string]avatarOSCBasisSample{
-		"coord/x":       {Float: 0.8, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
-		"coord/xSign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
-		"coord/y":       {Float: 0.5, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
-		"coord/ySign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
-		"coord/z":       {Float: 0.2, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
-		"coord/zSign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
-		"forward/x":     {Float: 1, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
-		"forward/xSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
-		"forward/y":     {Float: 0, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
-		"forward/ySign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
-		"forward/z":     {Float: 0, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
-		"forward/zSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
+		"avatar_beacon/coord/x":       {Float: 0.8, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
+		"avatar_beacon/coord/xSign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
+		"avatar_beacon/coord/y":       {Float: 0.5, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
+		"avatar_beacon/coord/ySign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
+		"avatar_beacon/coord/z":       {Float: 0.2, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
+		"avatar_beacon/coord/zSign":   {Float: 1, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
+		"avatar_beacon/forward/x":     {Float: 1, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
+		"avatar_beacon/forward/xSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
+		"avatar_beacon/forward/y":     {Float: 0, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
+		"avatar_beacon/forward/ySign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
+		"avatar_beacon/forward/z":     {Float: 0, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
+		"avatar_beacon/forward/zSign": {Float: 1, HasFloat: true, ReceivedAt: now.Add(-31 * time.Second)},
 	}
 
 	app.mu.Lock()
@@ -1127,18 +1170,18 @@ func TestAppMoveCameraToViewUsesAvatarOSCBasis(t *testing.T) {
 
 func readyAvatarOSCBasisSamples(now time.Time) map[string]avatarOSCBasisSample {
 	return map[string]avatarOSCBasisSample{
-		"coord/x":       {Float: 0.8, HasFloat: true, ReceivedAt: now},
-		"coord/xSign":   {Float: 1, HasFloat: true, ReceivedAt: now},
-		"coord/y":       {Float: 0.5, HasFloat: true, ReceivedAt: now},
-		"coord/ySign":   {Float: 1, HasFloat: true, ReceivedAt: now},
-		"coord/z":       {Float: 0.2, HasFloat: true, ReceivedAt: now},
-		"coord/zSign":   {Float: 1, HasFloat: true, ReceivedAt: now},
-		"forward/x":     {Float: 1, HasFloat: true, ReceivedAt: now},
-		"forward/xSign": {Float: 1, HasFloat: true, ReceivedAt: now},
-		"forward/y":     {Float: 0, HasFloat: true, ReceivedAt: now},
-		"forward/ySign": {Float: 1, HasFloat: true, ReceivedAt: now},
-		"forward/z":     {Float: 0, HasFloat: true, ReceivedAt: now},
-		"forward/zSign": {Float: 1, HasFloat: true, ReceivedAt: now},
+		"avatar_beacon/coord/x":       {Float: 0.8, HasFloat: true, ReceivedAt: now},
+		"avatar_beacon/coord/xSign":   {Float: 1, HasFloat: true, ReceivedAt: now},
+		"avatar_beacon/coord/y":       {Float: 0.5, HasFloat: true, ReceivedAt: now},
+		"avatar_beacon/coord/ySign":   {Float: 1, HasFloat: true, ReceivedAt: now},
+		"avatar_beacon/coord/z":       {Float: 0.2, HasFloat: true, ReceivedAt: now},
+		"avatar_beacon/coord/zSign":   {Float: 1, HasFloat: true, ReceivedAt: now},
+		"avatar_beacon/forward/x":     {Float: 1, HasFloat: true, ReceivedAt: now},
+		"avatar_beacon/forward/xSign": {Float: 1, HasFloat: true, ReceivedAt: now},
+		"avatar_beacon/forward/y":     {Float: 0, HasFloat: true, ReceivedAt: now},
+		"avatar_beacon/forward/ySign": {Float: 1, HasFloat: true, ReceivedAt: now},
+		"avatar_beacon/forward/z":     {Float: 0, HasFloat: true, ReceivedAt: now},
+		"avatar_beacon/forward/zSign": {Float: 1, HasFloat: true, ReceivedAt: now},
 	}
 }
 
@@ -1234,7 +1277,7 @@ func TestAppWaitForAutoCaptureStartReadinessWaitsForAvatarOSCBasis(t *testing.T)
 	app.state.Config.AutoCapture.Capture.PreplacedLocalAnchor = appBoolPtr(false)
 	app.state.Config.AutoCapture.Presence.WatchOutputLog = false
 	app.avatarOSCBasisSamples = map[string]avatarOSCBasisSample{
-		"coord/x": {Float: 0.8, HasFloat: true, ReceivedAt: time.Now()},
+		"avatar_beacon/coord/x": {Float: 0.8, HasFloat: true, ReceivedAt: time.Now()},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()

@@ -2636,7 +2636,7 @@ func (a *App) latestAvatarOSCBasisSnapshotLocked(cfg appcore.Config, now time.Ti
 	cfg.Normalize()
 	parameterPrefix := canonicalAvatarOSCBasisAddress(cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix)
 	if parameterPrefix == "" {
-		parameterPrefix = "coord"
+		parameterPrefix = "avatar_beacon"
 	}
 	lastAddress, lastReceivedAt := latestAvatarOSCParameterSample(a.avatarOSCBasisSamples)
 	snapshot := PlayerLocalBasisSnapshot{
@@ -2670,7 +2670,7 @@ func (a *App) latestAvatarOSCBasisSnapshotLocked(cfg appcore.Config, now time.Ti
 			}
 			snapshot.Error = err.Error()
 		} else {
-			snapshot.Error = "avatar OSC parameterをまだ受信していません。VRChatのOSCを有効にし、AvatarBeacon導入済みアバターで coord/* / forward/* が送信されるか確認してください"
+			snapshot.Error = "avatar OSC parameterをまだ受信していません。VRChatのOSCを有効にし、AvatarBeacon導入済みアバターで avatar_beacon/coord/* / avatar_beacon/forward/* が送信されるか確認してください"
 		}
 		snapshot.Pose = a.latestAvatarOSCBasis.Pose
 		if !a.latestAvatarOSCBasis.UpdatedAt.IsZero() {
@@ -2715,7 +2715,7 @@ func avatarOSCBasisStaleError(snapshot PlayerLocalBasisSnapshot, freshnessSec in
 	if freshnessSec <= 0 {
 		freshnessSec = appcore.DefaultConfig().AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec
 	}
-	message := fmt.Sprintf("AvatarBeaconの coord/* / forward/* が更新されていません。basis age=%s / freshness=%d秒です。AvatarBeacon導入アバターを選び直し、VRChatのOSC Reset Config後にアバターを再読み込みし、Avatar Dynamics Contact / Avatar Interactionsが有効か確認してください。", age, freshnessSec)
+	message := fmt.Sprintf("AvatarBeaconの avatar_beacon/coord/* / avatar_beacon/forward/* が更新されていません。basis age=%s / freshness=%d秒です。AvatarBeacon導入アバターを選び直し、VRChatのOSC Reset Config後にアバターを再読み込みし、Avatar Dynamics Contact / Avatar Interactionsが有効か確認してください。", age, freshnessSec)
 	if snapshot.LastReceivedAddress == "" {
 		return message
 	}
@@ -2777,15 +2777,27 @@ func (a *App) buildAvatarOSCBasisSampleLocked(cfg appcore.Config) (appcore.Avata
 	}
 	scheme, positionRoot, forwardRoot, signSuffix := avatarOSCBasisAddressScheme(cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix)
 	sample := appcore.AvatarOSCBasisSample{}
-	ok, err := a.fillAvatarOSCBasisVector(&sample.Position, positionRoot, signSuffix)
+	signedSix := !a.avatarOSCBasisHasAnySignSampleLocked(positionRoot, forwardRoot, signSuffix)
+	fillVector := a.fillAvatarOSCBasisVector
+	if signedSix {
+		scheme += "_main"
+		fillVector = func(target *appcore.AvatarOSCBasisVectorSample, root string, signSuffix string) (bool, error) {
+			return a.fillAvatarOSCBasisSignedVector(target, root, cfg.AutoCapture.PlayerLocal.AvatarOSC)
+		}
+	}
+	ok, err := fillVector(&sample.Position, positionRoot, signSuffix)
 	if err != nil || !ok {
 		return appcore.AvatarOSCBasisSample{}, scheme, ok, err
 	}
-	ok, err = a.fillAvatarOSCBasisVector(&sample.Forward, forwardRoot, signSuffix)
+	ok, err = fillVector(&sample.Forward, forwardRoot, signSuffix)
 	if err != nil || !ok {
 		return appcore.AvatarOSCBasisSample{}, scheme, ok, err
 	}
-	sample.ReceivedAt = latestAvatarOSCSampleTime(a.avatarOSCBasisSamples, positionRoot, forwardRoot, signSuffix)
+	if signedSix {
+		sample.ReceivedAt = latestAvatarOSCSampleTime(a.avatarOSCBasisSamples, positionRoot, forwardRoot)
+	} else {
+		sample.ReceivedAt = latestAvatarOSCSampleTime(a.avatarOSCBasisSamples, positionRoot, forwardRoot, signSuffix)
+	}
 	return sample, scheme, true, nil
 }
 
@@ -2808,17 +2820,17 @@ func (a *App) avatarOSCBasisAddressAffectsBasisLocked(address string, cfg appcor
 func avatarOSCBasisAddressScheme(prefix string) (scheme string, positionRoot string, forwardRoot string, signSuffix string) {
 	prefix = canonicalAvatarOSCBasisAddress(prefix)
 	if prefix == "" {
-		prefix = "coord"
+		prefix = "avatar_beacon"
 	}
 	scheme = "custom"
 	positionRoot = strings.TrimSuffix(prefix, "/") + "/p"
 	forwardRoot = strings.TrimSuffix(prefix, "/") + "/f"
 	signSuffix = "Sign"
 	switch {
-	case strings.EqualFold(prefix, "coord"):
+	case strings.EqualFold(prefix, "avatar_beacon"):
 		scheme = "AvatarBeacon"
-		positionRoot = "coord"
-		forwardRoot = "forward"
+		positionRoot = "avatar_beacon/coord"
+		forwardRoot = "avatar_beacon/forward"
 	case strings.EqualFold(prefix, "ATG") || strings.HasPrefix(strings.ToUpper(prefix), "ATG/"):
 		scheme = "ATG"
 		positionRoot = strings.TrimSuffix(prefix, "/") + "/p"
@@ -2826,6 +2838,17 @@ func avatarOSCBasisAddressScheme(prefix string) (scheme string, positionRoot str
 		signSuffix = "+"
 	}
 	return scheme, positionRoot, forwardRoot, signSuffix
+}
+
+func (a *App) avatarOSCBasisHasAnySignSampleLocked(positionRoot string, forwardRoot string, signSuffix string) bool {
+	for _, root := range []string{positionRoot, forwardRoot} {
+		for _, axis := range []string{"x", "y", "z"} {
+			if _, ok := a.lookupAvatarOSCBasisRawSample(root + "/" + axis + signSuffix); ok {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (a *App) fillAvatarOSCBasisVector(target *appcore.AvatarOSCBasisVectorSample, root string, signSuffix string) (bool, error) {
@@ -2871,6 +2894,52 @@ func (a *App) fillAvatarOSCBasisVector(target *appcore.AvatarOSCBasisVectorSampl
 	return any, nil
 }
 
+func (a *App) fillAvatarOSCBasisSignedVector(target *appcore.AvatarOSCBasisVectorSample, root string, cfg appcore.AutoCapturePlayerLocalAvatarOSCConfig) (bool, error) {
+	var any bool
+	for _, axis := range []struct {
+		name string
+		set  func(appcore.AvatarOSCBasisAxisSample)
+	}{
+		{name: "x", set: func(sample appcore.AvatarOSCBasisAxisSample) { target.X = sample }},
+		{name: "y", set: func(sample appcore.AvatarOSCBasisAxisSample) { target.Y = sample }},
+		{name: "z", set: func(sample appcore.AvatarOSCBasisAxisSample) { target.Z = sample }},
+	} {
+		rawSample, ok := a.lookupAvatarOSCBasisRawSample(root + "/" + axis.name)
+		if !ok {
+			return false, fmt.Errorf("partial avatar OSC basis sample: missing %s/%s", root, axis.name)
+		}
+		rawValue, ok := rawSample.floatValue()
+		if !ok || math.IsNaN(rawValue) || math.IsInf(rawValue, 0) {
+			return false, fmt.Errorf("invalid avatar OSC basis sample: %s/%s", root, axis.name)
+		}
+		signedValue := rawValue*2 - 1
+		if signedValue > 1 {
+			signedValue = 1
+		}
+		if signedValue < -1 {
+			signedValue = -1
+		}
+		magnitude := math.Abs(signedValue)
+		if cfg.InvertMagnitude {
+			magnitude = 1 - magnitude
+		}
+		signFlag := 0.0
+		if signedValue >= 0 {
+			signFlag = 1
+		}
+		axis.set(appcore.AvatarOSCBasisAxisSample{
+			Magnitude: magnitude,
+			SignFlag:  signFlag,
+			Present:   true,
+		})
+		any = true
+	}
+	if !any {
+		return false, fmt.Errorf("missing avatar OSC basis sample: %s", root)
+	}
+	return any, nil
+}
+
 func (a *App) lookupAvatarOSCBasisRawSample(address string) (avatarOSCBasisSample, bool) {
 	canonicalAddress := canonicalAvatarOSCBasisAddress(address)
 	if canonicalAddress == "" {
@@ -2888,10 +2957,14 @@ func (a *App) lookupAvatarOSCBasisRawSample(address string) (avatarOSCBasisSampl
 func (a *App) formatAvatarOSCBasisValuesLocked(cfg appcore.Config) string {
 	cfg.AutoCapture.PlayerLocal.AvatarOSC.Normalize()
 	_, positionRoot, forwardRoot, signSuffix := avatarOSCBasisAddressScheme(cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix)
+	includeSigns := a.avatarOSCBasisHasAnySignSampleLocked(positionRoot, forwardRoot, signSuffix)
 	keys := make([]string, 0, 12)
 	for _, root := range []string{positionRoot, forwardRoot} {
 		for _, axis := range []string{"x", "y", "z"} {
-			keys = append(keys, root+"/"+axis, root+"/"+axis+signSuffix)
+			keys = append(keys, root+"/"+axis)
+			if includeSigns {
+				keys = append(keys, root+"/"+axis+signSuffix)
+			}
 		}
 	}
 

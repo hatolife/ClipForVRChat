@@ -63,7 +63,7 @@ func TestConfigNormalizeAppliesDefaultsAndTrimsQuotes(t *testing.T) {
 	if cfg.AutoCapture.PlayerLocal.BasisSource != PlayerLocalBasisSourceAvatarOSC {
 		t.Fatalf("PlayerLocal.BasisSource = %q, want avatar_osc", cfg.AutoCapture.PlayerLocal.BasisSource)
 	}
-	if cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix != "coord" {
+	if cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix != "avatar_beacon" {
 		t.Fatalf("PlayerLocal.AvatarOSC.ParameterPrefix = %q", cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix)
 	}
 	if cfg.AutoCapture.PlayerLocal.AvatarOSC.PositionScale != 1000 {
@@ -173,7 +173,7 @@ func TestAutoCapturePlayerLocalNormalizeDefaultsAndSourceFallback(t *testing.T) 
 	if cfg.BasisSource != PlayerLocalBasisSourceManual {
 		t.Fatalf("BasisSource = %q, want manual", cfg.BasisSource)
 	}
-	if cfg.AvatarOSC.ParameterPrefix != "coord" {
+	if cfg.AvatarOSC.ParameterPrefix != "avatar_beacon" {
 		t.Fatalf("ParameterPrefix = %q", cfg.AvatarOSC.ParameterPrefix)
 	}
 	if cfg.AvatarOSC.PositionScale != 1000 {

@@ -21,17 +21,17 @@ Unity側で `.unitypackage` を手作業作成するときも、外部依存本�
 ## 追跡対象
 
 Prefab root直下の `point` が位置用の追跡対象、`HeadForwardAnchor` が向き用の追跡対象です。
-READMEの手順では Modular Avatar の Bone Proxy target を `AvatarBeacon/point` にHips、`AvatarBeacon/HeadForwardAnchor` にHeadを設定します。
+READMEの手順では Modular Avatar の Bone Proxy target を `AvatarBeacon_12/point` または `AvatarBeacon_main/point` にHips、`AvatarBeacon_12/HeadForwardAnchor` または `AvatarBeacon_main/HeadForwardAnchor` にHeadを設定します。
 
 これは player root そのものではありませんが、HipsはHeadよりプレイヤー位置に近いbasisとして扱います。
-ClipForVRChat 側では `coord/*` から復元したHips基準位置を `player_local` basis の位置、`forward/*` から復元したHead基準の水平forward vectorを basis yaw として使います。
+ClipForVRChat 側では `avatar_beacon/coord/*` から復元したHips基準位置を `player_local` basis の位置、`avatar_beacon/forward/*` から復元したHead基準の水平forward vectorを basis yaw として使います。
 
 `point` は単なる見た目用オブジェクトではありません。
 MA Bone Proxyの付いた追跡アンカーであり、`WorldOriginAnchor`、`const_x`、`const_z` などのConstraintがこのTransformを参照して座標エンコードの基準にします。
 そのため `point` 自体は必要です。
 
 `HeadForwardAnchor` もMA Bone Proxyの付いた追跡アンカーです。
-`offset_rot` のRotationConstraintがこのTransformを参照し、`forward/*` の生成元になります。
+`offset_rot` のRotationConstraintがこのTransformを参照し、`avatar_beacon/forward/*` の生成元になります。
 そのため、位置はHips、yawはHeadという分離を保つには必須です。
 
 ## OSC Parameter
@@ -39,24 +39,39 @@ MA Bone Proxyの付いた追跡アンカーであり、`WorldOriginAnchor`、`co
 VRChatから外部へ送られるOSC addressは `/avatar/parameters/` が付いた形になります。
 Prefab内のparameter名はその下の相対名です。
 
+### `AvatarBeacon_main.prefab`
+
+通常利用向けの6parameter方式です。各軸は `0.0..1.0` の centered float として出し、ClipForVRChat側で `raw * 2 - 1` に戻します。
+
 | 用途 | Avatar parameter | OSC address | 詳細 |
 | --- | --- | --- | --- |
-| position X magnitude | `coord/x` | `/avatar/parameters/coord/x` | 追跡対象 `point` のworld X座標の絶対値側。ClipForVRChatは既定で `1 - value` に `1000` を掛けて復元する。 |
-| position X sign | `coord/xSign` | `/avatar/parameters/coord/xSign` | X座標の符号。既定では `0` 以下を負、`0` より大きい値を正として扱う。 |
-| position Y magnitude | `coord/y` | `/avatar/parameters/coord/y` | 追跡対象 `point` のworld Y座標の絶対値側。高さ方向のbasis位置に使う。 |
-| position Y sign | `coord/ySign` | `/avatar/parameters/coord/ySign` | Y座標の符号。復元時に `coord/y` と組み合わせる。 |
-| position Z magnitude | `coord/z` | `/avatar/parameters/coord/z` | 追跡対象 `point` のworld Z座標の絶対値側。前後方向のbasis位置に使う。 |
-| position Z sign | `coord/zSign` | `/avatar/parameters/coord/zSign` | Z座標の符号。復元時に `coord/z` と組み合わせる。 |
-| forward X magnitude | `forward/x` | `/avatar/parameters/forward/x` | `HeadForwardAnchor` の向きから作るforward vectorのX成分の絶対値側。yaw算出に使う。 |
-| forward X sign | `forward/xSign` | `/avatar/parameters/forward/xSign` | forward X成分の符号。yaw算出前に `forward/x` と組み合わせる。 |
-| forward Y magnitude | `forward/y` | `/avatar/parameters/forward/y` | Head基準forward vectorのY成分の絶対値側。ClipForVRChatでは受信完全性の確認に使い、yaw計算には直接使わない。 |
-| forward Y sign | `forward/ySign` | `/avatar/parameters/forward/ySign` | forward Y成分の符号。`forward/y` と組み合わせて完全なforward vectorとして復元できるように残す。 |
-| forward Z magnitude | `forward/z` | `/avatar/parameters/forward/z` | Head基準forward vectorのZ成分の絶対値側。yaw算出に使う。 |
-| forward Z sign | `forward/zSign` | `/avatar/parameters/forward/zSign` | forward Z成分の符号。yaw算出前に `forward/z` と組み合わせる。 |
+| position X signed | `avatar_beacon/coord/x` | `/avatar/parameters/avatar_beacon/coord/x` | 追跡対象 `point` のworld X座標を符号込みで表す。 |
+| position Y signed | `avatar_beacon/coord/y` | `/avatar/parameters/avatar_beacon/coord/y` | 追跡対象 `point` のworld Y座標を符号込みで表す。 |
+| position Z signed | `avatar_beacon/coord/z` | `/avatar/parameters/avatar_beacon/coord/z` | 追跡対象 `point` のworld Z座標を符号込みで表す。 |
+| forward X signed | `avatar_beacon/forward/x` | `/avatar/parameters/avatar_beacon/forward/x` | `HeadForwardAnchor` の向きから作るforward vectorのX成分を符号込みで表す。 |
+| forward Y signed | `avatar_beacon/forward/y` | `/avatar/parameters/avatar_beacon/forward/y` | Head基準forward vectorのY成分を符号込みで表す。 |
+| forward Z signed | `avatar_beacon/forward/z` | `/avatar/parameters/avatar_beacon/forward/z` | Head基準forward vectorのZ成分を符号込みで表す。 |
 
-`coord/*` と `forward/*` のmagnitudeは float、`*Sign` はbool相当の制御値として扱います。
-magnitudeだけでは正負が分からないため、各軸は必ずmagnitude parameterとsign parameterを組み合わせて復元します。
-現Prefabでは Modular Avatar Parameters に全12個を `localOnly` として登録しています。
+### `AvatarBeacon_12.prefab`
+
+高精度版の12parameter方式です。各軸をmagnitudeとsignに分けて出します。
+
+| 用途 | Avatar parameter | OSC address | 詳細 |
+| --- | --- | --- | --- |
+| position X magnitude | `avatar_beacon/coord/x` | `/avatar/parameters/avatar_beacon/coord/x` | 追跡対象 `point` のworld X座標の絶対値側。ClipForVRChatは既定で `1 - value` に `1000` を掛けて復元する。 |
+| position X sign | `avatar_beacon/coord/xSign` | `/avatar/parameters/avatar_beacon/coord/xSign` | X座標の符号。既定では `0` 以下を負、`0` より大きい値を正として扱う。 |
+| position Y magnitude | `avatar_beacon/coord/y` | `/avatar/parameters/avatar_beacon/coord/y` | 追跡対象 `point` のworld Y座標の絶対値側。高さ方向のbasis位置に使う。 |
+| position Y sign | `avatar_beacon/coord/ySign` | `/avatar/parameters/avatar_beacon/coord/ySign` | Y座標の符号。復元時に `avatar_beacon/coord/y` と組み合わせる。 |
+| position Z magnitude | `avatar_beacon/coord/z` | `/avatar/parameters/avatar_beacon/coord/z` | 追跡対象 `point` のworld Z座標の絶対値側。前後方向のbasis位置に使う。 |
+| position Z sign | `avatar_beacon/coord/zSign` | `/avatar/parameters/avatar_beacon/coord/zSign` | Z座標の符号。復元時に `avatar_beacon/coord/z` と組み合わせる。 |
+| forward X magnitude | `avatar_beacon/forward/x` | `/avatar/parameters/avatar_beacon/forward/x` | `HeadForwardAnchor` の向きから作るforward vectorのX成分の絶対値側。yaw算出に使う。 |
+| forward X sign | `avatar_beacon/forward/xSign` | `/avatar/parameters/avatar_beacon/forward/xSign` | forward X成分の符号。yaw算出前に `avatar_beacon/forward/x` と組み合わせる。 |
+| forward Y magnitude | `avatar_beacon/forward/y` | `/avatar/parameters/avatar_beacon/forward/y` | Head基準forward vectorのY成分の絶対値側。ClipForVRChatでは受信完全性の確認に使い、yaw計算には直接使わない。 |
+| forward Y sign | `avatar_beacon/forward/ySign` | `/avatar/parameters/avatar_beacon/forward/ySign` | forward Y成分の符号。`avatar_beacon/forward/y` と組み合わせて完全なforward vectorとして復元できるように残す。 |
+| forward Z magnitude | `avatar_beacon/forward/z` | `/avatar/parameters/avatar_beacon/forward/z` | Head基準forward vectorのZ成分の絶対値側。yaw算出に使う。 |
+| forward Z sign | `avatar_beacon/forward/zSign` | `/avatar/parameters/avatar_beacon/forward/zSign` | forward Z成分の符号。yaw算出前に `avatar_beacon/forward/z` と組み合わせる。 |
+
+`AvatarBeacon_main.prefab` は Modular Avatar Parameters に6個、`AvatarBeacon_12.prefab` は12個を `localOnly` として登録しています。
 また、basis 用の Contact Receiver も `localOnly` として、ローカルクライアント上でOSC出力用の値を作る前提にしています。
 
 これは「他プレイヤーへOSC packetを送らない」という意味ではありません。
@@ -64,19 +79,29 @@ VRChatのOSC出力自体は、ローカルのVRChatクライアントから設�
 `localOnly` は、AvatarBeaconのContact処理とExpression Parameter同期を他プレイヤー側の表示・同期用途へ広げないための設定です。
 
 VRChatのOSC Avatar Parametersはparameter単位のaddressとして出力されます。
-AvatarBeacon単体では、12個の値を1つのOSC messageや文字列へまとめて送信しません。
-1 message化が必要な場合は、ClipForVRChatまたは別のOSCルーターで `/avatar/parameters/coord/*` と `/avatar/parameters/forward/*` を受け、外部向けに集約messageを再送する構成を別途設計します。
+AvatarBeacon単体では、6個または12個の値を1つのOSC messageや文字列へまとめて送信しません。
+1 message化が必要な場合は、ClipForVRChatまたは別のOSCルーターで `/avatar/parameters/avatar_beacon/coord/*` と `/avatar/parameters/avatar_beacon/forward/*` を受け、外部向けに集約messageを再送する構成を別途設計します。
 
 ## 値の復元
 
-AvatarBeacon は YL-ATG のContact方式を引き継いでおり、各軸を magnitude と sign に分けて出します。
-ClipForVRChat 側の既定復元は次の通りです。
+`AvatarBeacon_12.prefab` は YL-ATG のContact方式を引き継いでおり、各軸を magnitude と sign に分けて出します。
+ClipForVRChat 側の `_12` 復元は次の通りです。
 
 - `value = (1 - magnitude) * 1000`
 - `sign > 0` なら正、それ以外なら負
-- positionはHips基準の `coord/x,y,z` を使う
-- yawはHead基準の `forward/x,z` から `atan2(forward.x, forward.z)` で求める
-- `forward/y` は受信完全性の確認には使うが、`player_local` のyaw計算には直接使わない
+- positionはHips基準の `avatar_beacon/coord/x,y,z` を使う
+- yawはHead基準の `avatar_beacon/forward/x,z` から `atan2(forward.x, forward.z)` で求める
+- `avatar_beacon/forward/y` は受信完全性の確認には使うが、`player_local` のyaw計算には直接使わない
+
+`AvatarBeacon_main.prefab` は、各軸のContact Receiverを +方向へずらし、半径を広げることで `0.0..1.0` の centered float を作る構成です。
+ClipForVRChat は `xSign` などの `*Sign` parameterが1つも届いていない場合に `main` 方式と判定し、次のように復元します。
+
+- `signed = raw * 2 - 1`
+- `value = signed * 1000`
+- positionはHips基準の `avatar_beacon/coord/x,y,z` を使う
+- yawはHead基準の `avatar_beacon/forward/x,z` から `atan2(forward.x, forward.z)` で求める
+
+`AvatarBeacon_main.prefab` のContact構成は静的YAML編集で入れているため、Unity/VRChat実機で `0.5` 付近がゼロ、`0.0` 付近が負、`1.0` 付近が正としてOSC出力されることを確認してください。
 
 `ATG/*` 互換受信は、既存YL-ATGとの切り分け用にClipForVRChat側へ残します。
 AvatarBeaconの既定出力は `ATG/*` ではありません。
@@ -111,18 +136,18 @@ AvatarBeacon では、この仕組み自体は維持しつつ、公開parameter�
 
 | YL-ATG | AvatarBeacon | 意味 |
 | --- | --- | --- |
-| `ATG/p/x` | `coord/x` | X座標magnitude |
-| `ATG/p/x+` | `coord/xSign` | X座標符号 |
-| `ATG/p/y` | `coord/y` | Y座標magnitude |
-| `ATG/p/y+` | `coord/ySign` | Y座標符号 |
-| `ATG/p/z` | `coord/z` | Z座標magnitude |
-| `ATG/p/z+` | `coord/zSign` | Z座標符号 |
-| `ATG/r/x` | `forward/x` | forward X magnitude |
-| `ATG/r/x+` | `forward/xSign` | forward X符号 |
-| `ATG/r/y` | `forward/y` | forward Y magnitude |
-| `ATG/r/y+` | `forward/ySign` | forward Y符号 |
-| `ATG/r/z` | `forward/z` | forward Z magnitude |
-| `ATG/r/z+` | `forward/zSign` | forward Z符号 |
+| `ATG/p/x` | `avatar_beacon/coord/x` | X座標magnitude |
+| `ATG/p/x+` | `avatar_beacon/coord/xSign` | X座標符号 |
+| `ATG/p/y` | `avatar_beacon/coord/y` | Y座標magnitude |
+| `ATG/p/y+` | `avatar_beacon/coord/ySign` | Y座標符号 |
+| `ATG/p/z` | `avatar_beacon/coord/z` | Z座標magnitude |
+| `ATG/p/z+` | `avatar_beacon/coord/zSign` | Z座標符号 |
+| `ATG/r/x` | `avatar_beacon/forward/x` | forward X magnitude |
+| `ATG/r/x+` | `avatar_beacon/forward/xSign` | forward X符号 |
+| `ATG/r/y` | `avatar_beacon/forward/y` | forward Y magnitude |
+| `ATG/r/y+` | `avatar_beacon/forward/ySign` | forward Y符号 |
+| `ATG/r/z` | `avatar_beacon/forward/z` | forward Z magnitude |
+| `ATG/r/z+` | `avatar_beacon/forward/zSign` | forward Z符号 |
 
 参考:
 
@@ -151,10 +176,11 @@ AvatarBeacon
 ├── HeadForwardAnchor
 ```
 
-### Root `AvatarBeacon`
+### Root `AvatarBeacon_main` / `AvatarBeacon_12`
 
 Prefab rootです。
-Modular Avatar Parameters相当のComponentで、`coord/*` と `forward/*` をAvatar Expression Parameterへ登録します。
+Modular Avatar Parameters相当のComponentで、`avatar_beacon/coord/*` と `avatar_beacon/forward/*` をAvatar Expression Parameterへ登録します。
+`AvatarBeacon_main` は6parameter、`AvatarBeacon_12` は12parameterを登録します。
 
 このrootを削るとparameter登録とPrefab導入単位が壊れるため必須です。
 
@@ -171,16 +197,16 @@ Modular Avatar Bone Proxy相当のComponentを持ち、既定ではHipsへ追従
 yaw/forward追跡対象の基準Transformです。
 Modular Avatar Bone Proxy相当のComponentを持ち、既定ではHeadへ追従します。
 
-`offset_rot` のRotationConstraintがこのTransformを参照し、`forward/*` のContact経路へHead基準の向きを渡します。
+`offset_rot` のRotationConstraintがこのTransformを参照し、`avatar_beacon/forward/*` のContact経路へHead基準の向きを渡します。
 このオブジェクトがないと、位置をHips基準にしたまま向きだけHead基準に分離できないため必須です。
 
 ### `WorldOriginAnchor`
 
 position出力の中心です。
-`coord/x,y,z` と `coord/xSign,ySign,zSign` のContact receiver相当Componentを持ち、`point` 由来の位置を magnitude/sign に分けてAvatar Parameterへ書き込みます。
+`avatar_beacon/coord/x,y,z` と `avatar_beacon/coord/xSign,ySign,zSign` のContact receiver相当Componentを持ち、`point` 由来の位置を magnitude/sign に分けてAvatar Parameterへ書き込みます。
 Transformは原点、無回転、scale 1 を保つ前提です。
 
-このオブジェクトを削ると `coord/*` が出なくなるため必須です。
+このオブジェクトを削ると `avatar_beacon/coord/*` が出なくなるため必須です。
 
 ### `const_x` / `const_y` / `const_z`
 
@@ -192,25 +218,25 @@ ParentConstraint と Contact sender相当Componentを持ち、`WorldOriginAnchor
 ### `rot`
 
 forward vector出力の中心です。
-`forward/x,y,z` のContact receiver相当Componentを持ちます。
-ClipForVRChat はこのうち水平成分 `forward/x,z` からyawを復元します。
+`avatar_beacon/forward/x,y,z` のContact receiver相当Componentを持ちます。
+ClipForVRChat はこのうち水平成分 `avatar_beacon/forward/x,z` からyawを復元します。
 入力元の向きは `HeadForwardAnchor` です。
 
-このオブジェクトを削ると `forward/*` が出なくなるため必須です。
+このオブジェクトを削ると `avatar_beacon/forward/*` が出なくなるため必須です。
 
 ### `get_rot` / `get_rot/X,Y,Z`
 
 forward vectorの各軸を取り出す補助階層です。
-各軸子要素は Contact sender相当Componentを持ち、`rot` の `forward/*` receiverへ入力する構成と推定しています。
+各軸子要素は Contact sender相当Componentを持ち、`rot` の `avatar_beacon/forward/*` receiverへ入力する構成と推定しています。
 
 Yaw追従の主要経路なので削除しません。
 
 ### `Rot_flag`
 
-`forward/xSign,ySign,zSign` のContact receiver相当Componentを持つ符号出力用オブジェクトです。
+`avatar_beacon/forward/xSign,ySign,zSign` のContact receiver相当Componentを持つ符号出力用オブジェクトです。
 forward vectorの各軸が正方向か負方向かを外部で復元するために必要です。
 
-ClipForVRChatのyaw計算は `forward/x,z` の符号復元に依存するため必須です。
+ClipForVRChatのyaw計算は `avatar_beacon/forward/x,z` の符号復元に依存するため必須です。
 
 ### `offset_rot` / `offset_rot/X`
 
@@ -221,9 +247,9 @@ YL-ATG由来の座標変換グラフの一部であり、削るとforwardの符�
 
 ### 削除したデバッグメニュー
 
-YL-ATG由来の `ATG/SaveObject` は、Prefab上ではMA Menu Itemで保存/制御用parameterを操作するだけで、`coord/*` / `forward/*` のContact経路やClipForVRChatのbasis復元には使われていません。
+YL-ATG由来の `ATG/SaveObject` は、Prefab上ではMA Menu Itemで保存/制御用parameterを操作するだけで、`avatar_beacon/coord/*` / `avatar_beacon/forward/*` のContact経路やClipForVRChatのbasis復元には使われていません。
 AvatarBeaconでは用途が曖昧な `SaveObject` を残さず、basis復元に使わない `AvatarBeacon Debug` / `Debug OSC Ping` も削除します。
-OSC疎通確認は、ClipForVRChatの10秒summaryに `coord/*` / `forward/*` が出るかで行います。
+OSC疎通確認は、ClipForVRChatの10秒summaryに `avatar_beacon/coord/*` / `avatar_beacon/forward/*` が出るかで行います。
 
 ### `arrow` mesh
 
@@ -246,7 +272,7 @@ v0.1.8では、不要機能を追加しないことよりも、YL-ATGで成立�
 
 ## 送信頻度の扱い
 
-静的確認の範囲では、`AvatarBeacon.prefab` に送信頻度・更新周期・rate limit を Inspector から調整する項目はありません。
+静的確認の範囲では、`AvatarBeacon_main.prefab` と `AvatarBeacon_12.prefab` に送信頻度・更新周期・rate limit を Inspector から調整する項目はありません。
 現在の構成は、Contact / Constraint の変化を VRChat の Expression Parameter と OSC 出力へ乗せる方式であり、Prefab 単体で send-rate knob を持つ設計ではありません。
 
 そのため、現行版の実用設定は「既定のまま使う」です。
@@ -258,12 +284,12 @@ v0.1.8では、不要機能を追加しないことよりも、YL-ATGで成立�
 ## 実機確認項目
 
 - Unity import後、`Assets/PoppoWorks/AvatarBeacon/...` として配置される。
-- `AvatarBeacon.prefab` をアバターroot配下へ置ける。
+- `AvatarBeacon_main.prefab` と `AvatarBeacon_12.prefab` をアバターroot配下へ置ける。
 - `point` をHips基準、`HeadForwardAnchor` をHead基準に設定できる。
-- ClipForVRChatの `avatar_osc` 受信状態または10秒summaryに `coord/*` / `forward/*` が表示される。
-- VRChat OSCで `/avatar/parameters/coord/*` と `/avatar/parameters/forward/*` が更新される。
-- 前後左右移動で `coord/*` が変化する。
-- Headのyaw回転で `forward/*` が変化する。
+- ClipForVRChatの `avatar_osc` 受信状態または10秒summaryに `avatar_beacon/coord/*` / `avatar_beacon/forward/*` が表示される。
+- VRChat OSCで `/avatar/parameters/avatar_beacon/coord/*` と `/avatar/parameters/avatar_beacon/forward/*` が更新される。
+- 前後左右移動で `avatar_beacon/coord/*` が変化する。
+- Headのyaw回転で `avatar_beacon/forward/*` が変化する。
 - アバター切り替えやOSC停止時にClipForVRChat側が鮮度切れとして扱う。
 
 ## OSC送信されない場合の確認
@@ -273,10 +299,10 @@ v0.1.8では、不要機能を追加しないことよりも、YL-ATGで成立�
 
 - VRChatのOSCが有効で、送信先がClipForVRChatの受信ポートに合っているか。
 - avatar IDごとのOSC config JSONがAvatarBeacon導入後のparameterを含んでいるか。
-- `coord/*` と `forward/*` に `output.address` があるか。
+- `avatar_beacon/coord/*` と `avatar_beacon/forward/*` に `output.address` があるか。
 - VRChat Action Menuの `Reset OSC Config` 後にアバターを再読み込みしても変わらないか。
 - Avatar Dynamics Contact / Avatar Interactions が有効か。
 - ClipForVRChatの10秒summaryが出ているか、他parameterだけ届いているか。
 
 summaryが出ないなら、Prefabの復元ロジック以前にVRChatからOSC packetが出ていない。
-summaryが出ているのに `coord/*` / `forward/*` が欠けるなら、OSC configまたはPrefab parameter名の不一致を疑う。
+summaryが出ているのに `avatar_beacon/coord/*` / `avatar_beacon/forward/*` が欠けるなら、OSC configまたはPrefab parameter名の不一致を疑う。

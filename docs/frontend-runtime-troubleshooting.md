@@ -26,7 +26,7 @@
 
 ```js
 template: `
-  <p>AvatarBeaconは `/avatar/parameters/coord/x` を送信します。</p>
+  <p>AvatarBeaconは `/avatar/parameters/avatar_beacon/coord/x` を送信します。</p>
 `
 ```
 

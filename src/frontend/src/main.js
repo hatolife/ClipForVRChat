@@ -2754,7 +2754,7 @@ const vueApp = createApp({
               </div>
               <label>
                 <small>正規表現フィルタ</small>
-                <input v-model="oscLogFilter" placeholder="/avatar/parameters/coord|forward|usercamera" />
+                <input v-model="oscLogFilter" placeholder="/avatar/parameters/avatar_beacon/coord|avatar_beacon/forward|usercamera" />
               </label>
               <p v-if="oscLogFilterError" class="setting-note warning">正規表現エラー: {{ oscLogFilterError }}</p>
               <div class="osc-log-list" role="log" aria-live="polite">

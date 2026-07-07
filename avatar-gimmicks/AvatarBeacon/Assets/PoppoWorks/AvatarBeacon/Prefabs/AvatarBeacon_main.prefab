@@ -83,8 +83,8 @@ MonoBehaviour:
   position: {x: 0, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - coord/x
-  - coord/xSign
+  - avatar_beacon/coord/x
+  - avatar_beacon/internal/coord/xSign
 --- !u!1 &491871944873609954
 GameObject:
   m_ObjectHideFlags: 0
@@ -168,8 +168,8 @@ MonoBehaviour:
   position: {x: 0, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - coord/z
-  - coord/zSign
+  - avatar_beacon/coord/z
+  - avatar_beacon/internal/coord/zSign
 --- !u!1 &856071819521952918
 GameObject:
   m_ObjectHideFlags: 0
@@ -223,12 +223,12 @@ MonoBehaviour:
   position: {x: 0.5, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - forward/xSign
+  - avatar_beacon/internal/forward/xSign
   allowSelf: 1
   allowOthers: 0
   localOnly: 1
   receiverType: 2
-  parameter: forward/xSign
+  parameter: avatar_beacon/internal/forward/xSign
   minVelocity: 0.05
 --- !u!114 &4731777765370168354
 MonoBehaviour:
@@ -249,12 +249,12 @@ MonoBehaviour:
   position: {x: 0, y: 0.5, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - forward/ySign
+  - avatar_beacon/internal/forward/ySign
   allowSelf: 1
   allowOthers: 0
   localOnly: 1
   receiverType: 2
-  parameter: forward/ySign
+  parameter: avatar_beacon/internal/forward/ySign
   minVelocity: 0
 --- !u!114 &9180184445733332685
 MonoBehaviour:
@@ -275,12 +275,12 @@ MonoBehaviour:
   position: {x: 0, y: 0, z: 0.5}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - forward/zSign
+  - avatar_beacon/internal/forward/zSign
   allowSelf: 1
   allowOthers: 0
   localOnly: 1
   receiverType: 2
-  parameter: forward/zSign
+  parameter: avatar_beacon/internal/forward/zSign
   minVelocity: 0
 --- !u!1 &1246223224485854335
 GameObject:
@@ -407,8 +407,8 @@ MonoBehaviour:
   position: {x: 0, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - forward/y
-  - forward/ySign
+  - avatar_beacon/forward/y
+  - avatar_beacon/internal/forward/ySign
 --- !u!1 &4281172290312298543
 GameObject:
   m_ObjectHideFlags: 0
@@ -515,8 +515,8 @@ MonoBehaviour:
   position: {x: 0, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - forward/x
-  - forward/xSign
+  - avatar_beacon/forward/x
+  - avatar_beacon/internal/forward/xSign
 --- !u!1 &4848063545533936072
 GameObject:
   m_ObjectHideFlags: 0
@@ -606,7 +606,7 @@ GameObject:
   - component: {fileID: 2902941087723332167}
   - component: {fileID: 2467320044933366665}
   m_Layer: 0
-  m_Name: AvatarBeacon
+  m_Name: AvatarBeacon_main
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -644,7 +644,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   parameters:
-  - nameOrPrefix: coord/x
+  - nameOrPrefix: avatar_beacon/coord/x
     remapTo: 
     internalParameter: 0
     isPrefix: 0
@@ -654,7 +654,7 @@ MonoBehaviour:
     saved: 0
     hasExplicitDefaultValue: 0
     m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: coord/xSign
+  - nameOrPrefix: avatar_beacon/coord/y
     remapTo: 
     internalParameter: 0
     isPrefix: 0
@@ -664,7 +664,7 @@ MonoBehaviour:
     saved: 0
     hasExplicitDefaultValue: 0
     m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: coord/y
+  - nameOrPrefix: avatar_beacon/coord/z
     remapTo: 
     internalParameter: 0
     isPrefix: 0
@@ -674,7 +674,7 @@ MonoBehaviour:
     saved: 0
     hasExplicitDefaultValue: 0
     m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: coord/ySign
+  - nameOrPrefix: avatar_beacon/forward/x
     remapTo: 
     internalParameter: 0
     isPrefix: 0
@@ -684,7 +684,7 @@ MonoBehaviour:
     saved: 0
     hasExplicitDefaultValue: 0
     m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: coord/z
+  - nameOrPrefix: avatar_beacon/forward/y
     remapTo: 
     internalParameter: 0
     isPrefix: 0
@@ -694,67 +694,7 @@ MonoBehaviour:
     saved: 0
     hasExplicitDefaultValue: 0
     m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: coord/zSign
-    remapTo: 
-    internalParameter: 0
-    isPrefix: 0
-    syncType: 2
-    localOnly: 1
-    defaultValue: 0
-    saved: 0
-    hasExplicitDefaultValue: 0
-    m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: forward/x
-    remapTo: 
-    internalParameter: 0
-    isPrefix: 0
-    syncType: 2
-    localOnly: 1
-    defaultValue: 0
-    saved: 0
-    hasExplicitDefaultValue: 0
-    m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: forward/xSign
-    remapTo: 
-    internalParameter: 0
-    isPrefix: 0
-    syncType: 2
-    localOnly: 1
-    defaultValue: 0
-    saved: 0
-    hasExplicitDefaultValue: 0
-    m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: forward/y
-    remapTo: 
-    internalParameter: 0
-    isPrefix: 0
-    syncType: 2
-    localOnly: 1
-    defaultValue: 0
-    saved: 0
-    hasExplicitDefaultValue: 0
-    m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: forward/ySign
-    remapTo: 
-    internalParameter: 0
-    isPrefix: 0
-    syncType: 2
-    localOnly: 1
-    defaultValue: 0
-    saved: 0
-    hasExplicitDefaultValue: 0
-    m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: forward/z
-    remapTo: 
-    internalParameter: 0
-    isPrefix: 0
-    syncType: 2
-    localOnly: 1
-    defaultValue: 0
-    saved: 0
-    hasExplicitDefaultValue: 0
-    m_overrideAnimatorDefaults: 0
-  - nameOrPrefix: forward/zSign
+  - nameOrPrefix: avatar_beacon/forward/z
     remapTo: 
     internalParameter: 0
     isPrefix: 0
@@ -862,17 +802,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   rootTransform: {fileID: 0}
   shapeType: 0
-  radius: 1
+  radius: 2
   height: 2
-  position: {x: 0, y: 0, z: 0}
+  position: {x: 1, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - forward/x
+  - avatar_beacon/forward/x
   allowSelf: 1
   allowOthers: 0
   localOnly: 1
   receiverType: 2
-  parameter: forward/x
+  parameter: avatar_beacon/forward/x
   minVelocity: 0.05
 --- !u!114 &2446408489463595420
 MonoBehaviour:
@@ -888,17 +828,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   rootTransform: {fileID: 0}
   shapeType: 0
-  radius: 1
+  radius: 2
   height: 2
-  position: {x: 0, y: 0, z: 0}
+  position: {x: 0, y: 1, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - forward/y
+  - avatar_beacon/forward/y
   allowSelf: 1
   allowOthers: 0
   localOnly: 1
   receiverType: 2
-  parameter: forward/y
+  parameter: avatar_beacon/forward/y
   minVelocity: 0.05
 --- !u!114 &2820147324106217612
 MonoBehaviour:
@@ -914,17 +854,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   rootTransform: {fileID: 0}
   shapeType: 0
-  radius: 1
+  radius: 2
   height: 2
-  position: {x: 0, y: 0, z: 0}
+  position: {x: 0, y: 0, z: 1}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - forward/z
+  - avatar_beacon/forward/z
   allowSelf: 1
   allowOthers: 0
   localOnly: 1
   receiverType: 2
-  parameter: forward/z
+  parameter: avatar_beacon/forward/z
   minVelocity: 0.05
 --- !u!1 &8548155576797606135
 GameObject:
@@ -998,8 +938,8 @@ MonoBehaviour:
   position: {x: 0, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - forward/z
-  - forward/zSign
+  - avatar_beacon/forward/z
+  - avatar_beacon/internal/forward/zSign
 --- !u!1 &9124242601001485458
 GameObject:
   m_ObjectHideFlags: 0
@@ -1083,8 +1023,8 @@ MonoBehaviour:
   position: {x: 0, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - coord/y
-  - coord/ySign
+  - avatar_beacon/coord/y
+  - avatar_beacon/internal/coord/ySign
 --- !u!1 &9134728414806565927
 GameObject:
   m_ObjectHideFlags: 0
@@ -1153,17 +1093,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   rootTransform: {fileID: 0}
   shapeType: 0
-  radius: 1
+  radius: 2
   height: 2
-  position: {x: 0, y: 0, z: 0}
+  position: {x: 1, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - coord/x
+  - avatar_beacon/coord/x
   allowSelf: 1
   allowOthers: 0
   localOnly: 1
   receiverType: 2
-  parameter: coord/x
+  parameter: avatar_beacon/coord/x
   minVelocity: 0.05
 --- !u!114 &877146903721838477
 MonoBehaviour:
@@ -1179,17 +1119,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   rootTransform: {fileID: 0}
   shapeType: 0
-  radius: 1
+  radius: 2
   height: 2
-  position: {x: 0, y: 0, z: 0}
+  position: {x: 0, y: 1, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - coord/y
+  - avatar_beacon/coord/y
   allowSelf: 1
   allowOthers: 0
   localOnly: 1
   receiverType: 2
-  parameter: coord/y
+  parameter: avatar_beacon/coord/y
   minVelocity: 0.05
 --- !u!114 &3659174430522833631
 MonoBehaviour:
@@ -1205,17 +1145,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   rootTransform: {fileID: 0}
   shapeType: 0
-  radius: 1
+  radius: 2
   height: 2
-  position: {x: 0, y: 0, z: 0}
+  position: {x: 0, y: 0, z: 1}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - coord/z
+  - avatar_beacon/coord/z
   allowSelf: 1
   allowOthers: 0
   localOnly: 1
   receiverType: 2
-  parameter: coord/z
+  parameter: avatar_beacon/coord/z
   minVelocity: 0.05
 --- !u!114 &594679149949896675
 MonoBehaviour:
@@ -1236,12 +1176,12 @@ MonoBehaviour:
   position: {x: 0.5, y: 0, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - coord/xSign
+  - avatar_beacon/internal/coord/xSign
   allowSelf: 1
   allowOthers: 0
   localOnly: 1
   receiverType: 2
-  parameter: coord/xSign
+  parameter: avatar_beacon/internal/coord/xSign
   minVelocity: 0.05
 --- !u!114 &5596991193576000830
 MonoBehaviour:
@@ -1262,12 +1202,12 @@ MonoBehaviour:
   position: {x: 0, y: 0.5, z: 0}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - coord/ySign
+  - avatar_beacon/internal/coord/ySign
   allowSelf: 1
   allowOthers: 0
   localOnly: 1
   receiverType: 2
-  parameter: coord/ySign
+  parameter: avatar_beacon/internal/coord/ySign
   minVelocity: 0.05
 --- !u!114 &3285151922791795018
 MonoBehaviour:
@@ -1288,12 +1228,12 @@ MonoBehaviour:
   position: {x: 0, y: 0, z: 0.5}
   rotation: {x: 0, y: 0, z: 0, w: 1}
   collisionTags:
-  - coord/zSign
+  - avatar_beacon/internal/coord/zSign
   allowSelf: 1
   allowOthers: 0
   localOnly: 1
   receiverType: 2
-  parameter: coord/zSign
+  parameter: avatar_beacon/internal/coord/zSign
   minVelocity: 0.05
 
   m_ObjectHideFlags: 0
