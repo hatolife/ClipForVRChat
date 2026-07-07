@@ -19,6 +19,10 @@ VRChat写真フォルダを設定しておくと、ゲーム内で撮影され�
 
 issueに使い方画面の変更のやつがあったと思うのです 探して状況おしえて
 
+追記:
+
+256を編集した !のところを書いてほしい
+
 ## 文脈
 
 現在の使い方画面は「画像を用意する」「必要なら設定する」「Discordへ投稿する」「結果を使う」の4カード構成になっている。v0.1.8では、VRChat写真/スクリーンショットの自動処理に加えて、自動撮影、AvatarBeacon、Stream Camera(Spout)、OSCログ、診断データ生成などの説明が必要になっている。
@@ -149,15 +153,28 @@ ClipForVRChatは端に自動で定期的に撮影だけします。
 	よって、任意のワールドでアバター基準にカメラを自動配置することは、公式機能だけでは難しいです。
 
 	ClipForVRChatではこの問題を解決するため、
-	ワールド内のプレイヤーの位置情報をOSCで送信するアバターギミック AvatarBeacon を作成しました。
-	AvatarBeaconは、プレーヤーのHeadの座標と向きをOSCで送信するアバターギミックです。
-
+	ワールド内のプレイヤーの位置情報をOSCで送信するアバターギミック [AvatarBeacon](https://github.com/hatolife/AvatarBeacon) を作成しました。
+	AvatarBeacon は、プレーヤーのHeadの座標と向きをOSCで送信するアバターギミックです。
 	AvatarBeaconから送信されたプレーヤーの位置と向き情報を使って、
 	ClipForVRChatで配置先カメラ位置を計算し、アバター基準の自動撮影を実現しています。
 
-
 	AvatarBeaconをアバターへ導入する方法を解説します。
-	!ここに記載
+	AvatarBeaconはClipForVRChatの配布zipにunitypackageとして含まれているはずです。
+	必要であれば [ここからダウンロード](https://github.com/hatolife/AvatarBeacon/releases/download/v0.0.1/AvatarBeacon_v0.0.1.unitypackage) できます
+
+	AvatarBeaconの導入は、Unityでアバターを編集できる環境で行います。
+	VRCSDKとModular Avatarを導入済みのアバタープロジェクトを開き、`AvatarBeacon_v0.0.1.unitypackage` をimportしてください。
+	importできると、Projectに `Assets/PoppoWorks/AvatarBeacon` が追加されます。
+
+	通常は `Assets/PoppoWorks/AvatarBeacon/Prefabs/AvatarBeacon_main.prefab` を使います。
+	Hierarchy上で、使いたいアバターのroot直下に `AvatarBeacon_main.prefab` を配置してください。
+	配置後、AvatarBeacon内の `point` にある Modular Avatar Bone Proxy の target を `Head` に設定します。
+	高精度確認が必要な場合だけ `AvatarBeacon_12.prefab` も使えますが、使用するExpression Parameter数が増えるため、まずは `AvatarBeacon_main.prefab` を推奨します。
+
+	設定できたらアバターをアップロードし、VRChatでそのアバターに切り替えます。
+	VRChatのAction Menuで `Options > OSC > Enabled` をONにしてください。
+	AvatarBeaconのOSCが届かない場合は、`Options > OSC > Reset OSC Config` を実行し、アバターを読み込み直してください。
+	ClipForVRChat側では、自動撮影タブまたはOSCタブのAvatarBeacon受信状態で、最終受信時刻、position、yawが更新されることを確認します。
 
 また、フォールバックモードでも通常モードでも、ゲーム内でカメラを手動で起動しておく必要があります。
 これは、2026年7月時点のVRChatでは、Camera UIを閉じるとOSCによるカメラ制御が効かない不具合があるためです。
