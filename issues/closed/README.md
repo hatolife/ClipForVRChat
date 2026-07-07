@@ -220,3 +220,4 @@
 | 253 | [不具合報告zipとgpgのファイル名に添付可否を付ける](unreleased/253-prefix-diagnostic-package-filenames.md) | 完了 | 未定 | 不具合報告用の暗号化前zipと添付用gpgのファイル名先頭に、添付可否が分かる文言を付けるようにした。 |
 | 254 | [不具合報告についての説明文を更新する](unreleased/254-rewrite-diagnostic-report-description.md) | 完了 | 未定 | 情報タブの不具合報告説明を、zip/gpgの役割、添付対象、公開鍵による手動暗号化案内が分かる文面へ更新した。 |
 | 255 | [OSC送受信ログを分けて保持し不具合報告zipに含める](v0.1.8-b10/255-persist-osc-send-receive-logs-in-diagnostic-zip.md) | 完了 | `v0.1.8-b10` | `logs/osc_send.jsonl` と `logs/osc_recieve.jsonl` に最新1000件のOSC送受信ログをJSON Linesで保存し、診断zipへ含めるようにした。 |
+| 256 | [v0.1.8-b10 betaを作成する](maintenance-only/256-create-v018-b10-beta.md) | 完了 | 整理のみ | #243 と #255 を含む `v0.1.8-b10` betaタグを作成し、Release workflowとGitHub Releaseを確認した。 |

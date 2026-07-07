@@ -24,8 +24,18 @@
 
 ## 受け入れ条件
 
-- [ ] `v0.1.8-b10` に #243 と #255 の変更が含まれる。
-- [ ] 関連チェックが通る。
-- [ ] `develop` と `v0.1.8-b10` タグをGitHubへpushする。
-- [ ] Release workflowが成功する。
-- [ ] GitHub Releaseがprereleaseとして作成され、公開Assetが規定の4種類である。
+- [x] `v0.1.8-b10` に #243 と #255 の変更が含まれる。
+- [x] 関連チェックが通る。
+- [x] `develop` と `v0.1.8-b10` タグをGitHubへpushする。
+- [x] Release workflowが成功する。
+- [x] GitHub Releaseがprereleaseとして作成され、公開Assetが規定の4種類である。
+
+## 確認
+
+- `node scripts/check-closed-issue-index.mjs`
+- `cd src && GOCACHE=/tmp/clipforvrchat-go-cache go test ./...`
+- `git diff --check`
+- `node scripts/check-commit-subjects.mjs v0.1.8-b9..HEAD`
+- Release workflow run `28839948294` が成功。
+- GitHub Release `v0.1.8-b10` は prerelease、draftなし。
+- 公開Assetは `ClipForVRChat-v0.1.8-b10-windows-amd64.zip`、`ClipForVRChat-v0.1.8-b10-windows-amd64.exe.asc`、`ClipForVRChat-v0.1.8-b10-windows-amd64-separated.zip`、`AvatarBeacon-v0.1.8-b10-source.zip` の4件。
