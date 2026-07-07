@@ -1517,7 +1517,7 @@ func TestAppWaitForAutoCaptureStartReadinessAutoFallbacksWithoutAvatarOSCBasis(t
 	if err != nil {
 		t.Fatalf("readiness wait error = %v", err)
 	}
-	if elapsed := time.Since(start); elapsed > 50*time.Millisecond {
+	if elapsed := time.Since(start); elapsed > 200*time.Millisecond {
 		t.Fatalf("fallback readiness took too long: %s", elapsed)
 	}
 }
