@@ -53,15 +53,21 @@ Aを採用する。
 
 ## 受け入れ条件
 
-- [ ] 自動撮影投稿の実行条件が `autoCapture.discord.enabled` の明示ONだけになる。
-- [ ] 自動撮影投稿OFF時に専用Webhook URLが残っていても送信されない。
-- [ ] `output.uploadDiscord=true` かつ `autoCapture.discord.enabled=false` の回帰テストを追加する。
-- [ ] staleな `autoCapture.discord.webhookUrl` がOFF時に参照されないことをテストする。
-- [ ] UI文言と無効化条件が新しい仕様に一致する。
-- [ ] 既存の通常Discord投稿機能は手動処理で維持される。
-- [ ] Goテストとフロントエンドテンプレート検査が通る。
+- [x] 自動撮影投稿の実行条件が `autoCapture.discord.enabled` の明示ONだけになる。
+- [x] 自動撮影投稿OFF時に専用Webhook URLが残っていても送信されない。
+- [x] `output.uploadDiscord=true` かつ `autoCapture.discord.enabled=false` の回帰テストを追加する。
+- [x] staleな `autoCapture.discord.webhookUrl` がOFF時に参照されないことをテストする。
+- [x] UI文言と無効化条件が新しい仕様に一致する。
+- [x] 既存の通常Discord投稿機能は手動処理で維持される。
+- [x] Goテストとフロントエンドテンプレート検査が通る。
 
 ## 作業メモ
 
 2026-07-08: ユーザー指示によりbackend-sideのみで実装する。`src/frontend/src/main.js` は変更しない。
 `autoCapture.discord.enabled` を自動撮影Discord投稿の唯一の実行条件とし、`output.uploadDiscord=true` 単独では投稿しない回帰テストを追加する。
+
+2026-07-08: `ca7049a fix(autocapture): enforce backend privacy gates` で、自動撮影Discord投稿OFF時の漏えいを防ぐために、backendの実行条件を「`output.uploadDiscord` または `autoCapture.discord.enabled`」から「`autoCapture.discord.enabled` の明示ONのみ」へ変更した。
+同じコミットで、自動撮影専用Webhook URLが残っていてもOFF時には参照しないようにし、通常投稿ONだけでは自動撮影画像・本文をDiscordへ送らない回帰テストを追加した。
+
+2026-07-08: `src/frontend/src/main.js` で、UIの誤認を防ぐために、自動撮影Discord投稿の説明を「通常Discord投稿ON、またはこの設定ON」から「この設定ONのときだけ」へ変更した。
+同じく、自動撮影用Webhook URLと画像添付行の無効化条件を「通常投稿OFFかつ自動撮影投稿OFF」から「自動撮影投稿OFF」へ変更し、画面上でも専用opt-inと一致させた。

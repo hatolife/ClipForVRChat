@@ -43,9 +43,6 @@
 | 208 | [自動撮影説明を改善し、カメラ自動起動/終了を既定OFFにする](208-improve-auto-capture-help-and-disable-camera-auto-open-close.md) | 要確認 | `v0.1.8` | 自動撮影説明とAvatarBeacon状態表示を整理し、Camera OSCの不安定さを避けるためカメラ自動起動/終了を設定化して既定OFFにする。 |
 | 228 | [全Markdownドキュメントを現状仕様に合わせて更新する](228-update-all-markdown-documents.md) | 要対応 | 未定 | リポジトリ内のMarkdownを横断確認し、古い説明や矛盾を現状仕様に合わせて整理する。 |
 | 241 | [AvatarBeacon_mainとAvatarBeacon_12を追加しparameter pathをavatar_beacon配下へ変更する](241-add-avatarbeacon-main-and-12-prefabs-with-prefixed-parameters.md) | 要確認 | 未定 | AvatarBeaconのmain方式Prefabを通常版として追加し、12方式Prefabと `avatar_beacon/...` parameter pathへ移行する。 |
-| 310 | [自動撮影Discord opt-outを自動撮影アップロードへ厳密に適用する](310-enforce-autocapture-discord-opt-out.md) | 要対応 | 未定 | 自動撮影専用Discord投稿OFFを実効ゲートにし、通常投稿ONだけで自動撮影画像が投稿されないようにする。 |
-| 311 | [非表示のカメラ自動起動/終了設定を無効化する](311-disable-hidden-camera-auto-start-settings.md) | 要対応 | 未定 | UIで非表示のカメラ自動起動/終了フラグが既存・インポートconfigのtrue値で実行されないようにする。 |
-| 315 | [非表示タブのWebhook/自動投稿設定を保存前確認する](315-confirm-hidden-webhook-autopost-settings-before-save.md) | 要対応 | 未定 | タブ外のWebhook、自動投稿、監視フォルダ差分を保存前に具体的に確認できるようにする。 |
 
 ## 状態の意味
 

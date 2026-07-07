@@ -308,7 +308,12 @@
 
 ### 19:48版 残課題
 
-- 方針決定済み・実装待ち: `issues/310` は自動撮影Discord投稿を専用ONだけで有効化する。`issues/311` は非表示camera自動起動/終了をバックエンド側で無効化する。`issues/313` はhistory JSON/UI stateにDiscord tokenを保存せず、削除時に現在configのWebhook URLからID一致でtokenを一時解決できる場合だけDiscord削除を実行する。`issues/314` はissue原文引用よりsecret redactionを優先する。`issues/315` は非表示タブのWebhook/自動投稿差分を保存前に具体表示する。`issues/316` はRelease署名secretをbuild jobからsign jobへ分離する。
+- 方針決定済み項目の実装結果: `issues/310` のために、自動撮影Discord投稿の許可条件を「通常投稿ONまたは自動撮影投稿ON」から「自動撮影投稿ONだけ」へ変更し、自動撮影投稿OFF時は専用Webhook URLが残っていても送信しないようにした。
+- 方針決定済み項目の実装結果: `issues/311` のために、非表示camera自動起動/終了の既存true値を「backendが尊重してOSC送信し得る」状態から「backend正規化と実行経路で常にfalseへ丸める」状態へ変更した。
+- 方針決定済み項目の実装結果: `issues/313` のために、Discord履歴を「Webhook tokenをhistory JSON/UI stateへ保存する」方式から「message/webhook IDだけを履歴へ残し、削除時だけ現在configのWebhook URLからtokenを一時解決する」方式へ変更した。
+- 方針決定済み項目の実装結果: `issues/314` のために、issue原文引用ルールを「ユーザー発言を原文のまま引用する」だけの運用から「秘密情報・private dataはredactを優先してから記録する」運用へ変更した。
+- 方針決定済み項目の実装結果: `issues/315` のために、設定保存を「非表示タブのWebhook/自動投稿/監視フォルダ/自動撮影スケジュール差分もそのまま保存する」処理から「重要差分を『aのためにbをcからdに変更した』形式で確認し、確認後だけ保存する」処理へ変更した。
+- 方針決定済み項目の実装結果: `issues/316` のために、Release署名secretの利用範囲を「build jobにも渡る」構成から「署名専用sign jobだけへ渡り、package/release jobは署名済みartifactだけを扱う」構成へ変更した。
 - 将来提案: `docs/security-future-recommendations.md` に、313のOS秘密情報ストア分離、314のredaction検査、316のkeyless/KMS release signingを記録した。
 - 旧F43/19:48-F30相当のauto-photo scan cap policyは、追加情報再検証によりW9修正で対応済みへ移した。
 - 追加情報・方針確認待ちは、旧F05/旧F12の方針決定により今回分では解消した。

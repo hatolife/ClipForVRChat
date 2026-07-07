@@ -276,7 +276,10 @@
 | 307 | [Codex Security findings 19:48 CSVを分類して追記する](unreleased/307-classify-security-findings-1948-report.md) | 完了 | 未定 | 新規追加findingとF05/F12追加情報を含む50件を、重大仕様変更、追加情報要否、即時修正対象へ再分類した。 |
 | 308 | [Codex Security findings 19:48 CSVの即時修正をサブエージェントで監督する](unreleased/308-supervise-security-findings-1948-subagents.md) | 完了 | 未定 | 仕様変更・追加情報待ちを除いた19:48 CSVの即時修正対象を作業単位へ分け、サブエージェントに委任して統合した。 |
 | 309 | [Codex Security findings 19:48 CSVの修正作業結果をレポートへ追記する](unreleased/309-append-security-findings-1948-work-report.md) | 完了 | 未定 | 19:48 CSV基準の対応内容、テスト、保留理由、コミットを管理レポートへ追記した。 |
+| 310 | [自動撮影Discord opt-outを自動撮影アップロードへ厳密に適用する](unreleased/310-enforce-autocapture-discord-opt-out.md) | 完了 | 未定 | 自動撮影Discord投稿を専用ONだけで有効化し、通常投稿ONだけでは自動撮影画像・本文を送らないようにした。 |
+| 311 | [非表示のカメラ自動起動/終了設定を無効化する](unreleased/311-disable-hidden-camera-auto-start-settings.md) | 完了 | 未定 | 非表示のカメラ自動起動/終了フラグをbackend正規化と実行経路で常にfalseへ丸めるようにした。 |
 | 312 | [Auto-photo scan capによる旧画像漏えいを再検証する](unreleased/312-revalidate-autophoto-scan-cap-old-photo-leak.md) | 完了 | 未定 | 追加情報を再検証し、既存の全件baseline scan修正で旧画像投稿とstarvationが解消済みであることを確認した。 |
 | 313 | [Discord履歴のWebhook削除トークン保存を保護する](unreleased/313-protect-history-discord-token-storage.md) | 完了 | 未定 | 履歴JSONとUI stateへDiscord tokenを保存・露出せず、削除時は現在configのWebhook URLからtokenを解決するようにした。 |
 | 314 | [issue原文引用で秘密情報を永続化しない](unreleased/314-redact-secrets-in-verbatim-issue-quotes.md) | 完了 | 未定 | issueの原文引用ルールに、Webhook URLやtokenなどの秘密情報をredactする例外を追加した。 |
+| 315 | [非表示タブのWebhook/自動投稿設定を保存前確認する](unreleased/315-confirm-hidden-webhook-autopost-settings-before-save.md) | 完了 | 未定 | Webhook、自動投稿、監視フォルダ、自動撮影スケジュールの重要差分を保存前確認に表示し、確認なしで保存されないようにした。 |
 | 316 | [Release署名鍵をビルドジョブから分離する](unreleased/316-isolate-release-signing-secrets-from-build-job.md) | 完了 | 未定 | Release workflowをbuild/sign/package/releaseへ分割し、署名secretを署名専用jobだけへ渡すようにした。 |

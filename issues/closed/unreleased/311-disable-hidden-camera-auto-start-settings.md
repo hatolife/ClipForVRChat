@@ -52,13 +52,16 @@ UIで操作できない `openCameraBeforeBatch` / `closeCameraAfterBatch` は、
 
 ## 受け入れ条件
 
-- [ ] 読み込み・保存・実行のいずれでも非表示カメラ自動起動/終了trueが有効化されない。
-- [ ] インポートconfigにtrueが含まれていても保存後はfalseになる。
-- [ ] フロントエンドだけでなくバックエンド正規化または実行前正規化で強制される。
-- [ ] 自動撮影の通常動作、Stream取得、復元処理を壊さない。
-- [ ] 該当挙動を検証するGoテストを追加する。
+- [x] 読み込み・保存・実行のいずれでも非表示カメラ自動起動/終了trueが有効化されない。
+- [x] インポートconfigにtrueが含まれていても保存後はfalseになる。
+- [x] フロントエンドだけでなくバックエンド正規化または実行前正規化で強制される。
+- [x] 自動撮影の通常動作、Stream取得、復元処理を壊さない。
+- [x] 該当挙動を検証するGoテストを追加する。
 
 ## 作業メモ
 
 2026-07-08: ユーザー指示によりbackend-sideのみで実装する。`src/frontend/src/main.js` は変更しない。
 `OpenCameraBeforeBatch` と `CloseCameraAfterBatch` はbackend正規化で常にfalseへ丸め、実行経路でも正規化済み設定を使う。
+
+2026-07-08: `ca7049a fix(autocapture): enforce backend privacy gates` で、UIから隠れているCamera OSC操作が既存configやインポートconfigから実行されるのを防ぐために、`OpenCameraBeforeBatch` と `CloseCameraAfterBatch` をbackend正規化と実行経路で常にfalseへ変更した。
+同じコミットで、true値を含むconfigでも正規化後にfalseへ落ちること、実行時に非表示フラグ由来のcamera open/closeが使われないことをGoテストで確認した。

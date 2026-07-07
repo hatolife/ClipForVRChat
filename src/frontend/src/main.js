@@ -65,6 +65,7 @@ const vueApp = createApp({
       pendingSettingsLeave: null,
       autoCaptureDetailView: '',
       pendingAutoPostConfirmation: null,
+      pendingSensitiveSettingsConfirmation: null,
       autoCaptureHelpExpanded: false,
       pendingDropPaths: [],
       historyDragSelecting: false,
@@ -372,7 +373,7 @@ const vueApp = createApp({
           warning: this.autoProcessingWatchDirectoryWarning(screenshot.screenshotDirectory)
         })
       }
-      if (autoCaptureSchedule.enabled && (autoCaptureDiscord.enabled || output.uploadDiscord)) {
+      if (autoCaptureSchedule.enabled && autoCaptureDiscord.enabled) {
         const target = this.effectiveWebhookURL(autoCaptureDiscord.webhookUrl, primaryWebhook)
         if (!target) {
           items.push({
@@ -386,6 +387,19 @@ const vueApp = createApp({
     },
     shouldConfirmAutoPostSettings() {
       return this.autoPostConfirmationItems.length > 0
+    },
+    sensitiveSettingsConfirmationItems() {
+      if (!this.hasUnsavedSettings) return []
+      let baseline
+      try {
+        baseline = JSON.parse(this.settingsBaseline || '{}')
+      } catch {
+        return []
+      }
+      return this.buildSensitiveSettingsConfirmationItems(baseline, this.state.config || {})
+    },
+    shouldConfirmSensitiveSettings() {
+      return this.sensitiveSettingsConfirmationItems.length > 0
     },
     oscLogFilterError() {
       const query = String(this.oscLogFilter || '').trim()
@@ -554,6 +568,48 @@ const vueApp = createApp({
       }
       return paths
     },
+    valueAtPath(source, path) {
+      return String(path || '').split('.').reduce((current, key) => {
+        if (current === undefined || current === null) return undefined
+        return current[key]
+      }, source)
+    },
+    confirmationValueLabel(value, path = '') {
+      if (path.toLowerCase().includes('webhookurl')) {
+        return value ? this.maskWebhook(value) : '未設定'
+      }
+      if (typeof value === 'boolean') return value ? 'ON' : 'OFF'
+      if (value === undefined || value === null || value === '') return '未設定'
+      return String(value)
+    },
+    buildSensitiveSettingsConfirmationItems(before, after) {
+      const definitions = [
+        { path: 'output.uploadDiscord', purpose: '通常処理のDiscord投稿', label: 'Discord投稿', tab: 'webhook' },
+        { path: 'discord.webhookUrl', purpose: '通常処理のDiscord投稿', label: '通常投稿用Webhook URL', tab: 'webhook' },
+        { path: 'autoPhoto.enabled', purpose: 'VRChat写真自動処理', label: '自動処理', tab: 'feature' },
+        { path: 'autoPhoto.photoDirectory', purpose: 'VRChat写真自動処理', label: '監視フォルダ', tab: 'feature' },
+        { path: 'autoPhoto.webhookUrl', purpose: 'VRChat写真自動処理', label: '専用Webhook URL', tab: 'webhook' },
+        { path: 'screenshotAutoPost.enabled', purpose: 'スクリーンショット自動処理', label: '自動処理', tab: 'feature' },
+        { path: 'screenshotAutoPost.screenshotDirectory', purpose: 'スクリーンショット自動処理', label: '監視フォルダ', tab: 'feature' },
+        { path: 'screenshotAutoPost.webhookUrl', purpose: 'スクリーンショット自動処理', label: '専用Webhook URL', tab: 'webhook' },
+        { path: 'autoCapture.schedule.enabled', purpose: '自動撮影スケジュール', label: '自動撮影スケジュール', tab: 'autoCapture', detail: 'schedule' },
+        { path: 'autoCapture.discord.enabled', purpose: '自動撮影Discord投稿', label: 'Discord自動投稿', tab: 'autoCapture', detail: 'metadata' },
+        { path: 'autoCapture.discord.webhookUrl', purpose: '自動撮影Discord投稿', label: '専用Webhook URL', tab: 'webhook' }
+      ]
+      const items = []
+      for (const definition of definitions) {
+        const beforeValue = this.valueAtPath(before, definition.path)
+        const afterValue = this.valueAtPath(after, definition.path)
+        if (this.serializeSettings(beforeValue) === this.serializeSettings(afterValue)) continue
+        items.push({
+          key: definition.path,
+          tab: definition.tab,
+          detail: definition.detail || '',
+          text: `${definition.purpose}のために${definition.label}を${this.confirmationValueLabel(beforeValue, definition.path)}から${this.confirmationValueLabel(afterValue, definition.path)}に変更した。`
+        })
+      }
+      return items
+    },
     settingLabelForPath(path) {
       const exactLabels = {
         'autoCapture.osc.vrcHost': 'OSCホスト',
@@ -710,8 +766,13 @@ const vueApp = createApp({
         this.setView('main', 'after_settings')
       }
     },
-    async confirmSaveAndLeaveSettings(skipAutoPostConfirmation = false, overrideAction = '') {
+    async confirmSaveAndLeaveSettings(skipAutoPostConfirmation = false, overrideAction = '', skipSensitiveSettingsConfirmation = false) {
       const action = overrideAction || this.pendingSettingsLeave || 'home'
+      if (!skipSensitiveSettingsConfirmation && this.shouldConfirmSensitiveSettings) {
+        this.pendingSettingsLeave = null
+        this.requestSensitiveSettingsConfirmation(`leave:${action}`)
+        return
+      }
       if (!skipAutoPostConfirmation && this.shouldConfirmAutoPostSettings) {
         this.pendingSettingsLeave = null
         this.requestAutoPostConfirmation(`leave:${action}`)
@@ -954,6 +1015,29 @@ const vueApp = createApp({
     requestAutoPostConfirmation(action) {
       this.pendingAutoPostConfirmation = action
       this.logUserAction('settings_confirmation_required', `auto_post ${action}`)
+    },
+    requestSensitiveSettingsConfirmation(action) {
+      this.pendingSensitiveSettingsConfirmation = action
+      this.logUserAction('settings_confirmation_required', `sensitive_settings ${action}`)
+    },
+    async confirmSensitiveSettings() {
+      const action = this.pendingSensitiveSettingsConfirmation || 'save'
+      this.pendingSensitiveSettingsConfirmation = null
+      if (action.startsWith('leave:')) {
+        await this.confirmSaveAndLeaveSettings(false, action.slice('leave:'.length) || 'home', true)
+        return
+      }
+      await this.saveSettings(false, true)
+    },
+    cancelSensitiveSettingsConfirmation() {
+      this.logUserAction('button_click', 'cancel_sensitive_settings_confirmation')
+      this.pendingSensitiveSettingsConfirmation = null
+    },
+    openSensitiveSetting(item) {
+      this.logUserAction('button_click', `open_sensitive_setting ${item?.key || ''}`)
+      this.pendingSensitiveSettingsConfirmation = null
+      if (item?.tab) this.settingsTab = item.tab
+      this.autoCaptureDetailView = item?.detail || ''
     },
     async confirmAutoPostSettings() {
       const action = this.pendingAutoPostConfirmation || 'save'
@@ -1250,7 +1334,7 @@ const vueApp = createApp({
       return !!(item && this.isTrustedDiscordImageURL(item.url))
     },
     canDeleteHistoryDiscord(item) {
-      return !!(item && !item.pinned && !item.discordDeleted && this.hasHistoryDiscordRecord(item) && item.discordMessageId && item.discordWebhookId && item.discordToken)
+      return !!(item && !item.pinned && !item.discordDeleted && this.hasHistoryDiscordRecord(item) && item.discordMessageId && item.discordWebhookId)
     },
     historyDiscordLabel(item) {
       if (!this.hasHistoryDiscordRecord(item)) return 'Discord: なし'
@@ -2089,7 +2173,7 @@ const vueApp = createApp({
         this.error = String(err)
       }
     },
-    async saveSettings(skipAutoPostConfirmation = false) {
+    async saveSettings(skipAutoPostConfirmation = false, skipSensitiveSettingsConfirmation = false) {
       const settingsTabBeforeSave = this.settingsTab
       const autoCaptureDetailBeforeSave = this.autoCaptureDetailView
       const scrollPosition = this.isSettings ? this.captureSettingsScrollPosition() : null
@@ -2100,6 +2184,11 @@ const vueApp = createApp({
         this.sanitizeOutputDirectory()
         this.sanitizePhotoDirectory()
         this.sanitizeScreenshotDirectory()
+        if (!skipSensitiveSettingsConfirmation && this.shouldConfirmSensitiveSettings) {
+          this.saving = false
+          this.requestSensitiveSettingsConfirmation('save')
+          return
+        }
         if (!skipAutoPostConfirmation && this.shouldConfirmAutoPostSettings) {
           this.saving = false
           this.requestAutoPostConfirmation('save')
@@ -2800,12 +2889,12 @@ const vueApp = createApp({
                   <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.presence.includeUserIdsInDiscord" /><span></span></label>
                 </div>
                 <div class="setting-row">
-                  <div><strong>Discord自動投稿</strong><p>通常Discord投稿ON、またはこの設定ONのとき、自動撮影した画像をDiscord Webhookへ投稿します。</p></div>
+                  <div><strong>Discord自動投稿</strong><p>この設定ONのときだけ、自動撮影した画像や撮影情報をDiscord Webhookへ投稿します。</p></div>
                   <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.discord.enabled" /><span></span></label>
                 </div>
-                <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord && !autoCaptureSettings.discord.enabled }">
+                <div class="setting-row" :class="{ disabled: !autoCaptureSettings.discord.enabled }">
                   <div><strong>Discordに画像を添付する</strong><p>OFFの場合は撮影情報の本文だけを投稿します。画像はローカル保存先とsidecar JSONで保持します。</p></div>
-                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.discord.includeImages" :disabled="!state.config.output.uploadDiscord && !autoCaptureSettings.discord.enabled" /><span></span></label>
+                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.discord.includeImages" :disabled="!autoCaptureSettings.discord.enabled" /><span></span></label>
                 </div>
                 <div class="setting-row">
                   <div><strong>撮影後にCamera状態を戻す</strong><p>撮影前に受信したUser Camera OSC値を優先し、不足分は下の戻し先を使います。</p></div>
@@ -3245,7 +3334,7 @@ const vueApp = createApp({
                 <button class="link-button" @click="openURL(webhookGuideUrl)" :disabled="!state.config.output.uploadDiscord" :title="state.config.output.uploadDiscord ? 'DiscordのWebhook作成方法を開く' : 'Discord投稿をONにすると開けます'">Discord公式: Webhookの作成方法</button>
               </div>
               <label>
-              <input type="password" v-model="state.config.discord.webhookUrl" placeholder="https://discord.com/api/webhooks/..." :disabled="!state.config.output.uploadDiscord" :class="{ 'attention-input': shouldWarnMissingPrimaryWebhook() }" />
+                <input type="password" v-model="state.config.discord.webhookUrl" placeholder="https://discord.com/api/webhooks/..." :disabled="!state.config.output.uploadDiscord" :class="{ 'attention-input': shouldWarnMissingPrimaryWebhook() }" />
               </label>
             </div>
             <div class="setting-row" :class="[{ disabled: !state.config.output.uploadDiscord || !state.config.autoPhoto.enabled }, settingRowChangedClass('autoPhoto.webhookUrl')]">
@@ -3262,11 +3351,11 @@ const vueApp = createApp({
                 <p v-if="state.config.output.uploadDiscord && state.config.screenshotAutoPost.enabled" :class="['setting-note', webhookFallbackNoteClass(state.config.screenshotAutoPost.webhookUrl, state.config.screenshotAutoPost.enabled)]">{{ webhookFallbackNote(state.config.screenshotAutoPost.webhookUrl, state.config.screenshotAutoPost.enabled) }}</p>
               </label>
             </div>
-            <div class="setting-row" :class="[{ disabled: !state.config.output.uploadDiscord && !state.config.autoCapture.discord.enabled }, settingRowChangedClass('autoCapture.discord.webhookUrl')]">
+            <div class="setting-row" :class="[{ disabled: !state.config.autoCapture.discord.enabled }, settingRowChangedClass('autoCapture.discord.webhookUrl')]">
               <div><strong>自動撮影用Webhook URL</strong><p>通常投稿とは別の投稿先にしたい場合だけ入力します。空の場合は通常投稿用Webhook URLへ投稿します。</p></div>
               <label>
-                <input type="password" v-model="state.config.autoCapture.discord.webhookUrl" placeholder="空なら通常投稿用Webhook URLを使用" :disabled="!state.config.output.uploadDiscord && !state.config.autoCapture.discord.enabled" />
-                <p v-if="state.config.output.uploadDiscord || state.config.autoCapture.discord.enabled" :class="['setting-note', webhookFallbackNoteClass(state.config.autoCapture.discord.webhookUrl, true)]">{{ webhookFallbackNote(state.config.autoCapture.discord.webhookUrl, true) }}</p>
+                <input type="password" v-model="state.config.autoCapture.discord.webhookUrl" placeholder="空なら通常投稿用Webhook URLを使用" :disabled="!state.config.autoCapture.discord.enabled" />
+                <p v-if="state.config.autoCapture.discord.enabled" :class="['setting-note', webhookFallbackNoteClass(state.config.autoCapture.discord.webhookUrl, true)]">{{ webhookFallbackNote(state.config.autoCapture.discord.webhookUrl, true) }}</p>
               </label>
             </div>
           </section>
@@ -3361,6 +3450,23 @@ const vueApp = createApp({
             <button @click="confirmSaveAndLeaveSettings()" :disabled="saving" :title="saving ? '保存中です' : '保存して移動する'">{{ saving ? '保存中' : '保存して移動' }}</button>
             <button class="secondary" @click="discardSettingsAndLeave" :disabled="saving" :title="saving ? '保存中です' : '保存せずに移動する'">保存せずに移動</button>
             <button class="secondary" @click="cancelSettingsLeave" :disabled="saving" :title="saving ? '保存中です' : '移動を取りやめる'">キャンセル</button>
+          </div>
+        </div>
+      </div>
+      <div v-if="pendingSensitiveSettingsConfirmation" class="modal-backdrop" role="dialog" aria-modal="true">
+        <div class="confirm-dialog">
+          <h2>重要な設定変更を確認してください</h2>
+          <p>Webhook、自動投稿、監視フォルダ、自動撮影スケジュールの変更が含まれています。保存前に内容を確認してください。</p>
+          <ul class="confirmation-list">
+            <li v-for="item in sensitiveSettingsConfirmationItems" :key="item.key">
+              <span>{{ item.text }}</span>
+              <button type="button" class="link-button" @click="openSensitiveSetting(item)">該当設定を開く</button>
+            </li>
+          </ul>
+          <p v-if="error" class="error">{{ error }}</p>
+          <div class="button-row dialog-actions">
+            <button @click="confirmSensitiveSettings" :disabled="saving" :title="saving ? '保存中です' : 'この内容で保存する'">{{ saving ? '保存中' : '確認して保存' }}</button>
+            <button class="secondary" @click="cancelSensitiveSettingsConfirmation" :disabled="saving" :title="saving ? '保存中です' : '保存を取りやめる'">キャンセル</button>
           </div>
         </div>
       </div>
