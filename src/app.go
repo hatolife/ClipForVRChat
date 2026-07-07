@@ -500,47 +500,8 @@ func (a *App) CheckForUpdate() (appcore.UpdateInfo, error) {
 }
 
 func (a *App) GetOSSLicenses() []OSSLicense {
-	return []OSSLicense{
-		{Name: "Wails", License: "MIT", Copyright: "Copyright (c) 2018-Present Lea Anthony", URL: "https://github.com/wailsapp/wails"},
-		{Name: "go-arg", License: "MIT", Copyright: "Copyright (c) 2015, Alex Flint", URL: "https://github.com/alexflint/go-arg"},
-		{Name: "Vue.js", License: "MIT", Copyright: "Copyright (c) 2018-present, Yuxi (Evan) You", URL: "https://github.com/vuejs/core"},
-		{Name: "Vite", License: "MIT", Copyright: "Copyright (c) 2019-present, VoidZero Inc. and Vite contributors", URL: "https://github.com/vitejs/vite"},
-		{Name: "ProtonMail/go-crypto", License: "MIT", Copyright: "Copyright (c) 2022 Proton AG", URL: "https://github.com/ProtonMail/go-crypto"},
-		{Name: "imaging", License: "MIT", Copyright: "Copyright (c) 2012 Grigory Dryapak", URL: "https://github.com/disintegration/imaging"},
-		{Name: "flock", License: "BSD-3-Clause", Copyright: "Copyright (c) 2018-2025, The Gofrs; Copyright (c) 2015-2020, Tim Heckman", URL: "https://github.com/gofrs/flock"},
-		{Name: "gozxing", License: "MIT", Copyright: "Copyright (c) 2018 Daisuke MAKIUCHI", URL: "https://github.com/makiuchi-d/gozxing"},
-		{Name: "go-qrcode", License: "MIT", Copyright: "Copyright (c) 2014 Tom Harwood", URL: "https://github.com/skip2/go-qrcode"},
-		{Name: "golang.design/x/clipboard", License: "MIT", Copyright: "Copyright (c) 2021 Changkun Ou", URL: "https://github.com/golang-design/clipboard"},
-		{Name: "golang.org/x/crypto", License: "BSD-3-Clause", Copyright: "Copyright (c) The Go Authors", URL: "https://cs.opensource.google/go/x/crypto"},
-		{Name: "golang.org/x/image", License: "BSD-3-Clause", Copyright: "Copyright (c) The Go Authors", URL: "https://cs.opensource.google/go/x/image"},
-		{Name: "Spout2", License: "BSD-2-Clause", Copyright: "Copyright (c) 2016-2025, Lynn Jarvis", URL: "https://github.com/leadedge/Spout2", Text: spout2LicenseText},
-	}
+	return ossLicenses()
 }
-
-const spout2LicenseText = `Spout2 / SpoutLibrary
-
-Copyright (c) 2016-2025, Lynn Jarvis. All rights reserved.
-
-Redistribution and use in source and binary forms, with or without modification,
-are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice,
-   this list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`
 
 func (a *App) SelectOutputDirectory(current string) (string, error) {
 	return a.selectDirectory("出力先フォルダを選択", current)
