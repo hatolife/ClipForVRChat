@@ -67,17 +67,70 @@
 
 ## 分類結果
 
-### 重大な仕様変更が必要
+### 重大な仕様変更・運用判断が必要
 
-- 未分類
+| ID | Title | 理由 | 今回の扱い |
+| --- | --- | --- | --- |
+| F02 | Auto-capture Discord opt-out bypass leaks captures | `autoCapture.discord.enabled` と全体 `output.uploadDiscord` の同意境界をどう定義するかの仕様判断が必要。現HEADには全体ONで自動撮影Discord投稿もONになることを期待するテストがある。 | 保留 |
+| F07 | Raw issue quoting can leak user secrets | AGENTS運用として「ユーザー原文を誤字含め保存」と「秘密情報redaction」のどちらを優先するかの運用判断が必要。 | 保留 |
+| F11 | Hidden camera auto-start settings remain active | 既存configのカメラ自動起動/終了設定を強制無効化するか、UIへ戻すかの仕様判断が必要。 | 保留 |
+| F30 | Tabbed settings hide webhook auto-post settings | 外部config保存時にセキュリティ関連タブの確認を必須化するか、現在のタブ+確認ダイアログ方式でよいかのUX/仕様判断が必要。 | 保留 |
+| F37 | Release signing key exposed to prior build-step code execution | 署名job分離、鍵管理方式、hardware/KMS/keyless signing等のRelease信頼モデル判断が必要。 | 保留 |
+| F43 | Auto-photo scan cap can leak old photos and starve new ones | scan cap時に古い写真をどう扱うか、baselineを全件保持するか、監視対象を制限するかの仕様判断が必要。 | 保留 |
+| F44 | History file stores Discord tokens with weak permissions | 再起動後のDiscord削除機能維持とtoken非保存をどう両立するかのデータモデル判断が必要。権限自体は現HEADでprivate file化済み。 | 保留 |
 
-### 仕様変更不要だが追加情報が必要
+### 仕様変更不要だが追加情報・方針確認が必要
 
-- 未分類
+| ID | Title | 必要な追加情報・方針 | 今回の扱い |
+| --- | --- | --- | --- |
+| F05 | New diagnostic links are blocked by URL allow-list | `www.google.com` や `keys.openpgp.org` をアプリの外部URL許可リストへ入れるか、リンク先を許可済みhostへ変えるか判断が必要。 | 保留 |
+| F12 | New VRChat feedback help link is blocked | `feedback.vrchat.com` を許可リストへ入れるか、アプリ外導線を別形式にするか判断が必要。 | 保留 |
 
-### 仕様変更不要かつ追加情報不要
+### 仕様変更不要かつ追加情報不要: 即時修正対象
 
-- 未分類
+#### 設定・自動投稿・Webhook routing
+
+- F01 `Remote-player mask opt-out is silently reset`: explicit `false` をNormalizeで既定trueへ戻さない。
+- F08 `Unsaved draft can activate auto-post watchers`: 画像引数処理でresults modeへ入る場合、runtime watcher configを保存済みconfigへ戻す。
+- F17 `Auto-post warning suppressed when webhook is configured`: 自動写真/スクショ側は現HEADで大部分軽減済み。自動撮影側はF02の仕様判断に従属するため、今回の修正対象は残存する単純警告漏れが確認できた場合のみ。
+- F33/F34 `Screenshots ... wrong Discord webhook`: screenshot watcherの空WebhookがAutoPhoto webhookへfallbackしないようにする。
+
+#### 診断ログ・秘密情報redaction
+
+- F13 `Diagnostic logs leak VRChat private instance IDs`: instance IDをログ/診断用にredactまたはhashする。
+- F24 `Startup diagnostics log unredacted local paths`: 起動診断に残るpathをredaction済み形式へ寄せる。
+- F38 `Diagnostic log can persist Discord webhook tokens`: URL/error redactionのテストを追加し、漏れがあればredactionを強化する。
+
+#### 入力サイズ・DoS上限
+
+- F03 `Auto-photo skip path bypasses per-tick processing cap`: skipもtick上限に数える。
+- F04/F21/F22 `Unbounded CLI/ZIP encryption can exhaust memory`: CLI暗号化入力に通常ファイル確認とサイズ/件数上限を入れる。
+- F10 `Spout diagnose trusts unbounded sender dimensions`: Spout sender dimensionsに上限とoverflow checkを入れる。
+- F15 `Unbounded localhost IPC request can exhaust app memory`: IPC decode前にrequest size、command/token/path件数/長さ上限を入れる。
+- F18 `Unbounded OSC avatar parameter cache enables DoS`: avatar OSC sample cacheにallowlistまたは上限/evictionを入れる。
+- F31/F32 `Auto-photo scan errors ...`: 同一scan errorの重複追加を抑制し、UI/result増殖を防ぐ。
+- F39 `QR upscaling can exhaust memory on crafted tall images`: QR upscale後の総pixel数上限を入れる。
+- F41 `Unbounded native clipboard PNG copy can crash app`: clipboard PNGをcopyする前にGlobalSize上限を確認する。
+
+#### 境界チェック・URL・WebView
+
+- F14 `OSC forwarding can self-loop and cause UDP DoS`: wildcard bind時のsame-port local targetを保守的にself-forward扱いにする。
+- F23 `COM shell calls are made without OS-thread pinning`: `reveal_windows.go` のCOM呼び出しを `runtime.LockOSThread` で囲む。
+- F25/F26 `Explorer reveal ...`: Wails APIでも管理output配下のファイルだけExplorer表示できるようにする。
+- F27/F28 `Output format ...`: Discord/clipboard-only出力でも実際に使われるformat/qualityをUIで変更できるようにする。
+- F35/F36 `Update URL ...`: API応答の `html_url` をそのまま使わず、公式GitHub Release URLを構築または厳格検証する。
+- F42 `Accepted drops are not cancelled...`: drop eventで `preventDefault` / `stopPropagation` し、意図しないWebView navigationを防ぐ。
+
+### HEAD確認済み・重複・軽減済み
+
+| ID | Title | 確認内容 | 今回の扱い |
+| --- | --- | --- | --- |
+| F09 | Debug OSC input is written verbatim to diagnostics | 現HEADの `SendDebugOSC` はraw lineを診断ログへ書かず、target/address/typesと結果だけを記録している。 | 対応済み扱い |
+| F16 | Unbounded OSC packet logging enables log DoS | 現HEADではOSCログはメモリ上 `maxOSCLogEntries=1000` に制限され、永続化も専用ログへthrottleされている。追加強化はF18/F14側で扱う。 | 軽減済み |
+| F19 | Metadata failures can lead to unvalidated Discord uploads | 後続実装確認が必要だが、画像decode/metadataの扱いとDiscord upload経路が複数に分かれるため、F38/F33/F34/F41完了後に再確認する。 | 後続再確認 |
+| F20 | Release notes step uses wrong env syntax on Windows | 現HEADのRelease workflowはPowerShellで `$env:...`、bashで環境変数を使い分けている。 | 対応済み扱い |
+| F29 | Hidden auto-processing folders can exfiltrate images | `issues/293` の対応で監視フォルダUI表示と保存前確認が追加済み。 | 対応済み扱い |
+| F40 | Untrusted QR URLs can trigger Discord mentions | Discord payloadに `allowed_mentions.parse=[]` が入り、テストも存在する。 | 対応済み扱い |
 
 ## 作業割り当て
 
