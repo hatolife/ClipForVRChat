@@ -65,3 +65,21 @@
 
 CMakeのローカルドキュメントでも、外部サーバーから取得する場合はbranch/tag名よりcommit hashの利用が推奨されている。
 また、URL downloadでは `URL_HASH` がdownload内容のintegrity確認として強く推奨されている。
+
+### Spout2 revisionを更新するタイミング
+
+`GIT_TAG` をcommit SHAへ固定した後は、通常の依存ライブラリ更新と同じ扱いにする。
+Releaseごとに自動更新するものではなく、理由があるときだけ明示的なPR/issueで更新する。
+
+- Spout2にセキュリティ修正、クラッシュ修正、Windows/DirectX/OpenGL/Spout互換性の修正が入ったとき。
+- VRChat Stream Cameraや利用者環境で、現在固定しているSpout2由来と見られる不具合が確認されたとき。
+- Visual Studio、Windows SDK、CMake、GitHub Actions runner更新などで、現在のSpout2 revisionがビルドできなくなったとき。
+- Spout2側のライセンス、配布形態、依存DLL構成に変更があり、同梱物やライセンス表記を見直す必要があるとき。
+- 定期棚卸しで、長期間固定したrevisionが古くなりすぎていると判断したとき。ただし自動追従ではなく、差分確認と実機確認を伴う。
+
+更新しないケースも明確にする。
+「新しいタグが出たから」「最新にしておきたいから」だけでは更新しない。
+commit SHA固定は再現性と監査性を保つための措置なので、更新時は旧SHA、新SHA、対応するupstream tag、更新理由、ビルド結果、helper動作確認、ライセンス差分確認を記録する。
+
+build metadataにSpout2 revisionを記録する目的は、Release成果物から「どのSpout2 commitでhelperを作ったか」を後から追跡できるようにすることである。
+これは更新頻度を上げるためではなく、不具合調査、セキュリティ監査、Release再現確認で参照するための情報である。
