@@ -287,3 +287,4 @@
 | 318 | [Windows C++のmin/max macro衝突対策を再発防止として記録する](unreleased/318-document-windows-minmax-macro-prevention.md) | 完了 | 未定 | Windows header由来の `min` / `max` macro衝突対策をAGENTS.mdへ明文化した。 |
 | 319 | [master/developを同一状態にして作業ブランチを削除する](maintenance-only/319-sync-master-develop-and-delete-work-branch.md) | 完了 | 整理のみ | `master` と `develop` を同一commitへ揃え、作業ブランチをlocal/remoteから削除した。 |
 | 320 | [security_audit_prompt.md の監査を実施する](investigation-only/320-run-security-audit-prompt.md) | 完了 | 未定 | 指定プロンプトに沿って監査し、`reports/2026-07-08_061355/` に結果を作成した。 |
+| 321 | [設定保存時の自動処理投稿確認を対象設定変更時だけ表示する](v0.1.8/321-confirm-auto-post-only-when-target-settings-change.md) | 完了 | `v0.1.8` | 自動処理の監視フォルダや送信先が変わった保存時だけ投稿確認を表示する。 |
