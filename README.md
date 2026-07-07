@@ -207,7 +207,7 @@ Discord投稿では、本文に含まれる `@everyone`、`@here`、ユーザー
 - スクリーンショット用Webhook URL: スクリーンショットだけ別のDiscordチャンネルに投稿したい場合に入力します。空なら通常投稿用Webhook URLを使います。
 - 自動撮影用Webhook URL: 自動撮影だけ別のDiscordチャンネルに投稿したい場合に入力します。空なら通常投稿用Webhook URLを使います。
 
-Discord投稿がOFFの場合、投稿URLの自動コピーとWebhook設定はグレーアウトします。VRChat写真自動処理とスクリーンショット自動処理は、縮小、QRコードURL検出、ローカル保存を行えるためグレーアウトしません。ローカル保存がOFFの場合、出力形式を含むローカル保存に関係する設定はグレーアウトします。
+Discord投稿がOFFの場合、投稿URLの自動コピーと通常投稿用Webhook URLはグレーアウトします。VRChat写真自動処理とスクリーンショット自動処理は、縮小、QRコードURL検出、ローカル保存を行えるためグレーアウトしません。VRChat写真用Webhook URLとスクリーンショット用Webhook URLは、それぞれの自動処理がONでも通常Discord投稿がOFFならグレーアウトします。自動撮影用Webhook URLは、自動撮影のDiscord投稿がOFFの場合にグレーアウトします。ローカル保存がOFFの場合、出力形式を含むローカル保存に関係する設定はグレーアウトします。
 自動撮影の `player_local` は AvatarBeacon の `avatar_osc` basis を既定にし、専用アバターギミックがない場合だけ `manual` basis またはフォールバックモードに切り替えて使います。受信状態や最終受信時刻、position/yaw は設定画面の自動撮影タブとOSCタブで確認できます。
 
 ## 画面
