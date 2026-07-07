@@ -23,6 +23,10 @@
 - 構図の「現在Poseを取得」で、直近のUser Camera Zoomも拡大率として保存するようにしました。
 - ローカルアンカー配置済みカメラを使うフォールバックモードを追加し、自動ON/OFFを個別に設定できるようにしました。自動ON/OFFはどちらも既定OFFです。
 - 自動撮影の詳細設定画面でも「保存」「閉じる」ボタンを表示するようにしました。
+- Release workflowで同梱するAvatarBeacon packageのPGP署名を検証し、Spout2取得元をSHA256検証付きの固定archiveにしました。
+- 単一exe配布では既定で埋め込みSpout helperを使い、同じフォルダに置かれた未署名helperを優先しないようにしました。
+- 設定由来のlegacy ffmpeg実行パスを制限し、外部設定から任意実行ファイルを起動しにくくしました。
+- 自動処理の監視フォルダとDiscord送信先を保存前に確認できるようにし、広すぎる監視フォルダには警告を表示するようにしました。
 - 別フォルダや別バージョンのClipForVRChatでも同じWindowsユーザーでは単一起動になるようにし、OSC port競合を避けました。
 - 起動中の進捗表示、frontend template検査、Wails API surface検査を追加し、GUI起動不具合を切り分けやすくしました。
 
