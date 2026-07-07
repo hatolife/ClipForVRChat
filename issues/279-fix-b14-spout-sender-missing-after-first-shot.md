@@ -5,6 +5,8 @@
 > '/mnt/c/Users/user/Downloads/ClipForVRChat-v0.1.8-b14-windows-amd64/logs'
 > １枚目成功後何かいらない子として２枚目以降失敗してる気がする
 
+> 解決するまで継続して作業 betaどんどん作っていい　C:\Users\user\Downloads　にci生成物ダウンロードして実行して確認　configは'/mnt/c/Users/user/Downloads/ClipForVRChat-v0.1.8-b14-windows-amd64/config.json'をコピーして使用
+
 ## 文脈
 
 - `v0.1.8-b14` の自動撮影ログでは、1枚目のStream/Spout撮影は成功している。
@@ -36,3 +38,4 @@
 - 2026-07-08: b14ログを確認。1枚目は `spout sender recovery` のON再送後に `senders=1` となり `VRCSender1` の取得に成功。2枚目以降は1枚目成功後の次回 `spout list` が `senders=0` となり、`open_before_batch=false` のためOFF/ONではなくON再送のみ実施、その後も `senders=0` のまま `sender_not_found` で失敗していた。
 - 2026-07-08: `openCameraBeforeBatch=false` でも、ON再送後の再確認でsenderが戻らない場合は `/usercamera/Streaming=false` → `true` のトグルへ段階的に上げるよう修正した。ONだけで復帰した場合は従来どおりOFFを送らない。
 - 2026-07-08: 検証: `go test ./internal/appcore -run 'TestRecoverEmptySpoutSenderList|TestAutoCaptureRunnerRunOnceSkipsCameraAutoOpenWhenDisabled'`、`go test ./...`。実機VRChatでの連続撮影確認は未実施のため要確認。
+- 2026-07-08: ユーザー指示に基づき、解決確認までbeta作成とCI生成物の実行確認を継続する。`v0.1.8-b15` を本修正の確認betaとして扱う。
