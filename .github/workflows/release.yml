@@ -356,6 +356,19 @@ jobs:
           RELEASE_SIGNING_FINGERPRINT: ${{ env.RELEASE_SIGNING_FINGERPRINT }}
           RELEASE_SIGNING_KEY_UID: ${{ env.RELEASE_SIGNING_KEY_UID }}
         run: |
+          $spoutCMake = Get-Content "tools/spout-capture/CMakeLists.txt" -Raw
+          function Get-CMakeSetValue($name) {
+            $pattern = 'set\(' + [regex]::Escape($name) + '\s+"([^"]+)"\)'
+            $match = [regex]::Match($spoutCMake, $pattern)
+            if (!$match.Success) {
+              throw "CMake variable was not found: $name"
+            }
+            return $match.Groups[1].Value
+          }
+          $spout2Revision = Get-CMakeSetValue "SPOUT2_REVISION"
+          $spout2UpstreamTag = Get-CMakeSetValue "SPOUT2_UPSTREAM_TAG"
+          $spout2ArchiveUrl = (Get-CMakeSetValue "SPOUT2_ARCHIVE_URL").Replace('${SPOUT2_REVISION}', $spout2Revision)
+          $spout2ArchiveSha256 = Get-CMakeSetValue "SPOUT2_ARCHIVE_SHA256"
           $metadata = [ordered]@{
             tag = $env:TAG_NAME
             commit = $env:COMMIT_SHA
@@ -372,6 +385,12 @@ jobs:
               library = "SpoutLibrary.dll"
               librarySha256 = $env:SPOUT_DLL_SHA256
               source = "embedded in main exe and included in separated zip"
+              spout2 = [ordered]@{
+                revision = $spout2Revision
+                upstreamTag = $spout2UpstreamTag
+                archiveUrl = $spout2ArchiveUrl
+                archiveSha256 = $spout2ArchiveSha256
+              }
             }
             avatarBeacon = [ordered]@{
               package = $env:AVATARBEACON_PACKAGE_NAME

@@ -13,10 +13,16 @@ add_test(NAME spout-capture-logic-test COMMAND spout-capture-logic-test)
 if (WIN32)
   include(FetchContent)
 
+  set(SPOUT2_REVISION "fc63ac2c16918ffa1d3384cddfba2bbc70650bb4")
+  set(SPOUT2_UPSTREAM_TAG "2.007.015")
+  set(SPOUT2_ARCHIVE_URL "https://github.com/leadedge/Spout2/archive/${SPOUT2_REVISION}.tar.gz")
+  set(SPOUT2_ARCHIVE_SHA256 "087730642decf46d71fa1a96c1f63f4f6a99feb5e82e9b911b6b70c65d8a6305")
+
   FetchContent_Declare(
     Spout2
-    GIT_REPOSITORY https://github.com/leadedge/Spout2.git
-    GIT_TAG 2.007.015
+    URL ${SPOUT2_ARCHIVE_URL}
+    URL_HASH SHA256=${SPOUT2_ARCHIVE_SHA256}
+    DOWNLOAD_EXTRACT_TIMESTAMP FALSE
   )
   FetchContent_MakeAvailable(Spout2)
 
