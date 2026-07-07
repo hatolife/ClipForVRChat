@@ -1657,31 +1657,47 @@ func readOSCLogEntriesFile(t *testing.T, path string) []OSCLogEntry {
 	return entries
 }
 
-func TestEncryptZipFileWithPublicKey(t *testing.T) {
+func TestEncryptFileWithPublicKey(t *testing.T) {
 	dir := t.TempDir()
-	zipPath := filepath.Join(dir, "sample.zip")
-	var buf bytes.Buffer
-	zipWriter := zip.NewWriter(&buf)
-	writer, err := zipWriter.Create("inside.txt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := writer.Write([]byte("secret text")); err != nil {
-		t.Fatal(err)
-	}
-	if err := zipWriter.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(zipPath, buf.Bytes(), 0600); err != nil {
+	filePath := filepath.Join(dir, "sample.txt")
+	if err := os.WriteFile(filePath, []byte("secret text"), 0600); err != nil {
 		t.Fatal(err)
 	}
 
-	outputPath, err := encryptZipFileWithPublicKey(zipPath)
+	outputPath, err := encryptPathWithPublicKey(filePath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if outputPath != zipPath+".gpg" {
-		t.Fatalf("outputPath = %q, want %q", outputPath, zipPath+".gpg")
+	if outputPath != filePath+".gpg" {
+		t.Fatalf("outputPath = %q, want %q", outputPath, filePath+".gpg")
+	}
+	data, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, leaked := range []string{"sample.txt", "secret text"} {
+		if strings.Contains(string(data), leaked) {
+			t.Fatalf("encrypted file leaked %q", leaked)
+		}
+	}
+}
+
+func TestEncryptDirectoryWithPublicKey(t *testing.T) {
+	dir := t.TempDir()
+	inputDir := filepath.Join(dir, "report")
+	if err := os.Mkdir(inputDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(inputDir, "inside.txt"), []byte("secret text"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	outputPath, err := encryptPathWithPublicKey(inputDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if outputPath != inputDir+".zip.gpg" {
+		t.Fatalf("outputPath = %q, want %q", outputPath, inputDir+".zip.gpg")
 	}
 	data, err := os.ReadFile(outputPath)
 	if err != nil {
@@ -1689,7 +1705,7 @@ func TestEncryptZipFileWithPublicKey(t *testing.T) {
 	}
 	for _, leaked := range []string{"inside.txt", "secret text"} {
 		if strings.Contains(string(data), leaked) {
-			t.Fatalf("encrypted zip leaked %q", leaked)
+			t.Fatalf("encrypted directory leaked %q", leaked)
 		}
 	}
 }

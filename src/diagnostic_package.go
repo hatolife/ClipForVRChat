@@ -122,26 +122,13 @@ func createEncryptedDiagnosticPackage(configPath string, cfg appcore.Config) (st
 	return outputPath, nil
 }
 
-func encryptZipFileWithPublicKey(path string) (string, error) {
+func encryptPathWithPublicKey(path string) (string, error) {
 	if strings.TrimSpace(path) == "" {
-		return "", fmt.Errorf("zipファイルを指定してください")
+		return "", fmt.Errorf("暗号化するファイルまたはフォルダを指定してください")
 	}
-	if !strings.EqualFold(filepath.Ext(path), ".zip") {
-		return "", fmt.Errorf("zipファイルではありません: %s", path)
-	}
-	info, err := os.Stat(path) // #nosec G304,G703 -- path comes from explicit CLI zip argument and is validated as a local .zip file.
+	info, err := os.Stat(path) // #nosec G304,G703 -- path comes from explicit CLI file drop or command-line argument.
 	if err != nil {
-		return "", fmt.Errorf("zipファイルを確認できません: %w", err)
-	}
-	if info.IsDir() {
-		return "", fmt.Errorf("zipファイルではありません: %s", path)
-	}
-	data, err := os.ReadFile(path) // #nosec G304,G703 -- path comes from explicit CLI zip argument and is validated as a local .zip file.
-	if err != nil {
-		return "", fmt.Errorf("zipファイルを読み込めません: %w", err)
-	}
-	if _, err := zip.NewReader(bytes.NewReader(data), int64(len(data))); err != nil {
-		return "", fmt.Errorf("zipファイルを読み込めません: %w", err)
+		return "", fmt.Errorf("暗号化対象を確認できません: %w", err)
 	}
 	entities, err := openpgp.ReadArmoredKeyRing(strings.NewReader(releaseSigningPublicKeyArmored))
 	if err != nil {
@@ -150,32 +137,51 @@ func encryptZipFileWithPublicKey(path string) (string, error) {
 	if !hasEncryptionCapableKey(entities) {
 		return "", fmt.Errorf("公開鍵は暗号化用途に対応していません")
 	}
-	encrypted, err := encryptDiagnosticZip(data, entities)
+	var data []byte
+	outputPath := path + ".gpg"
+	fileName := filepath.Base(path)
+	if info.IsDir() {
+		data, err = zipDirectoryBytes(path)
+		if err != nil {
+			return "", fmt.Errorf("フォルダをzip化できません: %w", err)
+		}
+		outputPath = path + ".zip.gpg"
+		fileName += ".zip"
+	} else {
+		data, err = os.ReadFile(path) // #nosec G304,G703 -- path comes from explicit CLI file drop or command-line argument.
+		if err != nil {
+			return "", fmt.Errorf("暗号化対象を読み込めません: %w", err)
+		}
+	}
+	encrypted, err := encryptBytes(data, entities, fileName, "ファイル")
 	if err != nil {
 		return "", err
 	}
-	outputPath := path + ".gpg"
 	if err := appcore.WritePrivateFile(outputPath, encrypted); err != nil {
-		return "", fmt.Errorf("暗号化zipを保存できません: %w", err)
+		return "", fmt.Errorf("暗号化ファイルを保存できません: %w", err)
 	}
 	return outputPath, nil
 }
 
 func encryptDiagnosticZip(zipData []byte, entities openpgp.EntityList) ([]byte, error) {
+	return encryptBytes(zipData, entities, "diagnostics.zip", "診断パッケージ")
+}
+
+func encryptBytes(data []byte, entities openpgp.EntityList, fileName string, label string) ([]byte, error) {
 	var encrypted bytes.Buffer
 	writer, err := openpgp.Encrypt(&encrypted, entities, nil, &openpgp.FileHints{
 		IsBinary: true,
-		FileName: "diagnostics.zip",
+		FileName: fileName,
 	}, nil)
 	if err != nil {
-		return nil, fmt.Errorf("診断パッケージを暗号化できません: %w", err)
+		return nil, fmt.Errorf("%sを暗号化できません: %w", label, err)
 	}
-	if _, err := writer.Write(zipData); err != nil {
+	if _, err := writer.Write(data); err != nil {
 		_ = writer.Close()
-		return nil, fmt.Errorf("診断パッケージを書き込めません: %w", err)
+		return nil, fmt.Errorf("%sを書き込めません: %w", label, err)
 	}
 	if err := writer.Close(); err != nil {
-		return nil, fmt.Errorf("診断パッケージを完了できません: %w", err)
+		return nil, fmt.Errorf("%sを完了できません: %w", label, err)
 	}
 	return encrypted.Bytes(), nil
 }
@@ -382,6 +388,14 @@ func writePrivateFileInDirectory(baseDir string, name string, data []byte) error
 }
 
 func zipDirectory(sourceDir string, zipPath string) error {
+	data, err := zipDirectoryBytes(sourceDir)
+	if err != nil {
+		return err
+	}
+	return appcore.WritePrivateFile(zipPath, data)
+}
+
+func zipDirectoryBytes(sourceDir string) ([]byte, error) {
 	var buf bytes.Buffer
 	zipWriter := zip.NewWriter(&buf)
 	err := filepath.WalkDir(sourceDir, func(path string, entry os.DirEntry, walkErr error) error {
@@ -402,12 +416,12 @@ func zipDirectory(sourceDir string, zipPath string) error {
 	})
 	if err != nil {
 		_ = zipWriter.Close()
-		return err
+		return nil, err
 	}
 	if err := zipWriter.Close(); err != nil {
-		return err
+		return nil, err
 	}
-	return appcore.WritePrivateFile(zipPath, buf.Bytes())
+	return buf.Bytes(), nil
 }
 
 func addFileToZip(zipWriter *zip.Writer, name, path string) error {

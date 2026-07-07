@@ -231,6 +231,28 @@ func TestHandleCLIArgsLeavesExistingPositionalArgsAlone(t *testing.T) {
 	}
 }
 
+func TestSplitStartupPathsRoutesImagesAndEncryptionTargets(t *testing.T) {
+	dir := t.TempDir()
+	folderWithImageExt := filepath.Join(dir, "folder.png")
+	if err := os.Mkdir(folderWithImageExt, 0700); err != nil {
+		t.Fatal(err)
+	}
+
+	images, encryption := splitStartupPaths([]string{
+		filepath.Join(dir, "photo.png"),
+		filepath.Join(dir, "avatar.webp"),
+		filepath.Join(dir, "notes.txt"),
+		folderWithImageExt,
+	})
+
+	if got, want := strings.Join(images, "|"), strings.Join([]string{filepath.Join(dir, "photo.png"), filepath.Join(dir, "avatar.webp")}, "|"); got != want {
+		t.Fatalf("images = %q, want %q", got, want)
+	}
+	if got, want := strings.Join(encryption, "|"), strings.Join([]string{filepath.Join(dir, "notes.txt"), folderWithImageExt}, "|"); got != want {
+		t.Fatalf("encryption = %q, want %q", got, want)
+	}
+}
+
 func TestFrontendAssetSummaryReportsEmbeddedIndex(t *testing.T) {
 	got := frontendAssetSummary()
 	if !strings.Contains(got, "index_html=true") {

@@ -39,15 +39,19 @@ func main() {
 	appcore.SetOSCVersionNotice(appVersion())
 
 	args := os.Args[1:]
-	if len(args) == 1 && strings.EqualFold(filepath.Ext(args[0]), ".zip") {
-		outputPath, err := encryptZipFileWithPublicKey(args[0])
+	imageArgs, encryptionArgs := splitStartupPaths(args)
+	for _, path := range encryptionArgs {
+		outputPath, err := encryptPathWithPublicKey(path)
 		if err != nil {
-			fmt.Fprintln(stderr, err)
+			fmt.Fprintf(stderr, "%s: %v\n", path, err)
 			os.Exit(1)
 		}
 		fmt.Fprintf(stdout, "Encrypted: %s\n", outputPath)
+	}
+	if len(args) > 0 && len(imageArgs) == 0 {
 		return
 	}
+	args = imageArgs
 
 	instance, err := initializeSingleInstance(stderr, args)
 	if err != nil {
@@ -92,22 +96,6 @@ func main() {
 		appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(configPath), "settings draft ignored: %s", reason)
 	}
 
-	if len(args) == 1 && strings.EqualFold(filepath.Ext(args[0]), ".json") {
-		requestedConfigPath := args[0]
-		cfg, err := appcore.LoadConfig(requestedConfigPath)
-		if err != nil {
-			state.Mode = appcore.ModeError
-			state.Message = fmt.Sprintf("設定を読み込めませんでした: %v", err)
-		} else {
-			configPath = requestedConfigPath
-			state.Mode = appcore.ModeSettings
-			state.Config = cfg
-			state.ConfigPath = configPath
-		}
-		runUI(configPath, state, instance)
-		return
-	}
-
 	if !configExists {
 		state.Mode = appcore.ModeSettings
 		state.Message = "初回起動です。設定を確認して保存すると、続けて通常処理を実行します。"
@@ -115,15 +103,6 @@ func main() {
 		state.ProcessOnSave = len(args) > 0
 		runUI(configPath, state, instance)
 		return
-	}
-
-	for _, arg := range args {
-		if strings.EqualFold(filepath.Ext(arg), ".json") {
-			state.Mode = appcore.ModeError
-			state.Message = "画像ファイルと設定ファイルが混在しています。設定編集と画像処理は別々に起動してください。"
-			runUI(configPath, state, instance)
-			return
-		}
 	}
 
 	if len(args) == 0 {
@@ -155,6 +134,29 @@ func main() {
 		state.Message = resultMessage(cfg, results, copyErr)
 	}
 	runUI(configPath, state, instance)
+}
+
+func splitStartupPaths(paths []string) (imagePaths []string, encryptionPaths []string) {
+	for _, path := range paths {
+		if isStartupImagePath(path) {
+			imagePaths = append(imagePaths, path)
+		} else {
+			encryptionPaths = append(encryptionPaths, path)
+		}
+	}
+	return imagePaths, encryptionPaths
+}
+
+func isStartupImagePath(path string) bool {
+	if info, err := os.Stat(path); err == nil && info.IsDir() {
+		return false
+	}
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".png", ".jpg", ".jpeg", ".webp":
+		return true
+	default:
+		return false
+	}
 }
 
 func handleCLIArgs(args []string, stdout io.Writer, stderr io.Writer) (bool, int) {
