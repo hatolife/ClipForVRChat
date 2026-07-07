@@ -31,6 +31,7 @@ var (
 
 const (
 	maxOSCLogEntries      = 1000
+	maxAvatarOSCSamples   = 128
 	oscLogPersistInterval = time.Second
 	oscSendLogFileName    = "osc_send.jsonl"
 	oscReceiveLogFileName = "osc_recieve.jsonl"
@@ -537,15 +538,15 @@ func (a *App) logLifecycleLocked(format string, args ...any) {
 }
 
 func (a *App) RevealFileInExplorer(path string) error {
-	target, err := explorerRevealPath(path, filepath.Dir(a.configPath))
+	target, err := explorerRevealPath(path, filepath.Dir(a.configPath), a.state.Config.Image.OutputDirectory)
 	if err != nil {
 		return err
 	}
 	return revealFileInExplorer(target)
 }
 
-func explorerRevealPath(path string, baseDir string) (string, error) {
-	cleaned := appcore.ResolveHistoryOutputPath(path, baseDir)
+func explorerRevealPath(path string, baseDir string, outputDir string) (string, error) {
+	cleaned := appcore.ResolveManagedHistoryOutputPath(path, baseDir, outputDir)
 	if cleaned == "" {
 		return "", fmt.Errorf("保存済みファイルがありません")
 	}
@@ -1864,9 +1865,11 @@ func (a *App) waitForAutoCaptureStartReadiness(ctx context.Context, cfg appcore.
 				worldCandidate = world
 				worldCandidateAt = time.Now()
 				waitForWorldStable = true
-				appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait: world_metadata candidate world_id=%q instance_id=%q stable_for_ms=0", world.WorldID, world.InstanceID)
+				logWorldID, logInstanceID := worldMetadataLogFields(world)
+				appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait: world_metadata candidate world_id=%q instance_id=%q stable_for_ms=0", logWorldID, logInstanceID)
 			} else if time.Since(worldCandidateAt) >= worldStableDuration {
-				appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait complete: avatar_osc_ready=true world_metadata_stable=true world_id=%q instance_id=%q stable_for_ms=%d", world.WorldID, world.InstanceID, time.Since(worldCandidateAt).Milliseconds())
+				logWorldID, logInstanceID := worldMetadataLogFields(world)
+				appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait complete: avatar_osc_ready=true world_metadata_stable=true world_id=%q instance_id=%q stable_for_ms=%d", logWorldID, logInstanceID, time.Since(worldCandidateAt).Milliseconds())
 				return nil
 			}
 		}
@@ -1911,9 +1914,11 @@ func (a *App) waitForWorldStable(ctx context.Context, cfg appcore.Config, timeou
 		} else if world.WorldID != candidate.WorldID || world.InstanceID != candidate.InstanceID {
 			candidate = world
 			candidateAt = time.Now()
-			appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait: reason=%q world_metadata candidate world_id=%q instance_id=%q stable_for_ms=0", reason, world.WorldID, world.InstanceID)
+			logWorldID, logInstanceID := worldMetadataLogFields(world)
+			appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait: reason=%q world_metadata candidate world_id=%q instance_id=%q stable_for_ms=0", reason, logWorldID, logInstanceID)
 		} else if time.Since(candidateAt) >= stableDuration {
-			appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait complete: reason=%q world_metadata_stable=true world_id=%q instance_id=%q stable_for_ms=%d", reason, world.WorldID, world.InstanceID, time.Since(candidateAt).Milliseconds())
+			logWorldID, logInstanceID := worldMetadataLogFields(world)
+			appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait complete: reason=%q world_metadata_stable=true world_id=%q instance_id=%q stable_for_ms=%d", reason, logWorldID, logInstanceID, time.Since(candidateAt).Milliseconds())
 			return nil
 		}
 		select {
@@ -1924,6 +1929,14 @@ func (a *App) waitForWorldStable(ctx context.Context, cfg appcore.Config, timeou
 		case <-ticker.C:
 		}
 	}
+}
+
+func worldMetadataLogFields(world appcore.AutoCaptureVRChatMetadata) (string, string) {
+	instanceID := strings.TrimSpace(world.InstanceID)
+	if instanceID != "" {
+		instanceID = "<redacted-vrchat-instance-id>"
+	}
+	return world.WorldID, instanceID
 }
 
 func (a *App) runAutoCaptureBatch(ctx context.Context, cfg appcore.Config) {
@@ -2181,11 +2194,8 @@ func (a *App) runCameraPoseReceiver(ctx context.Context, seq uint64, host string
 				continue
 			}
 			a.mu.Lock()
-			if a.avatarOSCBasisSamples == nil {
-				a.avatarOSCBasisSamples = make(map[string]avatarOSCBasisSample)
-			}
-			a.avatarOSCBasisSamples[canonicalAddress] = sample
 			affectsBasis := a.avatarOSCBasisAddressAffectsBasisLocked(canonicalAddress, a.state.Config)
+			a.storeAvatarOSCBasisSampleLocked(canonicalAddress, sample, affectsBasis)
 			if affectsBasis {
 				a.rebuildAvatarOSCBasisLocked(now, logPath)
 			}
@@ -2351,7 +2361,7 @@ func sameOSCForwardEndpoint(a *net.UDPAddr, b *net.UDPAddr) bool {
 		return false
 	}
 	if a.IP == nil || a.IP.IsUnspecified() {
-		return b.IP == nil || b.IP.IsLoopback() || b.IP.IsUnspecified()
+		return b.IP == nil || b.IP.IsLoopback() || b.IP.IsUnspecified() || isLocalInterfaceIP(b.IP)
 	}
 	if b.IP == nil || b.IP.IsUnspecified() {
 		return a.IP.IsLoopback() || a.IP.IsUnspecified()
@@ -2360,6 +2370,35 @@ func sameOSCForwardEndpoint(a *net.UDPAddr, b *net.UDPAddr) bool {
 		return true
 	}
 	return a.IP.Equal(b.IP)
+}
+
+func isLocalInterfaceIP(ip net.IP) bool {
+	if ip == nil {
+		return false
+	}
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return false
+	}
+	for _, iface := range interfaces {
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			var candidate net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				candidate = v.IP
+			case *net.IPAddr:
+				candidate = v.IP
+			}
+			if candidate != nil && candidate.Equal(ip) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (a *App) recordOSCLogEvent(entry OSCLogEntry) {
@@ -2893,6 +2932,7 @@ func (a *App) latestAvatarOSCBasisSnapshotLocked(cfg appcore.Config, now time.Ti
 		parameterPrefix = "avatar_beacon"
 	}
 	lastAddress, lastReceivedAt := latestAvatarOSCParameterSample(a.avatarOSCBasisSamples)
+	_, basisLastReceivedAt := a.latestAvatarOSCBasisParameterSampleLocked(cfg)
 	if a.avatarOSCContextAt.IsZero() {
 		a.avatarOSCContextAt = now
 	}
@@ -2909,7 +2949,7 @@ func (a *App) latestAvatarOSCBasisSnapshotLocked(cfg appcore.Config, now time.Ti
 	}
 	sample, scheme, ok, err := a.buildAvatarOSCBasisSampleLocked(cfg)
 	if !ok {
-		if !lastReceivedAt.IsZero() {
+		if !basisLastReceivedAt.IsZero() {
 			snapshot.AutoFallback = false
 		} else {
 			snapshot.AutoFallback = now.Sub(a.avatarOSCContextAt) >= fallbackAfter
@@ -3031,7 +3071,8 @@ func (a *App) resetAvatarOSCSessionIfContextChangedLocked(cfg appcore.Config, no
 	a.avatarOSCBasisSamples = nil
 	a.latestAvatarOSCBasis = avatarOSCBasisState{}
 	a.avatarBeaconVersion = ""
-	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "avatar osc session reset: context_changed world_id=%q instance_id=%q avatar_id=%q", meta.WorldID, meta.InstanceID, meta.AvatarID)
+	logWorldID, logInstanceID := worldMetadataLogFields(meta)
+	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "avatar osc session reset: context_changed world_id=%q instance_id=%q avatar_id=%q", logWorldID, logInstanceID, meta.AvatarID)
 }
 
 func avatarOSCContextKey(meta appcore.AutoCaptureVRChatMetadata) string {
@@ -3119,6 +3160,45 @@ func (a *App) buildAvatarOSCBasisSampleLocked(cfg appcore.Config) (appcore.Avata
 		sample.ReceivedAt = latestAvatarOSCSampleTime(a.avatarOSCBasisSamples, positionRoot, forwardRoot, signSuffix)
 	}
 	return sample, scheme, true, nil
+}
+
+func (a *App) storeAvatarOSCBasisSampleLocked(address string, sample avatarOSCBasisSample, affectsBasis bool) {
+	if a.avatarOSCBasisSamples == nil {
+		a.avatarOSCBasisSamples = make(map[string]avatarOSCBasisSample)
+	}
+	a.avatarOSCBasisSamples[address] = sample
+	if len(a.avatarOSCBasisSamples) <= maxAvatarOSCSamples {
+		return
+	}
+	var oldestAddress string
+	var oldestTime time.Time
+	for candidate, existing := range a.avatarOSCBasisSamples {
+		if affectsBasis && a.avatarOSCBasisAddressAffectsBasisLocked(candidate, a.state.Config) {
+			continue
+		}
+		if oldestAddress == "" || existing.ReceivedAt.Before(oldestTime) {
+			oldestAddress = candidate
+			oldestTime = existing.ReceivedAt
+		}
+	}
+	if oldestAddress != "" {
+		delete(a.avatarOSCBasisSamples, oldestAddress)
+	}
+}
+
+func (a *App) latestAvatarOSCBasisParameterSampleLocked(cfg appcore.Config) (string, time.Time) {
+	var latestAddress string
+	var latestTime time.Time
+	for address, sample := range a.avatarOSCBasisSamples {
+		if sample.ReceivedAt.IsZero() || !a.avatarOSCBasisAddressAffectsBasisLocked(address, cfg) {
+			continue
+		}
+		if latestTime.IsZero() || sample.ReceivedAt.After(latestTime) {
+			latestTime = sample.ReceivedAt
+			latestAddress = address
+		}
+	}
+	return latestAddress, latestTime
 }
 
 func (a *App) avatarOSCBasisAddressAffectsBasisLocked(address string, cfg appcore.Config) bool {

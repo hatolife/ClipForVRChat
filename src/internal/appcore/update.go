@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -58,12 +59,19 @@ func CheckLatestRelease(ctx context.Context, client *http.Client, currentVersion
 	}
 	info.LatestVersion = strings.TrimSpace(latest.TagName)
 	info.LatestReleasePublished = strings.TrimSpace(latest.PublishedAt)
-	info.URL = strings.TrimSpace(latest.HTMLURL)
-	if info.URL == "" && info.LatestVersion != "" {
-		info.URL = "https://github.com/hatolife/ClipForVRChat/releases/tag/" + info.LatestVersion
+	if official, ok := officialReleaseURL(info.LatestVersion); ok {
+		info.URL = official
 	}
 	info.Available = IsNewerRelease(currentVersion, currentReleaseTime, info.LatestVersion, info.LatestReleasePublished)
 	return info, nil
+}
+
+func officialReleaseURL(tagName string) (string, bool) {
+	tagName = strings.TrimSpace(tagName)
+	if tagName == "" {
+		return "", false
+	}
+	return "https://github.com/hatolife/ClipForVRChat/releases/tag/" + url.PathEscape(tagName), true
 }
 
 func IsNewerRelease(currentVersion string, currentReleaseTime string, latestVersion string, latestReleasePublished string) bool {

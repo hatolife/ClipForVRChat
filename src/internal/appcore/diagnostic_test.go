@@ -22,3 +22,16 @@ func TestRedactDiagnosticTextRedactsUserPathsAndSecrets(t *testing.T) {
 		t.Fatalf("RedactDiagnosticText = %q, want placeholders", got)
 	}
 }
+
+func TestRedactDiagnosticTextRedactsWebhookURLInsideErrors(t *testing.T) {
+	text := `Post "https://discord.com/api/webhooks/1234567890/live-token": dial tcp: lookup discord.com: no such host`
+
+	got := RedactDiagnosticText(text)
+
+	if strings.Contains(got, "live-token") || strings.Contains(got, "1234567890") {
+		t.Fatalf("RedactDiagnosticText leaked webhook URL in %q", got)
+	}
+	if !strings.Contains(got, "<redacted-discord-webhook-url>") {
+		t.Fatalf("RedactDiagnosticText = %q, want webhook placeholder", got)
+	}
+}

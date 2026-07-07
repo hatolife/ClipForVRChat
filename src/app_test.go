@@ -293,16 +293,16 @@ func TestAppAutoCapturePhotoSuppressionSkipsActiveAndReservedPaths(t *testing.T)
 }
 
 func TestExplorerSelectArgsRejectsMissingPath(t *testing.T) {
-	if _, err := explorerRevealPath("", ""); err == nil {
+	if _, err := explorerRevealPath("", "", ""); err == nil {
 		t.Fatal("expected empty path error")
 	}
-	if _, err := explorerRevealPath(filepath.Join(t.TempDir(), "missing.png"), ""); err == nil {
+	if _, err := explorerRevealPath(filepath.Join(t.TempDir(), "missing.png"), "", ""); err == nil {
 		t.Fatal("expected missing file error")
 	}
 }
 
 func TestExplorerSelectArgsRejectsDirectory(t *testing.T) {
-	if _, err := explorerRevealPath(t.TempDir(), ""); err == nil {
+	if _, err := explorerRevealPath(t.TempDir(), "", ""); err == nil {
 		t.Fatal("expected directory error")
 	}
 }
@@ -317,12 +317,92 @@ func TestExplorerSelectArgsResolvesRelativePathFromBaseDir(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := explorerRevealPath("output/out.png", dir)
+	got, err := explorerRevealPath("output/out.png", dir, outputDir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got != filepath.Join(outputDir, "out.png") {
 		t.Fatalf("path = %q, want resolved relative output path", got)
+	}
+}
+
+func TestExplorerSelectArgsRejectsOutsideManagedOutputDir(t *testing.T) {
+	dir := t.TempDir()
+	outputDir := filepath.Join(dir, "output")
+	if err := os.MkdirAll(outputDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := explorerRevealPath(filepath.Join(dir, "other.png"), dir, outputDir); err == nil {
+		t.Fatal("expected outside output directory error")
+	}
+}
+
+func TestExplorerSelectArgsRejectsUncLikePath(t *testing.T) {
+	dir := t.TempDir()
+	outputDir := filepath.Join(dir, "output")
+	if err := os.MkdirAll(outputDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := explorerRevealPath(`\\server\share\evil.png`, dir, outputDir); err == nil {
+		t.Fatal("expected UNC-like path error")
+	}
+}
+
+func TestSingleInstanceRequestValidationRejectsTooManyPaths(t *testing.T) {
+	req := singleInstanceRequest{
+		Token:   strings.Repeat("a", maxSingleInstanceTokenLen),
+		Command: "open-paths",
+		Paths:   make([]string, maxSingleInstancePathCount+1),
+	}
+	for i := range req.Paths {
+		req.Paths[i] = fmt.Sprintf("path-%d.png", i)
+	}
+	if err := validateSingleInstanceRequest(req); err == nil {
+		t.Fatal("expected too many paths error")
+	}
+}
+
+func TestSingleInstanceRequestValidationRejectsShortToken(t *testing.T) {
+	req := singleInstanceRequest{
+		Token:   "short",
+		Command: "ping",
+	}
+	if err := validateSingleInstanceRequest(req); err == nil {
+		t.Fatal("expected invalid token error")
+	}
+}
+
+func TestSingleInstanceRequestValidationRejectsLongPath(t *testing.T) {
+	req := singleInstanceRequest{
+		Token:   strings.Repeat("a", maxSingleInstanceTokenLen),
+		Command: "open-paths",
+		Paths:   []string{strings.Repeat("b", maxSingleInstancePathLen+1)},
+	}
+	if err := validateSingleInstanceRequest(req); err == nil {
+		t.Fatal("expected long path error")
+	}
+}
+
+func TestReadSingleInstanceRequestRejectsOversizedBody(t *testing.T) {
+	payload := fmt.Sprintf(`{"token":"%s","command":"ping","paths":["%s"]}`, strings.Repeat("a", maxSingleInstanceTokenLen), strings.Repeat("b", maxSingleInstanceRequestBytes))
+	if _, err := readSingleInstanceRequest(strings.NewReader(payload)); err == nil {
+		t.Fatal("expected oversized request error")
+	}
+}
+
+func TestSendSingleInstanceCommandWithPathsRejectsTooManyPaths(t *testing.T) {
+	state := singleInstanceState{
+		Endpoint: "127.0.0.1:1",
+		Token:    strings.Repeat("a", maxSingleInstanceTokenLen),
+	}
+	paths := make([]string, maxSingleInstancePathCount+1)
+	for i := range paths {
+		paths[i] = fmt.Sprintf("path-%d.png", i)
+	}
+	if err := sendSingleInstanceCommandWithPaths(state, "open-paths", paths, time.Second); err == nil {
+		t.Fatal("expected client-side path count rejection")
 	}
 }
 
@@ -371,6 +451,19 @@ func TestAppLifecycleLogsCloseAndShutdown(t *testing.T) {
 		if !strings.Contains(text, want) {
 			t.Fatalf("diagnostic log = %q, want %q", text, want)
 		}
+	}
+}
+
+func TestWorldMetadataLogFieldsRedactsInstanceID(t *testing.T) {
+	worldID, instanceID := worldMetadataLogFields(appcore.AutoCaptureVRChatMetadata{
+		WorldID:    "wrld_abc",
+		InstanceID: "12345~private(usr_abc)~nonce(secret)",
+	})
+	if worldID != "wrld_abc" {
+		t.Fatalf("worldID = %q", worldID)
+	}
+	if instanceID != "<redacted-vrchat-instance-id>" {
+		t.Fatalf("instanceID = %q, want redacted", instanceID)
 	}
 }
 
@@ -594,6 +687,36 @@ func TestAppAvatarOSCBasisStatusUsesLastReadyBasisWhenNotMoving(t *testing.T) {
 	}
 }
 
+func TestAppAvatarOSCBasisUnrelatedParameterDoesNotSuppressAutoFallback(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	cfg := appcore.DefaultConfig()
+	cfg.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
+	cfg.AutoCapture.Capture.AutoEnablePreplaced = true
+	cfg.AutoCapture.Capture.AutoEnablePreplacedAfterMinutes = 1
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults, Config: cfg})
+	now := time.Date(2026, 7, 4, 4, 35, 50, 0, time.UTC)
+	app.avatarOSCContextAt = now.Add(-2 * time.Minute)
+	app.avatarOSCBasisSamples = map[string]avatarOSCBasisSample{
+		"GestureLeft": {Float: 1, HasFloat: true, ReceivedAt: now},
+	}
+
+	got := app.latestAvatarOSCBasisSnapshotLocked(cfg, now)
+	if !got.AutoFallback {
+		t.Fatalf("snapshot = %+v, want unrelated parameter not to suppress fallback", got)
+	}
+}
+
+func TestAppStoreAvatarOSCBasisSampleBoundsCache(t *testing.T) {
+	app := NewApp(filepath.Join(t.TempDir(), "config.json"), appcore.UIState{Mode: appcore.ModeResults, Config: appcore.DefaultConfig()})
+	now := time.Date(2026, 7, 4, 4, 35, 50, 0, time.UTC)
+	for i := 0; i < maxAvatarOSCSamples+20; i++ {
+		app.storeAvatarOSCBasisSampleLocked(fmt.Sprintf("Junk/%03d", i), avatarOSCBasisSample{Float: float64(i), HasFloat: true, ReceivedAt: now.Add(time.Duration(i) * time.Millisecond)}, false)
+	}
+	if len(app.avatarOSCBasisSamples) != maxAvatarOSCSamples {
+		t.Fatalf("sample count = %d, want %d", len(app.avatarOSCBasisSamples), maxAvatarOSCSamples)
+	}
+}
+
 func TestAppRebuildAvatarOSCBasisDoesNotRepeatPartialLog(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.json")
@@ -663,6 +786,43 @@ func TestOSCForwarderSkipsSelfTarget(t *testing.T) {
 
 	if len(forwarder.targets) != 0 {
 		t.Fatalf("targets = %d, want 0", len(forwarder.targets))
+	}
+}
+
+func TestOSCForwarderSkipsWildcardLocalSelfTarget(t *testing.T) {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var localIP net.IP
+	for _, iface := range ifaces {
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			ipNet, ok := addr.(*net.IPNet)
+			if !ok {
+				continue
+			}
+			ip := ipNet.IP
+			if ip == nil || ip.IsLoopback() || ip.IsUnspecified() {
+				continue
+			}
+			if v4 := ip.To4(); v4 != nil {
+				localIP = v4
+				break
+			}
+		}
+		if localIP != nil {
+			break
+		}
+	}
+	if localIP == nil {
+		t.Skip("no non-loopback local IPv4 address")
+	}
+	if !sameOSCForwardEndpoint(&net.UDPAddr{IP: net.IPv4zero, Port: 9001}, &net.UDPAddr{IP: localIP, Port: 9001}) {
+		t.Fatalf("wildcard listener should treat local same-port target %s as self", localIP)
 	}
 }
 

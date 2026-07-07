@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"runtime"
 	"syscall"
 	"unsafe"
 )
@@ -26,6 +27,9 @@ var (
 )
 
 func revealFileInExplorer(path string) error {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
 	pathPtr, err := syscall.UTF16PtrFromString(path)
 	if err != nil {
 		return err

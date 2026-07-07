@@ -151,7 +151,7 @@ func configSummaryForLog(cfg appcore.Config) string {
 			OutputFormat:    cfg.Image.OutputFormat,
 			Overwrite:       cfg.Image.Overwrite,
 			JPEGQuality:     cfg.Image.JPEGQuality,
-			OutputDirectory: cfg.Image.OutputDirectory,
+			OutputDirectory: diagnosticPathForLog(cfg.Image.OutputDirectory),
 		},
 		Output: cfg.Output,
 		Discord: webhookConfigLogSummary{
@@ -159,7 +159,7 @@ func configSummaryForLog(cfg appcore.Config) string {
 		},
 		AutoPhoto: autoPhotoConfigLogSummary{
 			Enabled:             cfg.AutoPhoto.Enabled,
-			PhotoDirectory:      cfg.AutoPhoto.PhotoDirectory,
+			PhotoDirectory:      diagnosticPathForLog(cfg.AutoPhoto.PhotoDirectory),
 			WebhookConfigured:   autoPhotoWebhook.WebhookConfigured,
 			FallbackToPrimary:   autoPhotoWebhook.FallbackToPrimaryWebhook,
 			EffectiveConfigured: autoPhotoWebhook.EffectiveWebhookConfigured,
@@ -169,7 +169,7 @@ func configSummaryForLog(cfg appcore.Config) string {
 		AutoCapture: autoCaptureSummaryForLog(cfg.AutoCapture, primaryWebhookConfigured),
 		ScreenshotAutoPost: screenshotAutoPostConfigLogSummary{
 			Enabled:             cfg.ScreenshotAutoPost.Enabled,
-			ScreenshotDirectory: cfg.ScreenshotAutoPost.ScreenshotDirectory,
+			ScreenshotDirectory: diagnosticPathForLog(cfg.ScreenshotAutoPost.ScreenshotDirectory),
 			WebhookConfigured:   screenshotWebhook.WebhookConfigured,
 			FallbackToPrimary:   screenshotWebhook.FallbackToPrimaryWebhook,
 			EffectiveConfigured: screenshotWebhook.EffectiveWebhookConfigured,
@@ -208,7 +208,7 @@ func autoCaptureSummaryForLog(cfg appcore.AutoCaptureConfig, primaryWebhookConfi
 			UpdatedAt:   cfg.PlayerLocal.UpdatedAt,
 		},
 		Output: autoCaptureOutputLogSummary{
-			Directory:           cfg.Output.Directory,
+			Directory:           diagnosticPathForLog(cfg.Output.Directory),
 			ImageFormat:         cfg.Output.ImageFormat,
 			WriteSidecarJSON:    cfg.Output.WriteSidecarJSON,
 			WriteEXIF:           cfg.Output.WriteEXIF,
@@ -228,6 +228,14 @@ func autoCaptureSummaryForLog(cfg appcore.AutoCaptureConfig, primaryWebhookConfi
 		EnabledViews:    enabledViews,
 		CalibratedViews: calibratedViews,
 	}
+}
+
+func diagnosticPathForLog(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+	return appcore.RedactDiagnosticText(path)
 }
 
 func webhookFallbackSummary(specificWebhookURL string, primaryWebhookConfigured bool) webhookFallbackLogSummary {

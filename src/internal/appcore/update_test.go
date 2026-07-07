@@ -38,7 +38,7 @@ func TestCheckLatestRelease(t *testing.T) {
 			t.Fatal("missing user-agent")
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"tag_name":"v0.1.5","html_url":"https://github.com/hatolife/ClipForVRChat/releases/tag/v0.1.5","published_at":"2026-06-22T05:00:00Z"}`))
+		_, _ = w.Write([]byte(`{"tag_name":"v0.1.5","html_url":"https://example.com/attacker","published_at":"2026-06-22T05:00:00Z"}`))
 	}))
 	defer server.Close()
 
@@ -57,8 +57,18 @@ func TestCheckLatestRelease(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !got.Available || got.LatestVersion != "v0.1.5" || got.LatestReleasePublished != "2026-06-22T05:00:00Z" || got.URL == "" {
+	if !got.Available || got.LatestVersion != "v0.1.5" || got.LatestReleasePublished != "2026-06-22T05:00:00Z" || got.URL != "https://github.com/hatolife/ClipForVRChat/releases/tag/v0.1.5" {
 		t.Fatalf("update info = %+v", got)
+	}
+}
+
+func TestOfficialReleaseURL(t *testing.T) {
+	got, ok := officialReleaseURL("v0.1.5-rc1")
+	if !ok {
+		t.Fatal("officialReleaseURL should accept release tag")
+	}
+	if want := "https://github.com/hatolife/ClipForVRChat/releases/tag/v0.1.5-rc1"; got != want {
+		t.Fatalf("officialReleaseURL() = %q, want %q", got, want)
 	}
 }
 

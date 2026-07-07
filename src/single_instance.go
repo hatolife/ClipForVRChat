@@ -23,9 +23,18 @@ const (
 	singleInstanceStateFile = "single-instance.json"
 )
 
+const (
+	maxSingleInstanceRequestBytes = 64 << 10
+	maxSingleInstanceTokenLen     = 64
+	maxSingleInstanceCommandLen   = 32
+	maxSingleInstancePathCount    = 128
+	maxSingleInstancePathLen      = 4096
+)
+
 var (
-	errSingleInstanceAlreadyRunning = errors.New("ClipForVRChat is already running")
-	singleInstanceDirFunc           = defaultSingleInstanceDir
+	errSingleInstanceAlreadyRunning  = errors.New("ClipForVRChat is already running")
+	errSingleInstanceRequestTooLarge = errors.New("single-instance request is too large")
+	singleInstanceDirFunc            = defaultSingleInstanceDir
 )
 
 type singleInstance struct {
@@ -394,9 +403,13 @@ func (s *singleInstanceServer) handle(conn net.Conn) {
 	defer conn.Close()
 	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
 
-	var req singleInstanceRequest
-	if err := json.NewDecoder(bufio.NewReader(conn)).Decode(&req); err != nil {
+	req, err := readSingleInstanceRequest(bufio.NewReader(conn))
+	if err != nil {
 		writeSingleInstanceResponse(conn, false, "invalid request")
+		return
+	}
+	if err := validateSingleInstanceRequest(req); err != nil {
+		writeSingleInstanceResponse(conn, false, err.Error())
 		return
 	}
 	if req.Token != s.token {
@@ -404,7 +417,7 @@ func (s *singleInstanceServer) handle(conn net.Conn) {
 		return
 	}
 
-	switch strings.ToLower(strings.TrimSpace(req.Command)) {
+	switch normalizeSingleInstanceCommand(req.Command) {
 	case "ping":
 		writeSingleInstanceResponse(conn, true, "")
 	case "activate":
@@ -460,6 +473,9 @@ func sendSingleInstanceCommand(state singleInstanceState, command string, timeou
 }
 
 func sendSingleInstanceCommandWithPaths(state singleInstanceState, command string, paths []string, timeout time.Duration) error {
+	if err := validateSingleInstanceRequest(singleInstanceRequest{Token: state.Token, Command: command, Paths: paths}); err != nil {
+		return err
+	}
 	conn, err := net.DialTimeout("tcp", state.Endpoint, timeout)
 	if err != nil {
 		return err
@@ -479,6 +495,64 @@ func sendSingleInstanceCommandWithPaths(state singleInstanceState, command strin
 			res.Message = "既存プロセスが要求を拒否しました"
 		}
 		return errors.New(res.Message)
+	}
+	return nil
+}
+
+func readSingleInstanceRequest(r io.Reader) (singleInstanceRequest, error) {
+	limited := &io.LimitedReader{R: r, N: maxSingleInstanceRequestBytes + 1}
+	decoder := json.NewDecoder(limited)
+	decoder.DisallowUnknownFields()
+	var req singleInstanceRequest
+	if err := decoder.Decode(&req); err != nil {
+		return singleInstanceRequest{}, err
+	}
+	if limited.N <= 0 {
+		return singleInstanceRequest{}, errSingleInstanceRequestTooLarge
+	}
+	return req, nil
+}
+
+func normalizeSingleInstanceCommand(command string) string {
+	return strings.ToLower(strings.TrimSpace(command))
+}
+
+func validateSingleInstanceRequest(req singleInstanceRequest) error {
+	token := strings.TrimSpace(req.Token)
+	if len(token) != maxSingleInstanceTokenLen {
+		return errors.New("invalid token")
+	}
+	if _, err := hex.DecodeString(token); err != nil {
+		return errors.New("invalid token")
+	}
+
+	command := normalizeSingleInstanceCommand(req.Command)
+	if len(command) == 0 || len(command) > maxSingleInstanceCommandLen {
+		return errors.New("unknown command")
+	}
+
+	switch command {
+	case "ping", "activate", "shutdown":
+		if len(req.Paths) != 0 {
+			return errors.New("unknown command")
+		}
+	case "open-paths":
+		if len(req.Paths) == 0 {
+			return errors.New("unknown command")
+		}
+		if len(req.Paths) > maxSingleInstancePathCount {
+			return errors.New("too many paths")
+		}
+		for _, path := range req.Paths {
+			if len(strings.TrimSpace(path)) == 0 {
+				return errors.New("invalid path")
+			}
+			if len(path) > maxSingleInstancePathLen {
+				return errors.New("path too long")
+			}
+		}
+	default:
+		return errors.New("unknown command")
 	}
 	return nil
 }
