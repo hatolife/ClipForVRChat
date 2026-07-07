@@ -257,6 +257,7 @@ jobs:
           Remove-Item -Recurse -Force $checkDir -ErrorAction SilentlyContinue
           $items = @(
             Join-Path $sourceRoot "README.md"
+            Join-Path $sourceRoot "LICENSE"
             Join-Path $sourceRoot "Assets"
           )
           if (!$items) {
@@ -268,9 +269,11 @@ jobs:
           Expand-Archive $zipPath -DestinationPath $checkDir
           $required = @(
             "README.md",
+            "LICENSE",
             "Assets/PoppoWorks/AvatarBeacon",
             "Assets/PoppoWorks/AvatarBeacon/README.md",
             "Assets/PoppoWorks/AvatarBeacon/Version.txt",
+            "Assets/PoppoWorks/AvatarBeacon/LICENSES/AvatarBeacon-MIT.txt",
             "Assets/PoppoWorks/AvatarBeacon/LICENSES/YL-ATG-MIT.txt"
           )
           foreach ($path in $required) {
