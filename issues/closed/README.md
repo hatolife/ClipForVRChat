@@ -213,3 +213,4 @@
 | 247 | [その他タブにPC起動時自動起動トグルを追加する](unreleased/247-add-startup-shortcut-toggle-to-other-settings.md) | 完了 | 未定 | 更新タブをその他へ変更し、Startupフォルダの固定名ショートカットでPC起動時自動起動をON/OFFできるようにした。 |
 | 248 | [未保存変更の対象設定ラベルをハイライトする](unreleased/248-highlight-unsaved-setting-labels.md) | 完了 | 未定 | 未保存変更チップに対応する設定行とタブボタンをハイライトし、変更箇所を分かりやすくした。 |
 | 249 | [AvatarBeaconバージョンOSC受信をログに記録する](unreleased/249-log-avatarbeacon-version-osc-receive.md) | 完了 | 未定 | AvatarBeacon version OSCを受信したら診断ログへ記録し、導入済みギミックのバージョンを切り分けやすくした。 |
+| 250 | [初回起動直後に未保存変更が表示される](unreleased/250-fix-initial-unsaved-settings-after-first-launch.md) | 完了 | 未定 | configなし初回起動で既定値のOSC転送先が差分扱いになる問題を修正し、未保存変更の具体項目と行ハイライトを改善した。 |

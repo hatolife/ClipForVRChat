@@ -435,6 +435,7 @@ func LoadConfig(path string) (Config, error) {
 	cfg.DiagnosticLogPath = DiagnosticLogPath(path)
 	data, err := os.ReadFile(path) // #nosec G304 -- config path is the app config path or an explicitly opened local config file.
 	if errors.Is(err, os.ErrNotExist) {
+		cfg.Normalize()
 		return cfg, nil
 	}
 	if err != nil {

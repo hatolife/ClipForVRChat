@@ -539,6 +539,7 @@ const vueApp = createApp({
         'autoCapture.playerLocal.avatarOsc.maxAbsForward': 'AvatarBeacon forward上限'
       }
       if (exactLabels[path]) return exactLabels[path]
+      if (path === 'autoCapture.osc.forward.targets') return 'OSC転送先'
       if (path.startsWith('autoCapture.osc.forward.targets.')) return 'OSC転送先'
       if (path.startsWith('autoCapture.playerLocal.basisPose.')) return 'manual基準位置'
       if (path.startsWith('image.')) return '画像変換'
@@ -2790,11 +2791,11 @@ const vueApp = createApp({
                 </select>
               </label>
             </div>
-            <div class="setting-row" :class="{ disabled: !autoCaptureSettings.osc.forward.enabled }">
+            <div class="setting-row" :class="[{ disabled: !autoCaptureSettings.osc.forward.enabled }, settingRowChangedClass('autoCapture.osc.forward.targets')]">
               <div><strong>転送先</strong><p>他アプリがlistenするhostとportです。ClipForVRChat自身の受信ポートと同じ転送先は起動時に除外されます。</p></div>
               <div class="settings-control-stack">
                 <div v-if="autoCaptureSettings.osc.forward.targets.length" class="view-list">
-                  <article v-for="(target, targetIndex) in autoCaptureSettings.osc.forward.targets" :key="'osc-forward-' + targetIndex" class="view-card">
+                  <article v-for="(target, targetIndex) in autoCaptureSettings.osc.forward.targets" :key="'osc-forward-' + targetIndex" class="view-card" :class="{ 'unsaved-setting-row': settingChanged('autoCapture.osc.forward.targets.' + targetIndex) }">
                     <div class="view-edit-grid">
                       <label><small>host</small><input v-model="target.host" :disabled="!autoCaptureSettings.osc.forward.enabled" placeholder="127.0.0.1" /></label>
                       <label><small>port</small><input type="number" min="1" max="65535" step="1" v-model.number="target.port" :disabled="!autoCaptureSettings.osc.forward.enabled" /></label>

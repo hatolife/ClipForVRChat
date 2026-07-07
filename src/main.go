@@ -78,7 +78,7 @@ func main() {
 	if history, err := appcore.LoadHistoryWithManagedOutputDir(appcore.HistoryPath(configPath), filepath.Dir(configPath), managedOutputDir(configPath, cfg)); err == nil {
 		state.History = history
 	}
-	if draft, ok, err := loadSettingsDraft(); err != nil {
+	if draft, ok, reason, diffPaths, err := loadSettingsDraftForConfig(configPath, cfg, configExists); err != nil {
 		appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(configPath), "settings draft load error: %v", err)
 	} else if ok {
 		baseline := cfg
@@ -87,6 +87,9 @@ func main() {
 		state.Config = draft
 		state.SettingsBaselineConfig = &baseline
 		state.UnsavedSettingsDraft = true
+		appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(configPath), "settings draft restored: diff_paths=%s", strings.Join(diffPaths, ","))
+	} else if reason != "" {
+		appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(configPath), "settings draft ignored: %s", reason)
 	}
 
 	if len(args) == 1 && strings.EqualFold(filepath.Ext(args[0]), ".json") {

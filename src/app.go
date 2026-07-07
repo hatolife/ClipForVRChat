@@ -253,13 +253,18 @@ func (a *App) StoreSettingsDraft(cfg appcore.Config, dirty bool) error {
 		return removeSettingsDraft()
 	}
 	cfg.Normalize()
-	if err := saveSettingsDraft(cfg); err != nil {
+	baseline := a.state.Config
+	if a.state.SettingsBaselineConfig != nil {
+		baseline = *a.state.SettingsBaselineConfig
+	}
+	diffPaths := configDiffPaths(baseline, cfg)
+	if err := saveSettingsDraftForConfig(a.configPath, cfg, &baseline); err != nil {
 		a.logLifecycleLocked("settings draft save failed: %v", err)
 		return err
 	}
 	a.settingsDraftDirty = true
 	a.state.UnsavedSettingsDraft = true
-	a.logLifecycleLocked("settings draft saved")
+	a.logLifecycleLocked("settings draft saved: diff_paths=%s", strings.Join(diffPaths, ","))
 	return nil
 }
 
