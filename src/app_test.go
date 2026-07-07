@@ -15,6 +15,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -72,7 +73,7 @@ func TestAppSaveConfigAndOpenSettings(t *testing.T) {
 	cfg := appcore.DefaultConfig()
 	cfg.Image.MaxWidth = 777
 
-	if err := app.SaveConfig(cfg); err != nil {
+	if _, err := app.SaveConfig(cfg); err != nil {
 		t.Fatal(err)
 	}
 	state, err := app.OpenSettings("")
@@ -98,8 +99,11 @@ func TestAppSaveConfigWritesDiagnosticConfigSummary(t *testing.T) {
 	cfg.ScreenshotAutoPost.WebhookURL = ""
 	cfg.AutoCapture.Discord.WebhookURL = ""
 
-	if err := app.SaveConfig(cfg); err != nil {
+	if _, err := app.SaveConfig(cfg); err != nil {
 		t.Fatal(err)
+	}
+	if app.state.Mode != appcore.ModeSettings {
+		t.Fatalf("mode after SaveConfig = %s, want settings", app.state.Mode)
 	}
 
 	data, err := os.ReadFile(appcore.DiagnosticLogPath(configPath))
@@ -131,7 +135,7 @@ func TestAppSaveConfigLogsFailure(t *testing.T) {
 	}
 	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeSettings})
 
-	if err := app.SaveConfig(appcore.DefaultConfig()); err == nil {
+	if _, err := app.SaveConfig(appcore.DefaultConfig()); err == nil {
 		t.Fatal("expected save error")
 	}
 
@@ -524,7 +528,7 @@ func TestAppAvatarOSCBasisStatusResolvesEvenWhenManualBasisMissing(t *testing.T)
 	}
 }
 
-func TestAppAvatarOSCBasisStatusExplainsStaleWithNonBasisLastParameter(t *testing.T) {
+func TestAppAvatarOSCBasisStatusUsesLastReadyBasisWhenNotMoving(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
 	now := time.Date(2026, 7, 4, 4, 35, 50, 0, time.UTC)
@@ -548,19 +552,14 @@ func TestAppAvatarOSCBasisStatusExplainsStaleWithNonBasisLastParameter(t *testin
 	}
 
 	got := app.latestAvatarOSCBasisSnapshotLocked(app.state.Config, now)
-	if got.Status != "stale" || got.Fresh {
-		t.Fatalf("snapshot = %+v, want stale", got)
+	if got.Status != "ready" || !got.Fresh {
+		t.Fatalf("snapshot = %+v, want ready from last basis", got)
 	}
-	if !got.AutoFallback {
-		t.Fatalf("autoFallback = false, want true for stale AvatarBeacon basis")
+	if got.AutoFallback {
+		t.Fatalf("autoFallback = true, want false after AvatarBeacon was received")
 	}
 	if got.LastReceivedAddress != "Ahoge_Angle" {
 		t.Fatalf("last address = %q, want Ahoge_Angle", got.LastReceivedAddress)
-	}
-	for _, want := range []string{"avatar_beacon/coord/* / avatar_beacon/forward/*", "AvatarBeaconのbasis parameterではありません", "Ahoge_Angle"} {
-		if !strings.Contains(got.Error, want) {
-			t.Fatalf("error = %q, want %q", got.Error, want)
-		}
 	}
 }
 
@@ -780,8 +779,8 @@ func TestAppSaveCurrentCameraPoseToViewCapturesFreshZoom(t *testing.T) {
 	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults, Config: cfg})
 	now := time.Now()
 	app.latestPose = appcore.CameraPoseConfig{
-		Position: appcore.CameraVector3Config{X: 1, Y: 2, Z: 3},
-		Rotation: appcore.CameraVector3Config{X: 4, Y: 5, Z: 6},
+		Position: appcore.CameraVector3Config{X: 1.23449, Y: 2.3455, Z: 3.0004},
+		Rotation: appcore.CameraVector3Config{X: 4.12349, Y: 5.5555, Z: 6.0004},
 	}
 	app.poseAt = now
 	app.userCameraSamples = map[string]userCameraOSCSample{
@@ -806,7 +805,8 @@ func TestAppSaveCurrentCameraPoseToViewCapturesFreshZoom(t *testing.T) {
 	if view.Zoom == nil || *view.Zoom != 72.5 {
 		t.Fatalf("zoom = %v, want 72.5", view.Zoom)
 	}
-	if view.Pose.Position.X != 1 || view.Pose.Rotation.Z != 6 || !view.Calibrated {
+	if view.Pose.Position.X != 1.234 || view.Pose.Position.Y != 2.346 || view.Pose.Position.Z != 3 ||
+		view.Pose.Rotation.X != 4.123 || view.Pose.Rotation.Y != 5.556 || view.Pose.Rotation.Z != 6 || !view.Calibrated {
 		t.Fatalf("view pose/calibrated = %+v", view)
 	}
 }
@@ -844,6 +844,33 @@ func TestAppSaveCurrentCameraPoseToViewKeepsZoomWithoutFreshSample(t *testing.T)
 	}
 	if view.Zoom == nil || *view.Zoom != 45 {
 		t.Fatalf("zoom = %v, want existing 45", view.Zoom)
+	}
+}
+
+func TestAppStoreSettingsDraftUpdatesRuntimeConfigForMoveCamera(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	cfg := appcore.DefaultConfig()
+	cfg.Normalize()
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeSettings, Config: cfg})
+	baseline := appcore.DefaultConfig()
+	baseline.Normalize()
+	app.state.SettingsBaselineConfig = &baseline
+
+	draft := appcore.DefaultConfig()
+	draft.Normalize()
+	draft.AutoCapture.Views[0].Pose.Position.X = 9.87654
+	if err := app.StoreSettingsDraft(draft, true); err != nil {
+		t.Fatal(err)
+	}
+	if got := app.state.Config.AutoCapture.Views[0].Pose.Position.X; got != 9.877 {
+		t.Fatalf("runtime draft pose x = %v, want rounded unsaved value 9.877", got)
+	}
+
+	if err := app.ClearSettingsDraft(); err != nil {
+		t.Fatal(err)
+	}
+	if got := app.state.Config.AutoCapture.Views[0].Pose.Position.X; got == 9.877 {
+		t.Fatalf("runtime config kept discarded draft pose x = %v", got)
 	}
 }
 
@@ -940,6 +967,56 @@ func TestAppAvatarBeaconOSCExcludeRegexTracksBasisAddresses(t *testing.T) {
 		if strings.Contains(pattern, unwanted) {
 			t.Fatalf("AvatarBeacon exclude regex = %q, should not include %q", pattern, unwanted)
 		}
+	}
+}
+
+func TestAppAvatarBeaconOSCIncludeRegexTracksBasisAndVersionAddresses(t *testing.T) {
+	app := NewApp(filepath.Join(t.TempDir(), "config.json"), appcore.UIState{Mode: appcore.ModeResults, Config: appcore.DefaultConfig()})
+	pattern := app.GetAvatarBeaconOSCIncludeRegex()
+
+	for _, want := range []string{
+		"avatar_beacon/coord/x",
+		"/avatar/parameters/avatar_beacon/forward/zSign",
+		"/avatar/parameters/AvatarBeacon/version",
+	} {
+		matched, err := regexp.MatchString(pattern, want+" | ,f | 1")
+		if err != nil {
+			t.Fatalf("regex error: %v", err)
+		}
+		if !matched {
+			t.Fatalf("pattern %q should match %q", pattern, want)
+		}
+	}
+	if matched, err := regexp.MatchString(pattern, "/avatar/parameters/Other/value | ,f | 1"); err != nil {
+		t.Fatalf("regex error: %v", err)
+	} else if matched {
+		t.Fatalf("pattern %q should not match unrelated Avatar Parameter", pattern)
+	}
+}
+
+func TestAppAvatarOSCSessionResetsWhenWorldAvatarContextChanges(t *testing.T) {
+	logDir := t.TempDir()
+	logPath := filepath.Join(logDir, "output_log_2026-07-07.txt")
+	if err := os.WriteFile(logPath, []byte("Joining wrld_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:1\nLoading avatar avtr_11111111-2222-3333-4444-555555555555\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := appcore.DefaultConfig()
+	cfg.AutoCapture.Presence.WatchOutputLog = true
+	cfg.AutoCapture.Presence.OutputLogDirectory = logDir
+	app := NewApp(filepath.Join(t.TempDir(), "config.json"), appcore.UIState{Mode: appcore.ModeResults, Config: cfg})
+	now := time.Now()
+	app.avatarOSCBasisSamples = readyAvatarOSCBasisSamples(now)
+	_ = app.latestAvatarOSCBasisSnapshotLocked(cfg, now)
+	if len(app.avatarOSCBasisSamples) == 0 {
+		t.Fatal("basis samples were reset before context changed")
+	}
+
+	if err := os.WriteFile(logPath, []byte("Joining wrld_ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee:2\nLoading avatar avtr_99999999-2222-3333-4444-555555555555\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	_ = app.latestAvatarOSCBasisSnapshotLocked(cfg, now.Add(time.Second))
+	if len(app.avatarOSCBasisSamples) != 0 {
+		t.Fatalf("basis samples were not reset after context change: %d", len(app.avatarOSCBasisSamples))
 	}
 }
 
@@ -1106,11 +1183,11 @@ func TestAppPrepareAutoCaptureConfigKeepsFallbackOffAfterAvatarBeaconTimeout(t *
 	app.mu.Lock()
 	cfg, err := app.prepareAutoCaptureConfigForRunLocked(app.state.Config)
 	app.mu.Unlock()
-	if err == nil {
-		t.Fatal("expected stale avatar basis error when fallback mode is off")
+	if err != nil {
+		t.Fatalf("prepareAutoCaptureConfigForRunLocked error = %v", err)
 	}
 	if cfg.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
-		t.Fatal("fallback mode should remain off after avatar beacon timeout")
+		t.Fatal("fallback mode should remain off after AvatarBeacon was received")
 	}
 }
 
@@ -1135,7 +1212,7 @@ func TestAppPrepareAutoCaptureConfigKeepsFallbackOnWhenAutoFallbackDisabled(t *t
 	}
 }
 
-func TestAppPrepareAutoCaptureConfigAutoFallbackEnablesFallbackAfterAvatarBeaconTimeout(t *testing.T) {
+func TestAppPrepareAutoCaptureConfigDoesNotAutoFallbackAfterAvatarBeaconWasReceived(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.json")
 	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
 	now := time.Now()
@@ -1151,8 +1228,30 @@ func TestAppPrepareAutoCaptureConfigAutoFallbackEnablesFallbackAfterAvatarBeacon
 	if err != nil {
 		t.Fatalf("prepareAutoCaptureConfigForRunLocked error = %v", err)
 	}
+	if cfg.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
+		t.Fatal("fallback mode should stay off when AvatarBeacon basis was received once")
+	}
+}
+
+func TestAppPrepareAutoCaptureConfigAutoFallbackEnablesFallbackAfterNoAvatarBeaconTimeout(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+	now := time.Now()
+	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
+	app.state.Config.AutoCapture.Capture.PreplacedLocalAnchor = appBoolPtr(false)
+	app.state.Config.AutoCapture.Capture.AutoEnablePreplaced = true
+	app.state.Config.AutoCapture.Capture.AutoEnablePreplacedAfterMinutes = 5
+	app.state.Config.AutoCapture.Presence.WatchOutputLog = false
+	app.avatarOSCContextAt = now.Add(-6 * time.Minute)
+
+	app.mu.Lock()
+	cfg, err := app.prepareAutoCaptureConfigForRunLocked(app.state.Config)
+	app.mu.Unlock()
+	if err != nil {
+		t.Fatalf("prepareAutoCaptureConfigForRunLocked error = %v", err)
+	}
 	if !cfg.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
-		t.Fatal("fallback mode should turn on when auto fallback is enabled and AvatarBeacon basis is stale")
+		t.Fatal("fallback mode should turn on after configured no-AvatarBeacon timeout")
 	}
 }
 
@@ -1368,6 +1467,8 @@ func TestAppWaitForAutoCaptureStartReadinessAutoFallbacksWithoutAvatarOSCBasis(t
 	app.state.Config.AutoCapture.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
 	app.state.Config.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = 3
 	app.state.Config.AutoCapture.Capture.AutoEnablePreplaced = true
+	app.state.Config.AutoCapture.Presence.WatchOutputLog = false
+	app.avatarOSCContextAt = time.Now().Add(-6 * time.Minute)
 	ctx := context.Background()
 	start := time.Now()
 	err := app.waitForAutoCaptureStartReadiness(ctx, app.state.Config, 50*time.Millisecond)

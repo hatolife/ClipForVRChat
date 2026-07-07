@@ -29,8 +29,6 @@ var (
 	runningGoTest         = isGoTestBinary(os.Args[0])
 )
 
-const avatarBeaconAutoFallbackAfter = 30 * time.Second
-
 func appBoolConfigPtr(value bool) *bool {
 	return &value
 }
@@ -64,6 +62,8 @@ type App struct {
 	userCameraSamples     map[string]userCameraOSCSample
 	latestAvatarOSCBasis  avatarOSCBasisState
 	avatarBeaconVersion   string
+	avatarOSCContextKey   string
+	avatarOSCContextAt    time.Time
 	avatarOSCBasisSamples map[string]avatarOSCBasisSample
 	oscLogEntries         []OSCLogEntry
 	oscSendLogEntries     []OSCLogEntry
@@ -247,6 +247,8 @@ func (a *App) StoreSettingsDraft(cfg appcore.Config, dirty bool) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if !dirty {
+		cfg.Normalize()
+		a.state.Config = cfg
 		a.settingsDraftDirty = false
 		a.state.UnsavedSettingsDraft = false
 		a.state.SettingsBaselineConfig = nil
@@ -264,6 +266,7 @@ func (a *App) StoreSettingsDraft(cfg appcore.Config, dirty bool) error {
 	}
 	a.settingsDraftDirty = true
 	a.state.UnsavedSettingsDraft = true
+	a.state.Config = cfg
 	a.logLifecycleLocked("settings draft saved: diff_paths=%s", strings.Join(diffPaths, ","))
 	return nil
 }
@@ -273,6 +276,9 @@ func (a *App) ClearSettingsDraft() error {
 	defer a.mu.Unlock()
 	a.settingsDraftDirty = false
 	a.state.UnsavedSettingsDraft = false
+	if a.state.SettingsBaselineConfig != nil {
+		a.state.Config = *a.state.SettingsBaselineConfig
+	}
 	a.state.SettingsBaselineConfig = nil
 	return removeSettingsDraft()
 }
@@ -352,9 +358,18 @@ func (a *App) GetAvatarBeaconOSCExcludeRegex() string {
 	a.mu.Lock()
 	cfg := a.state.Config
 	cfg.Normalize()
-	pattern := avatarOSCBasisAddressFilterPattern(cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix)
+	pattern := avatarBeaconOSCAddressFilterPattern(cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix)
 	a.mu.Unlock()
 	return "^(?!.*(?:" + pattern + ")(?:\\s|\\||$)).*$"
+}
+
+func (a *App) GetAvatarBeaconOSCIncludeRegex() string {
+	a.mu.Lock()
+	cfg := a.state.Config
+	cfg.Normalize()
+	pattern := avatarBeaconOSCAddressFilterPattern(cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix)
+	a.mu.Unlock()
+	return "(?:" + pattern + ")(?:\\s|\\||$)"
 }
 
 func (a *App) SendDebugOSC(line string) (appcore.DebugOSCSendResult, error) {
@@ -661,10 +676,13 @@ func (a *App) LoadConfig() (appcore.Config, error) {
 	return appcore.LoadConfig(a.configPath)
 }
 
-func (a *App) SaveConfig(cfg appcore.Config) error {
+func (a *App) SaveConfig(cfg appcore.Config) (appcore.Config, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return a.saveConfigLocked(cfg)
+	if err := a.saveConfigLocked(cfg); err != nil {
+		return a.state.Config, err
+	}
+	return a.state.Config, nil
 }
 
 func (a *App) saveConfigLocked(cfg appcore.Config) error {
@@ -678,7 +696,6 @@ func (a *App) saveConfigLocked(cfg appcore.Config) error {
 	}
 	a.settingsDraftDirty = false
 	a.state.Config = cfg
-	a.state.Mode = appcore.ModeResults
 	a.state.Message = ""
 	a.state.SettingsBaselineConfig = nil
 	a.state.UnsavedSettingsDraft = false
@@ -1716,6 +1733,11 @@ func (a *App) waitForAutoCaptureStartReadiness(ctx context.Context, cfg appcore.
 	if timeout <= 0 {
 		timeout = 30 * time.Second
 	}
+	if cfg.AutoCapture.Capture.AutoEnablePreplaced {
+		if fallbackAfter := avatarBeaconAutoFallbackAfter(cfg); fallbackAfter > timeout {
+			timeout = fallbackAfter + time.Second
+		}
+	}
 	pollInterval := 250 * time.Millisecond
 	if timeout < pollInterval {
 		pollInterval = timeout
@@ -1738,8 +1760,9 @@ func (a *App) waitForAutoCaptureStartReadiness(ctx context.Context, cfg appcore.
 			appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait: avatar_osc_status=%q fresh=%t auto_fallback=%t age_ms=%d error=%q", snapshot.Status, snapshot.Fresh, snapshot.AutoFallback, snapshot.AgeMS, snapshot.Error)
 			lastBasisStatus = snapshot.Status
 		}
+		fallbackAfter := avatarBeaconAutoFallbackAfter(cfg)
 		if snapshot.AutoFallback && cfg.AutoCapture.Capture.AutoEnablePreplaced {
-			appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait: avatar_osc auto fallback enabled age_ms=%d threshold_ms=%d", snapshot.AgeMS, avatarBeaconAutoFallbackAfter.Milliseconds())
+			appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait: avatar_osc auto fallback enabled age_ms=%d threshold_ms=%d", snapshot.AgeMS, fallbackAfter.Milliseconds())
 			if !cfg.AutoCapture.Presence.WatchOutputLog {
 				appcore.AppendDiagnosticLog(logPath, "auto-capture scheduler wait complete: auto_fallback=true world_metadata=disabled")
 				return nil
@@ -2675,15 +2698,16 @@ func (a *App) prepareAutoCaptureConfigForRunLocked(cfg appcore.Config) (appcore.
 	source := normalizePlayerLocalBasisSource(cfg.AutoCapture.PlayerLocal.BasisSource)
 	if source == appcore.PlayerLocalBasisSourceAvatarOSC {
 		snapshot := a.latestAvatarOSCBasisSnapshotLocked(cfg, now)
-		if cfg.AutoCapture.Capture.AutoEnablePreplaced && (snapshot.AutoFallback || !snapshot.Fresh) {
+		fallbackAfter := avatarBeaconAutoFallbackAfter(cfg)
+		if cfg.AutoCapture.Capture.AutoEnablePreplaced && snapshot.AutoFallback {
 			enableFallback := true
 			cfg.AutoCapture.Capture.PreplacedLocalAnchor = appBoolConfigPtr(enableFallback)
-			appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "avatar osc auto fallback enable applied: enabled=%t status=%q fresh=%t last=%q age_ms=%d threshold_ms=%d err=%q", enableFallback, snapshot.Status, snapshot.Fresh, snapshot.LastReceivedAddress, snapshot.AgeMS, avatarBeaconAutoFallbackAfter.Milliseconds(), snapshot.Error)
+			appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "avatar osc auto fallback enable applied: enabled=%t status=%q fresh=%t last=%q age_ms=%d threshold_ms=%d err=%q", enableFallback, snapshot.Status, snapshot.Fresh, snapshot.LastReceivedAddress, snapshot.AgeMS, fallbackAfter.Milliseconds(), snapshot.Error)
 		} else if cfg.AutoCapture.Capture.AutoDisablePreplaced && snapshot.Fresh {
 			cfg.AutoCapture.Capture.PreplacedLocalAnchor = appBoolConfigPtr(false)
 			appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "avatar osc auto fallback disable applied: status=%q fresh=%t last=%q age_ms=%d err=%q", snapshot.Status, snapshot.Fresh, snapshot.LastReceivedAddress, snapshot.AgeMS, snapshot.Error)
 		} else if snapshot.AutoFallback && !cfg.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
-			appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "avatar osc basis stale while fallback mode disabled: auto_enable_fallback=false status=%q last=%q age_ms=%d threshold_ms=%d err=%q", snapshot.Status, snapshot.LastReceivedAddress, snapshot.AgeMS, avatarBeaconAutoFallbackAfter.Milliseconds(), snapshot.Error)
+			appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "avatar osc basis unavailable while fallback mode disabled: auto_enable_fallback=false status=%q last=%q age_ms=%d threshold_ms=%d err=%q", snapshot.Status, snapshot.LastReceivedAddress, snapshot.AgeMS, fallbackAfter.Milliseconds(), snapshot.Error)
 		}
 	}
 	if cfg.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
@@ -2710,11 +2734,16 @@ func (a *App) prepareAutoCaptureConfigForRunLocked(cfg appcore.Config) (appcore.
 
 func (a *App) latestAvatarOSCBasisSnapshotLocked(cfg appcore.Config, now time.Time) PlayerLocalBasisSnapshot {
 	cfg.Normalize()
+	a.resetAvatarOSCSessionIfContextChangedLocked(cfg, now)
+	fallbackAfter := avatarBeaconAutoFallbackAfter(cfg)
 	parameterPrefix := canonicalAvatarOSCBasisAddress(cfg.AutoCapture.PlayerLocal.AvatarOSC.ParameterPrefix)
 	if parameterPrefix == "" {
 		parameterPrefix = "avatar_beacon"
 	}
 	lastAddress, lastReceivedAt := latestAvatarOSCParameterSample(a.avatarOSCBasisSamples)
+	if a.avatarOSCContextAt.IsZero() {
+		a.avatarOSCContextAt = now
+	}
 	snapshot := PlayerLocalBasisSnapshot{
 		Source:              "avatar_osc",
 		Configured:          true,
@@ -2728,10 +2757,21 @@ func (a *App) latestAvatarOSCBasisSnapshotLocked(cfg appcore.Config, now time.Ti
 	}
 	sample, scheme, ok, err := a.buildAvatarOSCBasisSampleLocked(cfg)
 	if !ok {
-		snapshot.AutoFallback = lastReceivedAt.IsZero() || now.Sub(lastReceivedAt) >= avatarBeaconAutoFallbackAfter
+		if !lastReceivedAt.IsZero() {
+			snapshot.AutoFallback = false
+		} else {
+			snapshot.AutoFallback = now.Sub(a.avatarOSCContextAt) >= fallbackAfter
+			snapshot.AgeMS = now.Sub(a.avatarOSCContextAt).Milliseconds()
+		}
 	} else {
 		age := now.Sub(sample.ReceivedAt)
-		snapshot.AutoFallback = sample.ReceivedAt.IsZero() || age >= avatarBeaconAutoFallbackAfter
+		snapshot.AutoFallback = false
+		if sample.ReceivedAt.IsZero() {
+			snapshot.AutoFallback = now.Sub(a.avatarOSCContextAt) >= fallbackAfter
+		}
+		if age > time.Duration(cfg.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec)*time.Second {
+			cfg.AutoCapture.PlayerLocal.AvatarOSC.FreshnessSec = int(age/time.Second) + 1
+		}
 	}
 	if !ok {
 		if err != nil {
@@ -2757,7 +2797,6 @@ func (a *App) latestAvatarOSCBasisSnapshotLocked(cfg appcore.Config, now time.Ti
 	}
 	avatarOSCCfg := cfg.AutoCapture
 	avatarOSCCfg.PlayerLocal.BasisSource = appcore.PlayerLocalBasisSourceAvatarOSC
-	avatarOSCCfg.PlayerLocal.AvatarOSC.FreshnessSec = int(avatarBeaconAutoFallbackAfter / time.Second)
 	pose, err := appcore.ResolvePlayerLocalBasisPose(avatarOSCCfg, sample, now)
 	snapshot.Pose = pose
 	snapshot.UpdatedAt = sample.ReceivedAt.Format(time.RFC3339Nano)
@@ -2799,6 +2838,59 @@ func avatarOSCBasisStaleError(snapshot PlayerLocalBasisSnapshot, freshnessSec in
 		return message + fmt.Sprintf(" 最後に受信したbasis parameter: %s", snapshot.LastReceivedAddress)
 	}
 	return message + fmt.Sprintf(" 最後に受信したAvatar Parameterは %s で、AvatarBeaconのbasis parameterではありません。VRChat OSC経路自体は動いていますが、専用ギミックの座標parameterが止まっている可能性があります。", snapshot.LastReceivedAddress)
+}
+
+func avatarBeaconAutoFallbackAfter(cfg appcore.Config) time.Duration {
+	cfg.Normalize()
+	minutes := cfg.AutoCapture.Capture.AutoEnablePreplacedAfterMinutes
+	if minutes <= 0 {
+		minutes = appcore.DefaultConfig().AutoCapture.Capture.AutoEnablePreplacedAfterMinutes
+	}
+	return time.Duration(minutes) * time.Minute
+}
+
+func (a *App) resetAvatarOSCSessionIfContextChangedLocked(cfg appcore.Config, now time.Time) {
+	if !cfg.AutoCapture.Presence.WatchOutputLog {
+		if a.avatarOSCContextAt.IsZero() {
+			a.avatarOSCContextAt = now
+		}
+		return
+	}
+	meta := appcore.SnapshotVRChatWorld(cfg.AutoCapture.Presence.OutputLogDirectory)
+	key := avatarOSCContextKey(meta)
+	if key == "" {
+		if a.avatarOSCContextAt.IsZero() {
+			a.avatarOSCContextAt = now
+		}
+		return
+	}
+	if a.avatarOSCContextKey == "" {
+		a.avatarOSCContextKey = key
+		if a.avatarOSCContextAt.IsZero() {
+			a.avatarOSCContextAt = now
+		}
+		return
+	}
+	if key == a.avatarOSCContextKey {
+		return
+	}
+	a.avatarOSCContextKey = key
+	a.avatarOSCContextAt = now
+	a.avatarOSCBasisSamples = nil
+	a.latestAvatarOSCBasis = avatarOSCBasisState{}
+	a.avatarBeaconVersion = ""
+	appcore.AppendDiagnosticLog(appcore.DiagnosticLogPath(a.configPath), "avatar osc session reset: context_changed world_id=%q instance_id=%q avatar_id=%q", meta.WorldID, meta.InstanceID, meta.AvatarID)
+}
+
+func avatarOSCContextKey(meta appcore.AutoCaptureVRChatMetadata) string {
+	parts := []string{}
+	if meta.WorldID != "" || meta.InstanceID != "" {
+		parts = append(parts, "world="+meta.WorldID, "instance="+meta.InstanceID)
+	}
+	if meta.AvatarID != "" {
+		parts = append(parts, "avatar="+meta.AvatarID)
+	}
+	return strings.Join(parts, "|")
 }
 
 func (a *App) rebuildAvatarOSCBasisLocked(now time.Time, logPath string) {
@@ -2913,6 +3005,18 @@ func avatarOSCBasisAddressFilterPattern(prefix string) string {
 		parts = append(parts, regexp.QuoteMeta("/avatar/parameters/"+key))
 	}
 	return strings.Join(parts, "|")
+}
+
+func avatarBeaconOSCAddressFilterPattern(prefix string) string {
+	pattern := avatarOSCBasisAddressFilterPattern(prefix)
+	versionKeys := []string{
+		"AvatarBeacon/version",
+		"/avatar/parameters/AvatarBeacon/version",
+	}
+	for _, key := range versionKeys {
+		pattern += "|" + regexp.QuoteMeta(key)
+	}
+	return pattern
 }
 
 func avatarOSCBasisAddressScheme(prefix string) (scheme string, positionRoot string, forwardRoot string, signSuffix string) {

@@ -86,7 +86,7 @@ const vueApp = createApp({
       avatarBeaconOSCExcludeRegex: '',
       oscLogUnsubscribe: null,
       oscSendLogUnsubscribe: null,
-      debugOSCInput: '/avatar/parameters/debug true',
+      debugOSCInput: '/chatbox/input test',
       debugOSCSending: false,
       debugOSCResult: null,
       settingsDraftSyncTimer: null,
@@ -167,11 +167,11 @@ const vueApp = createApp({
       return Boolean(status && status.available && !status.error)
     },
     autoCaptureAvatarBeaconStatusLine() {
-      if (!this.autoCaptureAvatarBeaconOK) return '現在のAvatarBeacon受信状態: エラー'
+      if (!this.autoCaptureAvatarBeaconOK) return '現在のAvatarBeacon受信状態: エラー アバターギミック導入済みの場合VRChat内で移動してみてください。'
       const status = this.avatarOscBasisStatus
       const position = status?.position || {}
       const fmt = (value) => (Number.isFinite(Number(value)) ? Number(value).toFixed(3) : '-')
-      const yaw = Number.isFinite(Number(status?.yaw)) ? `${Number(status.yaw).toFixed(3)}°` : '-°'
+      const yaw = Number.isFinite(Number(status?.yaw)) ? `${Number(status.yaw).toFixed(1)}°` : '-°'
       return `現在のAvatarBeacon受信状態: 成功 ${fmt(position.x)}, ${fmt(position.y)}, ${fmt(position.z)}, ${yaw}`
     },
     effectiveAutoCapturePreplacedLocalAnchor() {
@@ -233,6 +233,7 @@ const vueApp = createApp({
       autoCapture.capture ||= {}
       if (autoCapture.capture.preplacedLocalAnchor === undefined) autoCapture.capture.preplacedLocalAnchor = false
       if (autoCapture.capture.autoEnablePreplacedLocalAnchor === undefined) autoCapture.capture.autoEnablePreplacedLocalAnchor = false
+      if (!Number.isFinite(Number(autoCapture.capture.autoEnablePreplacedLocalAnchorAfterMinutes)) || Number(autoCapture.capture.autoEnablePreplacedLocalAnchorAfterMinutes) <= 0) autoCapture.capture.autoEnablePreplacedLocalAnchorAfterMinutes = 5
       if (autoCapture.capture.autoDisablePreplacedLocalAnchor === undefined) autoCapture.capture.autoDisablePreplacedLocalAnchor = false
       if (autoCapture.capture.openCameraBeforeBatch === undefined) autoCapture.capture.openCameraBeforeBatch = false
       if (autoCapture.capture.closeCameraAfterBatch === undefined) autoCapture.capture.closeCameraAfterBatch = false
@@ -525,6 +526,7 @@ const vueApp = createApp({
         'autoCapture.osc.forward.enabled': 'OSC転送',
         'autoCapture.osc.forward.mode': '転送モード',
         'autoCapture.capture.autoEnablePreplacedLocalAnchor': 'フォールバックモードを自動ON',
+        'autoCapture.capture.autoEnablePreplacedLocalAnchorAfterMinutes': 'フォールバック自動ON待機時間',
         'autoCapture.capture.autoDisablePreplacedLocalAnchor': 'フォールバックモードを自動OFF',
         'autoCapture.capture.preplacedLocalAnchor': 'フォールバックモード',
         'autoCapture.playerLocal.basisSource': 'プレイヤー基準の取得元',
@@ -1647,7 +1649,7 @@ const vueApp = createApp({
     },
     formatAvatarOSCBasisYaw(status = this.avatarOscBasisStatus) {
       if (!status) return '未取得'
-      return Number.isFinite(Number(status.yaw)) ? `${Number(status.yaw).toFixed(3)}°` : '未取得'
+      return Number.isFinite(Number(status.yaw)) ? `${Number(status.yaw).toFixed(1)}°` : '未取得'
     },
     async refreshAvatarOSCBasisStatus(silent = false) {
       if (!api?.GetAvatarOSCBasisStatus) {
@@ -1786,6 +1788,18 @@ const vueApp = createApp({
     async applyAvatarBeaconExcludeOSCFilter() {
       await this.refreshAvatarBeaconOSCExcludeRegex()
       this.oscLogFilter = this.avatarBeaconOSCExcludeRegex
+    },
+    async applyAvatarBeaconOnlyOSCFilter() {
+      const fallback = '(?:/avatar/parameters/)?avatar_beacon/(?:coord|forward)/(?:x|y|z)(?:Sign)?(?:\\s|\\||$)|(?:/avatar/parameters/)?AvatarBeacon/version(?:\\s|\\||$)'
+      if (!api?.GetAvatarBeaconOSCIncludeRegex) {
+        this.oscLogFilter = fallback
+        return
+      }
+      try {
+        this.oscLogFilter = await api.GetAvatarBeaconOSCIncludeRegex()
+      } catch {
+        this.oscLogFilter = fallback
+      }
     },
     async refreshStartupShortcutStatus() {
       if (!api?.GetStartupShortcutStatus) return
@@ -1974,15 +1988,22 @@ const vueApp = createApp({
             this.logUserAction('settings_warning', 'missing_primary_discord_webhook')
           }
         } else {
-          await api.SaveConfig(this.state.config)
+          const savedConfig = await api.SaveConfig(this.state.config)
+          if (savedConfig) {
+            this.state.config = savedConfig
+          }
           if (this.shouldWarnMissingPrimaryWebhook()) {
             this.logUserAction('settings_warning', 'missing_primary_discord_webhook')
           }
-          this.state = await api.CloseSettings()
+          this.rememberSettingsBaseline()
         }
-        this.resetSettingsBaseline()
         if (api?.ClearSettingsDraft) {
           await api.ClearSettingsDraft()
+        }
+        if (this.isSettings) {
+          this.rememberSettingsBaseline()
+        } else {
+          this.resetSettingsBaseline()
         }
         this.saved = true
         this.updateBannerDismissed = false
@@ -2638,8 +2659,12 @@ const vueApp = createApp({
               </template>
               <template v-else-if="autoCaptureDetailView === 'fallback'">
                 <div class="setting-row" :class="settingRowChangedClass('autoCapture.capture.autoEnablePreplacedLocalAnchor')">
-                  <div><strong>フォールバックモードを自動ON</strong><p>AvatarBeacon basisを一定時間受信できない場合に、フォールバックモードをONにします。</p></div>
+                  <div><strong>フォールバックモードを自動ON</strong><p>AvatarBeaconを一定時間受信できない場合に、フォールバックモードをONにします。</p></div>
                   <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.capture.autoEnablePreplacedLocalAnchor" /><span></span></label>
+                </div>
+                <div class="setting-row" :class="[{ disabled: !autoCaptureSettings.capture.autoEnablePreplacedLocalAnchor }, settingRowChangedClass('autoCapture.capture.autoEnablePreplacedLocalAnchorAfterMinutes')]">
+                  <div><strong>自動ONまでの未受信時間</strong><p>起動後またはワールド/アバター変更後、AvatarBeaconを一度も受信できないままこの時間が経過すると自動ONします。</p></div>
+                  <label><input type="number" min="1" max="1440" step="1" v-model.number="autoCaptureSettings.capture.autoEnablePreplacedLocalAnchorAfterMinutes" :disabled="!autoCaptureSettings.capture.autoEnablePreplacedLocalAnchor" /> 分</label>
                 </div>
                 <div class="setting-row" :class="settingRowChangedClass('autoCapture.capture.autoDisablePreplacedLocalAnchor')">
                   <div><strong>フォールバックモードを自動OFF</strong><p>AvatarBeacon basisを受信できた場合に、フォールバックモードをOFFにします。</p></div>
@@ -2818,6 +2843,7 @@ const vueApp = createApp({
                 </div>
                 <div class="inline-actions">
                   <button type="button" class="secondary" @click="applyAvatarBeaconExcludeOSCFilter" title="AvatarBeacon basis parameter以外だけを表示する正規表現フィルタを適用する">AvatarBeacon以外</button>
+                  <button type="button" class="secondary" @click="applyAvatarBeaconOnlyOSCFilter" title="AvatarBeacon basis parameterとversionだけを表示する正規表現フィルタを適用する">AvatarBeaconのみ</button>
                   <button type="button" class="secondary" @click="copyVisibleOSCLog" :disabled="filteredOSCLogEntries.length === 0" :title="filteredOSCLogEntries.length === 0 ? 'コピーできるOSCログがありません' : '表示中のOSCログをコピーする'">表示中ログをコピー</button>
                 </div>
               </div>
@@ -2860,7 +2886,7 @@ const vueApp = createApp({
                 </div>
               </div>
               <div class="osc-debug-send">
-                <input v-model="debugOSCInput" @keydown.enter.prevent="sendDebugOSC" placeholder="/avatar/parameters/debug true" />
+                <input v-model="debugOSCInput" @keydown.enter.prevent="sendDebugOSC" placeholder="/chatbox/input test" />
                 <button type="button" @click="sendDebugOSC" :disabled="debugOSCSending || !String(debugOSCInput || '').trim()" :title="debugOSCSending ? '送信中です' : '入力したOSCを送信する'">{{ debugOSCSending ? '送信中' : '送信' }}</button>
               </div>
               <p v-if="debugOSCResult" :class="['setting-note', debugOSCResult.ok ? 'ok' : 'warning']">

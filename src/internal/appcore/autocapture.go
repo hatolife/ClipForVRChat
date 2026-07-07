@@ -1178,6 +1178,7 @@ type AutoCaptureStreamMetadata struct {
 type AutoCaptureVRChatMetadata struct {
 	WorldID         string `json:"world_id,omitempty"`
 	InstanceID      string `json:"instance_id,omitempty"`
+	AvatarID        string `json:"avatar_id,omitempty"`
 	UsersSource     string `json:"users_source,omitempty"`
 	UsersConfidence string `json:"users_confidence,omitempty"`
 }
@@ -1482,12 +1483,18 @@ func SnapshotVRChatWorld(logDir string) AutoCaptureVRChatMetadata {
 func parseVRChatWorldMetadata(logText string) AutoCaptureVRChatMetadata {
 	worldRe := regexp.MustCompile(`wrld_[0-9A-Za-z-]+(?::[0-9A-Za-z~._:()%-]+)?`)
 	matches := worldRe.FindAllString(logText, -1)
+	avatarRe := regexp.MustCompile(`avtr_[0-9A-Za-z-]+`)
+	avatarMatches := avatarRe.FindAllString(logText, -1)
+	meta := AutoCaptureVRChatMetadata{}
+	if len(avatarMatches) > 0 {
+		meta.AvatarID = trimVRChatWorldToken(avatarMatches[len(avatarMatches)-1])
+	}
 	if len(matches) == 0 {
-		return AutoCaptureVRChatMetadata{}
+		return meta
 	}
 	last := trimVRChatWorldToken(matches[len(matches)-1])
 	parts := strings.SplitN(last, ":", 2)
-	meta := AutoCaptureVRChatMetadata{WorldID: parts[0]}
+	meta.WorldID = parts[0]
 	if len(parts) == 2 {
 		meta.InstanceID = parts[1]
 	}

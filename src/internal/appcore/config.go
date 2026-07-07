@@ -3,6 +3,7 @@ package appcore
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -138,19 +139,20 @@ type AutoCaptureScheduleConfig struct {
 }
 
 type AutoCaptureCaptureConfig struct {
-	Mode                    string `json:"mode"`
-	ConcurrentMode          string `json:"concurrentMode"`
-	RequestedCameraCount    int    `json:"requestedCameraCount"`
-	MultiBackend            string `json:"multiBackend"`
-	FallbackToSequential    bool   `json:"fallbackToSequential"`
-	PreplacedLocalAnchor    *bool  `json:"preplacedLocalAnchor"`
-	AutoEnablePreplaced     bool   `json:"autoEnablePreplacedLocalAnchor"`
-	AutoDisablePreplaced    bool   `json:"autoDisablePreplacedLocalAnchor"`
-	OpenCameraBeforeBatch   bool   `json:"openCameraBeforeBatch"`
-	CloseCameraAfterBatch   bool   `json:"closeCameraAfterBatch"`
-	AutoLevelRollBeforeShot *bool  `json:"autoLevelRollBeforeShot"`
-	SettleDelayMS           int    `json:"settleDelayMs"`
-	ButtonReleaseDelayMS    int    `json:"buttonReleaseDelayMs"`
+	Mode                            string `json:"mode"`
+	ConcurrentMode                  string `json:"concurrentMode"`
+	RequestedCameraCount            int    `json:"requestedCameraCount"`
+	MultiBackend                    string `json:"multiBackend"`
+	FallbackToSequential            bool   `json:"fallbackToSequential"`
+	PreplacedLocalAnchor            *bool  `json:"preplacedLocalAnchor"`
+	AutoEnablePreplaced             bool   `json:"autoEnablePreplacedLocalAnchor"`
+	AutoEnablePreplacedAfterMinutes int    `json:"autoEnablePreplacedLocalAnchorAfterMinutes"`
+	AutoDisablePreplaced            bool   `json:"autoDisablePreplacedLocalAnchor"`
+	OpenCameraBeforeBatch           bool   `json:"openCameraBeforeBatch"`
+	CloseCameraAfterBatch           bool   `json:"closeCameraAfterBatch"`
+	AutoLevelRollBeforeShot         *bool  `json:"autoLevelRollBeforeShot"`
+	SettleDelayMS                   int    `json:"settleDelayMs"`
+	ButtonReleaseDelayMS            int    `json:"buttonReleaseDelayMs"`
 }
 
 func (c AutoCaptureCaptureConfig) PreplacedLocalAnchorEnabled() bool {
@@ -377,19 +379,20 @@ func DefaultAutoCaptureConfig() AutoCaptureConfig {
 			CaptureOnStart:             true,
 		},
 		Capture: AutoCaptureCaptureConfig{
-			Mode:                    "stream",
-			ConcurrentMode:          "sequential",
-			RequestedCameraCount:    1,
-			MultiBackend:            "dolly_multi",
-			FallbackToSequential:    true,
-			PreplacedLocalAnchor:    boolConfigPtr(false),
-			AutoEnablePreplaced:     false,
-			AutoDisablePreplaced:    false,
-			OpenCameraBeforeBatch:   false,
-			CloseCameraAfterBatch:   false,
-			AutoLevelRollBeforeShot: boolConfigPtr(true),
-			SettleDelayMS:           1500,
-			ButtonReleaseDelayMS:    200,
+			Mode:                            "stream",
+			ConcurrentMode:                  "sequential",
+			RequestedCameraCount:            1,
+			MultiBackend:                    "dolly_multi",
+			FallbackToSequential:            true,
+			PreplacedLocalAnchor:            boolConfigPtr(false),
+			AutoEnablePreplaced:             false,
+			AutoEnablePreplacedAfterMinutes: 5,
+			AutoDisablePreplaced:            false,
+			OpenCameraBeforeBatch:           false,
+			CloseCameraAfterBatch:           false,
+			AutoLevelRollBeforeShot:         boolConfigPtr(true),
+			SettleDelayMS:                   1500,
+			ButtonReleaseDelayMS:            200,
 		},
 		Stream: AutoCaptureStreamConfig{
 			SpoutHelperPath:  "spout-capture.exe",
@@ -578,6 +581,12 @@ func (c *AutoCaptureConfig) Normalize() {
 	}
 	if c.Capture.ButtonReleaseDelayMS < 200 {
 		c.Capture.ButtonReleaseDelayMS = 200
+	}
+	if c.Capture.AutoEnablePreplacedAfterMinutes <= 0 {
+		c.Capture.AutoEnablePreplacedAfterMinutes = 5
+	}
+	if c.Capture.AutoEnablePreplacedAfterMinutes > 1440 {
+		c.Capture.AutoEnablePreplacedAfterMinutes = 1440
 	}
 	if c.Capture.AutoLevelRollBeforeShot == nil {
 		c.Capture.AutoLevelRollBeforeShot = boolConfigPtr(true)
@@ -917,10 +926,32 @@ func (v *CameraViewConfig) Normalize(index int) {
 	if v.CaptureDelayMS < 0 {
 		v.CaptureDelayMS = 0
 	}
+	v.Pose = roundCameraPoseConfig(v.Pose, 3)
 	if v.Zoom != nil {
-		zoom := clampFiniteDefault(*v.Zoom, userCameraZoomMin, userCameraZoomMax, userCameraZoomDefault)
+		zoom := roundFloat(clampFiniteDefault(*v.Zoom, userCameraZoomMin, userCameraZoomMax, userCameraZoomDefault), 3)
 		v.Zoom = float64ConfigPtr(zoom)
 	}
+}
+
+func roundCameraPoseConfig(p CameraPoseConfig, places int) CameraPoseConfig {
+	p.Position = roundCameraVector3Config(p.Position, places)
+	p.Rotation = roundCameraVector3Config(p.Rotation, places)
+	return p
+}
+
+func roundCameraVector3Config(v CameraVector3Config, places int) CameraVector3Config {
+	v.X = roundFloat(v.X, places)
+	v.Y = roundFloat(v.Y, places)
+	v.Z = roundFloat(v.Z, places)
+	return v
+}
+
+func roundFloat(value float64, places int) float64 {
+	if !isFiniteFloat64(value) {
+		return value
+	}
+	scale := math.Pow10(places)
+	return math.Round(value*scale) / scale
 }
 
 func DefaultVRChatPhotoDirectory() string {

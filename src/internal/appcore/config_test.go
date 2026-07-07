@@ -69,6 +69,9 @@ func TestConfigNormalizeAppliesDefaultsAndTrimsQuotes(t *testing.T) {
 	if cfg.AutoCapture.PlayerLocal.AvatarOSC.PositionScale != 1000 {
 		t.Fatalf("PlayerLocal.AvatarOSC.PositionScale = %v, want 1000", cfg.AutoCapture.PlayerLocal.AvatarOSC.PositionScale)
 	}
+	if cfg.AutoCapture.Capture.AutoEnablePreplacedAfterMinutes != 5 {
+		t.Fatalf("AutoEnablePreplacedAfterMinutes = %d, want 5", cfg.AutoCapture.Capture.AutoEnablePreplacedAfterMinutes)
+	}
 	if cfg.ScreenshotAutoPost.ScreenshotDirectory != `C:\Users\test\Pictures\Screenshots` {
 		t.Fatalf("ScreenshotDirectory = %q", cfg.ScreenshotAutoPost.ScreenshotDirectory)
 	}
@@ -77,6 +80,30 @@ func TestConfigNormalizeAppliesDefaultsAndTrimsQuotes(t *testing.T) {
 	}
 	if cfg.ScreenshotAutoPost.ScanIntervalSeconds != 2 {
 		t.Fatalf("Screenshot ScanIntervalSeconds = %d, want 2", cfg.ScreenshotAutoPost.ScanIntervalSeconds)
+	}
+}
+
+func TestCameraViewNormalizeRoundsPoseAndZoom(t *testing.T) {
+	zoom := 44.44449
+	view := CameraViewConfig{
+		ID:              "view",
+		Name:            "View",
+		CoordinateSpace: "player_local",
+		Pose: CameraPoseConfig{
+			Position: CameraVector3Config{X: 1.23449, Y: -2.3455, Z: 3.0004},
+			Rotation: CameraVector3Config{X: 10.12349, Y: 20.5555, Z: -30.0004},
+		},
+		Zoom: &zoom,
+	}
+	view.Normalize(0)
+	if view.Pose.Position.X != 1.234 || view.Pose.Position.Y != -2.346 || view.Pose.Position.Z != 3 {
+		t.Fatalf("position = %+v", view.Pose.Position)
+	}
+	if view.Pose.Rotation.X != 10.123 || view.Pose.Rotation.Y != 20.556 || view.Pose.Rotation.Z != -30 {
+		t.Fatalf("rotation = %+v", view.Pose.Rotation)
+	}
+	if view.Zoom == nil || *view.Zoom != 44.444 {
+		t.Fatalf("zoom = %v, want 44.444", view.Zoom)
 	}
 }
 

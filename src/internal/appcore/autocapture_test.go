@@ -1004,11 +1004,15 @@ func TestAutoCaptureUserIDOutputsAreIndependent(t *testing.T) {
 func TestParseVRChatWorldMetadata(t *testing.T) {
 	logText := `
 2026.06.30 20:00:00 Log - Joining wrld_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:12345~region(jp)
+2026.06.30 20:00:10 Log - Loading avatar avtr_11111111-2222-3333-4444-555555555555.
 2026.06.30 21:00:00 Log - Joining wrld_ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee:67890~private(usr_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa)~nonce(123456)~region(us).
 `
 	meta := parseVRChatWorldMetadata(logText)
 	if meta.WorldID != "wrld_ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee" || meta.InstanceID != "67890~private(usr_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa)~nonce(123456)~region(us)" {
 		t.Fatalf("meta = %+v", meta)
+	}
+	if meta.AvatarID != "avtr_11111111-2222-3333-4444-555555555555" {
+		t.Fatalf("AvatarID = %q", meta.AvatarID)
 	}
 }
 
