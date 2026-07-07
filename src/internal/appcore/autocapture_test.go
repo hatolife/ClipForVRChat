@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net"
@@ -188,6 +189,73 @@ func TestApplyIdleCameraStateSendsPlayerLocalDefaultPose(t *testing.T) {
 	}
 	if poseSample.Pose.Position.X != 0 || poseSample.Pose.Position.Y != -5 || poseSample.Pose.Position.Z != 0 {
 		t.Fatalf("idle pose = %+v, want player-local default resolved to Y=-5", poseSample.Pose)
+	}
+}
+
+func TestApplyCameraViewTemporarilyEnablesFlyingAroundPose(t *testing.T) {
+	conn, port := listenOSCUserCameraPackets(t)
+	defer conn.Close()
+
+	cfg := DefaultConfig()
+	cfg.AutoCapture.OSC.Host = "127.0.0.1"
+	cfg.AutoCapture.OSC.SendPort = port
+	view := cfg.AutoCapture.Views[0]
+	view.CoordinateSpace = "world"
+	view.Calibrated = true
+
+	client := oscClient{host: "127.0.0.1", port: port}
+	if err := client.open(); err != nil {
+		t.Fatal(err)
+	}
+	defer client.close()
+
+	if err := (AutoCaptureRunner{Config: cfg}).applyCameraView(client, view); err != nil {
+		t.Fatal(err)
+	}
+
+	samples := withoutVersionNoticePackets(readOSCPacketSamples(t, conn))
+	if len(samples) != 3 {
+		t.Fatalf("packet count = %d, want 3: %+v", len(samples), samples)
+	}
+	if samples[0].Address != "/usercamera/Flying" || !samples[0].HasBool || !samples[0].Bool {
+		t.Fatalf("packet[0] = %+v, want Flying=true", samples[0])
+	}
+	if samples[1].Address != "/usercamera/Pose" || !samples[1].HasPose {
+		t.Fatalf("packet[1] = %+v, want Pose", samples[1])
+	}
+	if samples[2].Address != "/usercamera/Flying" || !samples[2].HasBool || samples[2].Bool {
+		t.Fatalf("packet[2] = %+v, want Flying=false", samples[2])
+	}
+}
+
+func TestApplyCameraViewDisablesFlyingWhenPoseSendFails(t *testing.T) {
+	cfg := DefaultConfig()
+	view := cfg.AutoCapture.Views[0]
+	view.CoordinateSpace = "world"
+	view.Calibrated = true
+	conn := &addressFailConn{failAddress: "/usercamera/Pose"}
+	client := oscClient{host: "127.0.0.1", port: 9000, conn: conn}
+
+	err := (AutoCaptureRunner{Config: cfg}).applyCameraView(client, view)
+	if err == nil {
+		t.Fatal("applyCameraView returned nil, want pose send error")
+	}
+
+	got := make([]string, 0, len(conn.addresses))
+	for _, address := range conn.addresses {
+		if address == avatarBeaconVersionOSCAddress {
+			continue
+		}
+		got = append(got, address)
+	}
+	want := []string{"/usercamera/Flying", "/usercamera/Pose", "/usercamera/Flying"}
+	if len(got) != len(want) {
+		t.Fatalf("addresses = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("addresses = %v, want %v", got, want)
+		}
 	}
 }
 
@@ -897,6 +965,60 @@ func withoutVersionNoticePackets(samples []oscPacketSample) []oscPacketSample {
 		filtered = append(filtered, sample)
 	}
 	return filtered
+}
+
+type addressFailConn struct {
+	failAddress string
+	addresses   []string
+}
+
+func (c *addressFailConn) Read(_ []byte) (int, error) {
+	return 0, errors.New("read is not supported")
+}
+
+func (c *addressFailConn) Write(packet []byte) (int, error) {
+	address, _, _, ok := ParseOSCPacket(packet)
+	if ok {
+		c.addresses = append(c.addresses, address)
+	}
+	if address == c.failAddress {
+		return 0, errors.New("forced OSC write failure")
+	}
+	return len(packet), nil
+}
+
+func (c *addressFailConn) Close() error {
+	return nil
+}
+
+func (c *addressFailConn) LocalAddr() net.Addr {
+	return dummyAddr("local")
+}
+
+func (c *addressFailConn) RemoteAddr() net.Addr {
+	return dummyAddr("remote")
+}
+
+func (c *addressFailConn) SetDeadline(_ time.Time) error {
+	return nil
+}
+
+func (c *addressFailConn) SetReadDeadline(_ time.Time) error {
+	return nil
+}
+
+func (c *addressFailConn) SetWriteDeadline(_ time.Time) error {
+	return nil
+}
+
+type dummyAddr string
+
+func (a dummyAddr) Network() string {
+	return string(a)
+}
+
+func (a dummyAddr) String() string {
+	return string(a)
 }
 
 func boolPtr(value bool) *bool {

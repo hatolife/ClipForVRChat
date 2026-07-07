@@ -901,16 +901,34 @@ func (r AutoCaptureRunner) applyCameraView(client oscClient, view CameraViewConf
 	} else {
 		diagAutoCapture(logPath, "camera pose resolved: view_id=%q view_name=%q coordinate_space=%q world_pose=%+v", view.ID, view.Name, view.CoordinateSpace, pose)
 	}
+	if err := r.sendUserCameraFlying(client, view.ID, true, "before_pose"); err != nil {
+		return err
+	}
 	diagAutoCapture(logPath, "osc send begin: address=%q view_id=%q", "/usercamera/Pose", view.ID)
-	if err := client.sendFloats("/usercamera/Pose", []float32{
+	poseErr := client.sendFloats("/usercamera/Pose", []float32{
 		float32(pose.Position.X), float32(pose.Position.Y), float32(pose.Position.Z),
 		float32(pose.Rotation.X), float32(pose.Rotation.Y), float32(pose.Rotation.Z),
-	}); err != nil {
-		diagAutoCapture(logPath, "osc send error: address=%q view_id=%q err=%v", "/usercamera/Pose", view.ID, err)
-		return err
-	} else {
-		diagAutoCapture(logPath, "osc send success: address=%q view_id=%q coordinate_space=%q resolved_pose=%+v", "/usercamera/Pose", view.ID, view.CoordinateSpace, pose)
+	})
+	flyingOffErr := r.sendUserCameraFlying(client, view.ID, false, "after_pose")
+	if poseErr != nil {
+		diagAutoCapture(logPath, "osc send error: address=%q view_id=%q err=%v", "/usercamera/Pose", view.ID, poseErr)
+		return poseErr
 	}
+	if flyingOffErr != nil {
+		return flyingOffErr
+	}
+	diagAutoCapture(logPath, "osc send success: address=%q view_id=%q coordinate_space=%q resolved_pose=%+v", "/usercamera/Pose", view.ID, view.CoordinateSpace, pose)
+	return nil
+}
+
+func (r AutoCaptureRunner) sendUserCameraFlying(client oscClient, viewID string, value bool, detail string) error {
+	logPath := r.Config.DiagnosticLogPath
+	diagAutoCapture(logPath, "osc send begin: address=%q value=%t view_id=%q detail=%q", "/usercamera/Flying", value, viewID, detail)
+	if err := client.sendBool("/usercamera/Flying", value); err != nil {
+		diagAutoCapture(logPath, "osc send error: address=%q value=%t view_id=%q detail=%q err=%v", "/usercamera/Flying", value, viewID, detail, err)
+		return err
+	}
+	diagAutoCapture(logPath, "osc send success: address=%q value=%t view_id=%q detail=%q", "/usercamera/Flying", value, viewID, detail)
 	return nil
 }
 
