@@ -430,7 +430,7 @@ func addFileToZip(zipWriter *zip.Writer, name, path string) error {
 
 func isDiagnosticTextFile(name string) bool {
 	switch strings.ToLower(filepath.Ext(name)) {
-	case ".json", ".log", ".txt":
+	case ".json", ".jsonl", ".log", ".txt":
 		return true
 	default:
 		return false

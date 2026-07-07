@@ -1642,9 +1642,17 @@ func readOSCLogEntriesFile(t *testing.T, path string) []OSCLogEntry {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var entries []OSCLogEntry
-	if err := json.Unmarshal(data, &entries); err != nil {
-		t.Fatal(err)
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	entries := make([]OSCLogEntry, 0, len(lines))
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		var entry OSCLogEntry
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			t.Fatal(err)
+		}
+		entries = append(entries, entry)
 	}
 	return entries
 }
@@ -1712,10 +1720,10 @@ func TestDiagnosticZipDoesNotIncludeOutputImages(t *testing.T) {
 	if err := os.MkdirAll(logDir, 0700); err != nil {
 		t.Fatal(err)
 	}
-	if err := appcore.WritePrivateFile(filepath.Join(logDir, oscSendLogFileName), []byte(`[{"direction":"send","address":"/send"}]`+"\n")); err != nil {
+	if err := appcore.WritePrivateFile(filepath.Join(logDir, oscSendLogFileName), []byte(`{"direction":"send","address":"/send"}`+"\n")); err != nil {
 		t.Fatal(err)
 	}
-	if err := appcore.WritePrivateFile(filepath.Join(logDir, oscReceiveLogFileName), []byte(`[{"direction":"receive","address":"/receive"}]`+"\n")); err != nil {
+	if err := appcore.WritePrivateFile(filepath.Join(logDir, oscReceiveLogFileName), []byte(`{"direction":"receive","address":"/receive"}`+"\n")); err != nil {
 		t.Fatal(err)
 	}
 	zipData, _, err := buildDiagnosticZip(configPath, cfg)

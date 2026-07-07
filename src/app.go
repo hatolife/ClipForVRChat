@@ -32,8 +32,8 @@ var (
 const (
 	maxOSCLogEntries      = 1000
 	oscLogPersistInterval = time.Second
-	oscSendLogFileName    = "osc_send.json"
-	oscReceiveLogFileName = "osc_recieve.json"
+	oscSendLogFileName    = "osc_send.jsonl"
+	oscReceiveLogFileName = "osc_recieve.jsonl"
 )
 
 func appBoolConfigPtr(value bool) *bool {
@@ -2408,14 +2408,19 @@ func writeOSCLogEntriesFile(path string, entries []OSCLogEntry) error {
 	if strings.TrimSpace(path) == "" {
 		return nil
 	}
-	data, err := json.MarshalIndent(entries, "", "  ")
-	if err != nil {
-		return err
+	var builder strings.Builder
+	for _, entry := range entries {
+		data, err := json.Marshal(entry)
+		if err != nil {
+			return err
+		}
+		builder.Write(data)
+		builder.WriteByte('\n')
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return err
 	}
-	return appcore.WritePrivateFile(path, append(data, '\n'))
+	return appcore.WritePrivateFile(path, []byte(builder.String()))
 }
 
 func (a *App) recordDebugOSCLogResult(beforeSeq uint64, result appcore.DebugOSCSendResult, err error) {

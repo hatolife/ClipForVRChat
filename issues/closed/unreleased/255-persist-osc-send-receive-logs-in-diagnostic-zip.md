@@ -4,13 +4,17 @@
 
 oscの送受信ログについてlogs直下にosc_send.jsonとosc_recieve.jsonのような感じで送受信分けて最新の1000件だけ保持したい これは不具合報告用zipに含まれるようにしたい
 
+追記:
+
+jsonlinesにしたい
+
 ## 文脈
 
 OSCタブには送受信OSCのリアルタイムログがあるが、これまでは一時表示を前提としており、診断zipには含めない方針だった。OSC送受信の切り分けでは、ユーザー操作後に残る直近ログを不具合報告データとして確認できる必要がある。
 
 ## 解釈
 
-設定ファイル横の `logs/` 直下に、送信ログと受信ログを別々のJSONファイルとして保存する。ファイル名はユーザー指定の雰囲気に合わせ、送信は `osc_send.json`、受信は `osc_recieve.json` とする。各ファイルは最新1000件だけを保持し、既存の不具合報告用zipが `logs/` を取り込むことで同梱されるようにする。
+設定ファイル横の `logs/` 直下に、送信ログと受信ログを別々のJSON Linesファイルとして保存する。ファイル名は送信が `osc_send.jsonl`、受信が `osc_recieve.jsonl` とする。各ファイルは最新1000件だけを保持し、既存の不具合報告用zipが `logs/` を取り込むことで同梱されるようにする。
 
 ## 問題
 
@@ -20,16 +24,16 @@ OSCタブには送受信OSCのリアルタイムログがあるが、これま�
 
 ## 期待する挙動
 
-- `logs/osc_send.json` に送信OSCログが保存される。
-- `logs/osc_recieve.json` に受信OSCログが保存される。
+- `logs/osc_send.jsonl` に送信OSCログがJSON Lines形式で保存される。
+- `logs/osc_recieve.jsonl` に受信OSCログがJSON Lines形式で保存される。
 - 各ファイルは最新1000件だけを保持する。
 - 不具合報告用zipに上記JSONが含まれる。
 
 ## 受け入れ条件
 
-- [x] OSC送信時に `logs/osc_send.json` が更新される。
-- [x] OSC受信時に `logs/osc_recieve.json` が更新される。
+- [x] OSC送信時に `logs/osc_send.jsonl` が更新される。
+- [x] OSC受信時に `logs/osc_recieve.jsonl` が更新される。
 - [x] 各JSONファイルは最新1000件を超えて保持しない。
-- [x] JSONには時刻、方向、address、type tag、値概要、remote/target、status/errorなど既存OSCログと同等の切り分け情報が含まれる。
-- [x] 不具合報告用zipに `logs/osc_send.json` と `logs/osc_recieve.json` が含まれる。
+- [x] JSON Lines各行には時刻、方向、address、type tag、値概要、remote/target、status/errorなど既存OSCログと同等の切り分け情報が含まれる。
+- [x] 不具合報告用zipに `logs/osc_send.jsonl` と `logs/osc_recieve.jsonl` が含まれる。
 - [x] 関連テストが通る。
