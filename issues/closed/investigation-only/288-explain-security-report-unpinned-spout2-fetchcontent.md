@@ -41,3 +41,27 @@
 - 生成された `spout-capture.exe` は通常版では本体exeへ埋め込まれ、分離版zipでは同梱され、製品のStream撮影機能から実行される。
 - 現在の署名は単一配布用の `ClipForVRChat.exe` のDetached署名であり、分離版helper単体またはzip全体の署名ではない。通常版についても、署名はReleaseビルド後の成果物に対して行われるため、ビルド時に取得する依存関係の改変そのものを防ぐものではない。
 - 修正方針は、Spout2取得を不変commit SHAへ固定する、hash検証付きarchiveまたはvendor済みソースにする、加えてhelperまたはzip全体の署名・検証を検討することである。
+
+## 追加調査
+
+### 指示
+
+> Spout2取得を不変commit SHAへ固定する、hash検証付きアーカイブにする、またはvendor済みソースとして管理することです。　これについてより詳しく
+
+### 対策案の比較
+
+| 対策 | 内容 | 防げること | 残るリスク | 運用負荷 |
+| --- | --- | --- | --- | --- |
+| commit SHA固定 | `GIT_TAG` にタグ名ではなく40桁のcommit SHAを指定する。 | tag移動やbranch更新で別内容を取る問題を防ぐ。 | GitHubから取得する経路自体への依存は残る。 | 低い。更新時にSHAを差し替える。 |
+| hash検証付きarchive | GitHubのarchive tar/zip等を `URL` で取得し、`URL_HASH SHA256=...` で検証する。 | ダウンロードされたarchiveが想定byte列と違えばビルドを失敗させる。 | GitHub archiveの再生成仕様やURL選定に注意が必要。 | 中程度。hash更新手順が必要。 |
+| vendor済みソース | Spout2の必要ソースを `third_party/` 等へ取り込み、ビルド時に外部取得しない。 | Releaseビルド時の外部依存取得をなくせる。 | 取り込み時のレビュー、ライセンス、更新管理が必要。 | 高い。差分管理と更新作業が増える。 |
+
+### このリポジトリでの現実的な優先順
+
+1. まずは `GIT_TAG` をSpout2の実commit SHAへ固定する。
+2. 可能ならCIで、現在使うSpout2 revisionや取得元をbuild metadataへ記録する。
+3. より強い再現性が必要になったら、hash検証付きarchiveまたはvendor化へ進める。
+4. 分離版zipを今後も配るなら、helper単体またはzip全体の署名も別issueで検討する。
+
+CMakeのローカルドキュメントでも、外部サーバーから取得する場合はbranch/tag名よりcommit hashの利用が推奨されている。
+また、URL downloadでは `URL_HASH` がdownload内容のintegrity確認として強く推奨されている。
