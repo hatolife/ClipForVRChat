@@ -38,6 +38,7 @@ jobs:
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref }}
           fetch-depth: 0
+          submodules: recursive
 
       - name: Prepare version
         id: version
@@ -254,11 +255,14 @@ jobs:
           $shaPath = "$zipPath.sha256"
           $checkDir = Join-Path $env:RUNNER_TEMP "avatarbeacon-source-check"
           Remove-Item -Recurse -Force $checkDir -ErrorAction SilentlyContinue
-          $items = Get-ChildItem $sourceRoot -Force
+          $items = @(
+            Join-Path $sourceRoot "README.md"
+            Join-Path $sourceRoot "Assets"
+          )
           if (!$items) {
             throw "AvatarBeacon source root is empty: $sourceRoot"
           }
-          Compress-Archive -Path $items.FullName -DestinationPath $zipPath -Force
+          Compress-Archive -Path $items -DestinationPath $zipPath -Force
           $hash = (Get-FileHash $zipPath -Algorithm SHA256).Hash.ToLower()
           "$hash  $zipName" | Set-Content -Encoding ASCII $shaPath
           Expand-Archive $zipPath -DestinationPath $checkDir

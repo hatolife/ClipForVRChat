@@ -1,0 +1,3 @@
+[submodule "avatar-gimmicks/AvatarBeacon"]
+	path = avatar-gimmicks/AvatarBeacon
+	url = https://github.com/hatolife/AvatarBeacon.git

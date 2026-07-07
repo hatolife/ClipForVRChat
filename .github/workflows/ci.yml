@@ -45,6 +45,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          submodules: recursive
 
       - name: Setup Go
         uses: actions/setup-go@v6
@@ -173,11 +175,14 @@ jobs:
           $checkDir = Join-Path $env:RUNNER_TEMP "avatarbeacon-source-check"
           Remove-Item -Recurse -Force $checkDir -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force dist | Out-Null
-          $items = Get-ChildItem $sourceRoot -Force
+          $items = @(
+            Join-Path $sourceRoot "README.md"
+            Join-Path $sourceRoot "Assets"
+          )
           if (!$items) {
             throw "AvatarBeacon source root is empty: $sourceRoot"
           }
-          Compress-Archive -Path $items.FullName -DestinationPath $zipPath -Force
+          Compress-Archive -Path $items -DestinationPath $zipPath -Force
           $hash = (Get-FileHash $zipPath -Algorithm SHA256).Hash.ToLower()
           "$hash  $zipName" | Set-Content -Encoding ASCII $shaPath
           Expand-Archive $zipPath -DestinationPath $checkDir

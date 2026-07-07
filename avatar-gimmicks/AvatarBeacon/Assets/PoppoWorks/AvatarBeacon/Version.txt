@@ -1,2 +1,0 @@
-AvatarBeacon Version: dev
-This file name is intentionally stable so Unity package imports overwrite it.
