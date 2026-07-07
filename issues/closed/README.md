@@ -242,3 +242,4 @@
 | 273 | [v0.1.8-b12 betaを作成する](maintenance-only/273-create-v018-b12-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b12` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |
 | 274 | [外部AvatarBeacon unitypackageを配布zipへ同梱する](unreleased/274-package-external-avatarbeacon-unitypackage.md) | 完了 | 未定 | AvatarBeacon source zipの公開添付をやめ、外部Releaseのunitypackageを通常zipと分離zipへ同梱するようにした。 |
 | 275 | [v0.1.8-b13 betaを作成する](maintenance-only/275-create-v018-b13-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b13` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |
+| 276 | [b13でStream自動撮影後にカメラ終了・サムネイル未表示・Discord未投稿になる](unreleased/276-investigate-b13-stream-camera-close-thumbnail-discord.md) | 完了 | 未定 | 指定フォルダのログと設定から原因を切り分け、復元/Spout復旧の終了方向OSC送信、サムネイル生成、自動撮影Discord投稿条件を修正した。 |

@@ -545,6 +545,7 @@ func TestRecoverEmptySpoutSenderListTogglesStreaming(t *testing.T) {
 	cfg.AutoCapture.OSC.Host = "127.0.0.1"
 	cfg.AutoCapture.OSC.SendPort = port
 	cfg.AutoCapture.Capture.PreplacedLocalAnchor = boolPtr(false)
+	cfg.AutoCapture.Capture.OpenCameraBeforeBatch = true
 	runner := AutoCaptureRunner{Config: cfg}
 	client := oscClient{host: "127.0.0.1", port: port}
 	if err := client.open(); err != nil {
@@ -575,6 +576,70 @@ func TestRecoverEmptySpoutSenderListTogglesStreaming(t *testing.T) {
 	for i, sample := range samples {
 		if sample.Address != "/usercamera/Streaming" {
 			t.Fatalf("packet[%d].address = %q, want /usercamera/Streaming", i, sample.Address)
+		}
+		if want[i].boolVal != nil {
+			if !sample.HasBool || sample.Bool != *want[i].boolVal {
+				t.Fatalf("packet[%d] bool = %+v, want %t", i, sample, *want[i].boolVal)
+			}
+			continue
+		}
+		if !sample.HasInt || sample.Int != *want[i].intVal {
+			t.Fatalf("packet[%d] int = %+v, want %d", i, sample, *want[i].intVal)
+		}
+	}
+}
+
+func TestRecoverEmptySpoutSenderListDoesNotStopStreamingWhenAutoOpenDisabled(t *testing.T) {
+	conn, port := listenOSCUserCameraPackets(t)
+	defer conn.Close()
+
+	originalList := autoCaptureListSpoutSenders
+	defer func() { autoCaptureListSpoutSenders = originalList }()
+	calls := 0
+	autoCaptureListSpoutSenders = func(ctx context.Context, cfg AutoCaptureStreamConfig, logPath string) (SpoutListResult, error) {
+		calls++
+		return SpoutListResult{OK: true, Senders: nil}, nil
+	}
+
+	cfg := DefaultConfig()
+	cfg.AutoCapture.OSC.Host = "127.0.0.1"
+	cfg.AutoCapture.OSC.SendPort = port
+	cfg.AutoCapture.Capture.PreplacedLocalAnchor = boolPtr(false)
+	cfg.AutoCapture.Capture.OpenCameraBeforeBatch = false
+	runner := AutoCaptureRunner{Config: cfg}
+	client := oscClient{host: "127.0.0.1", port: port}
+	if err := client.open(); err != nil {
+		t.Fatal(err)
+	}
+	defer client.close()
+
+	if err := runner.recoverEmptySpoutSenderList(context.Background(), client, "front"); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 {
+		t.Fatalf("sender list calls = %d, want 2", calls)
+	}
+
+	samples := withoutVersionNoticePackets(readOSCPacketSamples(t, conn))
+	want := []struct {
+		boolVal *bool
+		intVal  *int
+	}{
+		{boolVal: boolPtr(true)},
+		{intVal: intPtr(1)},
+	}
+	if len(samples) != len(want) {
+		t.Fatalf("packet count = %d, want %d: %+v", len(samples), len(want), samples)
+	}
+	for i, sample := range samples {
+		if sample.Address != "/usercamera/Streaming" {
+			t.Fatalf("packet[%d].address = %q, want /usercamera/Streaming", i, sample.Address)
+		}
+		if sample.HasBool && !sample.Bool {
+			t.Fatalf("packet[%d] stopped streaming: %+v all=%+v", i, sample, samples)
+		}
+		if sample.HasInt && sample.Int == 0 {
+			t.Fatalf("packet[%d] stopped streaming by int compat: %+v all=%+v", i, sample, samples)
 		}
 		if want[i].boolVal != nil {
 			if !sample.HasBool || sample.Bool != *want[i].boolVal {
@@ -884,6 +949,65 @@ func TestMergeUserCameraRestoreStateCanIgnoreSnapshot(t *testing.T) {
 	target := mergeUserCameraRestoreState(restore)
 	if target.Mode == nil || *target.Mode != 0 {
 		t.Fatalf("mode = %v, want fallback 0", target.Mode)
+	}
+}
+
+func TestSuppressFallbackCameraActivationStateKeepsOnlySnapshotValues(t *testing.T) {
+	restore := defaultAutoCaptureRestoreConfig()
+	target := mergeUserCameraRestoreState(restore)
+	suppressFallbackCameraActivationState(&target, restore.Snapshot)
+	if target.Mode != nil {
+		t.Fatalf("mode = %v, want nil when snapshot is missing", target.Mode)
+	}
+	if target.Streaming != nil {
+		t.Fatalf("streaming = %v, want nil when snapshot is missing", target.Streaming)
+	}
+
+	streaming := true
+	mode := 2
+	restore.Snapshot = AutoCaptureUserCameraState{
+		Mode:      &mode,
+		Streaming: &streaming,
+	}
+	target = mergeUserCameraRestoreState(restore)
+	suppressFallbackCameraActivationState(&target, restore.Snapshot)
+	if target.Mode == nil || *target.Mode != 2 {
+		t.Fatalf("mode = %v, want snapshot 2", target.Mode)
+	}
+	if target.Streaming == nil || !*target.Streaming {
+		t.Fatalf("streaming = %v, want snapshot true", target.Streaming)
+	}
+}
+
+func TestFinalizeAutoCaptureImageCreatesThumbnail(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "capture.png")
+	writeTestPNG(t, path, 20, 10)
+	cfg := DefaultConfig()
+	cfg.AutoCapture.Output.WriteEXIF = false
+	cfg.AutoCapture.Output.WriteSidecarJSON = false
+	cfg.AutoCapture.Discord.Enabled = false
+	cfg.Output.UploadDiscord = false
+
+	result := (AutoCaptureRunner{Config: cfg}).finalizeAutoCaptureImage(path, "batch-test", "shot-test", cfg.AutoCapture.Views[0], nil, nil, "unknown", AutoCaptureVRChatMetadata{}, SpoutCaptureResult{})
+	if result.Error != "" {
+		t.Fatalf("result error = %q", result.Error)
+	}
+	if result.Thumbnail == "" || !strings.HasPrefix(result.Thumbnail, "data:image/png;base64,") {
+		t.Fatalf("thumbnail = %q, want data URL", result.Thumbnail)
+	}
+}
+
+func TestAutoCaptureDiscordUploadEnabledFollowsPrimaryUploadSetting(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.AutoCapture.Discord.Enabled = false
+	cfg.Output.UploadDiscord = true
+	if !autoCaptureDiscordUploadEnabled(cfg) {
+		t.Fatal("auto-capture Discord upload should be enabled by primary upload setting")
+	}
+	cfg.Output.UploadDiscord = false
+	cfg.AutoCapture.Discord.Enabled = true
+	if !autoCaptureDiscordUploadEnabled(cfg) {
+		t.Fatal("auto-capture Discord upload should be enabled by auto-capture setting")
 	}
 }
 

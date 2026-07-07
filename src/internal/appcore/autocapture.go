@@ -393,6 +393,9 @@ func (r AutoCaptureRunner) restoreUserCameraState(client oscClient) {
 		return
 	}
 	target := mergeUserCameraRestoreState(restore)
+	if !cfg.Capture.OpenCameraBeforeBatch && !cfg.Capture.CloseCameraAfterBatch {
+		suppressFallbackCameraActivationState(&target, restore.Snapshot)
+	}
 	modeSummary := "<missing>"
 	if target.Mode != nil {
 		modeSummary = fmt.Sprintf("%d", *target.Mode)
@@ -539,6 +542,15 @@ func mergeUserCameraRestoreState(restore AutoCaptureRestoreConfig) AutoCaptureUs
 		overlayUserCameraState(&target, restore.Snapshot)
 	}
 	return target
+}
+
+func suppressFallbackCameraActivationState(target *AutoCaptureUserCameraState, snapshot AutoCaptureUserCameraState) {
+	if snapshot.Mode == nil {
+		target.Mode = nil
+	}
+	if snapshot.Streaming == nil {
+		target.Streaming = nil
+	}
 }
 
 func userCameraFallbackState(fallback AutoCaptureUserCameraFallbackConfig) AutoCaptureUserCameraState {
@@ -1000,13 +1012,17 @@ func (r AutoCaptureRunner) recoverEmptySpoutSenderList(ctx context.Context, clie
 		return nil
 	}
 	diagAutoCapture(logPath, "spout sender recovery begin: reason=%q view_id=%q", "empty_sender_list", viewID)
-	if err := sendCameraBoolCompat(client, logPath, "/usercamera/Streaming", false, "spout_sender_recovery_off:"+viewID); err != nil {
-		diagAutoCapture(logPath, "spout sender recovery error: phase=%q view_id=%q err=%v", "off", viewID, err)
-		return err
-	}
-	if !sleepContext(ctx, 300*time.Millisecond) {
-		diagAutoCapture(logPath, "spout sender recovery cancelled: phase=%q view_id=%q err=%v", "off_wait", viewID, ctx.Err())
-		return ctx.Err()
+	if r.Config.AutoCapture.Capture.OpenCameraBeforeBatch {
+		if err := sendCameraBoolCompat(client, logPath, "/usercamera/Streaming", false, "spout_sender_recovery_off:"+viewID); err != nil {
+			diagAutoCapture(logPath, "spout sender recovery error: phase=%q view_id=%q err=%v", "off", viewID, err)
+			return err
+		}
+		if !sleepContext(ctx, 300*time.Millisecond) {
+			diagAutoCapture(logPath, "spout sender recovery cancelled: phase=%q view_id=%q err=%v", "off_wait", viewID, ctx.Err())
+			return ctx.Err()
+		}
+	} else {
+		diagAutoCapture(logPath, "spout sender recovery off skipped: open_before_batch=false view_id=%q", viewID)
 	}
 	if err := sendCameraBoolCompat(client, logPath, "/usercamera/Streaming", true, "spout_sender_recovery_on:"+viewID); err != nil {
 		diagAutoCapture(logPath, "spout sender recovery error: phase=%q view_id=%q err=%v", "on", viewID, err)
@@ -1094,7 +1110,12 @@ func (r AutoCaptureRunner) finalizeAutoCaptureImage(photoPath string, batchID st
 		diagAutoCapture(logPath, "sidecar write skipped: disabled image=%q", photoPath)
 	}
 	result := Result{SourcePath: photoPath, OutputPath: photoPath, Name: filepath.Base(photoPath), Warnings: metadataWarnings}
-	if cfg.Discord.Enabled {
+	if thumb, err := thumbnailDataURLForImageFile(photoPath); err != nil {
+		diagAutoCapture(logPath, "thumbnail generation warning: image=%q err=%v", photoPath, err)
+	} else {
+		result.Thumbnail = thumb
+	}
+	if autoCaptureDiscordUploadEnabled(r.Config) {
 		webhook := cfg.Discord.WebhookURL
 		if strings.TrimSpace(webhook) == "" {
 			webhook = r.Config.Discord.WebhookURL
@@ -1120,6 +1141,18 @@ func (r AutoCaptureRunner) finalizeAutoCaptureImage(photoPath string, batchID st
 		result.DiscordToken = uploaded.Token
 	}
 	return result
+}
+
+func thumbnailDataURLForImageFile(path string) (string, error) {
+	img, _, err := DecodeImageFile(path)
+	if err != nil {
+		return "", err
+	}
+	return ThumbnailDataURL(img)
+}
+
+func autoCaptureDiscordUploadEnabled(cfg Config) bool {
+	return cfg.AutoCapture.Discord.Enabled || cfg.Output.UploadDiscord
 }
 
 func (r AutoCaptureRunner) emit(event AutoCaptureEvent) {

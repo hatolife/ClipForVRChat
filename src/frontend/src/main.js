@@ -347,7 +347,7 @@ const vueApp = createApp({
           })
         }
       }
-      if (autoCaptureSchedule.enabled && autoCaptureDiscord.enabled) {
+      if (autoCaptureSchedule.enabled && (autoCaptureDiscord.enabled || output.uploadDiscord)) {
         const target = this.effectiveWebhookURL(autoCaptureDiscord.webhookUrl, primaryWebhook)
         if (!target) {
           items.push({
@@ -2692,12 +2692,12 @@ const vueApp = createApp({
                   <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.presence.includeUserIdsInDiscord" /><span></span></label>
                 </div>
                 <div class="setting-row">
-                  <div><strong>Discord自動投稿</strong><p>自動撮影した画像をDiscord Webhookへ投稿します。</p></div>
+                  <div><strong>Discord自動投稿</strong><p>通常Discord投稿ON、またはこの設定ONのとき、自動撮影した画像をDiscord Webhookへ投稿します。</p></div>
                   <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.discord.enabled" /><span></span></label>
                 </div>
-                <div class="setting-row" :class="{ disabled: !autoCaptureSettings.discord.enabled }">
+                <div class="setting-row" :class="{ disabled: !state.config.output.uploadDiscord && !autoCaptureSettings.discord.enabled }">
                   <div><strong>Discordに画像を添付する</strong><p>OFFの場合は撮影情報の本文だけを投稿します。画像はローカル保存先とsidecar JSONで保持します。</p></div>
-                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.discord.includeImages" :disabled="!autoCaptureSettings.discord.enabled" /><span></span></label>
+                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.discord.includeImages" :disabled="!state.config.output.uploadDiscord && !autoCaptureSettings.discord.enabled" /><span></span></label>
                 </div>
                 <div class="setting-row">
                   <div><strong>撮影後にCamera状態を戻す</strong><p>撮影前に受信したUser Camera OSC値を優先し、不足分は下の戻し先を使います。</p></div>
@@ -3117,11 +3117,11 @@ const vueApp = createApp({
                 <p v-if="state.config.output.uploadDiscord && state.config.screenshotAutoPost.enabled" :class="['setting-note', webhookFallbackNoteClass(state.config.screenshotAutoPost.webhookUrl, state.config.screenshotAutoPost.enabled)]">{{ webhookFallbackNote(state.config.screenshotAutoPost.webhookUrl, state.config.screenshotAutoPost.enabled) }}</p>
               </label>
             </div>
-            <div class="setting-row" :class="[{ disabled: !state.config.output.uploadDiscord }, settingRowChangedClass('autoCapture.discord.webhookUrl')]">
+            <div class="setting-row" :class="[{ disabled: !state.config.output.uploadDiscord && !state.config.autoCapture.discord.enabled }, settingRowChangedClass('autoCapture.discord.webhookUrl')]">
               <div><strong>自動撮影用Webhook URL</strong><p>通常投稿とは別の投稿先にしたい場合だけ入力します。空の場合は通常投稿用Webhook URLへ投稿します。</p></div>
               <label>
-                <input type="password" v-model="state.config.autoCapture.discord.webhookUrl" placeholder="空なら通常投稿用Webhook URLを使用" :disabled="!state.config.output.uploadDiscord" />
-                <p v-if="state.config.output.uploadDiscord" :class="['setting-note', state.config.autoCapture.discord.enabled ? webhookFallbackNoteClass(state.config.autoCapture.discord.webhookUrl, state.config.autoCapture.discord.enabled) : 'muted']">{{ state.config.autoCapture.discord.enabled ? webhookFallbackNote(state.config.autoCapture.discord.webhookUrl, state.config.autoCapture.discord.enabled) : '自動撮影のDiscord投稿をONにすると、この送信先設定を使います。' }}</p>
+                <input type="password" v-model="state.config.autoCapture.discord.webhookUrl" placeholder="空なら通常投稿用Webhook URLを使用" :disabled="!state.config.output.uploadDiscord && !state.config.autoCapture.discord.enabled" />
+                <p v-if="state.config.output.uploadDiscord || state.config.autoCapture.discord.enabled" :class="['setting-note', webhookFallbackNoteClass(state.config.autoCapture.discord.webhookUrl, true)]">{{ webhookFallbackNote(state.config.autoCapture.discord.webhookUrl, true) }}</p>
               </label>
             </div>
           </section>
