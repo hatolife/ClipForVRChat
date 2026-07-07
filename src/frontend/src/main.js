@@ -597,13 +597,42 @@ const vueApp = createApp({
       const paths = this.changedSettingPathList()
       return paths.some((path) => prefixes.some((prefix) => path === prefix.replace(/\.$/, '') || path.startsWith(prefix)))
     },
-    rememberSettingsBaseline() {
+    rememberSettingsBaseline(options = {}) {
       this.settingsBaseline = this.serializeSettings(this.state.settingsBaselineConfig || this.state.config)
+      if (options.resetView === false) return
       this.settingsTab = 'feature'
       this.autoCaptureDetailView = ''
     },
     resetSettingsBaseline() {
       this.settingsBaseline = ''
+    },
+    captureSettingsScrollPosition() {
+      const scrollingElement = document.scrollingElement || document.documentElement || document.body
+      return {
+        windowX: window.scrollX || 0,
+        windowY: window.scrollY || 0,
+        documentLeft: scrollingElement?.scrollLeft || 0,
+        documentTop: scrollingElement?.scrollTop || 0
+      }
+    },
+    async restoreSettingsScrollPosition(position) {
+      if (!position) return
+      const apply = () => {
+        const scrollingElement = document.scrollingElement || document.documentElement || document.body
+        if (scrollingElement) {
+          scrollingElement.scrollLeft = position.documentLeft || 0
+          scrollingElement.scrollTop = position.documentTop || 0
+        }
+        window.scrollTo(position.windowX || 0, position.windowY || 0)
+      }
+      await this.$nextTick()
+      apply()
+      await new Promise((resolve) => {
+        requestAnimationFrame(() => {
+          apply()
+          resolve()
+        })
+      })
     },
     async leaveSettings(action) {
       if (this.hasUnsavedSettings) {
@@ -1973,6 +2002,9 @@ const vueApp = createApp({
       }
     },
     async saveSettings(skipAutoPostConfirmation = false) {
+      const settingsTabBeforeSave = this.settingsTab
+      const autoCaptureDetailBeforeSave = this.autoCaptureDetailView
+      const scrollPosition = this.isSettings ? this.captureSettingsScrollPosition() : null
       this.saving = true
       this.saved = false
       this.error = ''
@@ -1998,13 +2030,16 @@ const vueApp = createApp({
           if (this.shouldWarnMissingPrimaryWebhook()) {
             this.logUserAction('settings_warning', 'missing_primary_discord_webhook')
           }
-          this.rememberSettingsBaseline()
+          this.rememberSettingsBaseline({ resetView: false })
         }
         if (api?.ClearSettingsDraft) {
           await api.ClearSettingsDraft()
         }
         if (this.isSettings) {
-          this.rememberSettingsBaseline()
+          this.settingsTab = settingsTabBeforeSave
+          this.autoCaptureDetailView = autoCaptureDetailBeforeSave
+          this.rememberSettingsBaseline({ resetView: false })
+          await this.restoreSettingsScrollPosition(scrollPosition)
         } else {
           this.resetSettingsBaseline()
         }
