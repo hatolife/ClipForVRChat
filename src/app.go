@@ -695,6 +695,10 @@ func (a *App) DeleteDiscordHistoryEntries(ids []string) ([]appcore.HistoryEntry,
 	if err != nil {
 		return history, err
 	}
+	cfg, err := appcore.LoadConfig(a.configPath)
+	if err != nil {
+		return history, err
+	}
 	idSet := make(map[string]bool, len(ids))
 	for _, id := range ids {
 		idSet[id] = true
@@ -703,10 +707,19 @@ func (a *App) DeleteDiscordHistoryEntries(ids []string) ([]appcore.HistoryEntry,
 		if !idSet[history[i].ID] || history[i].Pinned {
 			continue
 		}
-		if history[i].DiscordDeleted || !appcore.IsTrustedDiscordImageURL(history[i].URL) || history[i].DiscordWebhookID == "" || history[i].DiscordToken == "" || history[i].DiscordMessageID == "" {
+		if history[i].DiscordDeleted || !appcore.IsTrustedDiscordImageURL(history[i].URL) || history[i].DiscordWebhookID == "" || history[i].DiscordMessageID == "" {
 			continue
 		}
-		if err := deleteDiscordMessage(history[i].DiscordWebhookID, history[i].DiscordToken, history[i].DiscordMessageID); err != nil {
+		token := discordWebhookTokenForHistoryEntry(cfg, history[i].DiscordWebhookID)
+		if token == "" {
+			err := fmt.Errorf("Discord削除に必要なWebhook tokenを現在の設定から解決できません。Webhook設定が変更された可能性があります。履歴またはローカルファイルの削除は別操作で実行できます。")
+			if saveErr := appcore.SaveHistory(appcore.HistoryPath(a.configPath), history); saveErr != nil {
+				return history, fmt.Errorf("%v; 履歴保存にも失敗しました: %w", err, saveErr)
+			}
+			a.state.History = history
+			return history, err
+		}
+		if err := deleteDiscordMessage(history[i].DiscordWebhookID, token, history[i].DiscordMessageID); err != nil {
 			if saveErr := appcore.SaveHistory(appcore.HistoryPath(a.configPath), history); saveErr != nil {
 				return history, fmt.Errorf("%v; 履歴保存にも失敗しました: %w", err, saveErr)
 			}
@@ -721,6 +734,21 @@ func (a *App) DeleteDiscordHistoryEntries(ids []string) ([]appcore.HistoryEntry,
 	}
 	a.state.History = history
 	return history, nil
+}
+
+func discordWebhookTokenForHistoryEntry(cfg appcore.Config, webhookID string) string {
+	for _, rawURL := range []string{
+		cfg.Discord.WebhookURL,
+		cfg.AutoPhoto.WebhookURL,
+		cfg.ScreenshotAutoPost.WebhookURL,
+		cfg.AutoCapture.Discord.WebhookURL,
+	} {
+		id, token := appcore.ParseWebhookURL(rawURL)
+		if id == webhookID {
+			return token
+		}
+	}
+	return ""
 }
 
 func (a *App) DeleteLocalHistoryFiles(ids []string) ([]appcore.HistoryEntry, error) {

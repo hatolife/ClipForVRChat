@@ -77,10 +77,19 @@ OS別の秘密情報ストア実装は将来提案として扱う。
 
 ## 受け入れ条件
 
-- [ ] history保存先ディレクトリとhistoryファイルがprivate permissionで作成される。
-- [ ] `history.json` にDiscord tokenの生値が保存されない。
-- [ ] UIへ返す `Result` / `HistoryEntry` にDiscord tokenの生値が含まれない。
-- [ ] バックエンドのDiscord削除処理は、現在configのWebhook URLからID一致でtokenを解決できる場合だけ実行する。
-- [ ] tokenを解決できない履歴では、Discord削除不可を明示し、ローカル履歴削除は可能にする。
-- [ ] 既存履歴の読み込み互換を維持する。
-- [ ] tokenがJSON/API stateへ不要に露出しないことをテストで確認する。
+- [x] history保存先ディレクトリとhistoryファイルがprivate permissionで作成される。
+- [x] `history.json` にDiscord tokenの生値が保存されない。
+- [x] UIへ返す `Result` / `HistoryEntry` にDiscord tokenの生値が含まれない。
+- [x] バックエンドのDiscord削除処理は、現在configのWebhook URLからID一致でtokenを解決できる場合だけ実行する。
+- [x] tokenを解決できない履歴では、Discord削除不可を明示し、ローカル履歴削除は可能にする。
+- [x] 既存履歴の読み込み互換を維持する。
+- [x] tokenがJSON/API stateへ不要に露出しないことをテストで確認する。
+
+## 実装指示追記
+
+> Working directory: /home/user/work/ClipForVRChat. You are not alone in the codebase; do not revert edits made by others. Implement issue 313, with tests. Ownership: src/internal/appcore/history.go, src/internal/appcore/history_test.go, src/internal/appcore/types.go if needed, src/app.go and src/app_test.go only if needed for DeleteDiscordHistoryEntries. Requirements: history JSON and UI-facing history/results must not persist or expose DiscordToken. History should retain messageID/webhookID/reference enough to attempt Discord deletion by resolving token from current config webhook URLs when webhookID matches. If token cannot be resolved, Discord deletion should fail gracefully/mark error but local history deletion remains possible. Preserve backward compatibility loading old histories. Add tests for Save/AddResultsToHistory not writing token and DeleteDiscordHistoryEntries resolving token from config. Run focused go tests. Commit your changes with a conventional commit message if tests pass. Final response: summary, changed files, tests run, commit hash if committed.
+
+## 実装メモ
+
+`HistoryEntry` / `Result` の `DiscordToken` はJSON/API stateへ出さず、履歴保存時にも書き込まない。
+履歴には `DiscordMessageID` と `DiscordWebhookID` を残し、削除時に現在のconfig内のWebhook URLから `DiscordWebhookID` 一致でtokenを一時解決する。

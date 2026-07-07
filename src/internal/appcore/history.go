@@ -20,7 +20,7 @@ type HistoryEntry struct {
 	QRURLs           []string `json:"qrUrls,omitempty"`
 	DiscordMessageID string   `json:"discordMessageId"`
 	DiscordWebhookID string   `json:"discordWebhookId"`
-	DiscordToken     string   `json:"discordToken"`
+	DiscordToken     string   `json:"-"`
 	Cleared          bool     `json:"cleared"`
 	Pinned           bool     `json:"pinned,omitempty"`
 	DiscordDeleted   bool     `json:"discordDeleted"`
@@ -98,7 +98,6 @@ func AddResultsToHistory(path string, results []Result) ([]HistoryEntry, error) 
 			entry.URL = results[i].URL
 			entry.DiscordMessageID = results[i].DiscordMessageID
 			entry.DiscordWebhookID = results[i].DiscordWebhookID
-			entry.DiscordToken = results[i].DiscordToken
 		}
 		history = append([]HistoryEntry{entry}, history...)
 		results[i].HistoryID = entry.ID

@@ -34,7 +34,7 @@ type Result struct {
 	HistoryID        string   `json:"historyId"`
 	DiscordMessageID string   `json:"discordMessageId"`
 	DiscordWebhookID string   `json:"discordWebhookId"`
-	DiscordToken     string   `json:"discordToken"`
+	DiscordToken     string   `json:"-"`
 }
 
 type ProgressEvent struct {

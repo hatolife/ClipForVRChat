@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -418,5 +419,104 @@ func TestSaveHistoryWritesJSON(t *testing.T) {
 	}
 	if len(decoded) != 1 || decoded[0].ID != "1" {
 		t.Fatalf("decoded = %+v", decoded)
+	}
+}
+
+func TestSaveHistoryDoesNotWriteDiscordToken(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "history.json")
+	if err := SaveHistory(path, []HistoryEntry{{
+		ID:               "1",
+		URL:              "https://cdn.discordapp.com/attachments/1/2/a.png",
+		DiscordMessageID: "message-id",
+		DiscordWebhookID: "webhook-id",
+		DiscordToken:     "secret-token",
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if strings.Contains(text, "secret-token") || strings.Contains(text, "discordToken") {
+		t.Fatalf("history JSON leaked discord token: %s", text)
+	}
+	if !strings.Contains(text, "message-id") || !strings.Contains(text, "webhook-id") {
+		t.Fatalf("history JSON should retain deletion identifiers: %s", text)
+	}
+}
+
+func TestAddResultsToHistoryDoesNotWriteDiscordToken(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "history.json")
+	results := []Result{{
+		Name:             "image.png",
+		URL:              "https://cdn.discordapp.com/attachments/1/2/a.png",
+		DiscordMessageID: "message-id",
+		DiscordWebhookID: "webhook-id",
+		DiscordToken:     "secret-token",
+	}}
+	history, err := AddResultsToHistory(path, results)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(history) != 1 {
+		t.Fatalf("history = %+v, want one entry", history)
+	}
+	if history[0].DiscordToken != "" {
+		t.Fatalf("history token = %q, want empty", history[0].DiscordToken)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if strings.Contains(text, "secret-token") || strings.Contains(text, "discordToken") {
+		t.Fatalf("history JSON leaked discord token: %s", text)
+	}
+	if !strings.Contains(text, "message-id") || !strings.Contains(text, "webhook-id") {
+		t.Fatalf("history JSON should retain deletion identifiers: %s", text)
+	}
+}
+
+func TestHistoryAndResultJSONDoNotExposeDiscordToken(t *testing.T) {
+	payload, err := json.Marshal(struct {
+		History []HistoryEntry `json:"history"`
+		Results []Result       `json:"results"`
+	}{
+		History: []HistoryEntry{{ID: "1", DiscordToken: "history-token"}},
+		Results: []Result{{Name: "image.png", DiscordToken: "result-token"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(payload)
+	if strings.Contains(text, "discordToken") || strings.Contains(text, "history-token") || strings.Contains(text, "result-token") {
+		t.Fatalf("JSON leaked discord token: %s", text)
+	}
+}
+
+func TestLoadHistoryIgnoresOldDiscordTokenField(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "history.json")
+	if err := os.WriteFile(path, []byte(`[{
+		"id": "old",
+		"url": "https://cdn.discordapp.com/attachments/1/2/a.png",
+		"discordMessageId": "message-id",
+		"discordWebhookId": "webhook-id",
+		"discordToken": "old-secret-token"
+	}]`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	history, err := LoadHistory(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(history) != 1 {
+		t.Fatalf("history = %+v, want one entry", history)
+	}
+	if history[0].DiscordMessageID != "message-id" || history[0].DiscordWebhookID != "webhook-id" {
+		t.Fatalf("history identifiers = %+v", history[0])
+	}
+	if history[0].DiscordToken != "" {
+		t.Fatalf("old discordToken should not be loaded: %+v", history[0])
 	}
 }

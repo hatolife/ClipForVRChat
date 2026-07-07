@@ -2174,6 +2174,97 @@ func TestAppDeleteDiscordHistoryEntriesSkipsEntriesWithoutStoredWebhookData(t *t
 	}
 }
 
+func TestAppDeleteDiscordHistoryEntriesResolvesTokenFromConfig(t *testing.T) {
+	oldDelete := deleteDiscordMessage
+	t.Cleanup(func() {
+		deleteDiscordMessage = oldDelete
+	})
+
+	var gotWebhookID, gotToken, gotMessageID string
+	deleteDiscordMessage = func(webhookID, token, messageID string) error {
+		gotWebhookID = webhookID
+		gotToken = token
+		gotMessageID = messageID
+		return nil
+	}
+
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	cfg := appcore.DefaultConfig()
+	cfg.Discord.WebhookURL = "https://discord.com/api/webhooks/other/primary-token"
+	cfg.AutoPhoto.WebhookURL = "https://discord.com/api/webhooks/matching/resolved-token"
+	if err := appcore.SaveConfig(configPath, cfg); err != nil {
+		t.Fatal(err)
+	}
+	history := []appcore.HistoryEntry{{
+		ID:               "1",
+		URL:              "https://cdn.discordapp.com/attachments/1/2/a.png",
+		DiscordWebhookID: "matching",
+		DiscordMessageID: "message-id",
+	}}
+	if err := appcore.SaveHistory(appcore.HistoryPath(configPath), history); err != nil {
+		t.Fatal(err)
+	}
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+
+	got, err := app.DeleteDiscordHistoryEntries([]string{"1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotWebhookID != "matching" || gotToken != "resolved-token" || gotMessageID != "message-id" {
+		t.Fatalf("delete call = (%q, %q, %q), want resolved config token", gotWebhookID, gotToken, gotMessageID)
+	}
+	if len(got) != 1 || !got[0].DiscordDeleted || got[0].DeletedAt == "" {
+		t.Fatalf("history = %+v, want discord deleted", got)
+	}
+}
+
+func TestAppDeleteDiscordHistoryEntriesFailsWhenTokenCannotBeResolved(t *testing.T) {
+	oldDelete := deleteDiscordMessage
+	t.Cleanup(func() {
+		deleteDiscordMessage = oldDelete
+	})
+
+	deleteDiscordMessage = func(webhookID, token, messageID string) error {
+		t.Fatalf("deleteDiscordMessage should not be called without resolved token")
+		return nil
+	}
+
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	cfg := appcore.DefaultConfig()
+	cfg.Discord.WebhookURL = "https://discord.com/api/webhooks/other/primary-token"
+	if err := appcore.SaveConfig(configPath, cfg); err != nil {
+		t.Fatal(err)
+	}
+	history := []appcore.HistoryEntry{{
+		ID:               "1",
+		URL:              "https://cdn.discordapp.com/attachments/1/2/a.png",
+		DiscordWebhookID: "missing",
+		DiscordMessageID: "message-id",
+	}}
+	if err := appcore.SaveHistory(appcore.HistoryPath(configPath), history); err != nil {
+		t.Fatal(err)
+	}
+	app := NewApp(configPath, appcore.UIState{Mode: appcore.ModeResults})
+
+	got, err := app.DeleteDiscordHistoryEntries([]string{"1"})
+	if err == nil {
+		t.Fatal("expected token resolution error")
+	}
+	if !strings.Contains(err.Error(), "Webhook token") {
+		t.Fatalf("err = %v, want token resolution message", err)
+	}
+	if len(got) != 1 || got[0].DiscordDeleted {
+		t.Fatalf("history = %+v, want discord delete unchanged", got)
+	}
+	got, err = app.DeleteHistoryEntries([]string{"1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("history = %+v, want local history deletion still possible", got)
+	}
+}
+
 func TestAppDeleteDiscordHistoryEntriesPersistsPartialSuccess(t *testing.T) {
 	oldDelete := deleteDiscordMessage
 	t.Cleanup(func() {
@@ -2183,6 +2274,9 @@ func TestAppDeleteDiscordHistoryEntriesPersistsPartialSuccess(t *testing.T) {
 	calls := 0
 	deleteDiscordMessage = func(webhookID, token, messageID string) error {
 		calls++
+		if webhookID != "w" || token != "t" {
+			t.Fatalf("delete call webhookID=%q token=%q, want config token", webhookID, token)
+		}
 		if messageID == "m2" {
 			return errors.New("delete failed")
 		}
@@ -2190,9 +2284,14 @@ func TestAppDeleteDiscordHistoryEntriesPersistsPartialSuccess(t *testing.T) {
 	}
 
 	configPath := filepath.Join(t.TempDir(), "config.json")
+	cfg := appcore.DefaultConfig()
+	cfg.Discord.WebhookURL = "https://discord.com/api/webhooks/w/t"
+	if err := appcore.SaveConfig(configPath, cfg); err != nil {
+		t.Fatal(err)
+	}
 	history := []appcore.HistoryEntry{
-		{ID: "1", URL: "https://cdn.discordapp.com/attachments/1/2/a.png", DiscordWebhookID: "w", DiscordToken: "t", DiscordMessageID: "m1"},
-		{ID: "2", URL: "https://cdn.discordapp.com/attachments/1/2/b.png", DiscordWebhookID: "w", DiscordToken: "t", DiscordMessageID: "m2"},
+		{ID: "1", URL: "https://cdn.discordapp.com/attachments/1/2/a.png", DiscordWebhookID: "w", DiscordMessageID: "m1"},
+		{ID: "2", URL: "https://cdn.discordapp.com/attachments/1/2/b.png", DiscordWebhookID: "w", DiscordMessageID: "m2"},
 	}
 	if err := appcore.SaveHistory(appcore.HistoryPath(configPath), history); err != nil {
 		t.Fatal(err)
