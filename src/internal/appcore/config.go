@@ -693,7 +693,7 @@ func (c *AutoCaptureConfig) Normalize() {
 			if c.Views[i].LocalPlayer == nil {
 				c.Views[i].LocalPlayer = defaultView.LocalPlayer
 			}
-			if c.Views[i].RemotePlayer == nil || (defaultView.RemotePlayer != nil && !*c.Views[i].RemotePlayer) {
+			if c.Views[i].RemotePlayer == nil {
 				c.Views[i].RemotePlayer = defaultView.RemotePlayer
 			}
 			if c.Views[i].Environment == nil {

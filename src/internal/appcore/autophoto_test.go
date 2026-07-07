@@ -53,6 +53,25 @@ func TestAutoPhotoWatcherEmitsScanStatus(t *testing.T) {
 	}
 }
 
+func TestAutoPhotoWatcherSuppressesRepeatedScanStatus(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "missing")
+	var events []AutoPhotoEvent
+	watcher := AutoPhotoWatcher{
+		Directory: missing,
+		seen:      map[string]time.Time{},
+		Handler: func(event AutoPhotoEvent) {
+			events = append(events, event)
+		},
+	}
+
+	watcher.tick()
+	watcher.tick()
+
+	if len(events) != 1 {
+		t.Fatalf("events = %+v, want repeated scan status suppressed", events)
+	}
+}
+
 func TestAutoPhotoWatcherTickLimitsProcessing(t *testing.T) {
 	dir := t.TempDir()
 	for i := 0; i < MaxAutoPhotoProcessPerTick+3; i++ {
@@ -75,6 +94,40 @@ func TestAutoPhotoWatcherTickLimitsProcessing(t *testing.T) {
 
 	if processed != MaxAutoPhotoProcessPerTick {
 		t.Fatalf("processed = %d, want %d", processed, MaxAutoPhotoProcessPerTick)
+	}
+}
+
+func TestAutoPhotoWatcherCountsSkippedFilesTowardPerTickLimit(t *testing.T) {
+	dir := t.TempDir()
+	for i := 0; i < MaxAutoPhotoProcessPerTick+1; i++ {
+		path := filepath.Join(dir, fmt.Sprintf("%05d.png", i))
+		if err := os.WriteFile(path, []byte("x"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	processed := 0
+	skipped := 0
+	watcher := AutoPhotoWatcher{
+		Config: Config{AutoPhoto: AutoPhotoConfig{PhotoDirectory: dir}},
+		seen:   map[string]time.Time{},
+		ShouldSkip: func(path string) bool {
+			skipped++
+			return true
+		},
+		Process: func(path string) Result {
+			processed++
+			return Result{Name: filepath.Base(path), SourcePath: path}
+		},
+	}
+
+	watcher.tick()
+
+	if skipped != MaxAutoPhotoProcessPerTick {
+		t.Fatalf("skipped = %d, want %d", skipped, MaxAutoPhotoProcessPerTick)
+	}
+	if processed != 0 {
+		t.Fatalf("processed = %d, want 0", processed)
 	}
 }
 
@@ -200,5 +253,21 @@ func TestAutoPhotoWatcherProcessDoesNotForceDiscordUpload(t *testing.T) {
 	}
 	if _, err := os.Stat(result.OutputPath); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestAutoPhotoWatcherWebhookURLUsesExplicitOverrideOnly(t *testing.T) {
+	watcher := AutoPhotoWatcher{
+		WebhookURL: "",
+		Config: Config{
+			AutoPhoto: AutoPhotoConfig{WebhookURL: "https://discord.com/api/webhooks/auto/token"},
+		},
+	}
+	if got := watcher.webhookURL(); got != "" {
+		t.Fatalf("webhookURL() = %q, want empty without explicit override", got)
+	}
+	watcher.WebhookURL = " https://discord.com/api/webhooks/explicit/token "
+	if got := watcher.webhookURL(); got != "https://discord.com/api/webhooks/explicit/token" {
+		t.Fatalf("webhookURL() = %q, want explicit override", got)
 	}
 }

@@ -110,6 +110,9 @@ func main() {
 		return
 	}
 
+	state.Config = cfg
+	state.SettingsBaselineConfig = nil
+	state.UnsavedSettingsDraft = false
 	results, err := appcore.Processor{Config: cfg}.ProcessPaths(args)
 	if err != nil {
 		state.Mode = appcore.ModeError

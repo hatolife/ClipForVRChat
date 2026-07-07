@@ -162,6 +162,32 @@ func TestConfigNormalizeTrimsSpoutHelperPathWithoutResettingCustomPath(t *testin
 	}
 }
 
+func TestAutoCaptureConfigNormalizePreservesExplicitRemotePlayerFalse(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.AutoCapture.Views = []CameraViewConfig{
+		{
+			ID:              "front",
+			Enabled:         true,
+			CoordinateSpace: "player_local",
+			RemotePlayer:    boolConfigPtr(false),
+		},
+		{
+			ID:              "back",
+			Enabled:         true,
+			CoordinateSpace: "player_local",
+		},
+	}
+
+	cfg.Normalize()
+
+	if cfg.AutoCapture.Views[0].RemotePlayer == nil || *cfg.AutoCapture.Views[0].RemotePlayer {
+		t.Fatalf("front RemotePlayer = %v, want explicit false preserved", cfg.AutoCapture.Views[0].RemotePlayer)
+	}
+	if cfg.AutoCapture.Views[1].RemotePlayer == nil || !*cfg.AutoCapture.Views[1].RemotePlayer {
+		t.Fatalf("back RemotePlayer = %v, want default true", cfg.AutoCapture.Views[1].RemotePlayer)
+	}
+}
+
 func TestOSCForwardConfigNormalize(t *testing.T) {
 	cfg := OSCForwardConfig{
 		Enabled: true,

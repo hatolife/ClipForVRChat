@@ -36,6 +36,7 @@ type AutoPhotoWatcher struct {
 	Process            func(string) Result
 	ShouldSkip         func(string) bool
 	seen               map[string]time.Time
+	lastScanStatus     string
 }
 
 func (w *AutoPhotoWatcher) Run(ctx context.Context) {
@@ -62,7 +63,6 @@ func (w *AutoPhotoWatcher) tick() {
 	w.emitScanStatus(status)
 	processed := 0
 	for _, path := range sortedPhotoPaths(current) {
-		modTime := current[path]
 		if _, ok := w.seen[path]; ok {
 			continue
 		}
@@ -72,12 +72,13 @@ func (w *AutoPhotoWatcher) tick() {
 		if !fileLooksStable(path) {
 			continue
 		}
+		modTime := current[path]
+		processed++
 		if w.ShouldSkip != nil && w.ShouldSkip(path) {
 			w.seen[path] = modTime
 			continue
 		}
 		w.seen[path] = modTime
-		processed++
 		result := w.process(path)
 		event := AutoPhotoEvent{Path: path, Result: result}
 		if result.Error != "" {
@@ -103,8 +104,13 @@ func (w *AutoPhotoWatcher) emitScanStatus(status autoPhotoScanStatus) {
 		message = fmt.Sprintf("自動投稿の監視対象が%d件を超えたため、一部のファイルはこのスキャンで確認されませんでした。", MaxAutoPhotoScanFiles)
 	}
 	if message == "" {
+		w.lastScanStatus = ""
 		return
 	}
+	if message == w.lastScanStatus {
+		return
+	}
+	w.lastScanStatus = message
 	name := "自動投稿"
 	if dir := w.directory(); strings.TrimSpace(dir) != "" {
 		name = filepath.Base(dir)
@@ -146,10 +152,7 @@ func (w *AutoPhotoWatcher) directory() string {
 }
 
 func (w *AutoPhotoWatcher) webhookURL() string {
-	if strings.TrimSpace(w.WebhookURL) != "" {
-		return w.WebhookURL
-	}
-	return w.Config.AutoPhoto.WebhookURL
+	return strings.TrimSpace(w.WebhookURL)
 }
 
 func scanPhotoFiles(dir string) map[string]time.Time {
