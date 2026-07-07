@@ -347,6 +347,13 @@ const vueApp = createApp({
     autoPostConfirmationItems() {
       const config = this.state.config || {}
       const items = []
+      let baseline = null
+      try {
+        baseline = JSON.parse(this.settingsBaseline || '{}')
+      } catch {
+        baseline = null
+      }
+      if (!baseline || this.serializeSettings(baseline) === this.serializeSettings(config)) return items
       const autoPhoto = config.autoPhoto || {}
       const screenshot = config.screenshotAutoPost || {}
       const autoCapture = config.autoCapture || {}
@@ -355,7 +362,7 @@ const vueApp = createApp({
       const output = config.output || {}
       const discord = config.discord || {}
       const primaryWebhook = String(discord.webhookUrl || '').trim()
-      if (output.uploadDiscord && autoPhoto.enabled) {
+      if (output.uploadDiscord && autoPhoto.enabled && this.autoPostConfirmationTargetChanged(baseline, config, 'autoPhoto', ['enabled', 'photoDirectory'], 'webhookUrl', true)) {
         const target = this.effectiveWebhookURL(autoPhoto.webhookUrl, primaryWebhook)
         items.push({
           label: 'VRChat写真自動処理',
@@ -364,7 +371,7 @@ const vueApp = createApp({
           warning: this.autoProcessingWatchDirectoryWarning(autoPhoto.photoDirectory)
         })
       }
-      if (output.uploadDiscord && screenshot.enabled) {
+      if (output.uploadDiscord && screenshot.enabled && this.autoPostConfirmationTargetChanged(baseline, config, 'screenshotAutoPost', ['enabled', 'screenshotDirectory'], 'webhookUrl', true)) {
         const target = this.effectiveWebhookURL(screenshot.webhookUrl, primaryWebhook)
         items.push({
           label: 'スクリーンショット自動処理',
@@ -375,7 +382,7 @@ const vueApp = createApp({
       }
       if (autoCaptureSchedule.enabled && autoCaptureDiscord.enabled) {
         const target = this.effectiveWebhookURL(autoCaptureDiscord.webhookUrl, primaryWebhook)
-        if (!target) {
+        if (!target && this.autoPostConfirmationTargetChanged(baseline, config, 'autoCapture', ['schedule.enabled', 'discord.enabled', 'output.directory'], 'discord.webhookUrl', false)) {
           items.push({
             label: '自動撮影',
             detail: `保存先: ${autoCapture.output?.directory || '(未設定)'}`,
@@ -1011,6 +1018,18 @@ const vueApp = createApp({
         return '広い既知フォルダです。意図しない画像が自動投稿されないよう、専用フォルダを推奨します。'
       }
       return ''
+    },
+    autoPostConfirmationTargetChanged(before, after, section, relativePaths, webhookPath, dependsOnGlobalUpload) {
+      if (dependsOnGlobalUpload && this.serializeSettings(this.valueAtPath(before, 'output.uploadDiscord')) !== this.serializeSettings(this.valueAtPath(after, 'output.uploadDiscord'))) return true
+      if (relativePaths.some((relativePath) => {
+        const path = `${section}.${relativePath}`
+        return this.serializeSettings(this.valueAtPath(before, path)) !== this.serializeSettings(this.valueAtPath(after, path))
+      })) {
+        return true
+      }
+      const beforeTarget = this.effectiveWebhookURL(this.valueAtPath(before, `${section}.${webhookPath}`), this.valueAtPath(before, 'discord.webhookUrl'))
+      const afterTarget = this.effectiveWebhookURL(this.valueAtPath(after, `${section}.${webhookPath}`), this.valueAtPath(after, 'discord.webhookUrl'))
+      return this.serializeSettings(beforeTarget) !== this.serializeSettings(afterTarget)
     },
     requestAutoPostConfirmation(action) {
       this.pendingAutoPostConfirmation = action
