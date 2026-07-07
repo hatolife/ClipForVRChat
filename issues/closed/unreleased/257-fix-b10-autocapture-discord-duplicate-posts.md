@@ -6,6 +6,8 @@
 
 > 二重に投稿される不具合あって抑制処理入れたと思うんだけどフォールバックモードで自動撮影した場合ってちゃんと処理走る？
 
+> photoでどうなるかコードからチェック
+
 ## 文脈
 
 `v0.1.8-b10` の実行結果で、3枚撮影される想定の自動撮影がDiscordへ6枚投稿された。ユーザーから実行環境の `history.json` と `logs/` が提示された。
@@ -51,3 +53,8 @@
 - Stream方式の自動撮影はフォールバックモードでも `autoCaptureOutputPath()` で `AutoCapture.Output.Directory` へ保存するため、VRChat写真自動処理側の二重取り込み抑制が効く。
 - Photo方式の自動撮影はVRChat写真フォルダに保存された写真を検出して処理するため、`AutoCapture.Output.Directory` 除外とは別経路になる。フォールバックモードとPhoto方式を組み合わせる場合、VRChat写真自動処理も同時ONなら別途重複確認が必要。
 - 確認: `go test ./internal/appcore -run 'TestAutoPhotoWatcherExcludesAutoCaptureOutputDirectory|TestPreplacedLocalAnchorSkipsPoseResolve'`
+- 2026-07-07: Photo方式のフォールバックモード時に、VRChat写真自動処理の二重取り込み抑制が効くかコードから確認する。
+- Photo方式は `/usercamera/Capture` 後に `AutoPhoto.PhotoDirectory` の新規写真を `waitForNewPhoto()` で検出し、その `photoPath` を `finalizeAutoCaptureImage()` へ渡して自動撮影側でDiscord投稿する。
+- フォールバックモードの `preplaced_local_anchor` はカメラPose/Options送信をスキップするだけで、Photo方式の検出対象ディレクトリや `photoPath` は変えない。
+- VRChat写真自動処理の `AutoPhotoWatcher` は `ExcludeDirectories` として `AutoCapture.Output.Directory` のみ受け取り、`AutoPhoto.PhotoDirectory` 直下の写真は除外しない。
+- そのためPhoto方式でVRChat写真自動処理も有効な場合、同じVRChat写真を自動撮影側で投稿した後、通常のVRChat写真自動処理が再処理してDiscordへ投稿し得る。Stream方式向けに入れた出力ディレクトリ除外だけではPhoto方式の二重投稿抑制にならない。
