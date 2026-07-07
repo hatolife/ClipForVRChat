@@ -44,7 +44,6 @@
 | 228 | [全Markdownドキュメントを現状仕様に合わせて更新する](228-update-all-markdown-documents.md) | 要対応 | 未定 | リポジトリ内のMarkdownを横断確認し、古い説明や矛盾を現状仕様に合わせて整理する。 |
 | 241 | [AvatarBeacon_mainとAvatarBeacon_12を追加しparameter pathをavatar_beacon配下へ変更する](241-add-avatarbeacon-main-and-12-prefabs-with-prefixed-parameters.md) | 要確認 | 未定 | AvatarBeaconのmain方式Prefabを通常版として追加し、12方式Prefabと `avatar_beacon/...` parameter pathへ移行する。 |
 | 256 | [v0.1.8仕様に合わせて使い方画面の文面草案を作る](256-rewrite-help-screen-copy-for-v018.md) | 要対応 | 未定 | 使い方画面を基本、発展、補助機能の段階で読める文章へ変更するため、v0.1.8仕様に合わせた草案を整理する。 |
-| 266 | [AvatarBeacon READMEを作り直し、ClipForVRChat側をsubmodule化する](266-rewrite-avatarbeacon-readme-and-use-submodule.md) | 要対応 | 未定 | AvatarBeacon READMEを概要、導入、出力、仕組み、YL-ATGとの関係、ライセンスが分かる構成へ書き直し、ClipForVRChat側をsubmodule参照へ置き換える。 |
 
 ## 状態の意味
 
