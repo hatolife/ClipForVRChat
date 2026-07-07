@@ -245,3 +245,4 @@
 | 276 | [b13でStream自動撮影後にカメラ終了・サムネイル未表示・Discord未投稿になる](unreleased/276-investigate-b13-stream-camera-close-thumbnail-discord.md) | 完了 | 未定 | 指定フォルダのログと設定から原因を切り分け、復元/Spout復旧の終了方向OSC送信、サムネイル生成、自動撮影Discord投稿条件を修正した。 |
 | 277 | [自動撮影の通常モードに待機カメラ位置を追加する](unreleased/277-add-autocapture-idle-camera-position.md) | 完了 | 未定 | 通常モードで撮影後に送る待機カメラ位置を追加し、既定OFFかつ初期Poseをプレイヤー基準の足元方向にした。 |
 | 278 | [v0.1.8-b14 betaを作成する](maintenance-only/278-create-v018-b14-beta.md) | 完了 | 整理のみ | 現在のdevelopを `v0.1.8-b14` betaとしてタグ付けし、Release workflowと配布Assetを確認した。 |
+| 279 | [b14で1枚目成功後に2枚目以降のSpout取得が失敗する](v0.1.8-b15/279-fix-b14-spout-sender-missing-after-first-shot.md) | 完了 | `v0.1.8-b15` | 1枚目成功後にSpout senderが空になる場合、ON再送で戻らなければOFF/ONトグルして連続撮影を成功させる。 |
