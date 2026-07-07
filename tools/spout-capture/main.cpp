@@ -12,6 +12,7 @@
 #include <iomanip>
 #include <iostream>
 #include <cmath>
+#include <limits>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -33,6 +34,11 @@ using spout_capture::format_frame_stats;
 using spout_capture::is_blank_frame;
 
 namespace {
+
+constexpr unsigned int kMaxSpoutSenderDimension = 16384;
+constexpr size_t kMaxSpoutSenderPixels = 16u * 1024u * 1024u;
+constexpr size_t kMaxSpoutSenderRgbaBytes = 64u * 1024u * 1024u;
+constexpr size_t kBytesPerRgbaPixel = 4;
 
 struct SenderInfo {
   std::string name;
@@ -140,6 +146,20 @@ void print_error(const std::string &code, const std::string &message, const std:
   std::cout << "}\n";
 }
 
+void print_sender_dimension_error(const std::string &code, const std::string &message,
+                                 const std::string &sender_name, unsigned int width,
+                                 unsigned int height, const std::vector<SenderInfo> &senders = {}) {
+  std::cout << "{\"ok\":false,\"code\":\"" << json_escape(code)
+            << "\",\"message\":\"" << json_escape(message) << "\""
+            << ",\"senderName\":\"" << json_escape(sender_name) << "\""
+            << ",\"width\":" << width << ",\"height\":" << height;
+  if (!senders.empty()) {
+    std::cout << ",\"senders\":";
+    write_senders_json(std::cout, senders);
+  }
+  std::cout << "}\n";
+}
+
 void print_capture_error(const std::string &code, const std::string &message, const std::string &sender_name,
                          unsigned int width, unsigned int height, const CaptureObservation &observation,
                          const FrameStats &stats, const std::vector<SenderInfo> &senders = {},
@@ -169,6 +189,57 @@ void print_capture_error(const std::string &code, const std::string &message, co
     write_senders_json(std::cout, senders);
   }
   std::cout << "}\n";
+}
+
+bool checked_multiply_size(size_t lhs, size_t rhs, size_t *out) {
+  if (lhs != 0 && rhs > std::numeric_limits<size_t>::max() / lhs) {
+    return false;
+  }
+  *out = lhs * rhs;
+  return true;
+}
+
+std::string sender_dimension_error_message(unsigned int width, unsigned int height,
+                                           const std::string &reason) {
+  std::ostringstream out;
+  out << "Spout sender dimensions " << width << "x" << height << " are invalid: " << reason
+      << " (max dimension " << kMaxSpoutSenderDimension
+      << ", max pixels " << kMaxSpoutSenderPixels
+      << ", max RGBA bytes " << kMaxSpoutSenderRgbaBytes << ")";
+  return out.str();
+}
+
+bool validate_sender_dimensions(unsigned int width, unsigned int height, size_t *pixel_count,
+                                size_t *rgba_bytes, std::string *error) {
+  if (width == 0 || height == 0) {
+    *error = sender_dimension_error_message(width, height, "sender returned zero-sized dimensions");
+    return false;
+  }
+  if (width > kMaxSpoutSenderDimension || height > kMaxSpoutSenderDimension) {
+    *error = sender_dimension_error_message(width, height, "sender dimensions exceed the configured limit");
+    return false;
+  }
+  size_t pixels = 0;
+  if (!checked_multiply_size(static_cast<size_t>(width), static_cast<size_t>(height), &pixels)) {
+    *error = sender_dimension_error_message(width, height, "pixel count multiplication overflowed");
+    return false;
+  }
+  if (pixels > kMaxSpoutSenderPixels) {
+    *error = sender_dimension_error_message(width, height, "pixel count exceeds the configured limit");
+    return false;
+  }
+  size_t bytes = 0;
+  if (!checked_multiply_size(pixels, kBytesPerRgbaPixel, &bytes)) {
+    *error = sender_dimension_error_message(width, height, "RGBA byte count multiplication overflowed");
+    return false;
+  }
+  if (bytes > kMaxSpoutSenderRgbaBytes) {
+    *error = sender_dimension_error_message(width, height, "RGBA byte count exceeds the configured limit");
+    return false;
+  }
+  *pixel_count = pixels;
+  *rgba_bytes = bytes;
+  return true;
 }
 
 bool parse_int(const std::string &value, int *out) {
@@ -503,10 +574,16 @@ bool write_png_wic(const std::filesystem::path &path, unsigned int width, unsign
     return false;
   }
   std::vector<BYTE> encoded;
-  UINT stride = 0;
+  size_t stride_bytes = 0;
+  size_t encoded_size = 0;
   if (format == GUID_WICPixelFormat32bppBGRA) {
-    stride = width * 4;
-    encoded.resize(rgba.size());
+    if (!checked_multiply_size(static_cast<size_t>(width), kBytesPerRgbaPixel, &stride_bytes) ||
+        !checked_multiply_size(stride_bytes, static_cast<size_t>(height), &encoded_size)) {
+      cleanup();
+      *error = "PNG encoder size calculation overflowed";
+      return false;
+    }
+    encoded.resize(encoded_size);
     for (size_t i = 0; i + 3 < rgba.size(); i += 4) {
       encoded[i] = rgba[i + 2];
       encoded[i + 1] = rgba[i + 1];
@@ -514,8 +591,13 @@ bool write_png_wic(const std::filesystem::path &path, unsigned int width, unsign
       encoded[i + 3] = rgba[i + 3];
     }
   } else if (format == GUID_WICPixelFormat32bppPBGRA) {
-    stride = width * 4;
-    encoded.resize(rgba.size());
+    if (!checked_multiply_size(static_cast<size_t>(width), kBytesPerRgbaPixel, &stride_bytes) ||
+        !checked_multiply_size(stride_bytes, static_cast<size_t>(height), &encoded_size)) {
+      cleanup();
+      *error = "PNG encoder size calculation overflowed";
+      return false;
+    }
+    encoded.resize(encoded_size);
     for (size_t i = 0; i + 3 < rgba.size(); i += 4) {
       const unsigned int alpha = rgba[i + 3];
       encoded[i] = static_cast<BYTE>((static_cast<unsigned int>(rgba[i + 2]) * alpha + 127) / 255);
@@ -524,8 +606,13 @@ bool write_png_wic(const std::filesystem::path &path, unsigned int width, unsign
       encoded[i + 3] = rgba[i + 3];
     }
   } else if (format == GUID_WICPixelFormat24bppBGR) {
-    stride = width * 3;
-    encoded.resize(static_cast<size_t>(stride) * height);
+    if (!checked_multiply_size(static_cast<size_t>(width), 3, &stride_bytes) ||
+        !checked_multiply_size(stride_bytes, static_cast<size_t>(height), &encoded_size)) {
+      cleanup();
+      *error = "PNG encoder size calculation overflowed";
+      return false;
+    }
+    encoded.resize(encoded_size);
     for (size_t src = 0, dst = 0; src + 3 < rgba.size() && dst + 2 < encoded.size(); src += 4, dst += 3) {
       encoded[dst] = rgba[src + 2];
       encoded[dst + 1] = rgba[src + 1];
@@ -536,7 +623,14 @@ bool write_png_wic(const std::filesystem::path &path, unsigned int width, unsign
     *error = "PNG encoder does not support required pixel format";
     return false;
   }
-  const UINT size = stride * height;
+  if (stride_bytes > std::numeric_limits<UINT>::max() ||
+      encoded_size > std::numeric_limits<UINT>::max()) {
+    cleanup();
+    *error = "PNG encoder size exceeds supported range";
+    return false;
+  }
+  const UINT stride = static_cast<UINT>(stride_bytes);
+  const UINT size = static_cast<UINT>(encoded_size);
   hr = frame->WritePixels(height, stride, size, encoded.data());
   if (FAILED(hr) || FAILED(frame->Commit()) || FAILED(encoder->Commit())) {
     cleanup();
@@ -827,7 +921,15 @@ int diagnose(SPOUTHANDLE spout, const Options &options) {
       summary.width = width;
       summary.height = height;
       if (width > 0 && height > 0) {
-        pixels.assign(static_cast<size_t>(width) * static_cast<size_t>(height) * 4, 0);
+        [[maybe_unused]] size_t pixel_count = 0;
+        size_t rgba_bytes = 0;
+        std::string dimension_error;
+        if (!validate_sender_dimensions(width, height, &pixel_count, &rgba_bytes, &dimension_error)) {
+          print_sender_dimension_error("sender_dimension_error", dimension_error, selection.name,
+                                       width, height, selection.senders);
+          return 3;
+        }
+        pixels.assign(rgba_bytes, 0);
         receive_attempted = true;
         summary.receive_attempts++;
         if (spout->ReceiveImage(pixels.data(), GL_RGBA, false, 0)) {
@@ -969,7 +1071,17 @@ int capture(SPOUTHANDLE spout, const Options &options) {
       continue;
     }
 
-    pixels.assign(static_cast<size_t>(width) * static_cast<size_t>(height) * 4, 0);
+    [[maybe_unused]] size_t pixel_count = 0;
+    size_t rgba_bytes = 0;
+    std::string dimension_error;
+    if (!validate_sender_dimensions(width, height, &pixel_count, &rgba_bytes, &dimension_error)) {
+      debug.log_event("sender dimension validation failed error=\"" + dimension_error + "\"");
+      print_sender_dimension_error("sender_dimension_error", dimension_error, selection.name,
+                                   width, height, selection.senders);
+      return 3;
+    }
+
+    pixels.assign(rgba_bytes, 0);
     observation.receive_attempts++;
     if (spout->ReceiveImage(pixels.data(), GL_RGBA, false, 0)) {
       if (spout->IsUpdated()) {
