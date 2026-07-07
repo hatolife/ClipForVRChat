@@ -261,3 +261,4 @@
 | 292 | [隠れた監視フォルダによる画像流出セキュリティレポートを解説する](investigation-only/292-explain-security-report-hidden-watch-directory-exfiltration.md) | 完了 | 調査のみ | 外部JSON設定から隠れた自動処理監視フォルダとWebhookを有効化できるfindingの内容を整理した。 |
 | 293 | [インポート設定由来の自動処理監視フォルダを確認・制限する](unreleased/293-guard-imported-auto-processing-watch-directories.md) | 完了 | 未定 | 自動処理の監視フォルダと送信先Webhookを保存前確認に表示し、設定画面から監視フォルダを確認・変更できるようにした。 |
 | 294 | [Codex Security findings CSVを解説する](investigation-only/294-explain-codex-security-findings-csv.md) | 完了 | 調査のみ | Codex Security Findings CSVの24件のmedium指摘を分類し、優先対応候補を整理した。 |
+| 295 | [v0.1.8-rc2 release candidateを作成する](maintenance-only/295-create-v018-rc2.md) | 完了 | 整理のみ | `v0.1.8-rc2` を作成し、Release workflow、GitHub Release、公開Asset、zip内容を確認した。 |
