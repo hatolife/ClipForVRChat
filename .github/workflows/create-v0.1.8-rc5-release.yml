@@ -1,0 +1,41 @@
+name: Create v0.1.8-rc5 release
+
+on:
+  push:
+    branches:
+      - release-trigger/v0.1.8-rc5
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  create-tag-and-dispatch:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Create fixed release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          TAG_NAME: v0.1.8-rc5
+          TARGET_SHA: 73bf579e2667f85fbfa0012dc506ea290012f1fd
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_develop="$(gh api "repos/$REPOSITORY/git/ref/heads/develop" --jq '.object.sha')"
+          if [[ "$current_develop" != "$TARGET_SHA" ]]; then
+            echo "develop moved: expected=$TARGET_SHA actual=$current_develop" >&2
+            exit 1
+          fi
+          if gh api "repos/$REPOSITORY/git/ref/tags/$TAG_NAME" >/dev/null 2>&1; then
+            echo "tag already exists: $TAG_NAME" >&2
+            exit 1
+          fi
+          gh api --method POST "repos/$REPOSITORY/git/refs" \
+            -f "ref=refs/tags/$TAG_NAME" \
+            -f "sha=$TARGET_SHA"
+          gh workflow run release.yml \
+            --repo "$REPOSITORY" \
+            --ref develop \
+            -f "tag_name=$TAG_NAME"
