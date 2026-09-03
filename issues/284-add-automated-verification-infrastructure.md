@@ -11,6 +11,8 @@
 
 > 元のリポジトリにpush
 
+> releaseで確認できる状態に
+
 ## 文脈
 
 自動撮影はOSC、AvatarBeacon、Spout helper、Wails GUI、Discordなど複数の外部境界をまたぐ。現状は各部品の単体テストやWindows buildがある一方、既存のSpout C++テストがCIで実行されず、Frontendの自動テストと実Wails GUIの起動確認も不足している。
@@ -18,6 +20,8 @@
 旧リポジトリへのGitHub接続は読み取り専用だったため、書き込み可能な `xcd0/ClipForVRChat` を新しい公開先として作業を継続する。
 
 その後、元の `hatolife/ClipForVRChat` への書き込み権限が復旧したため、同じ検証済み差分を元リポジトリの作業ブランチへ反映する。
+
+元リポジトリの `develop` へ取り込んだ後、`v0.1.8-rc4` のpre-releaseを作成し、Windows成果物を取得して確認できる状態にする。
 
 ## 解釈
 
