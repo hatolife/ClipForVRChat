@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 env:
-  GO_VERSION: "1.26.4"
+  GO_VERSION: "1.26.7"
   NODE_VERSION: "22"
   WAILS_VERSION: "v2.12.0"
   GOVULNCHECK_VERSION: "v1.1.4"
@@ -70,6 +70,10 @@ jobs:
         working-directory: src/frontend
         run: npm audit --omit=dev
 
+      - name: Test frontend logic
+        working-directory: src/frontend
+        run: npm test
+
       - name: Build frontend
         working-directory: src/frontend
         run: npm run build
@@ -95,7 +99,11 @@ jobs:
         shell: pwsh
         run: |
           cmake -S tools/spout-capture -B build/spout-capture -A x64 -DCMAKE_BUILD_TYPE=Release
-          cmake --build build/spout-capture --config Release --target spout-capture
+          cmake --build build/spout-capture --config Release --target spout-capture spout-capture-logic-test
+
+      - name: Test Spout capture logic
+        shell: pwsh
+        run: ctest --test-dir build/spout-capture -C Release --output-on-failure
 
       - name: Check Spout helper
         shell: pwsh
@@ -147,7 +155,7 @@ jobs:
           $releaseTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
           node ../scripts/write-wails-info.mjs "ci" wails.json
           node ../scripts/write-wails-windows-info.mjs "ci" $shortSha build/windows/info.json
-          wails build -v 2 -m -nosyncgomod -skipbindings -webview2 browser -tags embeddedspout -ldflags "-X main.version=ci -X main.revision=$shortSha -X main.releaseTime=$releaseTime -X main.buildChannel=ci"
+          wails build -v 2 -m -nosyncgomod -skipbindings -webview2 browser -tags embeddedspout,ciguismoke -ldflags "-X main.version=ci -X main.revision=$shortSha -X main.releaseTime=$releaseTime -X main.buildChannel=ci"
 
       - name: Check executable
         working-directory: src
@@ -156,3 +164,8 @@ jobs:
           if (!(Test-Path "build/bin/ClipForVRChat.exe")) {
             throw "build/bin/ClipForVRChat.exe was not created"
           }
+
+      - name: Smoke test Wails frontend startup
+        timeout-minutes: 2
+        shell: pwsh
+        run: ./scripts/test-wails-webview2-smoke.ps1 -ExecutablePath src/build/bin/ClipForVRChat.exe
