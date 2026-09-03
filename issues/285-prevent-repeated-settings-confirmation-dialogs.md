@@ -39,3 +39,6 @@ Webhook URL変更は両方の確認対象になるが、各確認は1回だけ�
 - ローカル: Wails API surface check成功。
 - ローカル: Vite依存が未展開のためFrontend buildは未実施。GitHub Actionsの `npm ci` 後に確認する。
 - GitHub Actions CI #268: Frontend test/build、Goテスト、Spout CTest、Wails build、GUI lifecycle smokeを含めて成功。
+- GitHub Actions CI #270とマージ後CI #271が成功。
+- GitHub Actions Release #118が成功し、`v0.1.8-rc5` pre-releaseを公開した。
+- 公開Assetは通常zip、exe署名asc、separated zipの3種類。通常zip内にAvatarBeacon packageが同梱されている。

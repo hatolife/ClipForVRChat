@@ -25,7 +25,13 @@ Release workflowのartifactと`gh release upload`対象にAvatarBeacon package�
 
 ## 受け入れ条件
 
-- [ ] Release artifactから単独AvatarBeacon packageを除外する。
-- [ ] 公開Asset許可リストとupload対象を3種類へ限定する。
-- [ ] `v0.1.8-rc5`の公開Assetが3種類であることを確認する。
+- [x] Release artifactから単独AvatarBeacon packageを除外する。
+- [x] 公開Asset許可リストとupload対象を3種類へ限定する。
+- [x] `v0.1.8-rc5`の公開Assetが3種類であることを確認する。
 - [ ] Release workflow変更後のCIが成功する。
+
+## 確認
+
+- Cleanup workflow #2で単独`AvatarBeacon_v0.0.1.unitypackage`を削除した。
+- Cleanup workflow #2で公開Assetが許可された3種類だけであることを確認した。
+- Cleanup workflow #2で通常zip内に`AvatarBeacon_v0.0.1.unitypackage`が同梱されていることを確認した。
