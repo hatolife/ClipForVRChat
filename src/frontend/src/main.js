@@ -1,10 +1,11 @@
-Warning: truncated output (original token count: 55422)
-Total output lines: 3573
+Warning: truncated output (original token count: 55600)
+Total output lines: 3583
 
 import { createApp } from 'vue/dist/vue.esm-bundler.js'
 import './style.css'
 import { resumeAfterAutoPostConfirmation } from './settingsConfirmationFlow.js'
 import { modeAfterAutoCaptureResult } from './autoCaptureUiFlow.js'
+import { settingsNavigation } from './settingsNavigation.js'
 
 const api = window.go?.main?.App
 
@@ -338,14 +339,7 @@ const vueApp = createApp({
       return this.autoCaptureViews.filter((view) => view.enabled).length
     },
     settingsTabs() {
-      return [
-        { id: 'feature', label: '機能' },
-        { id: 'process', label: '処理' },
-        { id: 'webhook', label: 'Discord投稿' },
-        { id: 'autoCapture', label: '自動撮影' },
-        { id: 'osc', label: 'OSC' },
-        { id: 'other', label: 'その他' }
-      ]
+      return settingsNavigation
     },
     shouldShowUpdateBanner() {
       return Boolean(
@@ -2314,24 +2308,10 @@ const vueApp = createApp({
         </div>
       </div>
 
-      <se…5422 tokens truncated…on>
-            <button class="secondary" @click="setView('main', 'about_close')" title="前の画面へ戻る">閉じる</button>
-          </div>
-        </section>
-      </section>
-
-      <section v-else-if="view === 'licenses'" class="panel licenses">
-        <h2>OSSライセンス</h2>
-        <p class="subtle">このアプリで使用しているOSSです。</p>
-        <div class="license-list">
-          <article v-for="license in appLicenses" :key="license.name" class="license-card">
-            <h3>{{ license.name }}</h3>
-            <p>{{ license.license }}</p>
-            <p>{{ license.copyright }}</p>
-            <button class="link-button" @click="openURL(license.url)" title="このOSSの配布元を開く">{{ license.url }}</button>
-            <details v-if="license.text" class="license-text">
-              <summary>ライセンス本文</summary>
-              <pre>{{ license.text }}</pre>
+      <section v-if="view === 'help'" class="panel help">
+        <div class="section-title">
+          <h2>使い方</h2>
+          <p class="subtle">ClipForVRChatは、VRChatで使う画像URLを作ったり、…5600 tokens truncated…e>
             </details>
           </article>
         </div>
@@ -2424,20 +2404,36 @@ const vueApp = createApp({
           <button type="button" class="secondary" title="自動撮影設定の一覧へ戻ります。" aria-label="自動撮影設定の一覧へ戻る" @click="closeAutoCaptureDetail">戻る</button>
         </div>
         <div v-if="state.config" class="settings-layout">
-          <div v-if="!isAutoCaptureDetailActive" class="settings-topbar">
+          <aside class="settings-topbar" aria-label="設定ナビゲーション">
             <div class="settings-tabs" role="tablist" aria-label="設定カテゴリ">
-              <button
-                v-for="tab in settingsTabs"
-                :key="tab.id"
-                type="button"
-                role="tab"
-                :aria-selected="settingsTab === tab.id"
-                :class="{ active: settingsTab === tab.id, 'unsaved-setting-tab': settingTabChanged(tab.id) }"
-                :title="tab.label + '設定を開く'"
-                @click="selectSettingsTab(tab.id)"
-              >{{ tab.label }}</button>
+              <div class="settings-nav-section">
+                <strong class="settings-nav-heading">主要カテゴリ</strong>
+                <button
+                  v-for="tab in settingsTabs.filter((item) => item.group === 'primary')"
+                  :key="tab.id"
+                  type="button"
+                  role="tab"
+                  :aria-selected="settingsTab === tab.id"
+                  :class="{ active: settingsTab === tab.id, 'unsaved-setting-tab': settingTabChanged(tab.id) }"
+                  :title="tab.label + '設定を開く'"
+                  @click="selectSettingsTab(tab.id)"
+                >{{ tab.label }}</button>
+              </div>
+              <div class="settings-nav-section">
+                <strong class="settings-nav-heading">詳細・その他</strong>
+                <button
+                  v-for="tab in settingsTabs.filter((item) => item.group === 'advanced')"
+                  :key="tab.id"
+                  type="button"
+                  role="tab"
+                  :aria-selected="settingsTab === tab.id"
+                  :class="{ active: settingsTab === tab.id, 'unsaved-setting-tab': settingTabChanged(tab.id) }"
+                  :title="tab.label + '設定を開く'"
+                  @click="selectSettingsTab(tab.id)"
+                >{{ tab.label }}</button>
+              </div>
             </div>
-          </div>
+          </aside>
           <p v-if="error" class="error settings-error">{{ error }}</p>
           <div v-if="changedSettingLabels.length" class="unsaved-change-list" aria-label="未保存変更のある設定項目">
             <strong>未保存変更</strong>
@@ -2445,7 +2441,7 @@ const vueApp = createApp({
           </div>
 
           <section v-if="settingsTab === 'feature'" class="settings-group" role="tabpanel">
-            <h3>機能</h3>
+            <h3>機能 ON/OFF</h3>
             <div class="setting-row" :class="settingRowChangedClass('autoPhoto.enabled')">
               <div><strong>VRChat写真自動処理</strong><p>VRChat上で撮影されたときに処理します。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.autoPhoto.enabled" /><span></span></label>
@@ -2497,7 +2493,7 @@ const vueApp = createApp({
           </section>
 
           <section v-if="settingsTab === 'autoCapture'" class="settings-group" role="tabpanel">
-            <h3>自動撮影</h3>
+            <h3>撮影処理</h3>
             <div v-if="!autoCaptureDetailView" class="settings-explainer">
               <strong>自動撮影は、VRChatのカメラをOSCで操作し、自動で定期的に撮影する機能です。</strong>
               <p :class="['setting-note', autoCaptureAvatarBeaconOK ? 'ok' : 'warning']">{{ autoCaptureAvatarBeaconStatusLine }}</p>
@@ -3115,7 +3111,7 @@ const vueApp = createApp({
           </section>
 
           <section v-if="settingsTab === 'process'" class="settings-group" role="tabpanel">
-            <h3>処理</h3>
+            <h3>縮小処理</h3>
             <div class="setting-row" :class="settingRowChangedClass('output.uploadDiscord')">
               <div><strong>ローカル保存</strong><p>処理した画像をローカルに保存します。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.output.saveLocal" /><span></span></label>
@@ -3180,7 +3176,7 @@ const vueApp = createApp({
           </section>
 
           <section v-if="settingsTab === 'webhook'" class="settings-group" role="tabpanel">
-            <h3>Discord投稿</h3>
+            <h3>投稿処理</h3>
             <div class="setting-row">
               <div><strong>Discord投稿</strong><p>縮小した画像をDiscord Webhookへ投稿し、VRChatで使うURLを取得します。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.output.uploadDiscord" /><span></span></label>
