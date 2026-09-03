@@ -44,6 +44,7 @@
 | 241 | [AvatarBeacon_mainとAvatarBeacon_12を追加しparameter pathをavatar_beacon配下へ変更する](241-add-avatarbeacon-main-and-12-prefabs-with-prefixed-parameters.md) | 要確認 | 未定 | AvatarBeaconのmain方式Prefabを通常版として追加し、12方式Prefabと `avatar_beacon/...` parameter pathへ移行する。 |
 | 284 | [実機確認を減らす自動検証基盤を追加する](284-add-automated-verification-infrastructure.md) | 要確認 | `v0.1.8-rc4` | C++/Frontend/OSC/実Wails GUIの自動検証を段階的にCIへ追加する。 |
 | 285 | [Webhook URL保存時の確認ダイアログ循環を防ぐ](285-prevent-repeated-settings-confirmation-dialogs.md) | 要確認 | `v0.1.8-rc5` | 重要設定確認と自動投稿確認を各1回に限定し、確認後の保存を完了させる。 |
+| 323 | [自動撮影中の設定保持・終了処理・定期撮影UI・待機時間調整を改善する](323-improve-autocapture-interaction-and-timing.md) | 要対応 | `v0.1.8-rc6` | 設定編集中の画面保持、Flying OFF、定期撮影UI移動、主要待機時間のms設定を行う。 |
 
 ## 状態の意味
 
