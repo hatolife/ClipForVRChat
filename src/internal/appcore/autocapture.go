@@ -116,9 +116,10 @@ type PresenceUser struct {
 }
 
 type AutoCaptureRunner struct {
-	Config            Config
-	Handler           func(AutoCaptureEvent)
-	ReserveSourcePath func(string)
+	Config                  Config
+	Handler                 func(AutoCaptureEvent)
+	ReserveSourcePath       func(string)
+	RefreshPlayerLocalBasis func() (CameraPoseConfig, string, error)
 }
 
 type CameraPoseSnapshot struct {
@@ -853,7 +854,7 @@ func overlayPoseState(target **CameraPoseConfig, value *CameraPoseConfig) {
 	}
 }
 
-func (r AutoCaptureRunner) capturePhotoShot(ctx context.Context, client oscClient, batchID string, shotID string, index int, view CameraViewConfig, photoDir string, before map[string]time.Time, sidecarUsers []PresenceUser, discordUsers []PresenceUser, confidence string, world AutoCaptureVRChatMetadata) Result {
+func (r *AutoCaptureRunner) capturePhotoShot(ctx context.Context, client oscClient, batchID string, shotID string, index int, view CameraViewConfig, photoDir string, before map[string]time.Time, sidecarUsers []PresenceUser, discordUsers []PresenceUser, confidence string, world AutoCaptureVRChatMetadata) Result {
 	cfg := r.Config.AutoCapture
 	logPath := r.Config.DiagnosticLogPath
 	name := view.Name
@@ -903,8 +904,19 @@ func (r AutoCaptureRunner) capturePhotoShot(ctx context.Context, client oscClien
 	return r.finalizeAutoCaptureImage(photoPath, batchID, shotID, view, sidecarUsers, discordUsers, confidence, world, SpoutCaptureResult{})
 }
 
-func (r AutoCaptureRunner) applyCameraView(client oscClient, view CameraViewConfig) error {
+func (r *AutoCaptureRunner) applyCameraView(client oscClient, view CameraViewConfig) error {
 	logPath := r.Config.DiagnosticLogPath
+	if view.CoordinateSpace == "player_local" && r.Config.AutoCapture.PlayerLocal.BasisSource == PlayerLocalBasisSourceAvatarOSC && r.RefreshPlayerLocalBasis != nil {
+		basis, updatedAt, err := r.RefreshPlayerLocalBasis()
+		if err != nil {
+			diagAutoCapture(logPath, "camera basis refresh error: view_id=%q view_name=%q err=%v", view.ID, view.Name, err)
+			return err
+		}
+		r.Config.AutoCapture.PlayerLocal.BasisPose = basis
+		r.Config.AutoCapture.PlayerLocal.Calibrated = true
+		r.Config.AutoCapture.PlayerLocal.UpdatedAt = updatedAt
+		diagAutoCapture(logPath, "camera basis refreshed immediately before pose: view_id=%q view_name=%q updated_at=%q basis_pose=%+v", view.ID, view.Name, updatedAt, basis)
+	}
 	pose, err := ResolveCameraViewPose(r.Config.AutoCapture, view)
 	if err != nil {
 		diagAutoCapture(logPath, "camera pose resolve error: view_id=%q view_name=%q coordinate_space=%q basis_source=%q manual_calibrated=%t err=%v", view.ID, view.Name, view.CoordinateSpace, r.Config.AutoCapture.PlayerLocal.BasisSource, r.Config.AutoCapture.PlayerLocal.Calibrated, err)
@@ -957,7 +969,7 @@ func (r AutoCaptureRunner) sendUserCameraLock(client oscClient, viewID string, v
 	return nil
 }
 
-func (r AutoCaptureRunner) applyCameraViewAndOptions(client oscClient, view CameraViewConfig) error {
+func (r *AutoCaptureRunner) applyCameraViewAndOptions(client oscClient, view CameraViewConfig) error {
 	logPath := r.Config.DiagnosticLogPath
 	if r.Config.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
 		diagAutoCapture(logPath, "camera pose/options skipped: view_id=%q preplaced_local_anchor=true", view.ID)
@@ -1005,7 +1017,7 @@ func (r AutoCaptureRunner) applyAutoLevelRollBeforeShot(client oscClient, viewID
 	return nil
 }
 
-func (r AutoCaptureRunner) captureStreamShot(ctx context.Context, client oscClient, batchID string, shotID string, index int, view CameraViewConfig, sidecarUsers []PresenceUser, discordUsers []PresenceUser, confidence string, world AutoCaptureVRChatMetadata) Result {
+func (r *AutoCaptureRunner) captureStreamShot(ctx context.Context, client oscClient, batchID string, shotID string, index int, view CameraViewConfig, sidecarUsers []PresenceUser, discordUsers []PresenceUser, confidence string, world AutoCaptureVRChatMetadata) Result {
 	cfg := r.Config.AutoCapture
 	logPath := r.Config.DiagnosticLogPath
 	name := view.Name

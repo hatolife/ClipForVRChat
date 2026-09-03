@@ -246,7 +246,8 @@ func TestApplyCameraViewTemporarilyEnablesFlyingAroundPose(t *testing.T) {
 	}
 	defer client.close()
 
-	if err := (AutoCaptureRunner{Config: cfg}).applyCameraView(client, view); err != nil {
+	runner := AutoCaptureRunner{Config: cfg}
+	if err := runner.applyCameraView(client, view); err != nil {
 		t.Fatal(err)
 	}
 
@@ -262,6 +263,55 @@ func TestApplyCameraViewTemporarilyEnablesFlyingAroundPose(t *testing.T) {
 	}
 	if samples[2].Address != "/usercamera/Flying" || !samples[2].HasBool || samples[2].Bool {
 		t.Fatalf("packet[2] = %+v, want Flying=false", samples[2])
+	}
+}
+
+func TestApplyCameraViewRefreshesAvatarBasisImmediatelyBeforeEachPose(t *testing.T) {
+	conn, port := listenOSCUserCameraPackets(t)
+	defer conn.Close()
+
+	cfg := DefaultConfig()
+	cfg.AutoCapture.OSC.Host = "127.0.0.1"
+	cfg.AutoCapture.OSC.SendPort = port
+	view := cfg.AutoCapture.Views[0]
+	view.Pose.Position = CameraVector3Config{X: 1}
+
+	refreshCalls := 0
+	runner := AutoCaptureRunner{
+		Config: cfg,
+		RefreshPlayerLocalBasis: func() (CameraPoseConfig, string, error) {
+			refreshCalls++
+			return CameraPoseConfig{Position: CameraVector3Config{X: float64(refreshCalls * 10)}}, fmt.Sprintf("refresh-%d", refreshCalls), nil
+		},
+	}
+	client := oscClient{host: "127.0.0.1", port: port}
+	if err := client.open(); err != nil {
+		t.Fatal(err)
+	}
+	defer client.close()
+
+	if err := runner.applyCameraView(client, view); err != nil {
+		t.Fatal(err)
+	}
+	if err := runner.applyCameraView(client, view); err != nil {
+		t.Fatal(err)
+	}
+
+	samples := withoutVersionNoticePackets(readOSCPacketSamples(t, conn))
+	poses := make([]CameraPoseConfig, 0, 2)
+	for _, sample := range samples {
+		if sample.Address == "/usercamera/Pose" && sample.HasPose {
+			poses = append(poses, sample.Pose)
+		}
+	}
+	if refreshCalls != 2 {
+		t.Fatalf("refresh calls = %d, want 2", refreshCalls)
+	}
+	if len(poses) != 2 {
+		t.Fatalf("pose packets = %d, want 2: %+v", len(poses), samples)
+	}
+	if poses[0].Position.X != 11 || poses[1].Position.X != 21 {
+		t.Fatalf("resolved pose X = [%v, %v], want [11, 21]", poses[0].Position.X, poses[1].Position.X)
 	}
 }
 
@@ -303,7 +353,8 @@ func TestApplyCameraViewDisablesFlyingWhenPoseSendFails(t *testing.T) {
 	conn := &addressFailConn{failAddress: "/usercamera/Pose"}
 	client := oscClient{host: "127.0.0.1", port: 9000, conn: conn}
 
-	err := (AutoCaptureRunner{Config: cfg}).applyCameraView(client, view)
+	runner := AutoCaptureRunner{Config: cfg}
+	err := runner.applyCameraView(client, view)
 	if err == nil {
 		t.Fatal("applyCameraView returned nil, want pose send error")
 	}

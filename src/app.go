@@ -1292,7 +1292,10 @@ func (a *App) TestAutoCaptureView(viewID string) ([]appcore.Result, error) {
 		defer a.endAutoCapturePhotoSuppression()
 	}
 
-	runner := appcore.AutoCaptureRunner{Config: cfg}
+	runner := appcore.AutoCaptureRunner{
+		Config:                  cfg,
+		RefreshPlayerLocalBasis: a.autoCapturePlayerLocalBasisRefresher(cfg),
+	}
 	if suppressAutoPhoto {
 		runner.ReserveSourcePath = a.reserveAutoCapturePhotoPath
 	}
@@ -2026,7 +2029,7 @@ func (a *App) runAutoCaptureBatch(ctx context.Context, cfg appcore.Config) {
 		appcore.AppendDiagnosticLog(logPath, "auto-capture batch error: player_local basis resolve failed: %v", err)
 		a.mu.Lock()
 		a.state.Message = "自動撮影でエラーが発生しました: " + err.Error()
-		a.state.Mode = appcore.ModeResults
+		a.state.Mode = autoCaptureResultMode(a.state.Mode)
 		a.mu.Unlock()
 		return
 	}
@@ -2037,7 +2040,8 @@ func (a *App) runAutoCaptureBatch(ctx context.Context, cfg appcore.Config) {
 	}
 	appcore.AppendDiagnosticLog(logPath, "auto-capture batch begin")
 	runner := appcore.AutoCaptureRunner{
-		Config: cfg,
+		Config:                  cfg,
+		RefreshPlayerLocalBasis: a.autoCapturePlayerLocalBasisRefresher(cfg),
 		Handler: func(event appcore.AutoCaptureEvent) {
 			emitWailsEvent(a.ctx, "auto-capture:result", event)
 		},
@@ -2051,7 +2055,7 @@ func (a *App) runAutoCaptureBatch(ctx context.Context, cfg appcore.Config) {
 	if err != nil {
 		appcore.AppendDiagnosticLog(logPath, "auto-capture batch error: %v", err)
 		a.state.Message = "自動処理でエラーが発生しました: " + err.Error()
-		a.state.Mode = appcore.ModeResults
+		a.state.Mode = autoCaptureResultMode(a.state.Mode)
 		emitWailsEvent(a.ctx, "auto-photo:result", appcore.AutoPhotoEvent{Result: appcore.Result{Name: "自動撮影", Error: err.Error()}, Error: err.Error()})
 		return
 	}
@@ -2075,7 +2079,27 @@ func (a *App) runAutoCaptureBatch(ctx context.Context, cfg appcore.Config) {
 	} else if len(results) > 0 {
 		a.state.Message = summarizeAutoCaptureErrors(results)
 	}
-	a.state.Mode = appcore.ModeResults
+	a.state.Mode = autoCaptureResultMode(a.state.Mode)
+}
+
+func autoCaptureResultMode(current appcore.Mode) appcore.Mode {
+	if current == appcore.ModeSettings {
+		return appcore.ModeSettings
+	}
+	return appcore.ModeResults
+}
+
+func (a *App) autoCapturePlayerLocalBasisRefresher(cfg appcore.Config) func() (appcore.CameraPoseConfig, string, error) {
+	return func() (appcore.CameraPoseConfig, string, error) {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		pose, err := a.freshPlayerLocalBasisLocked(cfg)
+		if err != nil {
+			return appcore.CameraPoseConfig{}, "", err
+		}
+		snapshot := a.latestPlayerLocalBasisLocked(cfg, time.Now())
+		return pose, snapshot.UpdatedAt, nil
+	}
 }
 
 func autoCaptureVisibleResults(results []appcore.Result) []appcore.Result {
