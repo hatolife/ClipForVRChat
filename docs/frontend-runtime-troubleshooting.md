@@ -118,6 +118,20 @@ cd src && GOCACHE=/tmp/clipforvrchat-go-cache go test ./...
 
 Release workflowでは `Check Vue runtime template` が通っていることも確認する。
 
+## CIのDevTools endpoint未検出をGUI起動失敗と誤認しない
+
+パッケージ済みWails exeへ `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=...` を渡しても、GitHub-hosted Windows runnerではDevTools HTTP endpointが公開されない場合がある。exeプロセスが生存したままendpointだけがtimeoutする状態は、GUIまたはFrontendの起動失敗を直接意味しない。
+
+CIの実exe smokeでは、アプリ自身が `logs/YYYY-MM-DD.log` へ出す次の到達点を使用する。
+
+1. `ui lifecycle dom_ready`
+2. `ui action="frontend_script_loaded"`
+3. `api GetInitialState complete`
+
+この3点が同じ起動のログへ順に出れば、WebView2 DOM、ビルド済みFrontend JavaScript、FrontendからGo backendへの初期API呼び出しまで到達している。DevTools endpointは取得できた場合の追加情報として扱い、通常の起動smokeの必須条件にはしない。DOM操作を伴う実exe E2Eを追加する場合は、CDPが安定して利用できるrunnerを別途選定する。
+
+GitHub-hosted Windows runnerは管理者権限で実行されるため、通常の配布版exeをそのまま起動すると、管理者起動拒否のnative dialogでWails開始前に待機する。この場合はdiagnostic log自体が生成されない。CIでは `ciguismoke` build tagを付けた非配布バイナリだけ管理者起動拒否を回避する。Release workflowはこのtagを付けず、配布版の安全仕様を維持する。
+
 ## UI表示不具合時の基本順序
 
 1. 最新の `logs/YYYY-MM-DD.log` を読む。

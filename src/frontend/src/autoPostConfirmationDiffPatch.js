@@ -176,6 +176,11 @@ function buildAutoPostConfirmationItems(vm) {
   return items
 }
 
+export {
+  buildAutoPostConfirmationItems,
+  buildCurrentAutoPostConfirmationItems
+}
+
 function installComputedGetter(ctx, key, getter) {
   const descriptor = Object.getOwnPropertyDescriptor(ctx, key)
   if (descriptor && descriptor.configurable === false) return false
@@ -229,4 +234,6 @@ function waitForVueApp() {
   if (attempts < 200) window.setTimeout(waitForVueApp, 25)
 }
 
-waitForVueApp()
+if (typeof document !== 'undefined' && typeof window !== 'undefined') {
+  waitForVueApp()
+}
