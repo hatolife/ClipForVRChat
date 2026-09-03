@@ -1098,12 +1098,11 @@ func (r AutoCaptureRunner) ensureStreamCameraForSpoutCapture(ctx context.Context
 		diagAutoCapture(logPath, "stream camera refresh error: address=%q view_id=%q err=%v", "/usercamera/Streaming", viewID, err)
 		return err
 	}
-	refreshDelay := time.Duration(ac.Stream.RefreshDelayMS) * time.Millisecond
-	if !sleepContext(ctx, refreshDelay) {
+	if !sleepContext(ctx, 500*time.Millisecond) {
 		diagAutoCapture(logPath, "stream camera refresh cancelled: view_id=%q err=%v", viewID, ctx.Err())
 		return ctx.Err()
 	}
-	diagAutoCapture(logPath, "stream camera refresh complete: view_id=%q wait_ms=%d", viewID, ac.Stream.RefreshDelayMS)
+	diagAutoCapture(logPath, "stream camera refresh complete: view_id=%q wait_ms=%d", viewID, 500)
 	return nil
 }
 

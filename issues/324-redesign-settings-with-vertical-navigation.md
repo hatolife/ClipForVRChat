@@ -50,3 +50,4 @@
 - 2026-09-03: 自動撮影詳細画面でも左ナビゲーションを残し、別カテゴリ選択時に詳細状態を閉じる既存処理を利用する。
 - 2026-09-03: Navigation定義のFrontendテスト、Frontend build、template literal検査、Vue runtime template検査、Wails API surface検査は成功した。Windows CIはPRで確認する。
 - 2026-09-03: GitHub Actions CI #290でWindows上のFrontend build、template/API検査、Wails build、WebView2起動smokeを含む全jobが成功した。
+- 2026-09-03: PRレビューで「自動定期撮影」の未保存表示が撮影処理へ付く問題を修正し、変更pathが機能 ON/OFFへ割り当てられるFrontendテストを追加した（Frontend計13テスト）。

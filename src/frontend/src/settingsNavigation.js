@@ -6,3 +6,10 @@ export const settingsNavigation = Object.freeze([
   { id: 'osc', label: 'OSC', group: 'advanced' },
   { id: 'other', label: 'その他', group: 'advanced' }
 ])
+
+export function autoCaptureSettingsCategory(path) {
+  if (path === 'autoCapture.schedule' || path.startsWith('autoCapture.schedule.')) return 'feature'
+  if (path === 'autoCapture.osc' || path.startsWith('autoCapture.osc.') || path === 'autoCapture.playerLocal' || path.startsWith('autoCapture.playerLocal.')) return 'osc'
+  if (path === 'autoCapture' || path.startsWith('autoCapture.')) return 'autoCapture'
+  return ''
+}

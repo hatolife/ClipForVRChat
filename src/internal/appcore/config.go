@@ -173,7 +173,6 @@ type AutoCaptureStreamConfig struct {
 	SpoutAutoSelect         bool   `json:"spoutAutoSelect"`
 	CaptureTimeoutMS        int    `json:"captureTimeoutMs"`
 	StartDelayMS            int    `json:"startDelayMs"`
-	RefreshDelayMS          int    `json:"refreshDelayMs"`
 	RecoveryOnDelayMS       int    `json:"recoveryOnDelayMs"`
 	RecoveryOffDelayMS      int    `json:"recoveryOffDelayMs"`
 	RecoveryRestartDelayMS  int    `json:"recoveryRestartDelayMs"`
@@ -417,7 +416,6 @@ func DefaultAutoCaptureConfig() AutoCaptureConfig {
 			SpoutAutoSelect:        true,
 			CaptureTimeoutMS:       10000,
 			StartDelayMS:           1000,
-			RefreshDelayMS:         500,
 			RecoveryOnDelayMS:      800,
 			RecoveryOffDelayMS:     300,
 			RecoveryRestartDelayMS: 1200,
@@ -656,7 +654,6 @@ func (c *AutoCaptureConfig) Normalize() {
 	if c.Stream.StartDelayMS > 10000 {
 		c.Stream.StartDelayMS = 10000
 	}
-	c.Stream.RefreshDelayMS = clampWaitMilliseconds(c.Stream.RefreshDelayMS)
 	c.Stream.RecoveryOnDelayMS = clampWaitMilliseconds(c.Stream.RecoveryOnDelayMS)
 	c.Stream.RecoveryOffDelayMS = clampWaitMilliseconds(c.Stream.RecoveryOffDelayMS)
 	c.Stream.RecoveryRestartDelayMS = clampWaitMilliseconds(c.Stream.RecoveryRestartDelayMS)

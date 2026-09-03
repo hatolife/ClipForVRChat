@@ -733,7 +733,6 @@ config.json
       "spoutAutoSelect": true,
       "captureTimeoutMs": 10000,
       "startDelayMs": 1000,
-      "refreshDelayMs": 500,
       "recoveryOnDelayMs": 800,
       "recoveryOffDelayMs": 300,
       "recoveryRestartDelayMs": 1200,

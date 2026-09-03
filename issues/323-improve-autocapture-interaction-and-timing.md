@@ -75,3 +75,4 @@
 - 2026-09-03: 従来はバッチ開始前の `prepareAutoCaptureConfigForRunLocked` で取得したAvatarBeacon basisを全構図で使っていた。各 `player_local` 構図のPose送信直前にcallbackで最新basisを再取得するよう変更し、2回のPose送信がそれぞれ異なる最新basisを使うテストを追加した。
 - 2026-09-03: 1フレーム単位の連続basis再計算と「Spout録画フレーム数＝構図数」は、構図ごとにhelperを起動して1枚取得する現行構造を単一録画セッションへ変更する将来課題として残す。
 - 2026-09-03: GitHub Actions CI #290でFrontend 12テスト、production build、template/API検査、Windows Go全テスト、脆弱性検査、Spout build/CTest、Wails build、WebView2起動smokeが成功した。
+- 2026-09-03: PRレビューで、Camera自動起動を常時OFFへ正規化する現仕様では「Stream再送後待機」が到達不能と判明した。到達不能な操作を再有効化せず、誤解を招く設定項目とconfig fieldを削除した。

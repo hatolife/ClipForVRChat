@@ -2,7 +2,7 @@ import { createApp } from 'vue/dist/vue.esm-bundler.js'
 import './style.css'
 import { resumeAfterAutoPostConfirmation } from './settingsConfirmationFlow.js'
 import { modeAfterAutoCaptureResult } from './autoCaptureUiFlow.js'
-import { settingsNavigation } from './settingsNavigation.js'
+import { autoCaptureSettingsCategory, settingsNavigation } from './settingsNavigation.js'
 
 const api = window.go?.main?.App
 
@@ -256,7 +256,6 @@ const vueApp = createApp({
       if (!Number.isFinite(Number(autoCapture.capture.buttonReleaseDelayMs))) autoCapture.capture.buttonReleaseDelayMs = 200
       autoCapture.stream ||= {}
       if (!Number.isFinite(Number(autoCapture.stream.startDelayMs))) autoCapture.stream.startDelayMs = 1000
-      if (!Number.isFinite(Number(autoCapture.stream.refreshDelayMs))) autoCapture.stream.refreshDelayMs = 500
       if (!Number.isFinite(Number(autoCapture.stream.recoveryOnDelayMs))) autoCapture.stream.recoveryOnDelayMs = 800
       if (!Number.isFinite(Number(autoCapture.stream.recoveryOffDelayMs))) autoCapture.stream.recoveryOffDelayMs = 300
       if (!Number.isFinite(Number(autoCapture.stream.recoveryRestartDelayMs))) autoCapture.stream.recoveryRestartDelayMs = 1200
@@ -687,9 +686,6 @@ const vueApp = createApp({
       return { 'unsaved-setting-row': this.settingChanged(...prefixes) }
     },
     settingTabChanged(tabId) {
-      if (tabId === 'autoCapture') {
-        return this.changedSettingPathList().some((path) => path.startsWith('autoCapture.') && !path.startsWith('autoCapture.osc.') && !path.startsWith('autoCapture.playerLocal.'))
-      }
       const prefixesByTab = {
         feature: ['autoPhoto.', 'screenshotAutoPost.', 'output.saveLocal', 'output.detectQrCodeUrls'],
         osc: ['autoCapture.osc.', 'autoCapture.playerLocal.'],
@@ -699,7 +695,7 @@ const vueApp = createApp({
       }
       const prefixes = prefixesByTab[tabId] || []
       const paths = this.changedSettingPathList()
-      return paths.some((path) => prefixes.some((prefix) => path === prefix.replace(/\.$/, '') || path.startsWith(prefix)))
+      return paths.some((path) => autoCaptureSettingsCategory(path) === tabId || prefixes.some((prefix) => path === prefix.replace(/\.$/, '') || path.startsWith(prefix)))
     },
     rememberSettingsBaseline(options = {}) {
       this.settingsBaseline = this.serializeSettings(this.state.settingsBaselineConfig || this.state.config)
@@ -2878,10 +2874,6 @@ const vueApp = createApp({
                   <label>
                     <input type="number" min="0" max="10000" step="100" v-model.number="autoCaptureSettings.stream.startDelayMs" :disabled="autoCaptureSettings.capture.mode !== 'stream'" />
                   </label>
-                </div>
-                <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
-                  <div><strong>Stream再送後待機</strong><p>Camera ModeとStreamingを再送してからSpout取得へ進むまでの時間です。</p></div>
-                  <label><input type="number" min="0" max="30000" step="50" v-model.number="autoCaptureSettings.stream.refreshDelayMs" :disabled="autoCaptureSettings.capture.mode !== 'stream'" /> ms</label>
                 </div>
                 <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
                   <div><strong>sender ON再送後待機</strong><p>senderが見つからないとき、StreamingをONへ再送してから再確認するまでの時間です。</p></div>

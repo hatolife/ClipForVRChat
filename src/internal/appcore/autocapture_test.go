@@ -38,7 +38,7 @@ func TestDefaultAutoCaptureConfig(t *testing.T) {
 	if cfg.AutoCapture.Capture.SettleDelayMS != 1500 || cfg.AutoCapture.Capture.ButtonReleaseDelayMS != 200 {
 		t.Fatalf("unexpected capture wait defaults: %+v", cfg.AutoCapture.Capture)
 	}
-	if cfg.AutoCapture.Stream.RefreshDelayMS != 500 || cfg.AutoCapture.Stream.RecoveryOnDelayMS != 800 || cfg.AutoCapture.Stream.RecoveryOffDelayMS != 300 || cfg.AutoCapture.Stream.RecoveryRestartDelayMS != 1200 {
+	if cfg.AutoCapture.Stream.RecoveryOnDelayMS != 800 || cfg.AutoCapture.Stream.RecoveryOffDelayMS != 300 || cfg.AutoCapture.Stream.RecoveryRestartDelayMS != 1200 {
 		t.Fatalf("unexpected stream wait defaults: %+v", cfg.AutoCapture.Stream)
 	}
 	if !cfg.AutoCapture.Restore.Enabled || !cfg.AutoCapture.Restore.PreferSnapshot || cfg.AutoCapture.Restore.SnapshotFreshnessSec != 10 {
@@ -99,7 +99,6 @@ func TestAutoCaptureConfigNormalize(t *testing.T) {
 			ButtonReleaseDelayMS:  0,
 		},
 		Stream: AutoCaptureStreamConfig{
-			RefreshDelayMS:         -1,
 			RecoveryOnDelayMS:      30001,
 			RecoveryOffDelayMS:     -1,
 			RecoveryRestartDelayMS: 30001,
@@ -125,7 +124,7 @@ func TestAutoCaptureConfigNormalize(t *testing.T) {
 	if cfg.AutoCapture.Capture.SettleDelayMS != 0 || cfg.AutoCapture.Capture.ButtonReleaseDelayMS != 1 {
 		t.Fatalf("capture wait normalize failed: %+v", cfg.AutoCapture.Capture)
 	}
-	if cfg.AutoCapture.Stream.RefreshDelayMS != 0 || cfg.AutoCapture.Stream.RecoveryOnDelayMS != 30000 || cfg.AutoCapture.Stream.RecoveryOffDelayMS != 0 || cfg.AutoCapture.Stream.RecoveryRestartDelayMS != 30000 {
+	if cfg.AutoCapture.Stream.RecoveryOnDelayMS != 30000 || cfg.AutoCapture.Stream.RecoveryOffDelayMS != 0 || cfg.AutoCapture.Stream.RecoveryRestartDelayMS != 30000 {
 		t.Fatalf("stream wait normalize failed: %+v", cfg.AutoCapture.Stream)
 	}
 	if cfg.AutoCapture.Restore.ModeDelayMS != 0 {
