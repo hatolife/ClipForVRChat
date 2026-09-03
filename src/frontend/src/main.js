@@ -1,6 +1,8 @@
 import { createApp } from 'vue/dist/vue.esm-bundler.js'
 import './style.css'
 import { resumeAfterAutoPostConfirmation } from './settingsConfirmationFlow.js'
+import { modeAfterAutoCaptureResult } from './autoCaptureUiFlow.js'
+import { autoCaptureSettingsCategory, settingsNavigation } from './settingsNavigation.js'
 
 const api = window.go?.main?.App
 
@@ -250,7 +252,13 @@ const vueApp = createApp({
       if (autoCapture.capture.openCameraBeforeBatch === undefined) autoCapture.capture.openCameraBeforeBatch = false
       if (autoCapture.capture.closeCameraAfterBatch === undefined) autoCapture.capture.closeCameraAfterBatch = false
       if (autoCapture.capture.autoLevelRollBeforeShot === undefined) autoCapture.capture.autoLevelRollBeforeShot = true
+      if (!Number.isFinite(Number(autoCapture.capture.settleDelayMs))) autoCapture.capture.settleDelayMs = 1500
+      if (!Number.isFinite(Number(autoCapture.capture.buttonReleaseDelayMs))) autoCapture.capture.buttonReleaseDelayMs = 200
       autoCapture.stream ||= {}
+      if (!Number.isFinite(Number(autoCapture.stream.startDelayMs))) autoCapture.stream.startDelayMs = 1000
+      if (!Number.isFinite(Number(autoCapture.stream.recoveryOnDelayMs))) autoCapture.stream.recoveryOnDelayMs = 800
+      if (!Number.isFinite(Number(autoCapture.stream.recoveryOffDelayMs))) autoCapture.stream.recoveryOffDelayMs = 300
+      if (!Number.isFinite(Number(autoCapture.stream.recoveryRestartDelayMs))) autoCapture.stream.recoveryRestartDelayMs = 1200
       if (autoCapture.stream.debugRecordingEnabled === undefined) autoCapture.stream.debugRecordingEnabled = false
       if (!autoCapture.stream.debugFrameCount) autoCapture.stream.debugFrameCount = 8
       autoCapture.output ||= {}
@@ -279,6 +287,7 @@ const vueApp = createApp({
       if (autoCapture.restore.enabled === undefined) autoCapture.restore.enabled = true
       if (autoCapture.restore.preferSnapshot === undefined) autoCapture.restore.preferSnapshot = true
       if (!autoCapture.restore.snapshotFreshnessSec) autoCapture.restore.snapshotFreshnessSec = 10
+      if (!Number.isFinite(Number(autoCapture.restore.modeDelayMs))) autoCapture.restore.modeDelayMs = 150
       const restoreFallback = autoCapture.restore.fallback
       if (restoreFallback.mode === undefined) restoreFallback.mode = 0
       if (restoreFallback.streaming === undefined) restoreFallback.streaming = false
@@ -326,14 +335,7 @@ const vueApp = createApp({
       return this.autoCaptureViews.filter((view) => view.enabled).length
     },
     settingsTabs() {
-      return [
-        { id: 'feature', label: '機能' },
-        { id: 'process', label: '処理' },
-        { id: 'webhook', label: 'Discord投稿' },
-        { id: 'autoCapture', label: '自動撮影' },
-        { id: 'osc', label: 'OSC' },
-        { id: 'other', label: 'その他' }
-      ]
+      return settingsNavigation
     },
     shouldShowUpdateBanner() {
       return Boolean(
@@ -600,7 +602,7 @@ const vueApp = createApp({
         { path: 'screenshotAutoPost.enabled', purpose: 'スクリーンショット自動処理', label: '自動処理', tab: 'feature' },
         { path: 'screenshotAutoPost.screenshotDirectory', purpose: 'スクリーンショット自動処理', label: '監視フォルダ', tab: 'feature' },
         { path: 'screenshotAutoPost.webhookUrl', purpose: 'スクリーンショット自動処理', label: '専用Webhook URL', tab: 'webhook' },
-        { path: 'autoCapture.schedule.enabled', purpose: '自動撮影スケジュール', label: '自動撮影スケジュール', tab: 'autoCapture', detail: 'schedule' },
+        { path: 'autoCapture.schedule.enabled', purpose: '自動定期撮影', label: '自動定期撮影', tab: 'feature' },
         { path: 'autoCapture.discord.enabled', purpose: '自動撮影Discord投稿', label: 'Discord自動投稿', tab: 'autoCapture', detail: 'metadata' },
         { path: 'autoCapture.discord.webhookUrl', purpose: '自動撮影Discord投稿', label: '専用Webhook URL', tab: 'webhook' }
       ]
@@ -658,7 +660,7 @@ const vueApp = createApp({
       if (path.startsWith('autoCapture.idle.')) return '待機カメラ位置'
       if (path.startsWith('autoCapture.capture.')) return '自動撮影 撮影方式'
       if (path.startsWith('autoCapture.views.')) return '構図設定'
-      if (path.startsWith('autoCapture.schedule.')) return '自動撮影スケジュール'
+      if (path.startsWith('autoCapture.schedule.')) return '自動定期撮影'
       if (path.startsWith('autoCapture.stream.') || path.startsWith('autoCapture.output.')) return '自動撮影 撮影・出力'
       if (path.startsWith('autoCapture.discord.')) return '自動撮影 Discord投稿'
       if (path.startsWith('autoCapture.restore.')) return '撮影後復元'
@@ -684,9 +686,6 @@ const vueApp = createApp({
       return { 'unsaved-setting-row': this.settingChanged(...prefixes) }
     },
     settingTabChanged(tabId) {
-      if (tabId === 'autoCapture') {
-        return this.changedSettingPathList().some((path) => path.startsWith('autoCapture.') && !path.startsWith('autoCapture.osc.') && !path.startsWith('autoCapture.playerLocal.'))
-      }
       const prefixesByTab = {
         feature: ['autoPhoto.', 'screenshotAutoPost.', 'output.saveLocal', 'output.detectQrCodeUrls'],
         osc: ['autoCapture.osc.', 'autoCapture.playerLocal.'],
@@ -696,7 +695,7 @@ const vueApp = createApp({
       }
       const prefixes = prefixesByTab[tabId] || []
       const paths = this.changedSettingPathList()
-      return paths.some((path) => prefixes.some((prefix) => path === prefix.replace(/\.$/, '') || path.startsWith(prefix)))
+      return paths.some((path) => autoCaptureSettingsCategory(path) === tabId || prefixes.some((prefix) => path === prefix.replace(/\.$/, '') || path.startsWith(prefix)))
     },
     rememberSettingsBaseline(options = {}) {
       this.settingsBaseline = this.serializeSettings(this.state.settingsBaselineConfig || this.state.config)
@@ -926,7 +925,6 @@ const vueApp = createApp({
         viewId === 'idle' ||
         viewId === 'capture' ||
         viewId === 'metadata' ||
-        (viewId === 'schedule' && this.autoCaptureSettings.schedule.enabled) ||
         (viewId === 'restore' && this.autoCaptureSettings.restore.enabled)
       if (!enabled) return
       this.logUserAction('button_click', `auto_capture_detail ${viewId}`)
@@ -942,7 +940,6 @@ const vueApp = createApp({
       if (this.autoCaptureDetailView === 'idle') return '待機カメラ位置'
       if (this.autoCaptureDetailView === 'capture') return '撮影・出力'
       if (this.autoCaptureDetailView === 'metadata') return '保存・投稿・復元'
-      if (this.autoCaptureDetailView === 'schedule') return '自動撮影スケジュール'
       if (this.autoCaptureDetailView === 'restore') return '撮影後にCamera状態を戻す'
       return '自動撮影設定'
     },
@@ -952,7 +949,6 @@ const vueApp = createApp({
       if (this.autoCaptureDetailView === 'idle') return '自動撮影バッチ終了後に送るカメラ位置を設定します。'
       if (this.autoCaptureDetailView === 'capture') return 'Stream方式のSpout受信、出力先、保存形式、ファイル名を設定します。'
       if (this.autoCaptureDetailView === 'metadata') return 'sidecar、画像メタデータ、同席ユーザー情報、Discord投稿、撮影後復元を設定します。'
-      if (this.autoCaptureDetailView === 'schedule') return '自動撮影の開始条件と繰り返し間隔を設定します。'
       if (this.autoCaptureDetailView === 'restore') return '撮影後に戻すUser Camera状態を設定します。'
       return ''
     },
@@ -1135,7 +1131,7 @@ const vueApp = createApp({
       const hasVisibleWork = this.hasResultVisibleWork(result)
       const results = hasVisibleWork ? [result, ...(this.state.results || [])] : (this.state.results || [])
       const message = event.error ? '自動処理でエラーが発生しました。' : this.resultSummaryMessage([result])
-      this.state = { ...this.state, mode: 'results', results, message }
+      this.state = { ...this.state, mode: modeAfterAutoCaptureResult(this.state.mode), results, message }
       try {
         this.state.history = await api.GetHistory()
       } catch {
@@ -1525,7 +1521,7 @@ const vueApp = createApp({
         localPlayer: overrides.localPlayer ?? true,
         remotePlayer: overrides.remotePlayer ?? true,
         environment: overrides.environment ?? true,
-        settleDelayMs: overrides.settleDelayMs ?? 1500,
+        settleDelayMs: overrides.settleDelayMs ?? 0,
         captureDelayMs: overrides.captureDelayMs ?? 0,
         calibrated: overrides.calibrated ?? false
       }
@@ -2612,20 +2608,36 @@ const vueApp = createApp({
           <button type="button" class="secondary" title="自動撮影設定の一覧へ戻ります。" aria-label="自動撮影設定の一覧へ戻る" @click="closeAutoCaptureDetail">戻る</button>
         </div>
         <div v-if="state.config" class="settings-layout">
-          <div v-if="!isAutoCaptureDetailActive" class="settings-topbar">
+          <aside class="settings-topbar" aria-label="設定ナビゲーション">
             <div class="settings-tabs" role="tablist" aria-label="設定カテゴリ">
-              <button
-                v-for="tab in settingsTabs"
-                :key="tab.id"
-                type="button"
-                role="tab"
-                :aria-selected="settingsTab === tab.id"
-                :class="{ active: settingsTab === tab.id, 'unsaved-setting-tab': settingTabChanged(tab.id) }"
-                :title="tab.label + '設定を開く'"
-                @click="selectSettingsTab(tab.id)"
-              >{{ tab.label }}</button>
+              <div class="settings-nav-section">
+                <strong class="settings-nav-heading">主要カテゴリ</strong>
+                <button
+                  v-for="tab in settingsTabs.filter((item) => item.group === 'primary')"
+                  :key="tab.id"
+                  type="button"
+                  role="tab"
+                  :aria-selected="settingsTab === tab.id"
+                  :class="{ active: settingsTab === tab.id, 'unsaved-setting-tab': settingTabChanged(tab.id) }"
+                  :title="tab.label + '設定を開く'"
+                  @click="selectSettingsTab(tab.id)"
+                >{{ tab.label }}</button>
+              </div>
+              <div class="settings-nav-section">
+                <strong class="settings-nav-heading">詳細・その他</strong>
+                <button
+                  v-for="tab in settingsTabs.filter((item) => item.group === 'advanced')"
+                  :key="tab.id"
+                  type="button"
+                  role="tab"
+                  :aria-selected="settingsTab === tab.id"
+                  :class="{ active: settingsTab === tab.id, 'unsaved-setting-tab': settingTabChanged(tab.id) }"
+                  :title="tab.label + '設定を開く'"
+                  @click="selectSettingsTab(tab.id)"
+                >{{ tab.label }}</button>
+              </div>
             </div>
-          </div>
+          </aside>
           <p v-if="error" class="error settings-error">{{ error }}</p>
           <div v-if="changedSettingLabels.length" class="unsaved-change-list" aria-label="未保存変更のある設定項目">
             <strong>未保存変更</strong>
@@ -2633,7 +2645,7 @@ const vueApp = createApp({
           </div>
 
           <section v-if="settingsTab === 'feature'" class="settings-group" role="tabpanel">
-            <h3>機能</h3>
+            <h3>機能 ON/OFF</h3>
             <div class="setting-row" :class="settingRowChangedClass('autoPhoto.enabled')">
               <div><strong>VRChat写真自動処理</strong><p>VRChat上で撮影されたときに処理します。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.autoPhoto.enabled" /><span></span></label>
@@ -2662,6 +2674,22 @@ const vueApp = createApp({
                 <p v-if="state.config.screenshotAutoPost.enabled && autoProcessingWatchDirectoryWarning(state.config.screenshotAutoPost.screenshotDirectory)" class="setting-note warning">{{ autoProcessingWatchDirectoryWarning(state.config.screenshotAutoPost.screenshotDirectory) }}</p>
               </div>
             </div>
+            <div class="setting-row" :class="settingRowChangedClass('autoCapture.schedule.enabled')">
+              <div><strong>自動定期撮影</strong><p>ONにすると、設定した間隔でVRChatカメラ撮影を繰り返します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.schedule.enabled" /><span></span></label>
+            </div>
+            <div class="setting-row" :class="[{ disabled: !autoCaptureSettings.schedule.enabled }, settingRowChangedClass('autoCapture.schedule.captureIntervalSec')]">
+              <div><strong>定期撮影の間隔</strong><p>1回の撮影開始から次の撮影開始までの秒数です。最小10秒です。</p></div>
+              <label><input type="number" min="10" step="1" v-model.number="autoCaptureSettings.schedule.captureIntervalSec" :disabled="!autoCaptureSettings.schedule.enabled" /> 秒</label>
+            </div>
+            <div class="setting-row" :class="[{ disabled: !autoCaptureSettings.schedule.enabled }, settingRowChangedClass('autoCapture.schedule.initialDelaySec')]">
+              <div><strong>定期撮影の初回待機</strong><p>自動定期撮影を開始してから最初の撮影まで待つ秒数です。</p></div>
+              <label><input type="number" min="0" step="1" v-model.number="autoCaptureSettings.schedule.initialDelaySec" :disabled="!autoCaptureSettings.schedule.enabled" /> 秒</label>
+            </div>
+            <div class="setting-row" :class="[{ disabled: !autoCaptureSettings.schedule.enabled }, settingRowChangedClass('autoCapture.schedule.captureOnStart')]">
+              <div><strong>開始時に撮影</strong><p>AvatarBeaconのOSC基準が確定したら、定期撮影の初回待機とは別に1回撮影します。ワールド移動中は延期します。</p></div>
+              <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.schedule.captureOnStart" :disabled="!autoCaptureSettings.schedule.enabled" /><span></span></label>
+            </div>
             <div class="setting-row" :class="settingRowChangedClass('output.detectQrCodeUrls')">
               <div><strong>QRコードURL検出</strong><p>画像内のQRコードからURLを取得します。取得したURLはDiscord本文と結果画面に表示します。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.output.detectQrCodeUrls" /><span></span></label>
@@ -2669,7 +2697,7 @@ const vueApp = createApp({
           </section>
 
           <section v-if="settingsTab === 'autoCapture'" class="settings-group" role="tabpanel">
-            <h3>自動撮影</h3>
+            <h3>撮影処理</h3>
             <div v-if="!autoCaptureDetailView" class="settings-explainer">
               <strong>自動撮影は、VRChatのカメラをOSCで操作し、自動で定期的に撮影する機能です。</strong>
               <p :class="['setting-note', autoCaptureAvatarBeaconOK ? 'ok' : 'warning']">{{ autoCaptureAvatarBeaconStatusLine }}</p>
@@ -2700,25 +2728,7 @@ const vueApp = createApp({
                   <p>{{ autoCaptureDetailDescription() }}</p>
                 </div>
               </div>
-              <template v-if="autoCaptureDetailView === 'schedule'">
-                <div class="setting-row" :class="{ disabled: !autoCaptureSettings.schedule.enabled }">
-                  <div><strong>撮影間隔</strong><p>1回の撮影開始から次の撮影開始までの秒数です。最小10秒です。</p></div>
-                  <label>
-                    <input type="number" min="10" step="1" v-model.number="autoCaptureSettings.schedule.captureIntervalSec" :disabled="!autoCaptureSettings.schedule.enabled" />
-                  </label>
-                </div>
-                <div class="setting-row" :class="{ disabled: !autoCaptureSettings.schedule.enabled }">
-                  <div><strong>初回待機時間</strong><p>自動撮影開始後、最初の撮影まで待つ秒数です。</p></div>
-                  <label>
-                    <input type="number" min="0" step="1" v-model.number="autoCaptureSettings.schedule.initialDelaySec" :disabled="!autoCaptureSettings.schedule.enabled" />
-                  </label>
-                </div>
-                <div class="setting-row" :class="{ disabled: !autoCaptureSettings.schedule.enabled }">
-                  <div><strong>開始時に撮影</strong><p>自動撮影開始後、AvatarBeaconのOSC基準が確定してから1回撮影します。ワールド移動中は延期します。</p></div>
-                  <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.schedule.captureOnStart" :disabled="!autoCaptureSettings.schedule.enabled" /><span></span></label>
-                </div>
-              </template>
-              <template v-else-if="autoCaptureDetailView === 'composition'">
+              <template v-if="autoCaptureDetailView === 'composition'">
                 <section class="auto-capture-views" aria-label="構図設定">
                   <div class="auto-capture-views-header">
                     <div>
@@ -2766,6 +2776,8 @@ const vueApp = createApp({
                         <label><small>回転 Z</small><input type="number" step="0.001" v-model.number="cameraView.pose.rotation.z" :disabled="effectiveAutoCapturePreplacedLocalAnchor" /></label>
                         <label><small>拡大率</small><input type="number" min="20" max="150" step="0.1" v-model.number="cameraView.zoom" :disabled="effectiveAutoCapturePreplacedLocalAnchor" /></label>
                         <label><small>明るさ</small><input type="number" min="-10" max="10" step="0.1" v-model.number="cameraView.exposure" :disabled="effectiveAutoCapturePreplacedLocalAnchor" /></label>
+                        <label><small>構図反映待機 (ms)</small><input type="number" min="0" max="30000" step="50" v-model.number="cameraView.settleDelayMs" :disabled="effectiveAutoCapturePreplacedLocalAnchor" title="0の場合は撮影・出力の共通待機値を使います" /></label>
+                        <label><small>撮影前追加待機 (ms)</small><input type="number" min="0" max="30000" step="50" v-model.number="cameraView.captureDelayMs" :disabled="effectiveAutoCapturePreplacedLocalAnchor" /></label>
                       </div>
                       <div class="view-mask-controls" :class="{ disabled: effectiveAutoCapturePreplacedLocalAnchor }">
                         <label><input type="checkbox" v-model="cameraView.localPlayer" :disabled="effectiveAutoCapturePreplacedLocalAnchor" /> 自分</label>
@@ -2809,6 +2821,18 @@ const vueApp = createApp({
                 </section>
               </template>
               <template v-else-if="autoCaptureDetailView === 'capture'">
+                <div class="settings-explainer">
+                  <strong>自動撮影の待機時間</strong>
+                  <p>各操作の待機時間をミリ秒単位で調整できます。短くしすぎると、カメラ反映前の画像や空のSpout senderを取得する場合があります。</p>
+                </div>
+                <div class="setting-row">
+                  <div><strong>共通の構図反映待機</strong><p>カメラ位置や表示設定を送信してから撮影へ進むまで待つ時間です。構図側が0msのときに使います。</p></div>
+                  <label><input type="number" min="0" max="30000" step="50" v-model.number="autoCaptureSettings.capture.settleDelayMs" /> ms</label>
+                </div>
+                <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'photo' }">
+                  <div><strong>Photoボタン解放待機</strong><p>撮影ボタンを押してからOFFへ戻すまでの時間です。</p></div>
+                  <label><input type="number" min="1" max="5000" step="10" v-model.number="autoCaptureSettings.capture.buttonReleaseDelayMs" :disabled="autoCaptureSettings.capture.mode !== 'photo'" /> ms</label>
+                </div>
                 <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
                   <div><strong>Spout helper</strong><p>Stream Camera(Spout)映像を受信する同梱ヘルパーです。通常は初期値のまま使います。</p></div>
                   <div class="settings-control-stack">
@@ -2850,6 +2874,22 @@ const vueApp = createApp({
                   <label>
                     <input type="number" min="0" max="10000" step="100" v-model.number="autoCaptureSettings.stream.startDelayMs" :disabled="autoCaptureSettings.capture.mode !== 'stream'" />
                   </label>
+                </div>
+                <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
+                  <div><strong>sender ON再送後待機</strong><p>senderが見つからないとき、StreamingをONへ再送してから再確認するまでの時間です。</p></div>
+                  <label><input type="number" min="0" max="30000" step="50" v-model.number="autoCaptureSettings.stream.recoveryOnDelayMs" :disabled="autoCaptureSettings.capture.mode !== 'stream'" /> ms</label>
+                </div>
+                <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
+                  <div><strong>sender OFF後待機</strong><p>sender復旧でStreamingをOFFにしてから、再びONにするまでの時間です。</p></div>
+                  <label><input type="number" min="0" max="30000" step="50" v-model.number="autoCaptureSettings.stream.recoveryOffDelayMs" :disabled="autoCaptureSettings.capture.mode !== 'stream'" /> ms</label>
+                </div>
+                <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
+                  <div><strong>sender再起動後待機</strong><p>StreamingをOFF→ONしたあと、senderを再確認するまでの時間です。</p></div>
+                  <label><input type="number" min="0" max="30000" step="50" v-model.number="autoCaptureSettings.stream.recoveryRestartDelayMs" :disabled="autoCaptureSettings.capture.mode !== 'stream'" /> ms</label>
+                </div>
+                <div class="setting-row" :class="{ disabled: !autoCaptureSettings.restore.enabled }">
+                  <div><strong>Camera Mode復元後待機</strong><p>撮影前のCamera Modeを復元してから、位置や表示設定を復元するまでの時間です。</p></div>
+                  <label><input type="number" min="0" max="30000" step="50" v-model.number="autoCaptureSettings.restore.modeDelayMs" :disabled="!autoCaptureSettings.restore.enabled" /> ms</label>
                 </div>
                 <div class="setting-row" :class="{ disabled: autoCaptureSettings.capture.mode !== 'stream' }">
                   <div><strong>Spout録画デバッグ</strong><p>テスト撮影時だけ、Spout helperが受信したPNG化前のRGBA生フレームとmetadata/logを保存します。</p></div>
@@ -3069,24 +3109,14 @@ const vueApp = createApp({
             </div>
             <div class="setting-row" :class="settingRowChangedClass('autoCapture.idle')">
               <div>
-                <strong>待機カメラ位置</strong>
-                <p>自動撮影バッチ終了後、通常モードのカメラを指定位置へ退避します。</p>
-                <p>初期値はプレイヤー基準で足元方向 Y=-5m です。</p>
+                <strong>撮影後の待機カメラ位置（任意）</strong>
+                <p>自動撮影の終了時はCamera Lock（アンカー固定）とFlyingをOFFにします。さらにカメラを指定位置へ移動したい場合だけONにします。</p>
+                <p>初期値はOFFです。位置の初期値はプレイヤー基準で足元方向 Y=-5m です。</p>
                 <p v-if="effectiveAutoCapturePreplacedLocalAnchor">フォールバックモード中は送信しません。詳細設定は開けます。</p>
               </div>
               <div class="settings-overview-controls">
                 <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.idle.enabled" /><span></span></label>
                 <button type="button" class="secondary" title="待機カメラ位置の詳細設定を開きます。" aria-label="待機カメラ位置の詳細設定" @click="openAutoCaptureDetail('idle')">詳細設定</button>
-              </div>
-            </div>
-            <div class="setting-row" :class="settingRowChangedClass('autoCapture.schedule')">
-              <div>
-                <strong>自動撮影スケジュール</strong>
-                <p>一定間隔でVRChatカメラ撮影を実行します。</p>
-              </div>
-              <div class="settings-overview-controls">
-                <label class="switch"><input type="checkbox" v-model="autoCaptureSettings.schedule.enabled" /><span></span></label>
-                <button type="button" class="secondary" :title="autoCaptureSettings.schedule.enabled ? '撮影間隔、初回待機時間、開始時撮影を設定します。' : '自動撮影スケジュールをONにすると詳細設定を開けます。'" aria-label="自動撮影スケジュールの詳細設定" :disabled="!autoCaptureSettings.schedule.enabled" @click="openAutoCaptureDetail('schedule')">詳細設定</button>
               </div>
             </div>
             <div class="setting-row" :class="settingRowChangedClass('autoCapture.capture.mode')">
@@ -3281,7 +3311,7 @@ const vueApp = createApp({
           </section>
 
           <section v-if="settingsTab === 'process'" class="settings-group" role="tabpanel">
-            <h3>処理</h3>
+            <h3>縮小処理</h3>
             <div class="setting-row" :class="settingRowChangedClass('output.uploadDiscord')">
               <div><strong>ローカル保存</strong><p>処理した画像をローカルに保存します。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.output.saveLocal" /><span></span></label>
@@ -3346,7 +3376,7 @@ const vueApp = createApp({
           </section>
 
           <section v-if="settingsTab === 'webhook'" class="settings-group" role="tabpanel">
-            <h3>Discord投稿</h3>
+            <h3>投稿処理</h3>
             <div class="setting-row">
               <div><strong>Discord投稿</strong><p>縮小した画像をDiscord Webhookへ投稿し、VRChatで使うURLを取得します。</p></div>
               <label class="switch"><input type="checkbox" v-model="state.config.output.uploadDiscord" /><span></span></label>
@@ -3484,7 +3514,7 @@ const vueApp = createApp({
       <div v-if="pendingSensitiveSettingsConfirmation" class="modal-backdrop" role="dialog" aria-modal="true">
         <div class="confirm-dialog">
           <h2>重要な設定変更を確認してください</h2>
-          <p>Webhook、自動投稿、監視フォルダ、自動撮影スケジュールの変更が含まれています。保存前に内容を確認してください。</p>
+          <p>Webhook、自動投稿、監視フォルダ、自動定期撮影の変更が含まれています。保存前に内容を確認してください。</p>
           <ul class="confirmation-list">
             <li v-for="item in sensitiveSettingsConfirmationItems" :key="item.key">
               <span>{{ item.text }}</span>

@@ -40,6 +40,15 @@ func TestAppGetInitialStateRefreshesHistory(t *testing.T) {
 	}
 }
 
+func TestAutoCaptureResultModePreservesSettings(t *testing.T) {
+	if got := autoCaptureResultMode(appcore.ModeSettings); got != appcore.ModeSettings {
+		t.Fatalf("autoCaptureResultMode(settings) = %q, want settings", got)
+	}
+	if got := autoCaptureResultMode(appcore.ModeError); got != appcore.ModeResults {
+		t.Fatalf("autoCaptureResultMode(error) = %q, want results", got)
+	}
+}
+
 func appBoolPtr(value bool) *bool {
 	return &value
 }

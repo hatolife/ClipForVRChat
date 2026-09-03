@@ -174,12 +174,16 @@ ONの場合、縮小画像をファイルとして保存します。
 
 ## VRChat自動撮影
 
-v0.1.8では、設定画面の「自動撮影」タブからVRChat User CameraをOSCで操作し、構図ごとに撮影します。
+v0.1.8では、設定画面の「撮影処理」カテゴリからVRChat User CameraをOSCで操作し、構図ごとに撮影します。
 `player_local` の basis は `manual` と `avatar_osc` を選べます。`avatar_osc` は専用アバターギミックからOSC Avatar Parametersを受信する経路で、標準OSCだけでは動きません。
+
+`avatar_osc` を使う構図は、バッチ開始時の座標を固定せず、各構図のCamera Pose送信直前に最新のAvatarBeacon basisを再取得してworld座標へ変換します。
 
 AvatarBeacon は `avatar_osc` basis の確認に使う汎用アバターギミックであり、ClipForVRChat専用ではありません。AvatarBeaconの元ファイルは別リポジトリで管理し、ClipForVRChatのRelease workflowでは外部Releaseの `AvatarBeacon_v0.0.1.unitypackage` を通常zipと分離版zipへ同梱します。Unity projectへimportすると `Assets/PoppoWorks/AvatarBeacon/...` になる形を想定します。Prefab構造とparameter仕様は `docs/avatarbeacon-spec.md` に記録します。
 
-自動撮影スケジュール自体は既定OFFです。開始時撮影は既定ONですが、スケジュール有効時に `avatar_osc` basisが新鮮な状態、またはフォールバックモードが有効な状態になるまで待機してから実行します。VRChat output logからworld/instance情報を読む設定がONの場合は、world metadataが安定するまで待ってから開始します。
+「機能 ON/OFF」カテゴリの自動定期撮影は既定OFFです。開始時撮影は既定ONですが、自動定期撮影の有効時に `avatar_osc` basisが新鮮な状態、またはフォールバックモードが有効な状態になるまで待機してから実行します。VRChat output logからworld/instance情報を読む設定がONの場合は、world metadataが安定するまで待ってから開始します。
+
+自動撮影バッチ終了時は、復元と任意の待機位置移動のあとに `/usercamera/Lock=false`、`/usercamera/Flying=false` を送ります。待機位置移動は既定OFFです。VRChat公式OSCはAnchor ModeのDefault/Local/Worldを直接選択するendpointを公開していないため、アンカー固定解除は公開済みのCamera LockをOFFにして実機確認します。
 
 ### 撮影方式
 
@@ -198,6 +202,8 @@ Stream方式は主経路です。ffmpeg/gdigrabによるデスクトップやVRC
 
 - `world`: `/usercamera/Pose` へ設定値をそのまま送信します。
 - `player_local`: 手動保存したプレイヤー基準位置、または専用アバターギミックから受信した `avatar_osc` basis に対して、構図のローカル位置/回転を加算してから `/usercamera/Pose` へ送信します。
+
+`avatar_osc` basisはバッチ開始時に固定せず、各 `player_local` 構図の `/usercamera/Pose` 送信直前に最新値を再取得して座標変換します。現行のSpout方式は構図ごとに1フレームを取得するため、1フレーム単位の連続追従は行いません。将来、単一のSpout録画セッションで構図数と同数のフレームを得る方式へ変更する場合は、フレームごとのbasis再計算を行います。
 
 標準OSCだけではローカルプレイヤーroot位置/Yawを自動取得できないため、`manual` basis は「現在位置をmanual基準に保存」で保存した手動基準位置を使います。`avatar_osc` basis は Head/avatar 基準であり、player root 基準そのものではありません。基準位置が未設定、または `avatar_osc` が未受信/鮮度切れの場合、`player_local` 構図は撮影失敗として扱います。
 
@@ -459,9 +465,9 @@ URL一覧は以下の場合に表示します。
 
 設定画面の詳細仕様は [`SETTINGS_SPEC.md`](SETTINGS_SPEC.md) で管理します。
 
-この全体仕様では、設定画面が通常ユーザー向けの設定編集UIであり、`config.json` を直接編集しなくても主要な機能、自動撮影、OSC、処理、Discord投稿、更新確認、自動起動を切り替えられることだけを規定します。
+この全体仕様では、設定画面が通常ユーザー向けの設定編集UIであり、`config.json` を直接編集しなくても機能ON/OFF、縮小処理、投稿処理、撮影処理、OSC、更新確認、自動起動を切り替えられることだけを規定します。カテゴリは左側の縦ナビゲーション、選択した設定は右側のペインに表示します。
 
-通常の保存が成功した場合、設定画面に残り、選択中のタブ、詳細設定画面、スクロール位置を維持します。設定画面から別画面へ移動するときやウィンドウを閉じるときに未保存変更がある場合は、保存、破棄、キャンセルを選べる確認を表示します。
+通常の保存が成功した場合、設定画面に残り、選択中のカテゴリ、詳細設定画面、スクロール位置を維持します。設定画面から別画面へ移動するときやウィンドウを閉じるときに未保存変更がある場合は、保存、破棄、キャンセルを選べる確認を表示します。
 
 ### 更新通知
 
@@ -727,6 +733,9 @@ config.json
       "spoutAutoSelect": true,
       "captureTimeoutMs": 10000,
       "startDelayMs": 1000,
+      "recoveryOnDelayMs": 800,
+      "recoveryOffDelayMs": 300,
+      "recoveryRestartDelayMs": 1200,
       "debugRecordingEnabled": false,
       "debugFrameCount": 8,
       "legacyFfmpegPath": "ffmpeg"
@@ -735,6 +744,7 @@ config.json
       "enabled": true,
       "preferSnapshot": true,
       "snapshotFreshnessSec": 10,
+      "modeDelayMs": 150,
       "fallback": {
         "mode": 0,
         "streaming": false,
@@ -806,7 +816,7 @@ config.json
         },
         "zoom": 45,
         "exposure": 0,
-        "settleDelayMs": 1500,
+        "settleDelayMs": 0,
         "captureDelayMs": 0,
         "calibrated": false
       }
@@ -858,7 +868,7 @@ config.json
         "localPlayer": true,
         "remotePlayer": true,
         "environment": true,
-        "settleDelayMs": 1500,
+        "settleDelayMs": 0,
         "captureDelayMs": 0,
         "calibrated": false
       }

@@ -35,8 +35,17 @@ func TestDefaultAutoCaptureConfig(t *testing.T) {
 	if cfg.AutoCapture.Capture.Mode != "stream" || cfg.AutoCapture.Stream.SpoutHelperPath == "" || !cfg.AutoCapture.Stream.SpoutAutoSelect {
 		t.Fatalf("unexpected stream defaults: capture=%+v stream=%+v", cfg.AutoCapture.Capture, cfg.AutoCapture.Stream)
 	}
+	if cfg.AutoCapture.Capture.SettleDelayMS != 1500 || cfg.AutoCapture.Capture.ButtonReleaseDelayMS != 200 {
+		t.Fatalf("unexpected capture wait defaults: %+v", cfg.AutoCapture.Capture)
+	}
+	if cfg.AutoCapture.Stream.RecoveryOnDelayMS != 800 || cfg.AutoCapture.Stream.RecoveryOffDelayMS != 300 || cfg.AutoCapture.Stream.RecoveryRestartDelayMS != 1200 {
+		t.Fatalf("unexpected stream wait defaults: %+v", cfg.AutoCapture.Stream)
+	}
 	if !cfg.AutoCapture.Restore.Enabled || !cfg.AutoCapture.Restore.PreferSnapshot || cfg.AutoCapture.Restore.SnapshotFreshnessSec != 10 {
 		t.Fatalf("unexpected restore defaults: %+v", cfg.AutoCapture.Restore)
+	}
+	if cfg.AutoCapture.Restore.ModeDelayMS != 150 {
+		t.Fatalf("unexpected restore mode wait default: %+v", cfg.AutoCapture.Restore)
 	}
 	if cfg.AutoCapture.Capture.AutoLevelRollBeforeShot == nil || !*cfg.AutoCapture.Capture.AutoLevelRollBeforeShot {
 		t.Fatalf("AutoLevelRollBeforeShot should be enabled by default: %+v", cfg.AutoCapture.Capture)
@@ -71,6 +80,9 @@ func TestDefaultAutoCaptureConfig(t *testing.T) {
 	if cfg.AutoCapture.Views[0].CoordinateSpace != "player_local" || cfg.AutoCapture.Views[0].Pose.Position.Z != 1.0 {
 		t.Fatalf("default front view pose was not initialized: %+v", cfg.AutoCapture.Views[0])
 	}
+	if cfg.AutoCapture.Views[0].SettleDelayMS != 0 {
+		t.Fatalf("front view settle delay = %d, want shared default (0)", cfg.AutoCapture.Views[0].SettleDelayMS)
+	}
 }
 
 func TestAutoCaptureConfigNormalize(t *testing.T) {
@@ -83,10 +95,19 @@ func TestAutoCaptureConfigNormalize(t *testing.T) {
 			RequestedCameraCount:  10,
 			OpenCameraBeforeBatch: true,
 			CloseCameraAfterBatch: true,
+			SettleDelayMS:         -1,
+			ButtonReleaseDelayMS:  0,
+		},
+		Stream: AutoCaptureStreamConfig{
+			RecoveryOnDelayMS:      30001,
+			RecoveryOffDelayMS:     -1,
+			RecoveryRestartDelayMS: 30001,
 		},
 		Output:  AutoCaptureOutputConfig{ImageFormat: "gif"},
 		Discord: AutoCaptureDiscordConfig{PostMode: "bad"},
 	}}
+	cfg.AutoCapture.Restore = defaultAutoCaptureRestoreConfig()
+	cfg.AutoCapture.Restore.ModeDelayMS = -1
 	cfg.Normalize()
 	if cfg.AutoCapture.Schedule.CaptureIntervalSec != 10 {
 		t.Fatalf("CaptureIntervalSec = %d, want 10", cfg.AutoCapture.Schedule.CaptureIntervalSec)
@@ -99,6 +120,15 @@ func TestAutoCaptureConfigNormalize(t *testing.T) {
 	}
 	if cfg.AutoCapture.Capture.OpenCameraBeforeBatch || cfg.AutoCapture.Capture.CloseCameraAfterBatch {
 		t.Fatalf("camera auto open/close should default off: %+v", cfg.AutoCapture.Capture)
+	}
+	if cfg.AutoCapture.Capture.SettleDelayMS != 0 || cfg.AutoCapture.Capture.ButtonReleaseDelayMS != 1 {
+		t.Fatalf("capture wait normalize failed: %+v", cfg.AutoCapture.Capture)
+	}
+	if cfg.AutoCapture.Stream.RecoveryOnDelayMS != 30000 || cfg.AutoCapture.Stream.RecoveryOffDelayMS != 0 || cfg.AutoCapture.Stream.RecoveryRestartDelayMS != 30000 {
+		t.Fatalf("stream wait normalize failed: %+v", cfg.AutoCapture.Stream)
+	}
+	if cfg.AutoCapture.Restore.ModeDelayMS != 0 {
+		t.Fatalf("restore wait normalize failed: %+v", cfg.AutoCapture.Restore)
 	}
 	if cfg.AutoCapture.Capture.AutoLevelRollBeforeShot == nil || !*cfg.AutoCapture.Capture.AutoLevelRollBeforeShot {
 		t.Fatalf("AutoLevelRollBeforeShot should default on: %+v", cfg.AutoCapture.Capture)
@@ -215,7 +245,8 @@ func TestApplyCameraViewTemporarilyEnablesFlyingAroundPose(t *testing.T) {
 	}
 	defer client.close()
 
-	if err := (AutoCaptureRunner{Config: cfg}).applyCameraView(client, view); err != nil {
+	runner := AutoCaptureRunner{Config: cfg}
+	if err := runner.applyCameraView(client, view); err != nil {
 		t.Fatal(err)
 	}
 
@@ -234,6 +265,85 @@ func TestApplyCameraViewTemporarilyEnablesFlyingAroundPose(t *testing.T) {
 	}
 }
 
+func TestApplyCameraViewRefreshesAvatarBasisImmediatelyBeforeEachPose(t *testing.T) {
+	conn, port := listenOSCUserCameraPackets(t)
+	defer conn.Close()
+
+	cfg := DefaultConfig()
+	cfg.AutoCapture.OSC.Host = "127.0.0.1"
+	cfg.AutoCapture.OSC.SendPort = port
+	view := cfg.AutoCapture.Views[0]
+	view.Pose.Position = CameraVector3Config{X: 1}
+
+	refreshCalls := 0
+	runner := AutoCaptureRunner{
+		Config: cfg,
+		RefreshPlayerLocalBasis: func() (CameraPoseConfig, string, error) {
+			refreshCalls++
+			return CameraPoseConfig{Position: CameraVector3Config{X: float64(refreshCalls * 10)}}, fmt.Sprintf("refresh-%d", refreshCalls), nil
+		},
+	}
+	client := oscClient{host: "127.0.0.1", port: port}
+	if err := client.open(); err != nil {
+		t.Fatal(err)
+	}
+	defer client.close()
+
+	if err := runner.applyCameraView(client, view); err != nil {
+		t.Fatal(err)
+	}
+	if err := runner.applyCameraView(client, view); err != nil {
+		t.Fatal(err)
+	}
+
+	samples := withoutVersionNoticePackets(readOSCPacketSamples(t, conn))
+	poses := make([]CameraPoseConfig, 0, 2)
+	for _, sample := range samples {
+		if sample.Address == "/usercamera/Pose" && sample.HasPose {
+			poses = append(poses, sample.Pose)
+		}
+	}
+	if refreshCalls != 2 {
+		t.Fatalf("refresh calls = %d, want 2", refreshCalls)
+	}
+	if len(poses) != 2 {
+		t.Fatalf("pose packets = %d, want 2: %+v", len(poses), samples)
+	}
+	if poses[0].Position.X != 11 || poses[1].Position.X != 21 {
+		t.Fatalf("resolved pose X = [%v, %v], want [11, 21]", poses[0].Position.X, poses[1].Position.X)
+	}
+}
+
+func TestFinishUserCameraStateAlwaysDisablesLockAndFlying(t *testing.T) {
+	conn, port := listenOSCUserCameraPackets(t)
+	defer conn.Close()
+
+	cfg := DefaultConfig()
+	cfg.AutoCapture.OSC.Host = "127.0.0.1"
+	cfg.AutoCapture.OSC.SendPort = port
+	cfg.AutoCapture.Restore.Enabled = false
+	cfg.AutoCapture.Idle.Enabled = false
+
+	client := oscClient{host: "127.0.0.1", port: port}
+	if err := client.open(); err != nil {
+		t.Fatal(err)
+	}
+	defer client.close()
+
+	(AutoCaptureRunner{Config: cfg}).finishUserCameraState(client)
+
+	samples := withoutVersionNoticePackets(readOSCPacketSamples(t, conn))
+	if len(samples) != 2 {
+		t.Fatalf("packet count = %d, want 2: %+v", len(samples), samples)
+	}
+	if samples[0].Address != "/usercamera/Lock" || !samples[0].HasBool || samples[0].Bool {
+		t.Fatalf("packet[0] = %+v, want Lock=false", samples[0])
+	}
+	if samples[1].Address != "/usercamera/Flying" || !samples[1].HasBool || samples[1].Bool {
+		t.Fatalf("packet[1] = %+v, want Flying=false", samples[1])
+	}
+}
+
 func TestApplyCameraViewDisablesFlyingWhenPoseSendFails(t *testing.T) {
 	cfg := DefaultConfig()
 	view := cfg.AutoCapture.Views[0]
@@ -242,7 +352,8 @@ func TestApplyCameraViewDisablesFlyingWhenPoseSendFails(t *testing.T) {
 	conn := &addressFailConn{failAddress: "/usercamera/Pose"}
 	client := oscClient{host: "127.0.0.1", port: 9000, conn: conn}
 
-	err := (AutoCaptureRunner{Config: cfg}).applyCameraView(client, view)
+	runner := AutoCaptureRunner{Config: cfg}
+	err := runner.applyCameraView(client, view)
 	if err == nil {
 		t.Fatal("applyCameraView returned nil, want pose send error")
 	}

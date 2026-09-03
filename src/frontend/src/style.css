@@ -339,55 +339,68 @@ button:disabled {
 }
 
 .settings-layout {
-  max-width: 960px;
+  max-width: 1120px;
   display: grid;
-  gap: 0;
+  grid-template-columns: 210px minmax(0, 1fr);
+  align-items: start;
+  gap: 20px;
 }
 
 .settings-topbar {
   position: sticky;
-  top: -24px;
+  top: 0;
   z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  min-height: 54px;
-  padding-top: 8px;
-  background: #edf3f7;
-  border-bottom: 1px solid #c9d4df;
+  grid-column: 1;
+  grid-row: 1 / span 20;
+  padding: 12px;
+  border: 1px solid #d6dee7;
+  border-radius: 8px;
+  background: #f7fafc;
 }
 
 .settings-tabs {
-  align-self: end;
-  display: flex;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  gap: 0;
+  display: grid;
+  gap: 18px;
+}
+
+.settings-nav-section {
+  display: grid;
+  gap: 4px;
+}
+
+.settings-nav-heading {
+  padding: 4px 10px 6px;
+  color: #6a7886;
+  font-size: 12px;
+  letter-spacing: 0.04em;
 }
 
 .settings-tabs button {
-  min-width: 96px;
-  padding: 10px 14px;
-  border-color: #c9d4df;
-  border-bottom-color: transparent;
-  border-radius: 7px 7px 0 0;
-  background: #f7fafc;
+  width: 100%;
+  padding: 10px 12px;
+  border-color: transparent;
+  border-radius: 6px;
+  background: transparent;
   color: #17212b;
-  margin-bottom: -1px;
   font-weight: 600;
+  text-align: left;
 }
 
 .settings-tabs button.active {
-  border-color: #1f6f9d;
-  border-bottom-color: #ffffff;
-  background: #ffffff;
+  border-color: #b8d4e5;
+  background: #e4f1f8;
   color: #1b638f;
+  box-shadow: inset 3px 0 0 #1f6f9d;
 }
 
 .settings-tabs button.unsaved-setting-tab {
   border-color: #d99f22;
   color: #74530b;
-  box-shadow: inset 0 3px 0 #d99f22;
+  box-shadow: inset 3px 0 0 #d99f22;
+}
+
+.settings-layout > :not(.settings-topbar) {
+  grid-column: 2;
 }
 
 .settings-error {
@@ -445,7 +458,7 @@ button:disabled {
   border: 1px solid #d6dee7;
   border-radius: 8px;
   background: #ffffff;
-  margin-top: 16px;
+  margin-top: 0;
 }
 
 .settings-explainer {
@@ -1773,6 +1786,20 @@ small {
   .view-fields,
   .history-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-topbar {
+    position: static;
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .settings-layout > :not(.settings-topbar) {
+    grid-column: 1;
   }
 
   .switch {
