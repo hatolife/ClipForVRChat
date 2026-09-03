@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 55600)
-Total output lines: 3583
-
 import { createApp } from 'vue/dist/vue.esm-bundler.js'
 import './style.css'
 import { resumeAfterAutoPostConfirmation } from './settingsConfirmationFlow.js'
@@ -2311,7 +2308,218 @@ const vueApp = createApp({
       <section v-if="view === 'help'" class="panel help">
         <div class="section-title">
           <h2>使い方</h2>
-          <p class="subtle">ClipForVRChatは、VRChatで使う画像URLを作ったり、…5600 tokens truncated…e>
+          <p class="subtle">ClipForVRChatは、VRChatで使う画像URLを作ったり、撮影した画像を保存・投稿したりするためのアプリです。</p>
+        </div>
+
+        <article class="help-content">
+          <section class="help-section">
+            <h3>機能概要</h3>
+            <ol>
+              <li>
+                <strong>画像を処理する</strong>
+                <p>既定では、大きい画像を最大2048x2048に収まるよう縮小できます。画像ファイルをドラッグ&ドロップして処理でき、クリップボードに入っている画像や複数画像もまとめて処理できます。</p>
+                <p>VRChat写真自動処理をONにすると、ゲーム内で撮影された新しい写真を検出して自動で処理できます。スクリーンショット自動処理をONにすると、Windows + Shift + Sなどで保存された画像も自動で処理できます。</p>
+              </li>
+              <li>
+                <strong>処理した画像を保存・投稿する</strong>
+                <p>ローカルフォルダへ保存できます。Discord Webhookへ投稿し、投稿後の画像URLをコピーできます。QRコードURL検出をONにすると、画像内のQRコードURLを結果画面やDiscord本文に含められます。</p>
+              </li>
+              <li>
+                <strong>VRChatのカメラで自動撮影する</strong>
+                <p>AvatarBeaconを使うと、アバター基準の構図を設定し、自動でカメラを移動させて撮影できます。OSCでUser Cameraを操作して、設定した構図や間隔で撮影し、Stream Camera(Spout)の映像を取得して画像として保存できます。</p>
+                <p>フォールバックモードでは、VRChat内であらかじめ配置したローカルアンカーCameraを使って撮影できます。AvatarBeaconを使えない場合でも撮影できますが、ClipForVRChatはカメラ移動を送信しません。構図ごとの位置、拡大率、表示対象などは使われず、VRChat内で配置済みのカメラ状態をそのまま使います。</p>
+              </li>
+              <li>
+                <strong>結果やログを確認する</strong>
+                <p>履歴画面で過去の処理結果を確認・整理できます。履歴画面からDiscordに投稿した画像を削除できます。OSCタブでは送受信OSCを確認できます。不具合報告用データを生成し、設定、履歴、ログをまとめて送れる形にできます。</p>
+              </li>
+            </ol>
+          </section>
+
+          <section class="help-section">
+            <h3>1. 画像縮小</h3>
+            <p>まずは、処理したい画像ファイルをこのウィンドウへドラッグ&ドロップします。クリップボードに入っている画像を使う場合は、「クリップボード画像を処理」ボタンから処理できます。複数の画像をまとめて処理することもできます。</p>
+            <p>既定では、大きい画像は最大2048x2048に収まるよう縮小されます。それ以下の場合は縮小しません。画像形式、品質、ファイル名のサフィックスなどは設定画面から変更できます。</p>
+          </section>
+
+          <section class="help-section">
+            <h3>2. 画像保存・投稿</h3>
+            <p>処理した画像は、保存、Discord投稿、URLコピーができます。保存だけ投稿はしない、といった使い方も可能です。</p>
+            <p>VRChatで撮った写真を毎度貼り付けるのが面倒な場合は、設定 &gt; 機能 &gt; VRChat写真自動処理 をONにしてください。</p>
+            <p>Windows + Shift + Sなどで保存したスクリーンショットも自動で処理できます。設定 &gt; 機能 &gt; スクリーンショット自動処理 をONにします。</p>
+            <p>QRコード読み取り機能を使いたい場合は、設定 &gt; 機能 &gt; QRコードURL検出 をONにします。QRコードは1枚の画像に複数個あってもある程度対応していますが、完全ではないので注意してください。</p>
+            <p>処理結果は結果画面に表示されます。画像URLがある結果ではURLをコピーできます。ローカル保存した結果では、保存先を開けます。1枚だけ処理した場合は、設定がONなら画像URLを自動でクリップボードへコピーします。</p>
+            <p>Discordへ投稿する場合は、設定 &gt; Discord投稿 から投稿先チャンネルのWebhook URLを登録してください。Webhook URLは機能ごとに分けて設定可能です。</p>
+            <button class="link-button inline" @click="openURL(webhookGuideUrl)" title="DiscordのWebhook作成方法を開く">Discord公式: ウェブフックのご紹介</button>
+          </section>
+
+          <section class="help-section">
+            <h3>3. 自動撮影</h3>
+            <p>VRChat内のカメラを使って定期的に撮影したい場合は、自動撮影を使います。自動撮影は、VRChatのカメラを自動で定期的に撮影する機能です。</p>
+            <p>2つのモードがあり、初期状態ではフォールバックモードで動作します。</p>
+            <p>フォールバックモードでは、VRChat内であらかじめ配置したカメラを使って撮影します。ClipForVRChatは自動で定期的に撮影だけします。アンカーをローカルに設定しておくとアバターが移動しても追従してくれるので便利かと思います。</p>
+            <p>フォールバックモードがOFFの時、通常モードで動作します。通常モードでは事前に決めた構図にカメラを自動で移動させて撮影できます。構図は何個でも設定可能です。初期値では一定時間ごとに、正面、背面、斜めからの構図で3枚撮影します。</p>
+            <p>通常モードを使用するためには、アバターギミックの導入が必須となります。</p>
+
+            <div class="help-callout">
+              <h4>なぜアバターギミックの導入が必要なのか</h4>
+              <p>OSCでカメラの位置を制御するには、カメラを配置する座標をワールド座標系で指定する必要があります。ワールド座標系でアバター基準でカメラを配置するにはアバターの位置情報が必要です。</p>
+              <p>例えば、アバターの正面1mくらいのところにカメラ配置したい、というのを実現するには、アバターがワールド内のどこにいるのか調べ、アバターの向きを調べ、アバターの正面1mの位置を計算する必要があります。</p>
+              <p>しかし、公式の方法ではワールド内のアバター位置を取得する方法が提供されていません。ワールド側のギミックとしてなら可能ですが、その場合特定のワールドだけでしか使えない機能になってしまいます。よって、任意のワールドでアバター基準にカメラを自動配置することは、公式機能だけでは難しいです。</p>
+              <p>ClipForVRChatではこの問題を解決するため、ワールド内のプレイヤーの位置情報をOSCで送信するアバターギミック AvatarBeacon を用意しました。AvatarBeacon は、プレーヤーのHeadの座標と向きをOSCで送信するアバターギミックです。</p>
+              <p>AvatarBeaconから送信されたプレーヤーの位置と向き情報を使って、ClipForVRChatで配置先カメラ位置を計算し、アバター基準の自動撮影を実現しています。ClipForVRChatで自動でカメラを移動させて撮影する機能を使用するためには、AvatarBeaconの導入が必要となります。</p>
+              <button class="link-button inline" @click="openURL('https://github.com/hatolife/AvatarBeacon')" title="AvatarBeaconのGitHubリポジトリを開く">AvatarBeacon</button>
+            </div>
+
+            <div class="help-callout">
+              <h4>AvatarBeaconをアバターへ導入する方法</h4>
+              <p>AvatarBeaconはv0.1.8以降のClipForVRChatの配布zipにunitypackageとして含まれているはずです。必要であれば下記からダウンロードできます。</p>
+              <button class="link-button inline" @click="openURL('https://github.com/hatolife/AvatarBeacon/releases/download/v0.0.1/AvatarBeacon_v0.0.1.unitypackage')" title="AvatarBeacon v0.0.1 unitypackageを開く">AvatarBeacon_v0.0.1.unitypackage</button>
+              <p>AvatarBeaconの導入は、Unityでアバターを編集できる環境で行います。VRCSDKとModular Avatarを導入済みのアバタープロジェクトを開き、<code>AvatarBeacon_v0.0.1.unitypackage</code> をimportしてください。importできると、Projectに <code>Assets/PoppoWorks/AvatarBeacon</code> が追加されます。</p>
+              <p>この中にある <code>Assets/PoppoWorks/AvatarBeacon/Prefabs/AvatarBeacon_main.prefab</code> を使用します。Hierarchy上で、使いたいアバターのroot直下に <code>AvatarBeacon_main.prefab</code> を配置してください。</p>
+              <p>設定できたらアバターをアップロードし、VRChatでそのアバターに切り替えます。VRChatのAction Menuで <code>Options &gt; OSC &gt; Enabled</code> をONにしてください。</p>
+              <p>AvatarBeaconのOSCが届かない場合は、ゲーム内で位置を移動すると反応する場合があります。それでもダメな場合、<code>Options &gt; OSC &gt; Reset OSC Config</code> を実行し、アバターを読み込み直してください。ClipForVRChat側では、自動撮影タブまたはOSCタブのAvatarBeacon受信状態で、最終受信時刻、position、yawが更新されることを確認します。</p>
+            </div>
+
+            <p>また、フォールバックモードでも通常モードでも、ゲーム内でカメラを手動で起動しておく必要があります。これは、2026年7月時点のVRChatでは、Camera UIを閉じるとOSCによるカメラ制御が効かない不具合があるためです。そのため、自動撮影を使うときはゲーム内でカメラを手動で起動しておく必要があります。</p>
+            <button type="button" class="link-button inline" @click="openURL('https://feedback.vrchat.com/bug-reports/p/camera-osc-does-not-work-unless-camera-ui-is-open')" title="VRChat FeedbackのCamera OSC不具合報告を開く">VRChat Feedback: Camera OSC does not work unless Camera UI is open</button>
+          </section>
+
+          <section class="help-section">
+            <h3>4. 結果・ログ確認</h3>
+            <p>履歴画面では、これまで処理した画像の結果を確認できます。Discordへ投稿した画像、ローカル保存した画像、履歴だけに残っている画像を区別しながら、必要に応じて削除や整理ができます。</p>
+            <p>履歴画面からDiscordに投稿した画像を削除することもできます。削除しないようピン留めも可能です。</p>
+            <p>OSCタブでは、VRChatから受信したOSCやClipForVRChatから送信したOSCを確認できます。他のOSCアプリも同時に使いたい場合は、VRChatから届いたOSCを別ポートへ転送できます。</p>
+            <p>不具合報告が必要なときは、情報画面から不具合報告用データを生成できます。</p>
+          </section>
+        </article>
+
+        <div class="button-row">
+          <button class="secondary" @click="setView('main', 'help_close')" title="前の画面へ戻る">閉じる</button>
+        </div>
+      </section>
+
+      <section v-else-if="view === 'about'" class="panel about">
+        <h2>このアプリについて</h2>
+        <dl>
+          <div><dt>プログラム名</dt><dd>{{ info.name }}</dd></div>
+          <div><dt>バージョン</dt><dd>{{ info.version }}</dd></div>
+          <div><dt>ライセンス</dt><dd>MIT License / Copyright (c) 2026 hatolife</dd></div>
+          <div><dt>GitHub</dt><dd><button class="link-button" @click="openURL(info.github)" title="GitHubのリポジトリを開く">{{ info.github }}</button></dd></div>
+          <div><dt>作者</dt><dd><button class="link-button" @click="openURL(authorTwitterUrl)" title="作者のXを開く">@hato_poppo_life</button></dd></div>
+          <div><dt>バグ報告</dt><dd><button class="link-button" @click="openURL(issuesUrl)" title="GitHub Issueを開く">{{ issuesUrl }}</button></dd></div>
+        </dl>
+        <section class="about-note">
+          <h3>公式の配布場所</h3>
+          <p>公式の配布場所は下記のみです。</p>
+          <ul>
+            <li><button class="link-button inline" @click="openURL(latestReleaseUrl)" title="最新Releaseを開く">GitHub - https://github.com/hatolife/ClipForVRChat/releases/latest</button></li>
+            <li><button class="link-button inline" @click="openURL(boothUrl)" title="BOOTHを開く">BOOTH - https://hatolife.booth.pm/items/8531663</button></li>
+          </ul>
+        </section>
+        <section class="about-note">
+          <h3>PGPで改竄確認できます</h3>
+          <p>
+            GitHub Releasesでは、通常利用者向けzipとは別に <code>ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc</code> 署名ファイルも配布しています。
+          </p>
+          <p>
+            信頼済みfingerprintの公開鍵で検証した場合に限り、zip内のexeと署名の組み合わせを確認できます。
+          </p>
+          <ol>
+            <li><button class="link-button inline" @click="openURL(releasesUrl)" title="Release一覧を開く">GitHub Releases</button> で使いたいバージョンを開きます。</li>
+            <li><code>ClipForVRChat-vX.Y.Z-windows-amd64.zip</code> を展開します。</li>
+            <li>同じReleaseに別添付されている <code>.exe.asc</code> を、展開した <code>ClipForVRChat.exe</code> と同じフォルダに保存します。</li>
+            <li><code>release-signing@hato.life</code> の公開鍵を取り込み、fingerprintが <code>BE40 AA8D 082F 493F 613B C072 21DC 3486 1B40 E77D</code> と一致することを、このアプリのREADMEや公式配布ページなどRelease assetとは別の信頼経路で確認します。</li>
+            <li>コマンドプロンプトやPowerShellで <code>gpg --verify ClipForVRChat-vX.Y.Z-windows-amd64.exe.asc ClipForVRChat.exe</code> を実行します。</li>
+            <li>信頼済みfingerprintの公開鍵で <code>Good signature</code> と表示された場合に限り、その鍵で署名されたexeとして確認できます。</li>
+          </ol>
+          <p>同じReleaseに同梱されたURLや公開鍵だけでは、公開鍵自体の真正性は確認できません。</p>
+          <p>PGPがよく分からない場合は、公式の配布場所から直接ダウンロードしてください。</p>
+          <ul>
+            <li><button class="link-button inline" @click="openURL(latestReleaseUrl)" title="最新Releaseを開く">GitHub - https://github.com/hatolife/ClipForVRChat/releases/latest</button></li>
+            <li><button class="link-button inline" @click="openURL(boothUrl)" title="BOOTHを開く">BOOTH - https://hatolife.booth.pm/items/8531663</button></li>
+          </ul>
+        </section>
+        <section class="about-note">
+          <h3>連絡・要望</h3>
+          <p>
+            不具合や使いにくい点、要望などがありましたら、Twitterの <button class="link-button inline" @click="openURL(authorTwitterUrl)" title="作者のXを開く">@hato_poppo_life</button> までお気軽にご連絡ください。
+          </p>
+          <p>
+            「こんな機能が欲しい」といったご意見でも問題ありません。全てのご要望にお応えすることは難しいですが、できる限り改善していきます。
+          </p>
+          <p>
+            できれば
+            <button class="link-button inline" @click="openURL(feedbackTweetUrl)" title="返信元の投稿を開く">このツイートへの返信</button>
+            でご連絡いただけると、管理しやすく助かります。
+          </p>
+          <p>
+            GitHubのIssueからの報告でも問題ありません。日本語で気軽に投稿してください。
+          </p>
+          <p>
+            恐らく反応はTwitterのほうが早いです。GitHub Issueは返信が遅くなる場合がありますが、ご容赦ください。
+          </p>
+        </section>
+        <section class="about-note">
+          <h3>不具合報告について</h3>
+          <div class="diagnostic-report-text">
+            <p>不具合報告の際は、下記のボタンから生成できる不具合報告用データを添付していただける修正できる可能性が高まります。</p>
+            <p>下記の不具合報告用データ作成ボタンを押すと生成されます。</p>
+            <p>生成されるデータは2つあります。不具合報告の際は2.を添付してください。</p>
+
+            <ol>
+              <li>2の元データとなるzipファイル 内容物確認用</li>
+              <li>暗号化された<button class="link-button inline" @click="openURL('https://gnupg.org/')" title="GnuPG公式サイトを開く">gpgファイル</button> 不具合報告用</li>
+            </ol>
+
+            <p class="diagnostic-report-break">1.のzipファイルは、不具合報告データには何が含まれているのだろうと不安になる場合に内容を確認してもらうためのデータになります。</p>
+            <p>もう少し詳しく説明します。</p>
+            <p>不具合報告用データの元となるデータには、設定ファイル、履歴、ログ、実行ファイル本体、画像保持フォルダの情報が含まれます。</p>
+            <p>これを処理して可能な範囲で個人情報が含まれないようにしたデータをzipにしています。</p>
+            <p>例えばログや設定などのテキストに含まれるユーザーフォルダのパスは、可能な範囲で <code>%USERPROFILE%</code> などの環境変数表記へ置換されます。</p>
+            <p>このzipにはそうした処理後のデータになります。</p>
+
+            <p class="diagnostic-report-break">2.は1.のzipファイルを暗号化したものです。</p>
+            <p>1.のzipには基本的に個人情報は含まれないと考えていますが、</p>
+            <p>前述した処理が不十分で、秘匿性の高い情報が含まれてしまうかもしれません。</p>
+            <p>こうした場合でも問題にならないよう、GPGによる暗号化処理を行ったデータを生成するようにしました。</p>
+            <p>正式リリースされたプログラムで作成される2.の不具合報告用データは、<button class="link-button inline" @click="openURL(authorTwitterUrl)" title="作者のXを開く">作者</button>のみ復号できます。</p>
+            <p>とは言え、間違ってzipを添付してもzipにそれほど重要な情報が含まれる可能性は低いと思われるので、大した問題は発生しないと思います。</p>
+
+            <p class="diagnostic-report-break">ただpgpで暗号化されたデータがこのzipのデータだと信じられない場合もあろうかと思います。</p>
+            <p>この場合、ClipForVRChatの暗号化処理が信用できないという状態なので、<button class="link-button inline" @click="openURL(info.github)" title="GitHubのソースコードを開く">GitHubのソースコード</button>を確認してもらうか、</p>
+            <p><button class="link-button inline" @click="openURL('https://keys.openpgp.org/search?q=poppo@hato.life')" title="作者の公開鍵を開く">作者の公開鍵</button> を使用して暗号化する作業をご自身でして頂く必要があると思います。</p>
+            <p>作者としてはどちらでも構いません。</p>
+            <p>いずれにせよ不具合報告用データは、不具合の調査および原因解析の目的にのみ使用します。</p>
+
+            <p class="diagnostic-report-break">不具合報告頂いても対応できるかは状況次第です。</p>
+            <p>少なくとも作者の環境で再現できない不具合は対処が難しいです。ご了承ください。</p>
+          </div>
+          <div class="button-row">
+            <button @click="createDiagnosticPackage" :disabled="diagnosticGenerating" title="不具合報告用データを作成する">不具合報告用データ生成</button>
+          </div>
+        </section>
+        <section class="about-note">
+          <h3>その他</h3>
+          <div class="button-row">
+            <button @click="setView('licenses', 'about_licenses')" title="OSSライセンス一覧を開く">OSSライセンス</button>
+            <button class="secondary" @click="setView('main', 'about_close')" title="前の画面へ戻る">閉じる</button>
+          </div>
+        </section>
+      </section>
+
+      <section v-else-if="view === 'licenses'" class="panel licenses">
+        <h2>OSSライセンス</h2>
+        <p class="subtle">このアプリで使用しているOSSです。</p>
+        <div class="license-list">
+          <article v-for="license in appLicenses" :key="license.name" class="license-card">
+            <h3>{{ license.name }}</h3>
+            <p>{{ license.license }}</p>
+            <p>{{ license.copyright }}</p>
+            <button class="link-button" @click="openURL(license.url)" title="このOSSの配布元を開く">{{ license.url }}</button>
+            <details v-if="license.text" class="license-text">
+              <summary>ライセンス本文</summary>
+              <pre>{{ license.text }}</pre>
             </details>
           </article>
         </div>
