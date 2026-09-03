@@ -12,8 +12,14 @@
 - 自動撮影画像にsidecar JSONとPNG/JPEGメタデータを保存し、VRChat output logから推定した同席ユーザー、world ID、instance IDも記録できるようにしました。
 - 自動撮影結果を既存の結果/履歴画面、ローカル保存、Discord投稿へ統合しました。専用Webhook URLが空欄の場合は通常投稿用Webhook URLへフォールバックします。
 - AvatarBeaconからOSC Avatar Parametersで受け取る `avatar_osc` basisを使い、プレイヤー基準の構図をアバター位置と向きに追従できるようにしました。
+- 各 `player_local` 構図のCamera Pose送信直前に最新のAvatarBeacon basisを再取得し、撮影開始後の移動にも追従しやすくしました。
+- 自動撮影完了時に設定画面を開いている場合は結果画面へ切り替えず、編集中の未保存設定を保持するようにしました。
+- 自動撮影終了時はCamera LockとFlyingをOFFにし、待機カメラ位置への移動は任意かつ既定OFFにしました。
+- 撮影、Photoボタン、Spout sender復旧、Camera Mode復元などの待機時間をミリ秒単位で調整できるようにしました。
 - AvatarBeaconの `AvatarBeacon_v0.0.1.unitypackage` を通常利用者向けzipと分離版zipへ同梱するようにしました。
 - 設定画面に「OSC」タブを追加し、OSC送受信ポート、カメラOSCリセット、AvatarBeacon受信状態、player_local basis取得元をまとめました。
+- 設定画面を左側の縦ナビゲーションと右側の設定ペインへ変更し、「機能 ON/OFF」「縮小処理」「投稿処理」「撮影処理」「OSC」「その他」に整理しました。
+- 「自動撮影スケジュール」を「自動定期撮影」へ変更し、主スイッチと間隔設定を「機能 ON/OFF」へ移動しました。
 - VRChatから受信したOSC packetを別UDPポートへ転送できるようにし、他OSC受信アプリとのポート競合を避けやすくしました。
 - Stream Camera(Spout)取得の起動待ち、空フレーム待ち、PNG書き出し、失敗画像の隔離を改善し、Stream方式の撮影失敗を減らしました。
 - 自動撮影後にUser CameraのMode、Pose、Streaming、Zoom、Exposure、mask類などをできるだけ撮影前の状態へ戻すようにしました。

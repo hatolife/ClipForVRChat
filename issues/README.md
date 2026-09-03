@@ -44,8 +44,9 @@
 | 241 | [AvatarBeacon_mainとAvatarBeacon_12を追加しparameter pathをavatar_beacon配下へ変更する](241-add-avatarbeacon-main-and-12-prefabs-with-prefixed-parameters.md) | 要確認 | 未定 | AvatarBeaconのmain方式Prefabを通常版として追加し、12方式Prefabと `avatar_beacon/...` parameter pathへ移行する。 |
 | 284 | [実機確認を減らす自動検証基盤を追加する](284-add-automated-verification-infrastructure.md) | 要確認 | `v0.1.8-rc4` | C++/Frontend/OSC/実Wails GUIの自動検証を段階的にCIへ追加する。 |
 | 285 | [Webhook URL保存時の確認ダイアログ循環を防ぐ](285-prevent-repeated-settings-confirmation-dialogs.md) | 要確認 | `v0.1.8-rc5` | 重要設定確認と自動投稿確認を各1回に限定し、確認後の保存を完了させる。 |
-| 323 | [自動撮影中の設定保持・終了処理・定期撮影UI・待機時間調整を改善する](323-improve-autocapture-interaction-and-timing.md) | 要確認 | 未定 | 設定保持、Camera Lock/Flying解除、定期撮影UI移動、ms待機設定、構図ごとの最新basis反映を行う。 |
-| 324 | [設定画面を縦ナビゲーションとカテゴリ別ペインへ再設計する](324-redesign-settings-with-vertical-navigation.md) | 要確認 | 未定 | 横タブを左の縦ナビゲーションへ変え、縮小・投稿・撮影と補助設定を整理する。 |
+| 323 | [自動撮影中の設定保持・終了処理・定期撮影UI・待機時間調整を改善する](323-improve-autocapture-interaction-and-timing.md) | 要確認 | `v0.1.8-rc6` | 設定保持、Camera Lock/Flying解除、定期撮影UI移動、ms待機設定、構図ごとの最新basis反映を行う。 |
+| 324 | [設定画面を縦ナビゲーションとカテゴリ別ペインへ再設計する](324-redesign-settings-with-vertical-navigation.md) | 要確認 | `v0.1.8-rc6` | 横タブを左の縦ナビゲーションへ変え、縮小・投稿・撮影と補助設定を整理する。 |
+| 325 | [v0.1.8-rc6を公開して実機確認可能にする](325-release-v0.1.8-rc6.md) | 要対応 | `v0.1.8-rc6` | Release Notesと対象Issueを更新し、prereleaseと3種類の配布Assetを作成・確認する。 |
 
 ## 状態の意味
 

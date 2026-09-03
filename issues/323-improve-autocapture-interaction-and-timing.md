@@ -68,7 +68,7 @@
 
 - 2026-09-03: 自動撮影結果後の画面遷移を純粋関数へ分離し、設定画面では `settings` を維持するFrontendテストを追加した。
 - 2026-09-03: バッチ終了処理で、復元・任意の待機位置移動の後に `/usercamera/Lock=false`、`/usercamera/Flying=false` を送るOSCパケットテストを追加した。
-- 2026-09-03: 共通/構図別の安定待機、撮影前追加待機、Photoボタン解放、Stream再送、sender復旧、Camera Mode復元の待機時間をms単位で設定できるようにした。
+- 2026-09-03: 共通/構図別の安定待機、撮影前追加待機、Photoボタン解放、sender復旧、Camera Mode復元の待機時間をms単位で設定できるようにした。
 - 2026-09-03: Frontend test 11件、Frontend build、template literal検査、Vue runtime template検査、Wails API surface検査、`go test ./internal/appcore` は成功した。
 - 2026-09-03: コンテナでの `go test ./...` は、既存の `TestOSCForwarderSkipsWildcardLocalSelfTarget` がnetlink権限制限 `operation not permitted` で失敗したため、Windows CIで全体を再確認する。
 - 2026-09-03: VRChat公式OSCにはAnchor ModeのDefault/Local/Worldを直接選ぶendpointが公開されていない。公開済みのCamera Lock OFFで期待するアンカー解除になるか、Release成果物を使って実機確認する。
@@ -76,3 +76,4 @@
 - 2026-09-03: 1フレーム単位の連続basis再計算と「Spout録画フレーム数＝構図数」は、構図ごとにhelperを起動して1枚取得する現行構造を単一録画セッションへ変更する将来課題として残す。
 - 2026-09-03: GitHub Actions CI #290でFrontend 12テスト、production build、template/API検査、Windows Go全テスト、脆弱性検査、Spout build/CTest、Wails build、WebView2起動smokeが成功した。
 - 2026-09-03: PRレビューで、Camera自動起動を常時OFFへ正規化する現仕様では「Stream再送後待機」が到達不能と判明した。到達不能な操作を再有効化せず、誤解を招く設定項目とconfig fieldを削除した。
+- 2026-09-03: ユーザー合意により対応Releaseを `v0.1.8-rc6` とした。
