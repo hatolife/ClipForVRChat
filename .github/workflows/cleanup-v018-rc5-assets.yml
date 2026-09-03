@@ -1,0 +1,48 @@
+name: Cleanup v0.1.8-rc5 release assets
+
+on:
+  push:
+    branches:
+      - "release-cleanup/v0.1.8-rc5-assets"
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove prohibited standalone AvatarBeacon asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG_NAME: v0.1.8-rc5
+          AVATARBEACON_PACKAGE_NAME: AvatarBeacon_v0.0.1.unitypackage
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG_NAME" --json assets --jq '.assets[].name' | grep -Fxq "$AVATARBEACON_PACKAGE_NAME"; then
+            gh release delete-asset "$TAG_NAME" "$AVATARBEACON_PACKAGE_NAME" --yes
+          fi
+
+      - name: Verify public assets and bundled AvatarBeacon package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG_NAME: v0.1.8-rc5
+        run: |
+          set -euo pipefail
+          expected_assets=(
+            "ClipForVRChat-${TAG_NAME}-windows-amd64.exe.asc"
+            "ClipForVRChat-${TAG_NAME}-windows-amd64-separated.zip"
+            "ClipForVRChat-${TAG_NAME}-windows-amd64.zip"
+          )
+          mapfile -t actual_assets < <(gh release view "$TAG_NAME" --json assets --jq '.assets[].name' | sort)
+          if [[ "${actual_assets[*]}" != "${expected_assets[*]}" ]]; then
+            printf 'Expected assets:\n%s\n' "${expected_assets[*]}" >&2
+            printf 'Actual assets:\n%s\n' "${actual_assets[*]}" >&2
+            exit 1
+          fi
+          mkdir -p dist
+          gh release download "$TAG_NAME" --pattern "ClipForVRChat-${TAG_NAME}-windows-amd64.zip" --dir dist
+          unzip -Z1 "dist/ClipForVRChat-${TAG_NAME}-windows-amd64.zip" |
+            grep -Eq '(^|/)AvatarBeacon_v0\.0\.1\.unitypackage$'
