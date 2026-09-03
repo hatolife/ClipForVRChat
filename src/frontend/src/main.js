@@ -1,5 +1,6 @@
 import { createApp } from 'vue/dist/vue.esm-bundler.js'
 import './style.css'
+import { resumeAfterAutoPostConfirmation } from './settingsConfirmationFlow.js'
 
 const api = window.go?.main?.App
 
@@ -1061,11 +1062,19 @@ const vueApp = createApp({
     async confirmAutoPostSettings() {
       const action = this.pendingAutoPostConfirmation || 'save'
       this.pendingAutoPostConfirmation = null
-      if (action.startsWith('leave:')) {
-        await this.confirmSaveAndLeaveSettings(true, action.slice('leave:'.length) || 'home')
+      const resume = resumeAfterAutoPostConfirmation(action)
+      if (resume.target === 'leave') {
+        await this.confirmSaveAndLeaveSettings(
+          resume.skipAutoPostConfirmation,
+          resume.leaveAction,
+          resume.skipSensitiveSettingsConfirmation
+        )
         return
       }
-      await this.saveSettings(true)
+      await this.saveSettings(
+        resume.skipAutoPostConfirmation,
+        resume.skipSensitiveSettingsConfirmation
+      )
     },
     cancelAutoPostConfirmation() {
       this.logUserAction('button_click', 'cancel_auto_post_confirmation')
