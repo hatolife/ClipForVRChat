@@ -291,9 +291,8 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) (results []Result, err e
 	}
 	defer client.close()
 	streamStarted := false
-	if !ac.Capture.PreplacedLocalAnchorEnabled() {
-		defer r.finishUserCameraState(client)
-	} else if ac.Capture.PreplacedLocalAnchorEnabled() {
+	defer r.finishUserCameraState(client)
+	if ac.Capture.PreplacedLocalAnchorEnabled() {
 		diagAutoCapture(logPath, "camera restore skipped: preplaced_local_anchor=true")
 		if ac.Idle.Enabled {
 			diagAutoCapture(logPath, "idle camera skipped: preplaced_local_anchor=true")
@@ -389,13 +388,22 @@ func (r AutoCaptureRunner) RunOnce(ctx context.Context) (results []Result, err e
 }
 
 func (r AutoCaptureRunner) finishUserCameraState(client oscClient) {
-	if r.Config.AutoCapture.Restore.Enabled {
-		r.restoreUserCameraState(client)
-	} else {
-		diagAutoCapture(r.Config.DiagnosticLogPath, "camera restore skipped: enabled=false")
+	logPath := r.Config.DiagnosticLogPath
+	if !r.Config.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
+		if r.Config.AutoCapture.Restore.Enabled {
+			r.restoreUserCameraState(client)
+		} else {
+			diagAutoCapture(logPath, "camera restore skipped: enabled=false")
+		}
+		if err := r.applyIdleCameraState(client); err != nil {
+			diagAutoCapture(logPath, "idle camera apply error: err=%v", err)
+		}
 	}
-	if err := r.applyIdleCameraState(client); err != nil {
-		diagAutoCapture(r.Config.DiagnosticLogPath, "idle camera apply error: err=%v", err)
+	if err := r.sendUserCameraLock(client, "batch", false, "batch_finish"); err != nil {
+		diagAutoCapture(logPath, "camera lock disable error: err=%v", err)
+	}
+	if err := r.sendUserCameraFlying(client, "batch", false, "batch_finish"); err != nil {
+		diagAutoCapture(logPath, "camera flying disable error: err=%v", err)
 	}
 }
 
@@ -423,7 +431,7 @@ func (r AutoCaptureRunner) restoreUserCameraState(client oscClient) {
 	}
 	diagAutoCapture(
 		logPath,
-		"camera restore begin: prefer_snapshot=%t snapshot_values=%d fallback_values=%d target_values=%d mode=%s streaming=%s pose=%t snapshot=%q fallback=%q target=%q",
+		"camera restore begin: prefer_snapshot=%t snapshot_values=%d fallback_values=%d target_values=%d mode=%s streaming=%s pose=%t mode_delay_ms=%d snapshot=%q fallback=%q target=%q",
 		restore.PreferSnapshot,
 		countUserCameraStateValues(restore.Snapshot),
 		countUserCameraStateValues(userCameraFallbackState(restore.Fallback)),
@@ -431,6 +439,7 @@ func (r AutoCaptureRunner) restoreUserCameraState(client oscClient) {
 		modeSummary,
 		streamingSummary,
 		target.Pose != nil,
+		restore.ModeDelayMS,
 		formatUserCameraStateValues(restore.Snapshot),
 		formatUserCameraStateValues(userCameraFallbackState(restore.Fallback)),
 		formatUserCameraStateValues(target),
@@ -440,7 +449,9 @@ func (r AutoCaptureRunner) restoreUserCameraState(client oscClient) {
 	}
 	if target.Mode != nil {
 		sendRestoreInt(client, logPath, "/usercamera/Mode", *target.Mode)
-		time.Sleep(150 * time.Millisecond)
+		if restore.ModeDelayMS > 0 {
+			time.Sleep(time.Duration(restore.ModeDelayMS) * time.Millisecond)
+		}
 	}
 	if target.Pose != nil && shouldRestoreCameraParameters(target.Mode) {
 		pose := *target.Pose
@@ -935,6 +946,17 @@ func (r AutoCaptureRunner) sendUserCameraFlying(client oscClient, viewID string,
 	return nil
 }
 
+func (r AutoCaptureRunner) sendUserCameraLock(client oscClient, viewID string, value bool, detail string) error {
+	logPath := r.Config.DiagnosticLogPath
+	diagAutoCapture(logPath, "osc send begin: address=%q value=%t view_id=%q detail=%q", "/usercamera/Lock", value, viewID, detail)
+	if err := client.sendBool("/usercamera/Lock", value); err != nil {
+		diagAutoCapture(logPath, "osc send error: address=%q value=%t view_id=%q detail=%q err=%v", "/usercamera/Lock", value, viewID, detail, err)
+		return err
+	}
+	diagAutoCapture(logPath, "osc send success: address=%q value=%t view_id=%q detail=%q", "/usercamera/Lock", value, viewID, detail)
+	return nil
+}
+
 func (r AutoCaptureRunner) applyCameraViewAndOptions(client oscClient, view CameraViewConfig) error {
 	logPath := r.Config.DiagnosticLogPath
 	if r.Config.AutoCapture.Capture.PreplacedLocalAnchorEnabled() {
@@ -1064,11 +1086,12 @@ func (r AutoCaptureRunner) ensureStreamCameraForSpoutCapture(ctx context.Context
 		diagAutoCapture(logPath, "stream camera refresh error: address=%q view_id=%q err=%v", "/usercamera/Streaming", viewID, err)
 		return err
 	}
-	if !sleepContext(ctx, 500*time.Millisecond) {
+	refreshDelay := time.Duration(ac.Stream.RefreshDelayMS) * time.Millisecond
+	if !sleepContext(ctx, refreshDelay) {
 		diagAutoCapture(logPath, "stream camera refresh cancelled: view_id=%q err=%v", viewID, ctx.Err())
 		return ctx.Err()
 	}
-	diagAutoCapture(logPath, "stream camera refresh complete: view_id=%q wait_ms=%d", viewID, 500)
+	diagAutoCapture(logPath, "stream camera refresh complete: view_id=%q wait_ms=%d", viewID, ac.Stream.RefreshDelayMS)
 	return nil
 }
 
@@ -1090,13 +1113,21 @@ func (r AutoCaptureRunner) recoverEmptySpoutSenderList(ctx context.Context, clie
 		diagAutoCapture(logPath, "spout sender recovery skipped: senders=%d view_id=%q", len(list.Senders), viewID)
 		return nil
 	}
-	diagAutoCapture(logPath, "spout sender recovery begin: reason=%q view_id=%q", "empty_sender_list", viewID)
+	diagAutoCapture(
+		logPath,
+		"spout sender recovery begin: reason=%q view_id=%q on_wait_ms=%d off_wait_ms=%d restart_wait_ms=%d",
+		"empty_sender_list",
+		viewID,
+		ac.Stream.RecoveryOnDelayMS,
+		ac.Stream.RecoveryOffDelayMS,
+		ac.Stream.RecoveryRestartDelayMS,
+	)
 	if ac.Capture.OpenCameraBeforeBatch {
 		if err := sendCameraBoolCompat(client, logPath, "/usercamera/Streaming", false, "spout_sender_recovery_off:"+viewID); err != nil {
 			diagAutoCapture(logPath, "spout sender recovery error: phase=%q view_id=%q err=%v", "off", viewID, err)
 			return err
 		}
-		if !sleepContext(ctx, 300*time.Millisecond) {
+		if !sleepContext(ctx, time.Duration(ac.Stream.RecoveryOffDelayMS)*time.Millisecond) {
 			diagAutoCapture(logPath, "spout sender recovery cancelled: phase=%q view_id=%q err=%v", "off_wait", viewID, ctx.Err())
 			return ctx.Err()
 		}
@@ -1104,7 +1135,7 @@ func (r AutoCaptureRunner) recoverEmptySpoutSenderList(ctx context.Context, clie
 			diagAutoCapture(logPath, "spout sender recovery error: phase=%q view_id=%q err=%v", "on_after_off", viewID, err)
 			return err
 		}
-		if !sleepContext(ctx, 1200*time.Millisecond) {
+		if !sleepContext(ctx, time.Duration(ac.Stream.RecoveryRestartDelayMS)*time.Millisecond) {
 			diagAutoCapture(logPath, "spout sender recovery cancelled: phase=%q view_id=%q err=%v", "on_after_off_wait", viewID, ctx.Err())
 			return ctx.Err()
 		}
@@ -1120,7 +1151,7 @@ func (r AutoCaptureRunner) recoverEmptySpoutSenderList(ctx context.Context, clie
 		diagAutoCapture(logPath, "spout sender recovery error: phase=%q view_id=%q err=%v", "on", viewID, err)
 		return err
 	}
-	if !sleepContext(ctx, 800*time.Millisecond) {
+	if !sleepContext(ctx, time.Duration(ac.Stream.RecoveryOnDelayMS)*time.Millisecond) {
 		diagAutoCapture(logPath, "spout sender recovery cancelled: phase=%q view_id=%q err=%v", "on_wait", viewID, ctx.Err())
 		return ctx.Err()
 	}
@@ -1138,7 +1169,7 @@ func (r AutoCaptureRunner) recoverEmptySpoutSenderList(ctx context.Context, clie
 		diagAutoCapture(logPath, "spout sender recovery error: phase=%q view_id=%q err=%v", "off", viewID, err)
 		return err
 	}
-	if !sleepContext(ctx, 300*time.Millisecond) {
+	if !sleepContext(ctx, time.Duration(ac.Stream.RecoveryOffDelayMS)*time.Millisecond) {
 		diagAutoCapture(logPath, "spout sender recovery cancelled: phase=%q view_id=%q err=%v", "off_wait", viewID, ctx.Err())
 		return ctx.Err()
 	}
@@ -1146,7 +1177,7 @@ func (r AutoCaptureRunner) recoverEmptySpoutSenderList(ctx context.Context, clie
 		diagAutoCapture(logPath, "spout sender recovery error: phase=%q view_id=%q err=%v", "on_after_off", viewID, err)
 		return err
 	}
-	if !sleepContext(ctx, 1200*time.Millisecond) {
+	if !sleepContext(ctx, time.Duration(ac.Stream.RecoveryRestartDelayMS)*time.Millisecond) {
 		diagAutoCapture(logPath, "spout sender recovery cancelled: phase=%q view_id=%q err=%v", "on_after_off_wait", viewID, ctx.Err())
 		return ctx.Err()
 	}

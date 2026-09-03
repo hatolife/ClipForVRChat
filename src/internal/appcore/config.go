@@ -173,6 +173,10 @@ type AutoCaptureStreamConfig struct {
 	SpoutAutoSelect         bool   `json:"spoutAutoSelect"`
 	CaptureTimeoutMS        int    `json:"captureTimeoutMs"`
 	StartDelayMS            int    `json:"startDelayMs"`
+	RefreshDelayMS          int    `json:"refreshDelayMs"`
+	RecoveryOnDelayMS       int    `json:"recoveryOnDelayMs"`
+	RecoveryOffDelayMS      int    `json:"recoveryOffDelayMs"`
+	RecoveryRestartDelayMS  int    `json:"recoveryRestartDelayMs"`
 	DebugRecordingEnabled   bool   `json:"debugRecordingEnabled"`
 	DebugFrameCount         int    `json:"debugFrameCount"`
 	DebugRecordingDirectory string `json:"-"`
@@ -184,6 +188,7 @@ type AutoCaptureRestoreConfig struct {
 	Enabled              bool                                `json:"enabled"`
 	PreferSnapshot       bool                                `json:"preferSnapshot"`
 	SnapshotFreshnessSec int                                 `json:"snapshotFreshnessSec"`
+	ModeDelayMS          int                                 `json:"modeDelayMs"`
 	Fallback             AutoCaptureUserCameraFallbackConfig `json:"fallback"`
 	Snapshot             AutoCaptureUserCameraState          `json:"-"`
 }
@@ -408,11 +413,15 @@ func DefaultAutoCaptureConfig() AutoCaptureConfig {
 			ButtonReleaseDelayMS:            200,
 		},
 		Stream: AutoCaptureStreamConfig{
-			SpoutHelperPath:  "spout-capture.exe",
-			SpoutAutoSelect:  true,
-			CaptureTimeoutMS: 10000,
-			StartDelayMS:     1000,
-			DebugFrameCount:  8,
+			SpoutHelperPath:        "spout-capture.exe",
+			SpoutAutoSelect:        true,
+			CaptureTimeoutMS:       10000,
+			StartDelayMS:           1000,
+			RefreshDelayMS:         500,
+			RecoveryOnDelayMS:      800,
+			RecoveryOffDelayMS:     300,
+			RecoveryRestartDelayMS: 1200,
+			DebugFrameCount:        8,
 		},
 		Restore: defaultAutoCaptureRestoreConfig(),
 		Idle:    defaultAutoCaptureIdleConfig(),
@@ -590,11 +599,17 @@ func (c *AutoCaptureConfig) Normalize() {
 	if c.Capture.MultiBackend == "" {
 		c.Capture.MultiBackend = "dolly_multi"
 	}
-	if c.Capture.SettleDelayMS < 1500 {
-		c.Capture.SettleDelayMS = 1500
+	if c.Capture.SettleDelayMS < 0 {
+		c.Capture.SettleDelayMS = 0
 	}
-	if c.Capture.ButtonReleaseDelayMS < 200 {
-		c.Capture.ButtonReleaseDelayMS = 200
+	if c.Capture.SettleDelayMS > 30000 {
+		c.Capture.SettleDelayMS = 30000
+	}
+	if c.Capture.ButtonReleaseDelayMS < 1 {
+		c.Capture.ButtonReleaseDelayMS = 1
+	}
+	if c.Capture.ButtonReleaseDelayMS > 5000 {
+		c.Capture.ButtonReleaseDelayMS = 5000
 	}
 	c.Capture.OpenCameraBeforeBatch = false
 	c.Capture.CloseCameraAfterBatch = false
@@ -641,6 +656,10 @@ func (c *AutoCaptureConfig) Normalize() {
 	if c.Stream.StartDelayMS > 10000 {
 		c.Stream.StartDelayMS = 10000
 	}
+	c.Stream.RefreshDelayMS = clampWaitMilliseconds(c.Stream.RefreshDelayMS)
+	c.Stream.RecoveryOnDelayMS = clampWaitMilliseconds(c.Stream.RecoveryOnDelayMS)
+	c.Stream.RecoveryOffDelayMS = clampWaitMilliseconds(c.Stream.RecoveryOffDelayMS)
+	c.Stream.RecoveryRestartDelayMS = clampWaitMilliseconds(c.Stream.RecoveryRestartDelayMS)
 	if c.Stream.DebugFrameCount <= 0 {
 		c.Stream.DebugFrameCount = 8
 	}
@@ -735,6 +754,7 @@ func defaultAutoCaptureRestoreConfig() AutoCaptureRestoreConfig {
 		Enabled:              true,
 		PreferSnapshot:       true,
 		SnapshotFreshnessSec: 10,
+		ModeDelayMS:          150,
 		Fallback:             defaultAutoCaptureUserCameraFallbackConfig(),
 	}
 }
@@ -823,6 +843,7 @@ func (c *AutoCaptureRestoreConfig) Normalize() {
 	if c.SnapshotFreshnessSec > 300 {
 		c.SnapshotFreshnessSec = 300
 	}
+	c.ModeDelayMS = clampWaitMilliseconds(c.ModeDelayMS)
 	c.Fallback.Normalize()
 }
 
@@ -830,6 +851,7 @@ func (c AutoCaptureRestoreConfig) isZero() bool {
 	return !c.Enabled &&
 		!c.PreferSnapshot &&
 		c.SnapshotFreshnessSec == 0 &&
+		c.ModeDelayMS == 0 &&
 		c.Fallback.isZero()
 }
 
@@ -900,6 +922,16 @@ func (c AutoCaptureUserCameraFallbackConfig) isZero() bool {
 func clampFiniteDefault(value float64, min float64, max float64, fallback float64) float64 {
 	if !isFiniteFloat64(value) || value < min || value > max {
 		return fallback
+	}
+	return value
+}
+
+func clampWaitMilliseconds(value int) int {
+	if value < 0 {
+		return 0
+	}
+	if value > 30000 {
+		return 30000
 	}
 	return value
 }
@@ -987,11 +1019,17 @@ func (v *CameraViewConfig) Normalize(index int) {
 	default:
 		v.CoordinateSpace = "world"
 	}
-	if v.SettleDelayMS < 1500 {
-		v.SettleDelayMS = 1500
+	if v.SettleDelayMS < 0 {
+		v.SettleDelayMS = 0
+	}
+	if v.SettleDelayMS > 30000 {
+		v.SettleDelayMS = 30000
 	}
 	if v.CaptureDelayMS < 0 {
 		v.CaptureDelayMS = 0
+	}
+	if v.CaptureDelayMS > 30000 {
+		v.CaptureDelayMS = 30000
 	}
 	v.Pose = roundCameraPoseConfig(v.Pose, 3)
 	if v.Zoom != nil {
@@ -1120,7 +1158,7 @@ func defaultCameraView(id string, name string, order int, coordinateSpace string
 		LocalPlayer:     boolConfigPtr(true),
 		RemotePlayer:    boolConfigPtr(true),
 		Environment:     boolConfigPtr(true),
-		SettleDelayMS:   1500,
+		SettleDelayMS:   0,
 		CaptureDelayMS:  0,
 		Calibrated:      false,
 	}
