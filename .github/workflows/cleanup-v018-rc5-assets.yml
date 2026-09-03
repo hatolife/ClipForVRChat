@@ -32,8 +32,8 @@ jobs:
         run: |
           set -euo pipefail
           expected_assets=(
-            "ClipForVRChat-${TAG_NAME}-windows-amd64.exe.asc"
             "ClipForVRChat-${TAG_NAME}-windows-amd64-separated.zip"
+            "ClipForVRChat-${TAG_NAME}-windows-amd64.exe.asc"
             "ClipForVRChat-${TAG_NAME}-windows-amd64.zip"
           )
           mapfile -t actual_assets < <(gh release view "$TAG_NAME" --json assets --jq '.assets[].name' | sort)
