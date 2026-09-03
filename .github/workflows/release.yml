@@ -747,7 +747,6 @@ jobs:
             dist/${{ needs.build.outputs.asset_prefix }}-windows-amd64.exe.asc
             dist/${{ needs.build.outputs.asset_prefix }}-windows-amd64.zip
             dist/${{ needs.build.outputs.asset_prefix }}-windows-amd64-separated.zip
-            dist/${{ env.AVATARBEACON_PACKAGE_NAME }}
             dist/release-body.md
           if-no-files-found: error
 
@@ -772,7 +771,6 @@ jobs:
           TAG_NAME: ${{ needs.build.outputs.tag_name }}
           DRAFT: ${{ needs.build.outputs.draft }}
           PRERELEASE: ${{ needs.build.outputs.prerelease }}
-          AVATARBEACON_PACKAGE_NAME: ${{ env.AVATARBEACON_PACKAGE_NAME }}
         run: |
           set -euo pipefail
           args=(
@@ -794,7 +792,6 @@ jobs:
             "ClipForVRChat-${TAG_NAME}-windows-amd64.zip"
             "ClipForVRChat-${TAG_NAME}-windows-amd64.exe.asc"
             "ClipForVRChat-${TAG_NAME}-windows-amd64-separated.zip"
-            "$AVATARBEACON_PACKAGE_NAME"
           )
           mapfile -t existing_assets < <(gh release view "$TAG_NAME" --json assets --jq '.assets[].name')
           for asset in "${existing_assets[@]}"; do
@@ -812,5 +809,4 @@ jobs:
           gh release upload "$TAG_NAME" --clobber \
             "dist/ClipForVRChat-${TAG_NAME}-windows-amd64.zip" \
             "dist/ClipForVRChat-${TAG_NAME}-windows-amd64.exe.asc" \
-            "dist/ClipForVRChat-${TAG_NAME}-windows-amd64-separated.zip" \
-            "dist/${AVATARBEACON_PACKAGE_NAME}"
+            "dist/ClipForVRChat-${TAG_NAME}-windows-amd64-separated.zip"

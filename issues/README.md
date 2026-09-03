@@ -43,7 +43,7 @@
 | 208 | [自動撮影説明を改善し、カメラ自動起動/終了を既定OFFにする](208-improve-auto-capture-help-and-disable-camera-auto-open-close.md) | 要確認 | `v0.1.8` | 自動撮影説明とAvatarBeacon状態表示を整理し、Camera OSCの不安定さを避けるためカメラ自動起動/終了を設定化して既定OFFにする。 |
 | 241 | [AvatarBeacon_mainとAvatarBeacon_12を追加しparameter pathをavatar_beacon配下へ変更する](241-add-avatarbeacon-main-and-12-prefabs-with-prefixed-parameters.md) | 要確認 | 未定 | AvatarBeaconのmain方式Prefabを通常版として追加し、12方式Prefabと `avatar_beacon/...` parameter pathへ移行する。 |
 | 284 | [実機確認を減らす自動検証基盤を追加する](284-add-automated-verification-infrastructure.md) | 要確認 | `v0.1.8-rc4` | C++/Frontend/OSC/実Wails GUIの自動検証を段階的にCIへ追加する。 |
-| 285 | [Webhook URL保存時の確認ダイアログ循環を防ぐ](285-prevent-repeated-settings-confirmation-dialogs.md) | 要対応 | `v0.1.8-rc5` | 重要設定確認と自動投稿確認を各1回に限定し、確認後の保存を完了させる。 |
+| 285 | [Webhook URL保存時の確認ダイアログ循環を防ぐ](285-prevent-repeated-settings-confirmation-dialogs.md) | 要確認 | `v0.1.8-rc5` | 重要設定確認と自動投稿確認を各1回に限定し、確認後の保存を完了させる。 |
 
 ## 状態の意味
 
