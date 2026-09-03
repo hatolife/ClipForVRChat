@@ -68,6 +68,8 @@
 - GitHub Actions run #15: DevTools endpoint smokeをblocking化した結果、同じtimeoutをCI失敗として検出した。CDP endpointの有無をGUI起動成否と同一視せず、アプリ自身のlifecycle診断ログでDOM ready、Frontend script読込、初期Wails API完了を検証する方式へ変更する。
 - GitHub Actions run #17: lifecycle診断ログ方式でもログ生成前にtimeoutした。GitHub-hosted Windows runnerが管理者権限で動き、通常版の管理者起動拒否ダイアログでWails開始前に待機するため、配布版には含まれない `ciguismoke` build tagで作るCI専用exeをsmoke対象にする。
 - GitHub Actions run #19: Documentation checksとWindows build jobが成功。Frontend test/build/static check、`npm audit`、`go test ./...`、`govulncheck`、Spout helper build、CTest、埋め込みhelper抽出、Wails build、blocking GUI lifecycle smokeがすべて成功した。
+- 元リポジトリのGitHub Actions CI #259、PR #11のCI #261、`develop` マージ後のCI #262が成功した。
+- GitHub Actions Release #117が成功し、`v0.1.8-rc4` pre-releaseへ通常zip、exe署名、分離版zip、AvatarBeacon packageの4 Assetを公開した。
 
 ## 残件
 
