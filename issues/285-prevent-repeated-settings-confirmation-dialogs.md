@@ -29,8 +29,8 @@ Webhook URL変更は両方の確認対象になるが、各確認は1回だけ�
 - [x] 保存後の画面移動でも確認済み状態を引き継ぐ。
 - [x] 確認再開時に両確認を完了済みとして扱うことを自動テストする。
 - [x] Frontend test、template検査、Wails API surface検査が成功する。
-- [ ] Frontend buildが成功する。
-- [ ] Windows CIが成功する。
+- [x] Frontend buildが成功する。
+- [x] Windows CIが成功する。
 
 ## 確認
 
@@ -38,3 +38,4 @@ Webhook URL変更は両方の確認対象になるが、各確認は1回だけ�
 - ローカル: Frontend template literal check成功。
 - ローカル: Wails API surface check成功。
 - ローカル: Vite依存が未展開のためFrontend buildは未実施。GitHub Actionsの `npm ci` 後に確認する。
+- GitHub Actions CI #268: Frontend test/build、Goテスト、Spout CTest、Wails build、GUI lifecycle smokeを含めて成功。
