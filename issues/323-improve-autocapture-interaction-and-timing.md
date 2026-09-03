@@ -62,7 +62,7 @@
 - [x] 撮影・Stream復旧・復元の主要待機時間をms単位で設定できる。
 - [x] 設定の既定値・正規化・処理適用を自動テストする。
 - [x] 複数構図の各Pose送信直前に最新AvatarBeacon basisを再取得する。
-- [ ] Frontend test、template検査、Wails API surface検査、Go test、Windows CIが成功する。
+- [x] Frontend test、template検査、Wails API surface検査、Go test、Windows CIが成功する。
 
 ## 実装・確認記録
 
@@ -74,3 +74,4 @@
 - 2026-09-03: VRChat公式OSCにはAnchor ModeのDefault/Local/Worldを直接選ぶendpointが公開されていない。公開済みのCamera Lock OFFで期待するアンカー解除になるか、Release成果物を使って実機確認する。
 - 2026-09-03: 従来はバッチ開始前の `prepareAutoCaptureConfigForRunLocked` で取得したAvatarBeacon basisを全構図で使っていた。各 `player_local` 構図のPose送信直前にcallbackで最新basisを再取得するよう変更し、2回のPose送信がそれぞれ異なる最新basisを使うテストを追加した。
 - 2026-09-03: 1フレーム単位の連続basis再計算と「Spout録画フレーム数＝構図数」は、構図ごとにhelperを起動して1枚取得する現行構造を単一録画セッションへ変更する将来課題として残す。
+- 2026-09-03: GitHub Actions CI #290でFrontend 12テスト、production build、template/API検査、Windows Go全テスト、脆弱性検査、Spout build/CTest、Wails build、WebView2起動smokeが成功した。

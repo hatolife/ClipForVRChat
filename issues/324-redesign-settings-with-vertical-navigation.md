@@ -41,7 +41,7 @@
 - [x] 主要カテゴリと詳細・その他カテゴリを視覚的に分ける。
 - [x] active状態、未保存カテゴリ表示、キーボード操作用のtab semanticsを維持する。
 - [x] 自動撮影詳細画面とレスポンシブ表示が崩れない。
-- [ ] Frontend build、template検査、Wails API surface検査、Windows CIが成功する。
+- [x] Frontend build、template検査、Wails API surface検査、Windows CIが成功する。
 
 ## 実装・確認記録
 
@@ -49,3 +49,4 @@
 - 2026-09-03: 左ナビゲーションを「主要カテゴリ」と「詳細・その他」に分け、選択中は青、未保存変更ありは黄の左ボーダーで表示する。
 - 2026-09-03: 自動撮影詳細画面でも左ナビゲーションを残し、別カテゴリ選択時に詳細状態を閉じる既存処理を利用する。
 - 2026-09-03: Navigation定義のFrontendテスト、Frontend build、template literal検査、Vue runtime template検査、Wails API surface検査は成功した。Windows CIはPRで確認する。
+- 2026-09-03: GitHub Actions CI #290でWindows上のFrontend build、template/API検査、Wails build、WebView2起動smokeを含む全jobが成功した。
